@@ -136,3 +136,13 @@ SELECT cluster_id, name1, other_cluster_id, name2, avg_similarity
 FROM pair_scores
 ORDER BY 5 DESC
 LIMIT sqlc.arg('limit');
+
+-- name: ListManualFaceAssignmentsForAsset :many
+-- A user's manual person assignments on an Asset's faces, with the face box,
+-- captured before a re-detection replaces the faces.
+SELECT m.cluster_id, f.bounding_box
+FROM face_cluster_members m
+JOIN face_items f ON f.id = m.face_id
+WHERE f.asset_id = sqlc.arg(asset_id)
+  AND m.is_manual = 1
+ORDER BY m.cluster_id, f.id;

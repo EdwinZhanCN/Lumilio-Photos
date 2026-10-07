@@ -292,11 +292,6 @@ jobs:
                   # was already a no-op for the same reason).
                   run-install: false
 
-            - name: Authenticate GitHub Packages
-              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
             - name: Install generators
               run: |
                   task tools:install
@@ -366,13 +361,6 @@ jobs:
                   # newer vp fails there with an npm ENOENT (root-level caching
                   # was already a no-op for the same reason).
                   run-install: false
-
-            # @edwinzhancn/docts lives on GitHub Packages, which requires a
-            # token even for public packages (web/.npmrc maps the scope).
-            - name: Authenticate GitHub Packages
-              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
               run: task web:install:ci
@@ -493,9 +481,7 @@ jobs:
                       server/go.sum
 
             # `task ci:desktop:panel` builds the React control panel first,
-            # which needs `vp`. The panel's dependencies are all public, so it
-            # needs no GitHub Packages token, and `frontend:install:ci` runs
-            # `vp install` itself.
+            # which needs `vp`. `frontend:install:ci` runs `vp install` itself.
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'

@@ -29,7 +29,7 @@ flowchart TB
     n_runtime -->|"5"| n_http
     n_service -->|"1"| n_agent
     n_service -->|"2"| n_storage
-    n_storage -->|"2"| n_domain
+    n_storage -->|"3"| n_domain
     n_work -->|"1"| n_catalog
     linkStyle 2 stroke:#d9480f,stroke-width:1.5px
     classDef external stroke-dasharray:4 3
@@ -100,7 +100,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `service` → `storage`: 2 package import(s), declared
 - `service` → `work`: 1 package import(s), declared
 - `storage` → `catalog`: 9 package import(s), declared
-- `storage` → `domain`: 2 package import(s), declared
+- `storage` → `domain`: 3 package import(s), declared
 - `storage` → `foundation`: 6 package import(s), declared
 - `storage` → `media`: 3 package import(s), declared
 - `work` → `catalog`: 1 package import(s), declared

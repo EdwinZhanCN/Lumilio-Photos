@@ -57,8 +57,8 @@ flowchart LR
 | User in a browser |  | `ext:User` |
 | Web SPA (React) | Served by the Server; typed against the generated OpenAPI client. | `mod:web/src/app` |
 | Desktop App (tray + Settings) | Supervises one in-process Server generation; the product UI stays in the browser. | `go:desktop/internal/runtime.Controller` [`desktop/internal/runtime/controller.go:156`](../../../../desktop/internal/runtime/controller.go#L156) |
-| TOML manifest | Complete, schema-versioned, runtime-immutable configuration. | `go:config.LoadAppConfig` [`server/config/config.go:385`](../../../../server/config/config.go#L385) |
-| HTTP API + SPA | Auth, origin, setup, and rate-limit boundaries; RFC 9457 Problems. | `go:api.NewRouter` [`server/internal/api/router.go:367`](../../../../server/internal/api/router.go#L367) |
+| TOML manifest | Complete, schema-versioned, runtime-immutable configuration. | `go:config.LoadAppConfig` [`server/config/config.go:398`](../../../../server/config/config.go#L398) |
+| HTTP API + SPA | Auth, origin, setup, and rate-limit boundaries; RFC 9457 Problems. | `go:api.NewRouter` [`server/internal/api/router.go:374`](../../../../server/internal/api/router.go#L374) |
 | Services |  | `mod:server/internal/service` [`server/internal/service/doc.go`](../../../../server/internal/service/doc.go) |
 | Scheduler, River workers, commit coordinator |  | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
 | server/app.Run | The only composition root; owns startup and graceful shutdown. | `go:server/app.Run` [`server/app/app.go:101`](../../../../server/app/app.go#L101) |

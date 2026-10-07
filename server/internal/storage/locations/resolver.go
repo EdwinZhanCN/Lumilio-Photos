@@ -104,7 +104,7 @@ func (r *Resolver) OpenAsset(ctx context.Context, assetID uuid.UUID) (*OpenedMed
 		return &OpenedMedia{File: file, Repository: repositoryFS, Catalog: repository, Entry: entry, Path: repositoryPath}, nil
 	}
 	if unavailable != nil {
-		return nil, fmt.Errorf("%w: %v", ErrAssetUnavailable, unavailable)
+		return nil, fmt.Errorf("%w: %w", ErrAssetUnavailable, unavailable)
 	}
 	return nil, ErrAssetUnavailable
 }

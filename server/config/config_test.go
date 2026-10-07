@@ -42,6 +42,8 @@ backups_path = "data/app-state/backups"
 [repository_scan]
 interval_seconds = 300
 settle_seconds = 5
+[repository_trash]
+retention_days = 30
 [auth]
 secret_key_file = "data/app-state/secrets/key"
 access_token_ttl = "15m"

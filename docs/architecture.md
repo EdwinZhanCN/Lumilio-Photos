@@ -78,14 +78,19 @@ by a gate or test where one is named.
 - **Foreground reads never write.** Bootstrap, setup, status, and storage read
   models derive their answer through query-only readers; an HTTP read never
   triggers reconciliation or expiry merely to render current state.
-- **Originals are never rewritten, and only users delete.** A scan, watcher, or
-  cloud sync never unlinks, trashes, or purges. An Asset exists exactly while
+- **Originals are never rewritten; deletion follows explicit lifecycle policy.**
+  A scan, watcher, or cloud sync never unlinks, trashes, or purges. An Asset exists exactly while
   it has a repository entry; `lifecycle.PurgeEntriesTx` is the only Asset
-  delete (`task architecture:check`). Atlas:
+  hard-delete boundary, also used by repository removal (`task architecture:check`).
+  User Delete moves files into repository Trash; configured retention authorizes
+  expiry. Atlas:
   [Asset lifecycle](atlas/generated/lifecycle/asset-lifecycle.md).
 - **Owner scope is explicit.** `owner_id` is the only hard partition;
   repositories are unowned shared storage. Owner-scoped topology (Events)
   always carries its resolved owner into downstream queries.
+- **Events contain photos and videos only.** Audio belongs in Music and never
+  influences Event segmentation, membership, counts, covers, or shares. See
+  [Event semantics](../server/internal/event/doc.go).
 - **ML and LLM are optional.** Media management, browsing, and non-semantic
   search keep working when Lumen or an LLM provider is absent or failing.
 - **The Desktop App supervises, it does not reimplement.** It runs
@@ -133,3 +138,16 @@ by a gate or test where one is named.
   enforces one Asset per owner/content pair, which may have any number of
   present entries. Revisioned outbox consumers are leased, bounded,
   at-least-once, and idempotent.
+- Entry triggers derive Asset lifecycle: present or bound pending-hash wins as
+  active, then missing, then trashed. Offline is availability only; Missing and
+  Trash retain readable metadata. See [lifecycle](../server/internal/lifecycle/doc.go).
+- Delete preflights the whole selection before journaled, non-overwriting moves
+  into repository Trash. Restore keeps identity and metadata and chooses a free
+  sibling name. Startup recovery and hourly recovery, sidecar rebuild, and
+  expiry use required `repository_trash.retention_days` (generated configs: 30).
+  See [Trash](../server/internal/storage/trash/doc.go).
+- Permanent delete unlinks trashed files before purging entries; Remove missing
+  items touches no files. An Asset and its metadata disappear only after its
+  last entry is gone. Explicit irreversible API actions require `confirm: true`;
+  Repository-wide actions require an administrator. See
+  [HTTP lifecycle boundaries](../server/internal/api/handler/doc.go).

@@ -17,7 +17,6 @@
   },
   "asset-lifecycle": {
     "go:lifecycle.PurgeEntriesTx": "03f82d9d4b87ee95",
-    "go:lifecycle.PurgeRepositoryEntriesTx": "d5dc64e783d74cc6",
     "go:lifecycle.StateActive": "9cc0527e2a177be7",
     "go:lifecycle.StateMissing": "ae795571afadd83f",
     "go:lifecycle.StateTrashed": "9e264c34ca88bcc2",
@@ -93,7 +92,7 @@
     "go:search.FuseSet": "646c4391b1acb2da",
     "go:search.HydrateAssets": "d3451ea9b9a7969e",
     "go:search.NewPlaceRetriever": "095fd30ebf2c076a",
-    "go:service.AssetService": "e62e9a6bb469779f",
+    "go:service.AssetService": "102bab6bf30c44b1",
     "go:service.AssetService.SearchAssets": "452022f9346b1198",
     "go:service.LumenService": "4d2efa8e41ea1092",
     "go:service.LumenService.SemanticTextEmbed": "f97221087c8f1675",
@@ -133,7 +132,7 @@
     "ts:useLoginFlow": "237aa3a36d631275"
   },
   "system-context": {
-    "go:api.NewRouter": "91f80a616c8cf280",
+    "go:api.NewRouter": "6499b8c16f441e34",
     "go:api.RegisterSPA": "acbd734046d4f776",
     "go:bleveocr.Index": "86f49a74107230c4",
     "go:bleveocr.Writer": "f1ae366249a2c8d7",
@@ -163,7 +162,7 @@
   "upload-to-catalog": {
     "go:commit.Coordinator": "ee857ece1bceae17",
     "go:commit.Coordinator.ApplyIngestReceipt": "b54f92b3a7236756",
-    "go:handler.AssetHandler": "dc2a6a9d091c2468",
+    "go:handler.AssetHandler": "7a7a1bc851fa2d11",
     "go:handler.AssetHandler.PrecheckUpload": "916bdb10163993be",
     "go:handler.AssetHandler.StreamUploadOperationStatus": "324fed9fc28901f0",
     "go:handler.AssetHandler.enqueueStagingCommit": "2ba49c13279118b5",

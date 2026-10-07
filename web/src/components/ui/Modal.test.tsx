@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { userEvent } from "vitest/browser";
+import { userEvent } from "vite-plus/test/browser";
 import { renderWithProviders } from "@test/render";
 import { Modal } from "./Modal";
 

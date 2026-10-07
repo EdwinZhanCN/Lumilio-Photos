@@ -639,6 +639,8 @@ func run(
 	if err := assetTrash.Recover(ctx); err != nil {
 		appLogger.Warn("interrupted trash operations wait for their repositories", zap.Error(err))
 	}
+	go runTrashMaintenanceLoop(ctx, assetTrash,
+		time.Duration(appConfig.RepositoryTrash.RetentionDays)*24*time.Hour, appLogger.Named("trash"))
 	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {
 		return err
 	}
@@ -788,6 +790,7 @@ func run(
 
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, sqlDB, database.Writer, repoManager, stagingManager, settingsService, lumenService, repositoryFiles)
+	assetController.SetTrashRetentionDays(appConfig.RepositoryTrash.RetentionDays)
 	assetController.SetReaderDatabase(database.ReaderSQL)
 	assetController.SetLocationResolver(assetLocationResolver)
 	assetController.StartCleanupTasks(ctx)
@@ -816,7 +819,7 @@ func run(
 	cloudController := handler.NewCloudHandler(cloudSyncService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
 	repositoryScanController.SetBootstrapService(bootstrapService)
-	storageController := handler.NewStorageHandler(repoManager, queries, repositoryScanner)
+	storageController := handler.NewStorageHandler(repoManager, database.ReaderQueries, repositoryScanner)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)

@@ -840,6 +840,36 @@ func checkRepositoryPathArchitecture(root string) error {
 }
 
 func checkUserFacingTerminology(root string) error {
+	for _, locale := range []string{"en", "zh"} {
+		catalog, err := readJSONCatalog(filepath.Join(root, "web/src/locales", locale, "translation.json"))
+		if err != nil {
+			return err
+		}
+		for _, term := range []struct{ key, en, zh string }{
+			{"assets.lifecycle.missing", "Missing", "缺失"},
+			{"assets.trash.title", "Trash", "回收站"},
+			{"assets.lifecycle.deletePermanently", "Delete permanently", "永久删除"},
+			{"assets.lifecycle.removeMissing", "Remove missing items", "移除缺失项"},
+		} {
+			var value any = catalog
+			for _, part := range strings.Split(term.key, ".") {
+				object, ok := value.(map[string]any)
+				if !ok {
+					value = nil
+					break
+				}
+				value = object[part]
+			}
+			expected := term.en
+			if locale == "zh" {
+				expected = term.zh
+			}
+			if value != expected {
+				return fmt.Errorf("canonical lifecycle term %s (%s): got %v, want %s", term.key, locale, value, expected)
+			}
+		}
+	}
+
 	paths := []string{
 		"README.md", "README.en.md",
 		"web/src", "desktop/frontend/src",

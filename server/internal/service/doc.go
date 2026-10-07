@@ -30,5 +30,14 @@
 // administrator-only GET /api/v1/admin/lumen/runtime adds bounded per-node
 // diagnostics; neither returns raw TXT metadata or resolver errors.
 //
+// Metadata re-extraction preserves descriptions marked description_edited,
+// including an empty user edit; otherwise captions follow the file. See
+// preserveSpecificMetadataDescription. On any face re-detection, including a
+// model upgrade, captureManualFaceAssignments runs before old faces are
+// removed. reapplyManualFaceAssignments matches positive overlaps in descending
+// IoU order, with each face and assignment used at most once: IoU >= 0.5 stays
+// manual; smaller positive overlap becomes an unconfirmed automatic member.
+// Empty people are dissolved only after assignments are reapplied.
+//
 //atlas:group service
 package service

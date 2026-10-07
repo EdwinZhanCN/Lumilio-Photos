@@ -146,11 +146,12 @@ UPDATE assets
 SET rating = (SELECT source.rating FROM assets source WHERE source.asset_id = sqlc.arg(source_asset_id)),
     liked = (SELECT source.liked FROM assets source WHERE source.asset_id = sqlc.arg(source_asset_id)),
     specific_metadata = COALESCE((
-        SELECT json_set(COALESCE(assets.specific_metadata, '{}'), '$.description',
-                        json_extract(source.specific_metadata, '$.description'))
+        SELECT json_set(COALESCE(assets.specific_metadata, '{}'),
+                        '$.description', json_extract(source.specific_metadata, '$.description'),
+                        '$.description_edited', json('true'))
         FROM assets source
         WHERE source.asset_id = sqlc.arg(source_asset_id)
-          AND json_extract(source.specific_metadata, '$.description') IS NOT NULL
+          AND json_extract(source.specific_metadata, '$.description_edited') = 1
     ), specific_metadata)
 WHERE assets.asset_id = sqlc.arg(target_asset_id);
 
@@ -351,3 +352,45 @@ SELECT * FROM repository_entries
 WHERE asset_id IN (sqlc.slice('asset_ids'))
   AND state = 'trashed'
 ORDER BY asset_id, repository_id, path;
+
+-- name: ListExpiredTrashedRepositoryEntries :many
+-- Trashed files of one repository past their retention, oldest first.
+SELECT * FROM repository_entries
+WHERE repository_id = sqlc.arg(repository_id)
+  AND state = 'trashed'
+  AND trashed_at < sqlc.arg(cutoff)
+ORDER BY trashed_at, entry_id
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListMissingRepositoryEntriesForAssets :many
+SELECT * FROM repository_entries
+WHERE asset_id IN (sqlc.slice('asset_ids'))
+  AND state = 'missing'
+ORDER BY asset_id, repository_id, path;
+
+-- name: ListMissingRepositoryEntries :many
+-- Missing files of one repository, for "Remove missing items".
+SELECT * FROM repository_entries
+WHERE repository_id = sqlc.arg(repository_id)
+  AND state = 'missing'
+  AND kind = 'file'
+ORDER BY entry_id
+LIMIT sqlc.arg(row_limit);
+
+-- name: CountRepositoryEntriesWithTrashID :one
+SELECT count(*) FROM repository_entries
+WHERE trash_id = sqlc.arg(trash_id);
+
+-- name: CountRepositoryLifecycle :one
+SELECT COUNT(DISTINCT CASE WHEN a.lifecycle_state = 'missing' AND e.state = 'missing' THEN e.asset_id END) AS missing_count,
+       COUNT(CASE WHEN e.state = 'trashed' THEN 1 END) AS trash_count,
+       CAST(COALESCE(SUM(CASE WHEN e.state = 'trashed' THEN e.size ELSE 0 END), 0) AS INTEGER) AS trash_bytes
+FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.repository_id = sqlc.arg(repository_id);
+
+-- name: ListScopedTrashedRepositoryEntries :many
+SELECT e.* FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.state = 'trashed'
+  AND (sqlc.narg(repository_id) IS NULL OR e.repository_id = sqlc.narg(repository_id))
+  AND (sqlc.narg(owner_id) IS NULL OR a.owner_id = sqlc.narg(owner_id))
+ORDER BY e.entry_id LIMIT sqlc.arg(row_limit);

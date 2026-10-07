@@ -111,12 +111,18 @@ func (c *Cleaner) references(ctx context.Context, repository repo.Repository) (m
 		return nil, err
 	}
 
+	// A transcode is kept while its Asset exists with an entry in this
+	// repository, active, missing, or trashed: a restored or returning file
+	// needs no re-transcode. PurgeEntries deletes the Asset, and with it the
+	// reference.
 	transcodes, err := c.database.ReaderSQL.QueryContext(ctx, `
 		SELECT DISTINCT a.content_id, state.pipeline_version, a.type
 		FROM asset_pipeline_state state
 		JOIN assets a ON a.asset_id = state.asset_id
-		JOIN active_asset_occurrences occurrence ON occurrence.asset_id = a.asset_id
-		WHERE occurrence.repository_id = ?
+		WHERE EXISTS (
+			SELECT 1 FROM repository_entries entry
+			WHERE entry.asset_id = a.asset_id AND entry.repository_id = ?
+		  )
 		  AND state.stage = 'transcode'
 		  AND state.applied_version = state.desired_version
 		  AND state.terminal_error IS NULL`, repository.RepoID.String())

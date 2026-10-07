@@ -25,5 +25,13 @@
 // materialize immutable snapshots of displayable Assets, and automatic
 // membership uses no ML signal.
 //
+// Events contain only photo/video logical media, including Live Photos;
+// audio belongs in Music. Audio never seeds or bridges segmentation and cannot
+// be manually added. Resolution excludes it from membership, counts, covers,
+// Browse Scope, navigation, and share snapshots. Rebuild discards audio
+// memberships, cover overrides, and constraints with audio endpoints while
+// preserving eligible corrections; stale audio-only Events retire. See
+// .agents/decisions/2026-10-06-audio-event-participation.md.
+//
 //atlas:group domain
 package event

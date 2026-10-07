@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import en from "@/locales/en/translation.json";
 import zh from "@/locales/zh/translation.json";
 
@@ -9,6 +9,16 @@ function translationValues(value: unknown): string[] {
 }
 
 describe("canonical product terminology", () => {
+  it("keeps Asset lifecycle terms canonical", () => {
+    expect(en.assets.lifecycle.missing).toBe("Missing");
+    expect(zh.assets.lifecycle.missing).toBe("缺失");
+    expect(en.assets.trash.title).toBe("Trash");
+    expect(zh.assets.trash.title).toBe("回收站");
+    expect(en.assets.lifecycle.deletePermanently).toBe("Delete permanently");
+    expect(zh.assets.lifecycle.deletePermanently).toBe("永久删除");
+    expect(en.assets.lifecycle.removeMissing).toBe("Remove missing items");
+    expect(zh.assets.lifecycle.removeMissing).toBe("移除缺失项");
+  });
   it("does not expose Library as a Repository synonym", () => {
     const violations = translationValues(en).filter((value) => /\blibrar(?:y|ies)\b/i.test(value));
     expect(violations).toEqual([]);

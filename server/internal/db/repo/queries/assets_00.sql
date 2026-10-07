@@ -338,11 +338,15 @@ SET rating = sqlc.arg('rating'),
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: UpdateAssetDescription :exec
+-- A user edit marks the description, so re-extracted metadata never
+-- overwrites it while an extracted caption keeps following the file.
 UPDATE assets
 SET specific_metadata = json_set(
     COALESCE(specific_metadata, '{}'),
     char(36) || '.description',
-    sqlc.arg('description')
+    sqlc.arg('description'),
+    char(36) || '.description_edited',
+    json('true')
 )
 WHERE asset_id = sqlc.arg('asset_id');
 

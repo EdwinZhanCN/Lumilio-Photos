@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 	"sync"
@@ -64,10 +65,11 @@ func (r *Rejection) Unwrap() error        { return r.Cause }
 // Request names the Assets a user deletes or restores. Authorization is the
 // caller's.
 type Request struct {
-	AssetIDs    []uuid.UUID
-	Actor       string
-	ActorUserID *int32
-	RequestID   string
+	AssetIDs         []uuid.UUID
+	Actor            string
+	ActorUserID      *int32
+	RequestID        string
+	ConfirmationType string
 }
 
 // Service owns the repository trash.
@@ -304,4 +306,8 @@ func nullIDs(ids []uuid.UUID) []uuid.NullUUID {
 		values = append(values, uuid.NullUUID{UUID: id, Valid: true})
 	}
 	return values
+}
+
+func isNotExist(err error) bool {
+	return errors.Is(err, fs.ErrNotExist)
 }

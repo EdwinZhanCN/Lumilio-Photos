@@ -51,6 +51,10 @@
  * column together with the storage label that names where the figure was
  * measured. History is {@link LifecycleHistory} as a flat audit list with no
  * row expansion.
+ * Repository rows expose Missing Asset counts and Trash file counts/bytes as
+ * links to scoped galleries. Remove missing items and Empty trash require
+ * explicit confirmation, target only that Repository's entries, and refresh
+ * the Storage projection after success or partial failure.
  * Row commands live in {@link RepositoryRowActions}, one menu per row, so an
  * action always names its Repository instead of relying on a page-level
  * selection.
@@ -151,5 +155,3 @@ import type {
 import type { getStorageEntityDisplayName } from "./model/storageEntities.ts";
 import type { deriveStorageLabel } from "./model/storageLabels.ts";
 import type { StorageEntity } from "./types.ts";
-
-export {};

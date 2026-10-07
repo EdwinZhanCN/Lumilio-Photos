@@ -17,8 +17,8 @@ stateDiagram-v2
     n_missing --> n_active: the file returns, or the same content is re-uploaded
     n_active --> n_trashed: user Delete moves every file into the repository trash
     n_trashed --> n_active: Restore, or a new present copy appears
-    n_missing --> [*]: purge (repository removal#59; #quot;Remove missing items#quot; is Phase 4b)
-    n_trashed --> [*]: purge (repository removal#59; expiry and #quot;Delete permanently#quot; are Phase 4b)
+    n_missing --> [*]: purge (repository removal or confirmed Remove missing items)
+    n_trashed --> [*]: purge (repository removal, expiry, or confirmed permanent delete)
 ```
 
 ## States
@@ -38,8 +38,8 @@ stateDiagram-v2
 | missing | active | the file returns, or the same content is re-uploaded | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:66`](../../../../server/internal/storage/scan/walk.go#L66) |
 | active | trashed | user Delete moves every file into the repository trash | `go:trash.Service.Delete` [`server/internal/storage/trash/delete.go:62`](../../../../server/internal/storage/trash/delete.go#L62) |
 | trashed | active | Restore, or a new present copy appears | `go:trash.Service.Restore` [`server/internal/storage/trash/restore.go:61`](../../../../server/internal/storage/trash/restore.go#L61) |
-| missing | [*] | purge (repository removal; "Remove missing items" is Phase 4b) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go:41`](../../../../server/internal/lifecycle/purge.go#L41) |
-| trashed | [*] | purge (repository removal; expiry and "Delete permanently" are Phase 4b) | `go:lifecycle.PurgeRepositoryEntriesTx` [`server/internal/lifecycle/purge.go:82`](../../../../server/internal/lifecycle/purge.go#L82) |
+| missing | [*] | purge (repository removal or confirmed Remove missing items) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go:41`](../../../../server/internal/lifecycle/purge.go#L41) |
+| trashed | [*] | purge (repository removal, expiry, or confirmed permanent delete) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go:41`](../../../../server/internal/lifecycle/purge.go#L41) |
 
 ## Where the state is written
 
@@ -47,7 +47,7 @@ Only the asset_lifecycle_entry_insert, _update, and _delete triggers in the cata
 
 ## What never deletes an Asset
 
-A scan, a watcher, and a cloud sync never unlink a file, never move one into the trash, and never purge. `lifecycle.PurgeEntriesTx` is the only Asset delete, and `task architecture:check` rejects any other code that deletes from assets.
+User Delete authorizes trashing; configured retention authorizes hourly expiry after recovery and sidecar rebuild. A scan, a watcher, and a cloud sync never unlink a file, never move one into the trash, and never purge. `lifecycle.PurgeEntriesTx` is the only Asset delete, and `task architecture:check` rejects any other code that deletes from assets.
 
 ## Related views
 

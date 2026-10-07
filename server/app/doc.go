@@ -23,5 +23,11 @@
 // as an owner-only sqlite-runtime.json under logging.dir for host-side
 // sampling; there is deliberately no HTTP debug API over private data.
 //
+// runTrashMaintenanceLoop runs at startup and hourly: retry deferred move
+// recovery, rebuild Trash from sidecars, then expire files using the manifest's
+// required repository_trash.retention_days. Repository verification runs at
+// startup and periodically with 3/4–5/4 interval jitter; watcher hints never
+// replace authoritative full scans.
+//
 //atlas:group runtime
 package app

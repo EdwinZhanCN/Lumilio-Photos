@@ -55,7 +55,7 @@ sequenceDiagram
 | # | From → To | Message | Anchor |
 | --- | --- | --- | --- |
 | 1 | web → handler | POST /assets/search {query, filter} | `api:POST /api/v1/assets/search` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
-| 2 | handler → service | SearchAssets | `go:service.AssetService.SearchAssets` [`server/internal/service/asset_service.go:111`](../../../../server/internal/service/asset_service.go#L111) |
+| 2 | handler → service | SearchAssets | `go:service.AssetService.SearchAssets` [`server/internal/service/asset_service.go:114`](../../../../server/internal/service/asset_service.go#L114) |
 | 3 | service → semantic | _par every channel is self-thresholded_ — RetrieveSet (calibrated cutoff) | `go:search.EmbeddingRetriever.RetrieveSet` [`server/internal/search/setretrieve.go:148`](../../../../server/internal/search/setretrieve.go#L148) |
 | 4 | semantic → lumen | _par every channel is self-thresholded_ — embed query text | `go:service.LumenService.SemanticTextEmbed` [`server/internal/service/lumen_service.go:35`](../../../../server/internal/service/lumen_service.go#L35) |
 | 5 | semantic → vec | _par every channel is self-thresholded_ — KNN in the active embedding space, cosine floor |  |

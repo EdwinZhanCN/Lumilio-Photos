@@ -8,9 +8,14 @@ took as approval. Phase 2 (scan core) merged in #231 on 2026-09-27. On
 2026-09-27 the owner approved folding the sweep into a per-directory diff and
 renaming `parent_path` to `parent_key`; #222 was amended to match. Phase 3
 (wiring, ROE removal) merged in #232 on 2026-09-27 with three Phase 0
-tests. Phase 4 is split into three PRs; the first (lifecycle core, the
-repository trash, and the last two Phase 0 tests) is in review on
-`feat/asset-lifecycle-core`. Child of
+tests. Phase 4 is split into three PRs; 4a (lifecycle core, the repository
+trash, and the last two Phase 0 tests) merged in #233 on 2026-09-29, with
+a fix for the video enrich regression #232 left on `dev`. 4b (expiry,
+permanent delete, remove missing, Trash rebuild) merged in #234 and 4c
+(carry-over follow-ups) merged in #235. Phase 5 merged in #237 on 2026-10-05.
+Phase 6 documentation and E2E items are done and locally validated on
+2026-10-05; hardware qualification, the radxa round trip, and plan/issue closure
+remain outstanding. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
@@ -245,23 +250,39 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
 - [x] Phase 0 `MissingFileLeavesLibraryBrowse` and
   `ReuploadOfTrashedPhotoIsVisible` land and pass.
 
-4b — irreversible steps:
-- [ ] Expiry job with the required `repository_trash.retention_days`,
-  "Delete permanently", and "Remove missing items", all through
-  `PurgeEntries`.
-- [ ] Artifact cleaner keyed on Asset existence.
-- [ ] The Trash view can be rebuilt from the sidecars.
+4b — irreversible steps (`feat/trash-expiry-and-purge`):
+- [x] The required `[repository_trash].retention_days` (generated configs
+  write 30). An hourly maintenance pass retries deferred recovery, rebuilds
+  the Trash from sidecars, and expires files past retention: unlink, then
+  `PurgeEntries`, idempotent when the file is already gone.
+- [x] "Delete permanently" and "Remove missing items" (per Repository or
+  selection) through `PurgeEntries`, in batches of 256, each audited. Their
+  endpoints land in Phase 5.
+- [x] Artifact cleaner keyed on Asset existence: a transcode stays while its
+  Asset has any entry in the Repository.
+- [x] The Trash view can be rebuilt from the sidecars
+  (`scan.AdoptTrash`): an unknown trash ID binds to the owner's Asset for its
+  content, or to a new trashed Asset; a newer sidecar format is reported and
+  left alone. The rebuild waits while a trash journal is open.
 
-4c — carry-over follow-ups the scan core cannot do alone:
-- [ ] Re-extracted metadata never overwrites the user-edited description.
-- [ ] Manual face assignments are re-applied to the re-detected face with
-  IoU ≥ 0.5, or surfaced as unconfirmed.
+4c — carry-over follow-ups the scan core cannot do alone
+(`feat/carry-over-followups`):
+- [x] Re-extracted metadata never overwrites the user-edited description. A
+  user edit sets `specific_metadata.description_edited`; re-extraction keeps
+  an edited description (even an empty one) and otherwise follows the file's
+  caption, so a caption rewritten by another tool shows up. Carry-over
+  branch 2 copies only an edited description.
+- [x] Manual face assignments are re-applied on re-detection: captured before
+  the old faces go, each goes to the new face it overlaps most (IoU ≥ 0.5
+  stays manual; any smaller overlap joins the person as an unconfirmed,
+  automatic member), and emptied people are dissolved only afterwards. It
+  applies to any re-detection, including a model upgrade.
 
 ### Phase 5 — API and Web (#222, #223)
-- [ ] DTOs and endpoints for the scan status and counters, trash, the Missing
+- [x] DTOs and endpoints for the scan status and counters, trash, the Missing
   view, and the typed `asset_missing`, `asset_offline`, and `asset_trashed`
   problems. Follow `lumilio-api-contract-change` (`task dto`).
-- [ ] Web:
+- [x] Web:
   - Trash view with restore, delete permanently, and empty;
   - Missing view reached from the Storage page count, with "Remove missing
     items";
@@ -269,15 +290,53 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
     retention;
   - viewer states for the typed problems;
   - `VerificationHistoryModal` and `useRepositoryVerifications`.
-- [ ] Terminology registry entries (`lumilio-frontend-i18n`) and feature
+- [x] Terminology registry entries (`lumilio-frontend-i18n`) and feature
   `doc.ts` updates (`lumilio-feature-doc`).
 
+Implementation and evidence (2026-09-30):
+- Whole-selection `/assets/trash` and `/assets/restore` commands authorize
+  every Asset first; bulk Delete now has one preflight instead of parallel
+  single-Asset requests. `/assets/delete-impact` provides the exact Assets,
+  present files, bytes, Repository names, and configured retention for both
+  gallery and viewer confirmations. Restore reports non-overwriting names.
+- `/assets/delete-permanently`, `/assets/remove-missing`, and
+  `/assets/empty-trash` require `confirm: true` and audit the explicit
+  confirmation. Repository-wide actions require an administrator; ordinary
+  Empty trash is owner-scoped. Emptying one Repository preserves entries and
+  metadata held by copies elsewhere, including active Assets with trashed copies.
+- Storage exposes Missing Asset counts and Trash file counts/bytes, links to
+  scoped galleries, and confirmed Repository-wide actions. Missing and Trash
+  reuse one lifecycle flow; the Trash gallery supports restore, permanent
+  delete, and empty. Commands refresh all affected read projections even after
+  a partial purge failure.
+- `/assets/{id}/availability` reads only catalog facts. Viewer, original,
+  bulk download, and playback boundaries use the registered `asset/missing`,
+  `asset/offline`, and `asset/trashed` Problems; Missing/Trash metadata stays
+  readable. The terminology registry and both feature docs were updated.
+- `task server:test`, `task web:test` (temporary Chromium installation through
+  `PLAYWRIGHT_BROWSERS_PATH`), and `task architecture:check` passed. Web: 125
+  test files, 539 tests passed. The real Server HTTP regression covers impact,
+  trash on disk, confirmation refusal, renamed restore with album intact,
+  Missing browse/counts, and removal. Service/handler tests prove owner and
+  Repository scope, whole-selection authorization, and multi-copy availability.
+- The authorization test was proved red by temporarily removing the selection
+  authorization check: expected HTTP 403, got 200. The check was restored and
+  the full Server gate passed.
+- Generated with `task server:sqlc`, `task dto`, and `task web:docs`.
+  Re-running DTO, feature-doc, and config-example generation changed none of
+  58 snapshotted artifacts. `task verify:generated` assumes a committed tree;
+  the pre/post-generation hashes provide freshness evidence for this
+  uncommitted implementation. `i18next-cli status`: zh coverage 100%.
+- PR preparation (2026-10-02): after committing Phase 5,
+  `task verify:generated` passed with no drift; `task ci:site` passed its
+  bilingual documentation checks and production build.
+
 ### Phase 6 — Docs and proof
-- [x] Rewrite the ROE sections of `docs/architecture.md` (done 2026-10-01 with
-  the Atlas; `docs/BACKEND.md` was retired into package `doc.go` files).
-- [ ] Update the guardrail links in postmortem 0001; add the retention field to
-  `site/docs` (en and zh-cn) where configuration is documented.
-- [ ] E2E: update `storage-admin.spec.ts` for the new scan statuses; add a
+- [x] Rewrite the ROE sections of `docs/architecture.md`; the Atlas retired
+  `docs/BACKEND.md` into owning package `doc.go` files. Postmortem 0001
+  guardrail links and the retention field in `site/docs` (en and zh-cn)
+  are also updated.
+- [x] E2E: update `storage-admin.spec.ts` for the new scan statuses; add a
   trash spec (delete, restore with album intact, delete permanently, file gone
   from disk).
 - [ ] N100 qualification (`lumilio-remote-qualification`): the 100k profile,
@@ -291,6 +350,49 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
   catalog is restored from a backup taken before the delete. Record the
   image and results here.
 - [ ] Complete this plan per `lumilio-exec-plan` and close #222 and #223.
+
+Implementation and evidence for items 1–2 (2026-10-05):
+- Replaced ROE node/Location and native-cursor descriptions in `BACKEND.md`
+  and `architecture.md` with the implemented entry index, per-directory diff,
+  stat/racy/settle rules, separate walk/hash work, scan receipts and watcher
+  hints, and derived Asset lifecycle. Verified against `storage/scan`,
+  `storage/locations`, `storage/trash`, `lifecycle/purge.go`, the baseline
+  entry triggers, and the app scan runtime and trash maintenance loop.
+  Postmortem 0001 links to current timeout, continuation, scan-safety, and
+  cancellation tests. Required positive `repository_trash.retention_days`,
+  generated value 30, restart boundary, and hourly expiry are documented in
+  English Settings and the canonical Chinese account/configuration pages
+  (the old Chinese Settings page is a redirect).
+- Phase 3 already introduced `queued`, `walking`, and `sweeping` in the
+  storage E2E. `storage-admin.spec.ts` now waits for an explicit typed terminal
+  status and verifies the Storage projection against its reported operation,
+  allowing a watcher follow-up to become latest during ingestion. The manual
+  receipt still independently proves successful completion and file discovery.
+- Added `trash.spec.ts` in the existing `@smoke` slice, using the shared
+  per-attempt workspace, generated API types, and translated/data locators.
+  It deletes through the gallery, verifies the original moved into repository
+  Trash with identical bytes, restores through Trash with the same Asset ID
+  and album membership visible in the album, then deletes again and confirms
+  permanent deletion through the UI. Assertions re-read catalog and album
+  state, require HTTP 404 for the purged Asset, and check that both original
+  and trash paths are gone from the real container volume.
+- Local Docker Compose base stack built and ran successfully. After
+  `task web:e2e:up` and `vp run e2e:seed` (smoke profile, fakelumen replay and
+  the keyless fake Ollama fixture),
+  `vp exec playwright test e2e/specs/storage-admin.spec.ts e2e/specs/trash.spec.ts --workers=1`
+  passed: 2 tests in 12.9 s, no skips or retries. Early runs exposed ambiguous
+  confirmation-button and plural-key locators; both were corrected.
+  The file-deletion guard was proved red by temporarily recreating the
+  deleted trash path after permanent deletion: the container `test ! -e`
+  assertion failed. The fault was removed and both specs passed again.
+- `task ci:site` passed bilingual/link/terminology checks and the production
+  build; `task web:type-check` and `task web:lint` passed (existing lint
+  warnings only). `task verify:generated` passed with no artifact drift after
+  installing the global Vite+ CLI and putting the installed Swag tool on PATH.
+  `vp fmt` checked/formatted the two specs; `git diff --check` passed.
+  The disposable stack was torn down with `task web:e2e:down`.
+- Items 3–5 remain open: no N100 qualification, radxa round trip, plan
+  completion, or issue closure was performed.
 
 ## Validation boundaries
 

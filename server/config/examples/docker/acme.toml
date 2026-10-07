@@ -119,6 +119,11 @@ interval_seconds = 300
 # Seconds a file must stay unmodified before it is considered complete.
 settle_seconds = 5
 
+[repository_trash]
+# Days a deleted file stays in its repository's trash before it is
+# deleted permanently.
+retention_days = 30
+
 [auth]
 # Path to the token-signing key. This is a path, never the secret itself;
 # secret values must not appear in this manifest or in the environment. The

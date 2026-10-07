@@ -37,5 +37,5 @@ func TestRegisteredProblemCatalogIsCompleteAndUnique(t *testing.T) {
 		require.Falsef(t, duplicate, "duplicate Problem type %s", descriptor.Type)
 		seen[descriptor.Type] = struct{}{}
 	}
-	require.Len(t, seen, 24)
+	require.Len(t, seen, 27)
 }

@@ -1,3 +1,5 @@
+import { $api } from "@/lib/http-commons/queryClient";
+import { AssetAvailabilityNotice } from "../AssetAvailabilityNotice";
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from "@vidstack/react";
 import { useSearchParams } from "react-router-dom";
@@ -120,6 +122,27 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
     !videoAsset && !audioAsset && selectedAssetId
       ? assetUrls.getThumbnailUrl(selectedAssetId, "large")
       : undefined;
+
+  const availability = $api.useQuery(
+    "get",
+    "/api/v1/assets/{id}/availability",
+    { params: { path: { id: selectedAssetId ?? asset.asset_id ?? "" } } },
+    { enabled: isActive && Boolean(selectedAssetId ?? asset.asset_id), retry: false, staleTime: 0 },
+  );
+  if (isActive && availability.isPending)
+    return (
+      <div className="flex h-full items-center justify-center">
+        <span className="loading loading-spinner" />
+      </div>
+    );
+  if (availability.isError)
+    return (
+      <AssetAvailabilityNotice
+        onRetry={() => void availability.refetch()}
+        error={availability.error}
+        assetId={selectedAssetId ?? asset.asset_id ?? ""}
+      />
+    );
 
   // ── Regular audio player ───────────────────────────────────────────────────
   if (audioAsset && webAudioUrl) {

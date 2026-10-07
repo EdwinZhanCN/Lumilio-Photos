@@ -47,6 +47,6 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `web-contexts` → `web-workers`: 1 package import(s), declared
 - `web-features` → `web-components`: 24 package import(s), declared
 - `web-features` → `web-contexts`: 6 package import(s), declared
-- `web-features` → `web-lib`: 76 package import(s), declared
+- `web-features` → `web-lib`: 78 package import(s), declared
 - `web-features` → `web-workers`: 1 package import(s), declared
 - `web-workers` → `web-lib`: 2 package import(s), declared

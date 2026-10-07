@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	fileutil "server/internal/utils/file"
 )
 
 // TrashedFile is one file the repository trash took, as its entry records it.
@@ -148,4 +150,91 @@ func (s *Scanner) CommitRestore(ctx context.Context, files []RestoredFile, also 
 // recorded, under the rule the walk uses to skip unchanged files.
 func SameTuple(row repo.RepositoryEntry, observation storage.FileObservation) bool {
 	return sameTuple(row, observation)
+}
+
+// TrashRecord is a trashed file described by its info sidecar, for
+// rebuilding the Trash of a catalog that does not know it: after the catalog
+// was rebuilt from disk, or a repository was opened into a new catalog.
+type TrashRecord struct {
+	TrashID       uuid.UUID
+	OriginalPath  string
+	HashAlgorithm string
+	ContentHash   string
+	Size          int64
+	MtimeNs       int64
+	DeletedAt     time.Time
+}
+
+// AdoptTrash records trashed files the catalog does not know, in one
+// transaction. Each binds to the owner's Asset for its content, or to a new
+// trashed Asset, so it is listed in the Trash and can be restored or expire.
+// Records whose trash ID is already known are skipped. It returns how many
+// records it adopted.
+func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner int32, records []TrashRecord) (int, error) {
+	adopted := 0
+	err := s.writer.WithTx(ctx, catalogtx.OperationAssetDelete, func(_ *sql.Tx, queries *repo.Queries) error {
+		adopted = 0
+		for _, record := range records {
+			known, err := queries.CountRepositoryEntriesWithTrashID(ctx, uuid.NullUUID{UUID: record.TrashID, Valid: true})
+			if err != nil {
+				return err
+			}
+			if known > 0 {
+				continue
+			}
+			validation := fileutil.ValidateFile(path.Base(record.OriginalPath), "")
+			if !validation.Valid {
+				continue
+			}
+			stamp := dbtypes.NewTimestamp(record.DeletedAt)
+			content, err := queries.InsertContentObject(ctx, repo.InsertContentObjectParams{
+				ContentID: uuid.New(), HashAlgorithm: record.HashAlgorithm, FullHash: record.ContentHash,
+				FileSize: record.Size, CreatedAt: stamp,
+			})
+			if err != nil {
+				return fmt.Errorf("record trashed content: %w", err)
+			}
+			assetID := uuid.Nil
+			existing, err := queries.GetOwnerContentAsset(ctx, repo.GetOwnerContentAssetParams{OwnerID: &owner, ContentID: content.ContentID})
+			switch {
+			case err == nil:
+				assetID = existing.AssetID
+			case errors.Is(err, sql.ErrNoRows):
+				created, err := queries.InsertOwnerContentAsset(ctx, repo.InsertOwnerContentAssetParams{
+					AssetID: uuid.New(), OwnerID: &owner, ContentID: content.ContentID,
+					Type: string(validation.AssetType), OriginalFilename: path.Base(record.OriginalPath),
+					MimeType: validation.MimeType, UploadTime: stamp,
+					TakenTime: dbtypes.NewTimestamp(time.Unix(0, record.MtimeNs)),
+					Rating:    new(int64), Status: dbtypes.JSON(`{"state":"processing","message":"Pending processing"}`),
+					UpdatedAt: stamp,
+				})
+				if err != nil {
+					return fmt.Errorf("record trashed Asset: %w", err)
+				}
+				assetID = created.AssetID
+			default:
+				return err
+			}
+			key, err := s.pathKey(record.OriginalPath)
+			if err != nil {
+				return err
+			}
+			parentKey, err := s.pathKey(parentOf(record.OriginalPath))
+			if err != nil {
+				return err
+			}
+			if err := queries.InsertTrashedRepositoryEntry(ctx, repo.InsertTrashedRepositoryEntryParams{
+				EntryID: uuid.New(), RepositoryID: repositoryID, Path: record.OriginalPath, PathKey: key,
+				ParentKey: parentKey, Size: record.Size, MtimeNs: record.MtimeNs,
+				ContentID: uuid.NullUUID{UUID: content.ContentID, Valid: true},
+				AssetID:   uuid.NullUUID{UUID: assetID, Valid: true},
+				TrashID:   uuid.NullUUID{UUID: record.TrashID, Valid: true}, TrashedAt: stamp, UpdatedAt: stamp,
+			}); err != nil {
+				return fmt.Errorf("record trashed file %s: %w", record.OriginalPath, err)
+			}
+			adopted++
+		}
+		return nil
+	})
+	return adopted, err
 }

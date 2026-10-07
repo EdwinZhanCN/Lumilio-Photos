@@ -153,6 +153,8 @@ type Querier interface {
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) (int64, error)
+	CountRepositoryEntriesWithTrashID(ctx context.Context, trashID uuid.NullUUID) (int64, error)
+	CountRepositoryLifecycle(ctx context.Context, repositoryID uuid.UUID) (CountRepositoryLifecycleRow, error)
 	CountStackedMediaItems(ctx context.Context, mediaItemIds []uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CountVideoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
@@ -589,6 +591,8 @@ type Querier interface {
 	ListEventMembership(ctx context.Context, arg ListEventMembershipParams) ([]EventMediaItem, error)
 	ListEventMembershipPage(ctx context.Context, arg ListEventMembershipPageParams) ([]EventMediaItem, error)
 	ListEventsPage(ctx context.Context, arg ListEventsPageParams) ([]Event, error)
+	// Trashed files of one repository past their retention, oldest first.
+	ListExpiredTrashedRepositoryEntries(ctx context.Context, arg ListExpiredTrashedRepositoryEntriesParams) ([]RepositoryEntry, error)
 	ListIncompleteLifecycleOperations(ctx context.Context) ([]LifecycleOperation, error)
 	ListLifecycleAuditEvents(ctx context.Context, arg ListLifecycleAuditEventsParams) ([]LifecycleAuditEvent, error)
 	ListLifecycleAuditEventsForTarget(ctx context.Context, arg ListLifecycleAuditEventsForTargetParams) ([]LifecycleAuditEvent, error)
@@ -596,6 +600,12 @@ type Querier interface {
 	ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLiveRepositoryEntriesUnderParams) ([]RepositoryEntry, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
 	ListLocationProjectionScopes(ctx context.Context, repositoryID interface{}) ([]ListLocationProjectionScopesRow, error)
+	// A user's manual person assignments on an Asset's faces, with the face box,
+	// captured before a re-detection replaces the faces.
+	ListManualFaceAssignmentsForAsset(ctx context.Context, assetID uuid.UUID) ([]ListManualFaceAssignmentsForAssetRow, error)
+	// Missing files of one repository, for "Remove missing items".
+	ListMissingRepositoryEntries(ctx context.Context, arg ListMissingRepositoryEntriesParams) ([]RepositoryEntry, error)
+	ListMissingRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error)
 	ListMusicAlbumArtists(ctx context.Context, arg ListMusicAlbumArtistsParams) ([]ListMusicAlbumArtistsRow, error)
 	ListMusicAlbumTracks(ctx context.Context, arg ListMusicAlbumTracksParams) ([]ListMusicAlbumTracksRow, error)
 	ListMusicAlbums(ctx context.Context, arg ListMusicAlbumsParams) ([]ListMusicAlbumsRow, error)
@@ -639,6 +649,7 @@ type Querier interface {
 	// rows are not part of the tree.
 	ListRepositoryEntryChildren(ctx context.Context, arg ListRepositoryEntryChildrenParams) ([]RepositoryEntry, error)
 	ListRepositoryScans(ctx context.Context, arg ListRepositoryScansParams) ([]RepositoryScan, error)
+	ListScopedTrashedRepositoryEntries(ctx context.Context, arg ListScopedTrashedRepositoryEntriesParams) ([]RepositoryEntry, error)
 	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
 	ListStorageLocations(ctx context.Context) ([]StorageLocation, error)
 	ListStoredLocationClusterAssetsForScope(ctx context.Context, arg ListStoredLocationClusterAssetsForScopeParams) ([]ListStoredLocationClusterAssetsForScopeRow, error)
@@ -760,6 +771,8 @@ type Querier interface {
 	UpdateAgentPinWidget(ctx context.Context, arg UpdateAgentPinWidgetParams) error
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
+	// A user edit marks the description, so re-extracted metadata never
+	// overwrites it while an extracted caption keeps following the file.
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
 	UpdateAssetDimensions(ctx context.Context, arg UpdateAssetDimensionsParams) error
 	UpdateAssetDuration(ctx context.Context, arg UpdateAssetDurationParams) error

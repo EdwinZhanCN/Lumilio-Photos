@@ -29,21 +29,22 @@ const SchemaVersion = 1
 // AppConfig is the fully resolved, runtime-immutable configuration consumed by
 // server/app. Production hosts obtain it only from LoadAppConfig.
 type AppConfig struct {
-	SchemaVersion  int
-	ManifestPath   string
-	ManifestSHA256 string
-	Environment    string
-	DatabaseConfig DatabaseConfig
-	ServerConfig   ServerConfig
-	LoggingConfig  LoggingConfig
-	StorageConfig  StorageConfig
-	RepositoryScan RepositoryScanConfig
-	Auth           AuthConfig
-	Transcode      TranscodeConfig
-	Lumen          LumenConfig
-	Tools          ToolsConfig
-	Execution      ExecutionConfig
-	loaded         bool
+	SchemaVersion   int
+	ManifestPath    string
+	ManifestSHA256  string
+	Environment     string
+	DatabaseConfig  DatabaseConfig
+	ServerConfig    ServerConfig
+	LoggingConfig   LoggingConfig
+	StorageConfig   StorageConfig
+	RepositoryScan  RepositoryScanConfig
+	RepositoryTrash RepositoryTrashConfig
+	Auth            AuthConfig
+	Transcode       TranscodeConfig
+	Lumen           LumenConfig
+	Tools           ToolsConfig
+	Execution       ExecutionConfig
+	loaded          bool
 }
 
 // LoadedFromManifest reports whether the strict loader produced this value.
@@ -121,6 +122,12 @@ type RepositoryScanConfig struct {
 	SettleSeconds   int
 }
 
+// RepositoryTrashConfig bounds how long deleted files stay recoverable in
+// each repository's trash before they are unlinked and purged.
+type RepositoryTrashConfig struct {
+	RetentionDays int
+}
+
 type AuthConfig struct {
 	SecretKeyFile   string
 	AccessTokenTTL  time.Duration
@@ -190,17 +197,18 @@ type manifest struct {
 	SchemaVersion *int `toml:"schema_version" json:"schema_version"`
 	// Deployment environment. Selects test-only affordances; it does not relax
 	// runtime manifest validation.
-	Environment    *string                 `toml:"environment" json:"environment" jsonschema:"enum=development,enum=production,enum=test"`
-	Database       *databaseManifest       `toml:"database" json:"database"`
-	Server         *serverManifest         `toml:"server" json:"server"`
-	Logging        *loggingManifest        `toml:"logging" json:"logging"`
-	Storage        *storageManifest        `toml:"storage" json:"storage"`
-	RepositoryScan *repositoryScanManifest `toml:"repository_scan" json:"repository_scan"`
-	Auth           *authManifest           `toml:"auth" json:"auth"`
-	Transcode      *transcodeManifest      `toml:"transcode" json:"transcode"`
-	Lumen          *lumenManifest          `toml:"lumen" json:"lumen"`
-	Tools          *toolsManifest          `toml:"tools" json:"tools"`
-	Execution      *executionManifest      `toml:"execution" json:"execution"`
+	Environment     *string                  `toml:"environment" json:"environment" jsonschema:"enum=development,enum=production,enum=test"`
+	Database        *databaseManifest        `toml:"database" json:"database"`
+	Server          *serverManifest          `toml:"server" json:"server"`
+	Logging         *loggingManifest         `toml:"logging" json:"logging"`
+	Storage         *storageManifest         `toml:"storage" json:"storage"`
+	RepositoryScan  *repositoryScanManifest  `toml:"repository_scan" json:"repository_scan"`
+	RepositoryTrash *repositoryTrashManifest `toml:"repository_trash" json:"repository_trash"`
+	Auth            *authManifest            `toml:"auth" json:"auth"`
+	Transcode       *transcodeManifest       `toml:"transcode" json:"transcode"`
+	Lumen           *lumenManifest           `toml:"lumen" json:"lumen"`
+	Tools           *toolsManifest           `toml:"tools" json:"tools"`
+	Execution       *executionManifest       `toml:"execution" json:"execution"`
 }
 
 type databaseManifest struct {
@@ -274,6 +282,11 @@ type repositoryScanManifest struct {
 	IntervalSeconds *int `toml:"interval_seconds" json:"interval_seconds"`
 	// Seconds a file must stay unmodified before it is considered complete.
 	SettleSeconds *int `toml:"settle_seconds" json:"settle_seconds"`
+}
+type repositoryTrashManifest struct {
+	// Days a deleted file stays in its repository's trash before it is
+	// deleted permanently.
+	RetentionDays *int `toml:"retention_days" json:"retention_days"`
 }
 type authManifest struct {
 	// Path to the token-signing key. This is a path, never the secret itself;
@@ -445,6 +458,7 @@ func validateManifestPresence(m manifest) []string {
 	requiredSection(&p, "logging", m.Logging)
 	requiredSection(&p, "storage", m.Storage)
 	requiredSection(&p, "repository_scan", m.RepositoryScan)
+	requiredSection(&p, "repository_trash", m.RepositoryTrash)
 	requiredSection(&p, "auth", m.Auth)
 	requiredSection(&p, "transcode", m.Transcode)
 	requiredSection(&p, "lumen", m.Lumen)
@@ -486,6 +500,9 @@ func validateManifestPresence(m manifest) []string {
 	if m.RepositoryScan != nil {
 		required(&p, "repository_scan.interval_seconds", m.RepositoryScan.IntervalSeconds)
 		required(&p, "repository_scan.settle_seconds", m.RepositoryScan.SettleSeconds)
+	}
+	if m.RepositoryTrash != nil {
+		required(&p, "repository_trash.retention_days", m.RepositoryTrash.RetentionDays)
 	}
 	if m.Auth != nil {
 		required(&p, "auth.secret_key_file", m.Auth.SecretKeyFile)
@@ -629,6 +646,8 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	scan := RepositoryScanConfig{IntervalSeconds: *m.RepositoryScan.IntervalSeconds, SettleSeconds: *m.RepositoryScan.SettleSeconds}
 	requirePositive(&p, "repository_scan.interval_seconds", scan.IntervalSeconds)
 	requirePositive(&p, "repository_scan.settle_seconds", scan.SettleSeconds)
+	trash := RepositoryTrashConfig{RetentionDays: *m.RepositoryTrash.RetentionDays}
+	requirePositive(&p, "repository_trash.retention_days", trash.RetentionDays)
 
 	auth := AuthConfig{
 		SecretKeyFile: resolvePath(base, *m.Auth.SecretKeyFile),
@@ -764,7 +783,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 		p = append(p, "execution.ffmpeg_threads must not exceed execution.cpu")
 	}
 
-	return AppConfig{Environment: environment, DatabaseConfig: db, ServerConfig: server, LoggingConfig: logging, StorageConfig: storage, RepositoryScan: scan, Auth: auth, Transcode: transcode, Lumen: lumen, Tools: tools, Execution: executionCfg}, p
+	return AppConfig{Environment: environment, DatabaseConfig: db, ServerConfig: server, LoggingConfig: logging, StorageConfig: storage, RepositoryScan: scan, RepositoryTrash: trash, Auth: auth, Transcode: transcode, Lumen: lumen, Tools: tools, Execution: executionCfg}, p
 }
 
 func invalidConfig(p []string) error {

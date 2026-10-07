@@ -133,6 +133,39 @@ END;`)
 	require.NoError(t, json.Unmarshal(allRecorder.Body.Bytes(), &response))
 	require.Len(t, response.Events, 2)
 	require.True(t, response.Events[0].IsHidden)
+
+	// An old mixed Event is not present in a Repository containing only its
+	// audio members; an old audio-only Event must not poison owner-wide lists.
+	_, err = database.SQL.ExecContext(ctx, `
+UPDATE assets SET type='AUDIO' WHERE asset_id IN (
+ '00000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000013');
+UPDATE media_items SET media_kind='audio' WHERE media_item_id IN (
+ '00000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000023');`)
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name, query string
+		count       int
+	}{
+		{"owner-wide", "?include_hidden=true", 1},
+		{"visual Repository", "?repository_id=00000000-0000-0000-0000-000000000002&include_hidden=true", 1},
+		{"audio Repository", "?repository_id=00000000-0000-0000-0000-000000000003&include_hidden=true", 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			requestContext, _ := gin.CreateTestContext(recorder)
+			requestContext.Set("current_user", &service.UserResponse{UserID: 1, Username: "owner"})
+			requestContext.Request = httptest.NewRequest(http.MethodGet, "/api/v1/events"+test.query, nil)
+			handler.ListEvents(requestContext)
+			require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+			var result dto.EventListPageDTO
+			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &result))
+			require.Len(t, result.Events, test.count)
+			if test.count > 0 {
+				require.Equal(t, 1, result.Events[0].MediaCount)
+				require.Equal(t, 1, result.Events[0].DisplayableCount)
+			}
+		})
+	}
 }
 
 func TestEventHandlerListEventsRejectsInvalidRepository(t *testing.T) {

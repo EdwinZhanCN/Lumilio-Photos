@@ -81,6 +81,150 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "api.AssetMissingProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/asset/missing",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.AssetMissingProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/asset/missing",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.AssetOfflineProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/asset/offline",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.AssetOfflineProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/asset/offline",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.AssetTrashedProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/asset/trashed",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.AssetTrashedProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/asset/trashed",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
             "api.AuthAuthenticationRequiredProblem": {
                 "additionalProperties": false,
                 "properties": {
@@ -767,6 +911,9 @@ const docTemplate = `{
                 "discriminator": {
                     "mapping": {
                         "https://lumilio.org/problems/agent/operation-failed": "#/components/schemas/api.AgentOperationFailedProblemReference",
+                        "https://lumilio.org/problems/asset/missing": "#/components/schemas/api.AssetMissingProblemReference",
+                        "https://lumilio.org/problems/asset/offline": "#/components/schemas/api.AssetOfflineProblemReference",
+                        "https://lumilio.org/problems/asset/trashed": "#/components/schemas/api.AssetTrashedProblemReference",
                         "https://lumilio.org/problems/auth/authentication-required": "#/components/schemas/api.AuthAuthenticationRequiredProblemReference",
                         "https://lumilio.org/problems/auth/invalid-credentials": "#/components/schemas/api.AuthInvalidCredentialsProblemReference",
                         "https://lumilio.org/problems/auth/mfa-invalid": "#/components/schemas/api.AuthMfaInvalidProblemReference",
@@ -796,6 +943,15 @@ const docTemplate = `{
                 "oneOf": [
                     {
                         "$ref": "#/components/schemas/api.AgentOperationFailedProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.AssetMissingProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.AssetOfflineProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.AssetTrashedProblemReference"
                     },
                     {
                         "$ref": "#/components/schemas/api.AuthAuthenticationRequiredProblemReference"
@@ -873,6 +1029,9 @@ const docTemplate = `{
                     "mapping": {
                         "about:blank": "#/components/schemas/api.AboutBlankProblem",
                         "https://lumilio.org/problems/agent/operation-failed": "#/components/schemas/api.AgentOperationFailedProblem",
+                        "https://lumilio.org/problems/asset/missing": "#/components/schemas/api.AssetMissingProblem",
+                        "https://lumilio.org/problems/asset/offline": "#/components/schemas/api.AssetOfflineProblem",
+                        "https://lumilio.org/problems/asset/trashed": "#/components/schemas/api.AssetTrashedProblem",
                         "https://lumilio.org/problems/auth/authentication-required": "#/components/schemas/api.AuthAuthenticationRequiredProblem",
                         "https://lumilio.org/problems/auth/invalid-credentials": "#/components/schemas/api.AuthInvalidCredentialsProblem",
                         "https://lumilio.org/problems/auth/mfa-invalid": "#/components/schemas/api.AuthMfaInvalidProblem",
@@ -905,6 +1064,15 @@ const docTemplate = `{
                     },
                     {
                         "$ref": "#/components/schemas/api.AgentOperationFailedProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.AssetMissingProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.AssetOfflineProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.AssetTrashedProblem"
                     },
                     {
                         "$ref": "#/components/schemas/api.AuthAuthenticationRequiredProblem"
@@ -2422,6 +2590,30 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetDeleteImpactDTO": {
+                "properties": {
+                    "assets": {
+                        "type": "integer"
+                    },
+                    "bytes": {
+                        "type": "integer"
+                    },
+                    "files": {
+                        "type": "integer"
+                    },
+                    "repositories": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetImpactRepositoryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "retention_days": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetDetailDTO": {
                 "properties": {
                     "albums": {
@@ -2738,6 +2930,17 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetImpactRepositoryDTO": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetIndexingRebuildStatusDTO": {
                 "properties": {
                     "receipt_id": {
@@ -2813,6 +3016,30 @@ const docTemplate = `{
                     "total_count": {
                         "example": 2400,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetLifecycleResultDTO": {
+                "properties": {
+                    "assets": {
+                        "type": "integer"
+                    },
+                    "bytes": {
+                        "type": "integer"
+                    },
+                    "entries": {
+                        "type": "integer"
+                    },
+                    "files": {
+                        "type": "integer"
+                    },
+                    "renamed": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetRestoredPathDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -2944,6 +3171,28 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetPurgeRequestDTO": {
+                "properties": {
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 10000,
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "confirm": {
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "confirm"
+                ],
+                "type": "object"
+            },
             "dto.AssetQueryRequestDTO": {
                 "properties": {
                     "filter": {
@@ -2987,6 +3236,37 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "dto.AssetRestoredPathDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "original_path": {
+                        "type": "string"
+                    },
+                    "restored_path": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetSelectionDTO": {
+                "properties": {
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 10000,
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "required": [
+                    "asset_ids"
+                ],
                 "type": "object"
             },
             "dto.AssetSidecarResponseDTO": {
@@ -9011,6 +9291,9 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
+                    "missing_count": {
+                        "type": "integer"
+                    },
                     "mount_path": {
                         "description": "MountPath is the directory where the backing filesystem is mounted on\nthe host running the Server: \"/\", \"/Volumes/Backup\", \"/volume1\", or a\nWindows drive root such as \"C:\". It names the storage an operator\nrecognizes. It is raw host data and is never localized by the Server.\nEmpty when the mount could not be resolved.",
                         "example": "/data/storage",
@@ -9035,6 +9318,12 @@ const docTemplate = `{
                     "storage_location_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
+                    },
+                    "trash_bytes": {
+                        "type": "integer"
+                    },
+                    "trash_count": {
+                        "type": "integer"
                     },
                     "verification": {
                         "$ref": "#/components/schemas/dto.StorageRepositoryVerificationSummaryDTO"
@@ -13514,6 +13803,187 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/delete-impact": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetSelectionDTO",
+                                        "description": "Selected Assets",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Selected Assets",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetDeleteImpactDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Preview asset deletion",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/delete-permanently": {
+            "post": {
+                "description": "Permanently unlink selected trashed files and purge their entries. Requires explicit confirmation.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetPurgeRequestDTO",
+                                        "description": "Lifecycle request",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Lifecycle request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetLifecycleResultDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "DeleteAssetsPermanently",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/download": {
             "post": {
                 "description": "Serve original files for the requested asset IDs as a zip archive.",
@@ -13581,6 +14051,16 @@ const docTemplate = `{
                         },
                         "description": "Asset or original file not found"
                     },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "asset_missing, asset_offline, or asset_trashed"
+                    },
                     "500": {
                         "content": {
                             "application/problem+json": {
@@ -13593,6 +14073,107 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Download assets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/empty-trash": {
+            "post": {
+                "description": "Empty the authenticated owner scope or one administrator-selected Repository. Preserves copies outside the scope.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetPurgeRequestDTO",
+                                        "description": "Lifecycle request",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Lifecycle request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetLifecycleResultDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "EmptyAssetTrash",
                 "tags": [
                     "assets"
                 ]
@@ -14411,6 +14992,208 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/remove-missing": {
+            "post": {
+                "description": "Remove missing entries of a selection or one Repository. No files are touched; metadata is lost if no entry remains.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetPurgeRequestDTO",
+                                        "description": "Lifecycle request",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Lifecycle request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetLifecycleResultDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "RemoveMissingAssets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/restore": {
+            "post": {
+                "description": "Restore selected trashed files without overwriting. Reports each renamed destination.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetSelectionDTO",
+                                        "description": "Lifecycle request",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Lifecycle request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetLifecycleResultDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "RestoreAssets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/search": {
             "post": {
                 "description": "Search assets with optional top results enhancement, filename fallback, or visual similarity to a catalog asset.",
@@ -14780,6 +15563,107 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/trash": {
+            "post": {
+                "description": "Move all present files of the selection into their Repository trash. Preflight applies to the whole selection.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetSelectionDTO",
+                                        "description": "Lifecycle request",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Lifecycle request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetLifecycleResultDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "TrashAssets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/types": {
             "get": {
                 "description": "Retrieve a list of all supported asset types in the system.",
@@ -14863,7 +15747,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Nothing moved: conflict_type is repository_offline, file_changed, asset_missing, or move_failed"
+                        "description": "asset_offline, asset_missing, or repository/conflict; no files moved"
                     },
                     "500": {
                         "content": {
@@ -15259,6 +16143,16 @@ const docTemplate = `{
                         },
                         "description": "Asset not found or not audio"
                     },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "asset_missing, asset_offline, or asset_trashed"
+                    },
                     "500": {
                         "content": {
                             "application/problem+json": {
@@ -15271,6 +16165,77 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Get web-optimized audio",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/{id}/availability": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "asset_missing, asset_offline, or asset_trashed"
+                    }
+                },
+                "summary": "Check asset availability",
                 "tags": [
                     "assets"
                 ]
@@ -15729,6 +16694,16 @@ const docTemplate = `{
                         },
                         "description": "Asset not found"
                     },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "asset_missing, asset_offline, or asset_trashed"
+                    },
                     "500": {
                         "content": {
                             "application/problem+json": {
@@ -15999,11 +16974,11 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.MessageResponseDTO"
+                                    "$ref": "#/components/schemas/dto.AssetLifecycleResultDTO"
                                 }
                             }
                         },
-                        "description": "Asset restored successfully"
+                        "description": "Asset restored; renamed destination paths are reported"
                     },
                     "400": {
                         "content": {
@@ -16023,7 +16998,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Nothing moved: conflict_type is repository_offline, not_trashed, trash_file_missing, or move_failed"
+                        "description": "asset_offline, asset_missing, or repository/conflict; no files moved"
                     },
                     "500": {
                         "content": {
@@ -16591,6 +17566,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Asset not found or not a video"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "asset_missing, asset_offline, or asset_trashed"
                     },
                     "500": {
                         "content": {

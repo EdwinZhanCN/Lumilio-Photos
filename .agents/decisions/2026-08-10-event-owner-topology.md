@@ -14,6 +14,8 @@ Repository Browse Scope leaked into identity. Manual merge/split/move/add/
 remove could be undone by the next rebuild. Header counts, covers, and
 galleries could disagree.
 
+Membership is narrowed by [the audio participation decision](2026-10-06-audio-event-participation.md).
+
 ## Decision
 
 Canonical Event construction is owner-wide and repository-independent.

@@ -386,7 +386,7 @@ it("marks a failed runtime refresh stale while retaining prior endpoint diagnost
   await screen
     .getByRole("button", { name: t("settings.serverSettings.refresh"), exact: true })
     .click();
-  await expect.element(screen.getByRole("alert")).toHaveTextContent(t("monitor.snapshot.stale"));
+  await expect.element(screen.getByRole("alert")).toMatchTextContent(t("monitor.snapshot.stale"));
   await expect
     .element(screen.getByText(t("monitor.capabilities.noNodes"), { exact: true }))
     .toBeVisible();

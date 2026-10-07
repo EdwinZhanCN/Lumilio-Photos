@@ -43,12 +43,12 @@ transitions:
     anchor: go:trash.Service.Restore
   - from: missing
     to: "[*]"
-    label: purge (repository removal; "Remove missing items" is Phase 4b)
+    label: purge (repository removal or confirmed Remove missing items)
     anchor: go:lifecycle.PurgeEntriesTx
   - from: trashed
     to: "[*]"
-    label: purge (repository removal; expiry and "Delete permanently" are Phase 4b)
-    anchor: go:lifecycle.PurgeRepositoryEntriesTx
+    label: purge (repository removal, expiry, or confirmed permanent delete)
+    anchor: go:lifecycle.PurgeEntriesTx
 notes:
   - title: Where the state is written
     body: >-
@@ -59,7 +59,9 @@ notes:
       component.
   - title: What never deletes an Asset
     body: >-
-      A scan, a watcher, and a cloud sync never unlink a file, never move one
+      User Delete authorizes trashing; configured retention authorizes hourly
+      expiry after recovery and sidecar rebuild. A scan, a watcher, and a cloud
+      sync never unlink a file, never move one
       into the trash, and never purge. `lifecycle.PurgeEntriesTx` is the only
       Asset delete, and `task architecture:check` rejects any other code that
       deletes from assets.

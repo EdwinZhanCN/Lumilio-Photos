@@ -22,5 +22,9 @@
 // Runtime-mutable settings — ML and LLM features, reverse geocoding — are not
 // configuration; they live in the catalog (see [server/internal/settings]).
 //
+// repository_trash.retention_days is required and positive, with no code
+// default; generated manifests write 30. It sets repository Trash retention
+// before the runtime's hourly expiry pass.
+//
 //atlas:group foundation
 package config

@@ -305,7 +305,8 @@ LEFT JOIN assets component ON component.asset_id = (
  WHEN 'raw_original' THEN 2 WHEN 'original' THEN 3 WHEN 'edited_version' THEN 4
  WHEN 'alternative' THEN 5 WHEN 'component' THEN 6 WHEN 'live_photo_video' THEN 7 ELSE 8 END,
  mia.position, mia.asset_id LIMIT 1)
-WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
+WHERE mi.owner_id=? AND mi.media_kind IN ('photo','video','live_photo')
+ORDER BY 2, mi.media_item_id`
 	rows, err := database.QueryContext(ctx, query, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("load Event candidates: %w", err)
@@ -344,7 +345,14 @@ WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
 func loadConstraints(ctx context.Context, database queryer, ownerID int32) ([]Constraint, error) {
 	rows, err := database.QueryContext(ctx, `
 SELECT kind, event_id, left_media_item_id, right_media_item_id
-FROM event_constraints WHERE owner_id=?
+FROM event_constraints ec WHERE owner_id=?
+  AND EXISTS (SELECT 1 FROM media_items mi
+              WHERE mi.media_item_id=ec.left_media_item_id AND mi.owner_id=ec.owner_id
+                AND mi.media_kind IN ('photo','video','live_photo'))
+  AND (ec.right_media_item_id IS NULL OR EXISTS (
+       SELECT 1 FROM media_items mi
+       WHERE mi.media_item_id=ec.right_media_item_id AND mi.owner_id=ec.owner_id
+         AND mi.media_kind IN ('photo','video','live_photo')))
 ORDER BY kind, event_id, left_media_item_id, right_media_item_id`, ownerID)
 	if err != nil {
 		return nil, err
@@ -373,6 +381,9 @@ SELECT e.event_id, e.start_at, e.end_at, e.cover_override_media_item_id,
        emi.media_item_id
 FROM events e
 LEFT JOIN event_media_items emi ON emi.event_id=e.event_id AND emi.owner_id=e.owner_id
+  AND EXISTS (SELECT 1 FROM media_items mi
+              WHERE mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
+                AND mi.media_kind IN ('photo','video','live_photo'))
 WHERE e.owner_id=? AND e.status='active'
 ORDER BY e.created_at, e.event_id, emi.position, emi.media_item_id`, ownerID)
 	if err != nil {
@@ -584,6 +595,17 @@ FROM event_owner_state WHERE owner_id=?`, ownerID).
 	}
 	if expectedRevision == nil {
 		expectedRevision = &sourceRevision
+	}
+
+	// Constraints referring to ineligible media cannot participate in future
+	// rebuilds. Keep every correction whose endpoints are photo/video media.
+	if _, err := tx.ExecContext(ctx, `
+DELETE FROM event_constraints
+WHERE owner_id=? AND (
+ left_media_item_id IN (SELECT media_item_id FROM media_items WHERE owner_id=? AND media_kind NOT IN ('photo','video','live_photo'))
+ OR right_media_item_id IN (SELECT media_item_id FROM media_items WHERE owner_id=? AND media_kind NOT IN ('photo','video','live_photo'))
+)`, ownerID, ownerID, ownerID); err != nil {
+		return err
 	}
 
 	// Remove the old complete membership set before inserting the new one.
@@ -1022,7 +1044,8 @@ SELECT COALESCE(max(position)+1,0) FROM event_media_items WHERE event_id=? AND o
 		if err := tx.QueryRowContext(ctx, `
 SELECT mi.media_item_id FROM media_items mi
 JOIN media_item_assets mia ON mia.media_item_id=mi.media_item_id
-WHERE mia.asset_id=? AND mi.owner_id=?`, assetID, ownerID).Scan(&mediaID); err != nil {
+WHERE mia.asset_id=? AND mi.owner_id=?
+  AND mi.media_kind IN ('photo','video','live_photo')`, assetID, ownerID).Scan(&mediaID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return Summary{}, ErrNotFound
 			}

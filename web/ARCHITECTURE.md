@@ -201,6 +201,8 @@ gzip (`vp run test:bundle`).
 
 ## Test layers
 
+Vitest 5 through Vite+ owns the unit and browser test projects.
+
 The file name and directory choose the runner (`web/vite.config.ts`
 `test.projects`); do not invent other conventions. Placement, GPU self-skip,
 and proving a guard can fail:

@@ -46,6 +46,9 @@ export type RepositoryRow = {
   role: "primary" | "regular";
   state: RepositoryState;
   assetCount: number;
+  missingCount?: number;
+  trashCount?: number;
+  trashBytes?: number;
   verification: VerificationState;
   storageLocationId: string | null;
   storage: StorageLabel;
@@ -154,6 +157,9 @@ function mapRepositoryRow(
     role,
     state: mapRepositoryState(repository),
     assetCount: repository.asset_count ?? 0,
+    missingCount: repository.missing_count ?? 0,
+    trashCount: repository.trash_count ?? 0,
+    trashBytes: repository.trash_bytes ?? 0,
     verification: mapVerification(repository.verification),
     storageLocationId: repository.storage_location_id ?? null,
     storage: deriveStorageLabel(repository.mount_path),

@@ -60,6 +60,9 @@ type AssetService interface {
 	// nothing, when a repository is offline or a file changed.
 	DeleteAssets(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
 	RestoreAssets(ctx context.Context, request trash.Request) (trash.RestoreResult, error)
+	DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
+	RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
+	EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
 	UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error
@@ -661,25 +664,32 @@ func ApplyAssetExtractedMetadataTx(
 	return nil
 }
 
+// preserveSpecificMetadataDescription keeps a user-edited description, even
+// an empty one, across re-extraction; an extracted description follows the
+// file, so a caption rewritten by another tool shows up after an in-place
+// edit.
 func preserveSpecificMetadataDescription(existing, incoming dbtypes.SpecificMetadata) (dbtypes.SpecificMetadata, error) {
 	var existingObject map[string]json.RawMessage
 	if len(existing) == 0 || json.Unmarshal(existing, &existingObject) != nil {
+		return incoming, nil
+	}
+	var edited bool
+	if raw, ok := existingObject["description_edited"]; !ok || json.Unmarshal(raw, &edited) != nil || !edited {
 		return incoming, nil
 	}
 	description, exists := existingObject["description"]
 	if !exists {
 		return incoming, nil
 	}
-	var descriptionText string
-	if err := json.Unmarshal(description, &descriptionText); err != nil {
-		return incoming, nil
-	}
-
 	var incomingObject map[string]json.RawMessage
 	if err := json.Unmarshal(incoming, &incomingObject); err != nil {
 		return nil, err
 	}
+	if incomingObject == nil {
+		incomingObject = map[string]json.RawMessage{}
+	}
 	incomingObject["description"] = description
+	incomingObject["description_edited"] = json.RawMessage("true")
 	encoded, err := json.Marshal(incomingObject)
 	return dbtypes.SpecificMetadata(encoded), err
 }
@@ -760,6 +770,9 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 type AssetTrash interface {
 	Delete(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
 	Restore(ctx context.Context, request trash.Request) (trash.RestoreResult, error)
+	DeletePermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
+	RemoveMissing(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
+	Empty(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
 }
 
 // ErrAssetTrashUnavailable reports a Server built without the repository
@@ -1887,4 +1900,23 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetMediaItemRefsUni
 	out.CameraModel = params.CameraModel
 	out.LensModel = params.LensModel
 	return out
+}
+
+func (s *assetService) DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.DeletePermanently(ctx, request)
+}
+func (s *assetService) RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.RemoveMissing(ctx, request)
+}
+func (s *assetService) EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.Empty(ctx, request, repositoryID, ownerID)
 }

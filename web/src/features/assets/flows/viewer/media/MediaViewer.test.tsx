@@ -48,6 +48,7 @@ function serveMediaItem(assetId: string) {
   } satisfies MediaItemByAssetResponse;
 
   worker.use(
+    http.get("*/api/v1/assets/:id/availability", () => HttpResponse.json({ message: "available" })),
     http.get("*/api/v1/assets/:id/media-item", () => HttpResponse.json(response)),
     // The <img> actually requests its thumbnail; the URL is the subject, not the
     // bytes, so answer with an empty 200 to keep the /api/ guard quiet.
@@ -96,6 +97,9 @@ describe("MediaViewer video playback container", () => {
 
     const screen = await renderWithProviders(<MediaViewer asset={asset} isActive={true} />);
 
+    await expect
+      .element(screen.getByRole("region", { name: "sample-video.mp4" }))
+      .toBeInTheDocument();
     const region = screen.getByRole("region", { name: "sample-video.mp4" }).element();
     const parentContainer = region.parentElement;
     expect(parentContainer).not.toBeNull();
@@ -121,4 +125,29 @@ describe("MediaViewer video start time", () => {
       .element(screen.getByRole("region", { name: "semantic-match.mp4" }))
       .toHaveAttribute("data-current-time", "12.345");
   });
+});
+
+describe("MediaViewer availability boundary", () => {
+  it.each(["missing", "offline", "trashed"] as const)(
+    "renders the %s Problem instead of media",
+    async (state) => {
+      serveMediaItem("a");
+      worker.use(
+        http.get("*/api/v1/assets/:id/availability", () =>
+          HttpResponse.json(
+            {
+              type: `https://lumilio.org/problems/asset/${state}`,
+              status: 409,
+              instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+            },
+            { status: 409 },
+          ),
+        ),
+      );
+      const asset = { asset_id: "a", type: "PHOTO", original_filename: "a.jpg" } satisfies Asset;
+      const screen = await renderWithProviders(<MediaViewer asset={asset} selectedAssetId="a" />);
+      await expect.element(screen.getByText(t(`apiErrors.asset.${state}`))).toBeVisible();
+      await expect.element(screen.getByRole("img")).not.toBeInTheDocument();
+    },
+  );
 });

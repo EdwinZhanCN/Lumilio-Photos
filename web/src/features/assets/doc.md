@@ -1,6 +1,6 @@
 # Assets
 
-Assets owns catalog and Trash browsing, reusable asset-set presentation,
+Assets owns catalog, Missing, and Trash browsing, reusable asset-set presentation,
 selection, filtering, viewer inspection, and export/bulk asset actions.
 Collection, People, Home, Share, Studio, and Lumilio reuse its reviewed
 public surfaces instead of implementing another gallery or viewer.
@@ -25,7 +25,7 @@ directory contains only migration from the retired persisted browse state.
 
 ```mermaid
 flowchart TD
-    ROUTES["Assets / Trash / scoped routes"] --> SCOPE["AssetBrowserScope"]
+    ROUTES["Assets / Missing / Trash / scoped routes"] --> SCOPE["AssetBrowserScope"]
     SCOPE --> BROWSER["AssetBrowser"]
     BROWSER --> SOURCE["catalog or pin source"]
     BROWSER --> GALLERY["Justified / Square gallery"]
@@ -72,6 +72,16 @@ Manual image search, export, and download fetches use
 [readProblemResponse](../../lib/http-commons/problem.ts); UI flows localize the structured result and
 visual-search recovery branches on exact Problem type rather than message
 text.
+
+Missing and Trash reuse the lifecycle-constrained gallery. Missing is reached
+from each Repository's Storage count; selection and Repository-wide purge
+require explicit confirmation. Trash restores a selection in one command,
+reports non-overwriting destination names, and offers permanent delete and
+Empty trash. Delete previews enumerate Assets, files, bytes, Repositories,
+and the configured retention before the whole-selection preflight.
+The viewer reads typed availability Problems while metadata stays readable.
+Lifecycle commands invalidate browse, Storage counts, and affected projections
+even when a purge reports a partial failure.
 
 [useAssetMediaItem](./api/useAssetMediaItem.ts) resolves RAW/JPEG and Live Photo components.
 [useAssetOCR](./api/useAssetOCR.ts) reads the generated asset-detail contract with only

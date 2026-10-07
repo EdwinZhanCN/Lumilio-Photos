@@ -33,5 +33,15 @@
 // an optional complete south,north,west,east viewport (antimeridian-aware) so
 // map rendering stays proportional to the visible area.
 //
+// Asset lifecycle commands authorize the whole selection before execution.
+// [AssetHandler.PreviewAssetDelete] reports present files, bytes, repositories,
+// and retention. [AssetHandler.GetAssetAvailability] reads catalog facts only;
+// media boundaries return asset/missing, asset/offline, or asset/trashed Problems
+// while Missing/Trash metadata remains readable.
+// [AssetHandler.DeleteAssetsPermanently], [AssetHandler.RemoveMissingAssets],
+// and [AssetHandler.EmptyAssetTrash] require confirm: true and audit explicit
+// confirmation. Repository-wide actions require an administrator; ordinary
+// Empty trash is owner-scoped and preserves copies held elsewhere.
+//
 //atlas:group http
 package handler

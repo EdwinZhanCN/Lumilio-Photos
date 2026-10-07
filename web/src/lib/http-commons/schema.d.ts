@@ -2232,7 +2232,7 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
-                /** @description Nothing moved: conflict_type is repository_offline, file_changed, asset_missing, or move_failed */
+                /** @description asset_offline, asset_missing, or repository/conflict; no files moved */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2456,8 +2456,92 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
+                /** @description asset_missing, asset_offline, or asset_trashed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check asset availability */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description asset_missing, asset_offline, or asset_trashed */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2904,6 +2988,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
+                /** @description asset_missing, asset_offline, or asset_trashed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -3177,13 +3270,13 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Asset restored successfully */
+                /** @description Asset restored; renamed destination paths are reported */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.MessageResponseDTO"];
+                        "application/json": components["schemas"]["dto.AssetLifecycleResultDTO"];
                     };
                 };
                 /** @description Invalid asset ID format */
@@ -3195,7 +3288,7 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
-                /** @description Nothing moved: conflict_type is repository_offline, not_trashed, trash_file_missing, or move_failed */
+                /** @description asset_offline, asset_missing, or repository/conflict; no files moved */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -3744,6 +3837,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
+                /** @description asset_missing, asset_offline, or asset_trashed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {
@@ -4046,6 +4148,181 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/delete-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview asset deletion */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Selected Assets */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetSelectionDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetDeleteImpactDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/delete-permanently": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * DeleteAssetsPermanently
+         * @description Permanently unlink selected trashed files and purge their entries. Requires explicit confirmation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Lifecycle request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetPurgeRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetLifecycleResultDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/download": {
         parameters: {
             query?: never;
@@ -4118,7 +4395,114 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
+                /** @description asset_missing, asset_offline, or asset_trashed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
                 /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/empty-trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * EmptyAssetTrash
+         * @description Empty the authenticated owner scope or one administrator-selected Repository. Preserves copies outside the scope.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Lifecycle request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetPurgeRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetLifecycleResultDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4922,6 +5306,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/remove-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RemoveMissingAssets
+         * @description Remove missing entries of a selection or one Repository. No files are touched; metadata is lost if no entry remains.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Lifecycle request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetPurgeRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetLifecycleResultDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RestoreAssets
+         * @description Restore selected trashed files without overwriting. Reports each renamed destination.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Lifecycle request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetSelectionDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetLifecycleResultDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/search": {
         parameters: {
             query?: never;
@@ -5260,6 +5840,104 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * TrashAssets
+         * @description Move all present files of the selection into their Repository trash. Preflight applies to the whole selection.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Lifecycle request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetSelectionDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetLifecycleResultDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -14676,7 +15354,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
         "api.RepositoryConflictProblemResponse": {
             actions?: string[];
             conflict_type: string;
@@ -15023,6 +15701,13 @@ export interface components {
             upload_time?: string;
             width?: number;
         };
+        "dto.AssetDeleteImpactDTO": {
+            assets?: number;
+            bytes?: number;
+            files?: number;
+            repositories?: components["schemas"]["dto.AssetImpactRepositoryDTO"][];
+            retention_days?: number;
+        };
         "dto.AssetDetailDTO": {
             albums?: components["schemas"]["dto.AssetAlbumRefDTO"][];
             asset_id?: string;
@@ -15142,6 +15827,10 @@ export interface components {
              */
             types?: string[];
         };
+        "dto.AssetImpactRepositoryDTO": {
+            id?: string;
+            name?: string;
+        };
         "dto.AssetIndexingRebuildStatusDTO": {
             /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
             receipt_id?: string;
@@ -15176,6 +15865,13 @@ export interface components {
             queued_jobs?: number;
             /** @example 2400 */
             total_count?: number;
+        };
+        "dto.AssetLifecycleResultDTO": {
+            assets?: number;
+            bytes?: number;
+            entries?: number;
+            files?: number;
+            renamed?: components["schemas"]["dto.AssetRestoredPathDTO"][];
         };
         "dto.AssetListResponseDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
@@ -15225,6 +15921,11 @@ export interface components {
             text_content?: string;
             text_length?: number;
         };
+        "dto.AssetPurgeRequestDTO": {
+            asset_ids?: string[];
+            confirm: boolean;
+            repository_id?: string;
+        };
         "dto.AssetQueryRequestDTO": {
             filter?: components["schemas"]["dto.AssetFilterDTO"];
             pagination?: components["schemas"]["dto.PaginationDTO"];
@@ -15251,6 +15952,14 @@ export interface components {
             stack_mode?: "collapsed" | "expanded";
             /** @example America/New_York */
             viewer_timezone?: string;
+        };
+        "dto.AssetRestoredPathDTO": {
+            asset_id?: string;
+            original_path?: string;
+            restored_path?: string;
+        };
+        "dto.AssetSelectionDTO": {
+            asset_ids: string[];
         };
         "dto.AssetSidecarResponseDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -17546,6 +18255,7 @@ export interface components {
             filesystem?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
+            missing_count?: number;
             /**
              * @description MountPath is the directory where the backing filesystem is mounted on
              *     the host running the Server: "/", "/Volumes/Backup", "/volume1", or a
@@ -17566,6 +18276,8 @@ export interface components {
             role?: "primary" | "regular";
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             storage_location_id?: string;
+            trash_bytes?: number;
+            trash_count?: number;
             verification?: components["schemas"]["dto.StorageRepositoryVerificationSummaryDTO"];
             write_policy?: components["schemas"]["dto.StorageRepositoryWritePolicyDTO"];
         };
@@ -18291,6 +19003,69 @@ export interface components {
              */
             type: "https://lumilio.org/problems/agent/operation-failed";
         };
+        "api.AssetMissingProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/asset/missing";
+        };
+        "api.AssetMissingProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/asset/missing";
+        };
+        "api.AssetOfflineProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/asset/offline";
+        };
+        "api.AssetOfflineProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/asset/offline";
+        };
+        "api.AssetTrashedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/asset/trashed";
+        };
+        "api.AssetTrashedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/asset/trashed";
+        };
         "api.AuthAuthenticationRequiredProblem": {
             /** Format: uri */
             instance: string;
@@ -18782,7 +19557,7 @@ export interface components {
              */
             type: "https://lumilio.org/problems/upload/processing-failed";
         };
-        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
+        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
         "api.RateLimitedProblemResponse": {
             /** Format: uri */
             instance: string;
