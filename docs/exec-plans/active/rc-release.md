@@ -3,8 +3,11 @@
 Status: active, created 2026-09-24. Phase 0 done (release workflow green on `dev` `c397cf38`); Phase 1 (release notes) next, best written once the milestone blockers land. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Target: `rc.1` tag on
 `main`, date **TBD** (owner decision 2026-09-24; originally 2026-09-29) until
-the RC blockers #222 and #223 land. Draft promotion PR **#210** (`dev` → `main`) is open and
-its CI was fully green at `dev` `f598310a` (all jobs, all 8 E2E slices).
+the RC blockers #222 and #223 land.
+rc.1 is a quality milestone, not a date deadline: the storage refactor completes fully,
+storage-repository bugs are eradicated, and core paths hold up through a stretch of real
+use by Edwin and a few friends. It can be postponed.
+Draft promotion PR **#210** (`dev` → `main`) is open and its CI was fully green at `dev` `f598310a` (all jobs, all 8 E2E slices).
 
 Goal: a published `rc.1` whose Server image and Desktop artifacts built from
 the promotion commit, with bilingual release notes, smoked once.
@@ -30,7 +33,10 @@ the promotion commit, with bilingual release notes, smoked once.
   pushed.
 - **RC blocker gate (hard stop).** The GitHub milestone
   [`v26.1.0-rc.1`](https://github.com/EdwinZhanCN/Lumilio-Photos/milestone/1)
-  holds every issue that blocks the RC; the user keeps adding to it. Before
+  admits only bugs meeting the blocker definition in release-hardening.md:
+  data loss, a broken core flow, or broken install/upgrade. #242 stays in
+  rc.1; #217 is outside rc.1. #240 and its released-build updater proof move
+  to rc.2, which needs a prior released build with an updater. Before
   marking #210 ready, before merging it, and again immediately before
   tagging, run:
   `gh issue list --milestone v26.1.0-rc.1 --state open`
@@ -92,7 +98,9 @@ the promotion commit, with bilingual release notes, smoked once.
 ### Phase 2 — Promote
 - [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
 - [ ] Update #210's body with the final list; mark it ready for review; CI
-  must be green on its final head with no skipped/quarantined checks.
+  must be green on its final head. Correctness tests are never skipped, disabled, or
+  quarantined to reach green. Performance and hardware checks in declared non-required
+  lanes are not quarantine.
 - [ ] User reviews and merges #210.
 
 ### Phase 3 — Tag and publish (user confirms first)
@@ -115,12 +123,12 @@ the promotion commit, with bilingual release notes, smoked once.
   (`server/migrations/steps/README.md`; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)). This is the last
   item of issue #221's scope.
 
-### Phase 4 — Smoke the published artifacts
-- [ ] Docker: on the radxa, pull the published image **by digest**, fresh
+### Phase 4 — Post-tag published-artifact checkpoints
+- [ ] Docker: on any Docker host (radxa optional), pull the published image **by digest**, fresh
   install with `deploy/compose/compose.yml`, setup wizard, upload a photo,
-  view it. (Pull on the radxa directly — this checks the registry artifact,
+  view it. (Pull from the registry directly — this checks the registry artifact,
   not a local build.)
-- [ ] Desktop: the user installs the published build on macOS or Windows,
+- [ ] Desktop post-tag checkpoint: the user installs the published build on macOS or Windows,
   onboarding, import, view.
 - [ ] Record digests and results in release-hardening.md; tick Phase 6;
   complete the parent plan per the exec-plan skill.

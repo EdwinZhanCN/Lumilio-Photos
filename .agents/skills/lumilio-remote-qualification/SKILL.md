@@ -1,14 +1,14 @@
 ---
 name: lumilio-remote-qualification
-description: Use when running hardware qualification, scheduling resilience,
+description: Use when running optional reference-hardware benchmarks, scheduling resilience,
   or heavy ADR validation on a remote Docker daemon (e.g. Radxa X4 / Intel N100)
   — execution budget limits, telemetry, disposable QueueDB recovery, and
   destructive resilience testing.
 ---
 
-# Remote Hardware Qualification & Scheduler Resilience
+# Reference Hardware Benchmark (Non-blocking)
 
-This skill defines the qualification protocol on dedicated remote hardware
+This skill defines an optional benchmark protocol on dedicated reference hardware
 (baseline qualification host: Radxa X4, Intel N100 4C/4T @ 768MB memory limit).
 
 ## Audience & Responsibility Boundary
@@ -18,9 +18,12 @@ This skill defines the qualification protocol on dedicated remote hardware
 | `lumilio-e2e-environment` | All contributors | Standard local E2E runs on developer workstations; fast iteration, mock services, zero special hardware requirements. |
 | `lumilio-remote-qualification` | Core maintainers & release reviewers | Low-power baseline hardware qualification, real CPU/cgroup memory saturation, and destructive crash-recovery drills. |
 
-### When to Execute Remote Qualification
+### When to Consider a Reference Benchmark
 
-Run this protocol when landing major architectural changes:
+This protocol is optional before releases or large changes. Its thresholds
+are reference numbers, never merge, issue-closure, or release gates. See
+[the lighter-gates decision](../../decisions/2026-10-07-lighter-gates.md).
+Consider it for:
 1. Concurrency or scheduling model changes (`execution.Budget`, `DemandCatalog`).
 2. Changes to media transcoding or imaging pipelines (ffmpeg thread limits, libvips memory/cache settings).
 3. Queue topology and recovery changes (disposable QueueDB contracts, SQLite WAL concurrency).
@@ -73,11 +76,11 @@ During a benchmark or qualification run, monitor the container from a secondary 
 docker ${LUMILIO_E2E_DOCKER_HOST:+--host $LUMILIO_E2E_DOCKER_HOST} stats lumilio-photos-e2e-lumilio-1
 ```
 
-- **Target Peak**: ~375% on 4C/4T (video transcode allocated 3 threads + photo processing allocated 1 thread).
+- **Reference Peak**: ~375% on 4C/4T (video transcode allocated 3 threads + photo processing allocated 1 thread).
 - **Triage**: If CPU stays below 320% during video transcoding, inspect thread allocations in `execution.Budget` or lock contention in libvips.
 
 ### 2. Memory Limits and cgroup OOM Detection
-Ensure the container stays within the 768 MB budget without tripping the Linux kernel OOM killer:
+Record behavior under the reference 768 MB limit, including any cgroup OOM:
 
 ```sh
 docker ${LUMILIO_E2E_DOCKER_HOST:+--host $LUMILIO_E2E_DOCKER_HOST} inspect \
@@ -110,10 +113,14 @@ Run the full media ingestion and video semantic suite against the remote host:
 LUMILIO_E2E_DOCKER_HOST="ssh://radxa-x4" task web:test:video-semantic
 ```
 
-Verify:
-1. End-to-end ingestion throughput matches or exceeds the 1.7 assets/s baseline.
+Report:
+1. End-to-end ingestion throughput against the 1.7 assets/s reference.
 2. All derivative files (thumbnails, transcode profiles, embeddings) complete without error.
-3. Health check endpoints (`/api/v1/health/ready`) respond with HTTP 200 within 50ms under load.
+3. Health endpoint latency against the 50ms reference under load.
+
+Correctness (completed derivatives and successful recovery) remains required;
+this manual hardware run is optional. The QueueDB-loss/crash drill below
+should become a reproducible Docker E2E correctness check on any host.
 
 ### Step 3: Destructive Resilience Testing (QueueDB Loss & Kill -9)
 The architectural contract mandates that `catalog.db` holds product truth and `river.sqlite3` is completely disposable.

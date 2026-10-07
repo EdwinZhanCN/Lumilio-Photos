@@ -7,10 +7,11 @@ checklist"); must finish before the rc.1 tag (date TBD, owner decision
 [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md)
 (#222, #223) merges; those PRs replace scanning, Storage counts, and delete.
 
-Goal: every flow below has a recorded verdict (pass / fail + PR / deferred +
-tracker entry) on **a fresh Docker Compose install** and on **Desktop**. This
-is a human-eye pass over what E2E does not cover (layout, empty states,
-copy, i18n, keyboard and error paths), not a replacement for the E2E slices.
+Goal: a tag-time checkpoint of core flows on a fresh Docker Compose install
+on any Docker host (including this cloud box or Mac Docker) and Desktop on
+Edwin's Mac. Record first-run setup, upload/browse, Storage create including a
+removable Storage Location, Trash/restore, and language switch. Other rows
+are spot checks; Windows is checked if available. This complements E2E.
 
 ## Non-goals
 
@@ -28,44 +29,35 @@ copy, i18n, keyboard and error paths), not a replacement for the E2E slices.
   [release-hardening.md](release-hardening.md#fixed-contracts). A cosmetic or
   copy issue is never a blocker; a data-loss, blank page, or broken core flow
   always is.
-- Bilingual: run each flow in English, and switch to 中文 at least once per
-  page to catch untranslated or broken strings (canonical terms: Storage
-  Location / 存储位置, Repository / 资源库 — see the
+- Bilingual checkpoint: run core flows in English and switch to 中文 to catch untranslated
+  or broken strings (canonical terms: Storage Location / 存储位置, Repository / 资源库 — see the
   `lumilio-frontend-i18n` skill's registry).
 
-## Part A — Docker Compose (agent-runnable on the radxa)
+## Part A — Docker Compose (any Docker host)
 
-Environment: `ssh radxa-x4` (Intel N100, Fedora 44, fish shell — wrap bash in
-`bash -c`). Build the server image **on this Mac** for `linux/amd64` from the
-promotion head, ship it with `docker save | gzip -1 | ssh radxa-x4 'gunzip |
-docker load'`, then install with `deploy/compose/compose.yml` exactly as
-`site/docs/en/user-manual/introduction/first-use.md` tells a user (set
-`LUMILIO_IMAGE` to the shipped tag). Use its own compose project (`-p
-rc-smoke`), its own data dir (`~/rc-smoke/`), and a port that doesn't collide
-with `lumilio-photos-e2e` (16657–16659) or `rc-compat`. Reach it from the Mac
-with an SSH tunnel and drive a real browser (Chrome via the claude-in-chrome
-tools, or Playwright headed). For ML flows, the radxa runs a real Lumen Hub
-on `:50051` (face, siglip, ocr); connect it through the documented settings
-path.
+Install the promotion-head image with `deploy/compose/compose.yml` as the
+first-use guide describes. Use an isolated `rc-smoke` Compose project, data
+directory, and port, then drive a real browser. ML flows are optional spot
+checks with a configured Hub. Intel N100 / radxa-x4 is optional reference
+hardware, never a release prerequisite.
 
 Seed with a realistic library: the pinned `demo` profile from the assets cache
 (`/Volumes/CodeBase/Projects/Lumilio-Photos/.cache/lumilio-assets/<rev>/demo`,
 see `web/scripts/assets-sync.ts`), uploaded through the UI.
 
-## Part B — Desktop (the user runs this; macOS or Windows)
+## Part B — Desktop (Edwin's Mac; Windows if available)
 
 Install the Desktop build from the promotion head (or the latest CI artifact
 of #210), complete onboarding, import a folder of mixed media, and walk the
 same table. Also check: tray menu open/quit, "open in browser" at
-`localhost:6680`, restart the app and confirm the library persists, and an
-in-place upgrade from the installed v26.1.0-beta.1 Desktop if available.
+`localhost:6680`, restart the app and confirm the library persists.
 
-## Checklist (record one row per flow, per part)
+## Checklist (core checkpoint rows; other rows are spot checks)
 
 | Flow | What to check |
 |---|---|
-| First run / setup | Wizard completes; no "Unable to verify system status"; primary Repository created; zh copy renders |
-| Photos / browse | Grid, timeline scrubbing, detail view, EXIF panel, zoom, keyboard nav, empty state before import |
+| First run / setup (core) | Wizard completes; no "Unable to verify system status"; primary Repository created; zh copy renders |
+| Upload / Photos / browse (core) | Upload mixed media, browse the grid, and open a detail view. Spot-check timeline scrubbing, EXIF, zoom, keyboard navigation, and empty states |
 | Video & music | Video play + seek right after import (regression area of #216), music album play/next/queue, lyrics if present |
 | Search | Filename, semantic ("ocean", "portrait"), filters (date, camera, location), no-results state |
 | People | Clusters appear with Hub on, rename (modal), merge, hide; cover choice |
@@ -74,21 +66,22 @@ in-place upgrade from the installed v26.1.0-beta.1 Desktop if available.
 | Share links | Create from gallery and viewer, open logged out, revoke → "no longer available" |
 | Studio | Open a photo, frame/text tools, export; RAW (NEF) open |
 | Map | Photos with GPS appear; empty state without GPS |
-| Settings / Users | Appearance/theme, language switch, create a second user, change password → sign out → sign in (regression area of #214), MFA page |
-| Storage admin | Storage Locations and Repositories, asset counts non-zero (#209), scan now, verification badge |
-| Scanning (#222) | Full test, not a spot-check: copy a folder in and see it appear without a manual scan; move and rename a folder and check that albums survive; unplug an external disk (or stop the share) and check that nothing goes Missing and the Repository shows offline |
-| Trash (#223) | Delete a photo and see the file under `<repo>/.lumilio/trash`; restore it with album, rating, and people intact; delete permanently and see it gone from disk; delete on an offline Repository is refused with a reason; resolve a duplicate group and see the duplicates in Trash |
+| Language switch (core) | Switch English / 中文 and confirm the page remains usable with translated copy |
+| Settings / Users | Appearance/theme, create a second user, change password → sign out → sign in (regression area of #214), MFA page |
+| Storage admin (core) | Create a Repository and a Storage Location, including a removable location; asset counts non-zero (#209), scan now, verification badge |
+| Scanning (#222) | Spot-check: copy a folder in and see it appear without a manual scan; move and rename a folder and check that albums survive; unplug an external disk (or stop the share) and check that nothing goes Missing and the Repository shows offline |
+| Trash / restore (#223, core) | Delete a photo and see the file under `<repo>/.lumilio/trash`; restore it with album, rating, and people intact. Spot-check: delete permanently and see it gone from disk; delete on an offline Repository is refused with a reason; resolve a duplicate group and see the duplicates in Trash |
 | Missing and edits (#223) | Delete a file outside Lumilio: it leaves the library and appears in the Missing view on the Storage page, and Remove missing items clears it; edit a photo in another app (save over the file): album, rating, and people are kept |
 | Processing / Monitor | Stage grid settles to idle; retry on a failed item |
 | Agent (Lumilio) | Plain chat with a configured provider if available; otherwise note "not configured" |
 
 ## Execution phases
 
-- [ ] Part A run on the radxa; results recorded below.
-- [ ] Part B run by the user; results recorded below.
-- [ ] Every failure: blocker fix PR into `dev` or a tracker entry with owner
-  path and user impact; tick release-hardening Phase 3 items; tear down
-  `rc-smoke` on the radxa; delete this plan.
+- [ ] Part A core rows run on any Docker host; results recorded below.
+- [ ] Part B core rows run on Edwin's Mac; Windows if available; results recorded below.
+- [ ] Every failure: fix blockers in `dev`; recording deferred findings in the tracker
+  is encouraged; tick release-hardening Phase 3 items; tear down
+  `rc-smoke` on the chosen host; delete this plan.
 
 ## Results
 
@@ -97,5 +90,6 @@ tracker link.)
 
 ## Validation boundaries
 
-- Every row has a verdict in both parts.
+- Core rows have tag-time verdicts for Docker and Edwin's Mac, including language switch.
+- Other rows are spot checks; missing spot checks do not block the tag.
 - No open blocker.
