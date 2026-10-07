@@ -75,6 +75,7 @@ Uses: `foundation`, `media`, `catalog`, `domain`
 | `server/internal/storage/repocfg` | Package repocfg defines a single repository's own configuration: the .lumiliorepo file and the catalog column that mirrors it. | [`server/internal/storage/repocfg/doc.go`](../../../server/internal/storage/repocfg/doc.go) |
 | `server/internal/storage/rootcfg` | Package rootcfg owns the portable .lumilioroot marker used to identify an authorized repository container independently from its current mount path. | [`server/internal/storage/rootcfg/doc.go`](../../../server/internal/storage/rootcfg/doc.go) |
 | `server/internal/storage/scan` | Package scan is the repository scan index (#222). | [`server/internal/storage/scan/doc.go`](../../../server/internal/storage/scan/doc.go) |
+| `server/internal/storage/testfixture` | Package testfixture builds deterministic Storage Location and Repository trees for tests. | [`server/internal/storage/testfixture/doc.go`](../../../server/internal/storage/testfixture/doc.go) |
 | `server/internal/storage/trash` | Package trash moves deleted Assets' files into their repository's trash and back. | [`server/internal/storage/trash/doc.go`](../../../server/internal/storage/trash/doc.go) |
 
 ### Lumilio Agent (`agent`)
