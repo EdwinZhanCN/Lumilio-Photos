@@ -83,17 +83,29 @@ func TestTypedMarkerReadings(t *testing.T) {
 	}
 }
 
+// canonicalPath mirrors the observer's symlink resolution so injected facts
+// keyed by path also match on macOS, where TempDir lives under /var -> /private/var.
+func canonicalPath(t *testing.T, path string) string {
+	t.Helper()
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved
+}
+
 func TestAssessmentReadOnlyAndChildIndependence(t *testing.T) {
 	for _, parent := range []testfixture.Marker{testfixture.Valid, testfixture.Corrupt, testfixture.Missing, testfixture.Unsupported} {
 		location := testfixture.NewLocation(t, parent)
 		repository := location.Repository(t, "child", testfixture.Valid, testfixture.MissingPrivate)
 		before := treeSnapshot(t, location.Path)
 		observer := factsObserver()
+		locationPath := canonicalPath(t, location.Path)
 		observer.MountInfoFunc = func(p string) (storage.MountFacts, error) {
-			if p == location.Path {
+			if p == locationPath {
 				return storage.MountFacts{Platform: "linux", MountID: "A", Device: "A", MountPath: "/"}, nil
 			}
-			return storage.MountFacts{Platform: "linux", MountID: "B", Device: "B", MountPath: repository.Path, Removable: true}, nil
+			return storage.MountFacts{Platform: "linux", MountID: "B", Device: "B", MountPath: canonicalPath(t, repository.Path), Removable: true}, nil
 		}
 		parentResult := storage.AssessStorageTarget(context.Background(), observer, location.Path, false, "")
 		child := storage.AssessStorageTarget(context.Background(), observer, repository.Path, true, repository.Config.ID)
@@ -190,7 +202,7 @@ func TestAbsentTargetUsesNearestProvenAncestor(t *testing.T) {
 	observer := factsObserver()
 	target := filepath.Join(location.Path, "absent", "child")
 	result := storage.AssessStorageTarget(context.Background(), observer, target, true, "")
-	if result.Observation.SamplePath != location.Path || result.Observation.Access.State != storage.AccessAbsent || !result.Capabilities.ReviewCreate {
+	if result.Observation.SamplePath != canonicalPath(t, location.Path) || result.Observation.Access.State != storage.AccessAbsent || !result.Capabilities.ReviewCreate {
 		t.Fatalf("%+v", result)
 	}
 	observer.StatFunc = func(p string) (fs.FileInfo, error) {
@@ -299,9 +311,10 @@ func TestChildSupportUsesActualFilesystem(t *testing.T) {
 	location := testfixture.NewLocation(t, testfixture.Valid)
 	child := location.Repository(t, "network-child", testfixture.Valid, testfixture.Full)
 	observer := factsObserver()
+	childPath := canonicalPath(t, child.Path)
 	observer.StatFSFunc = func(p string) (storage.VolumeFacts, error) {
 		filesystem := "ext4"
-		if p == child.Path {
+		if p == childPath {
 			filesystem = "cifs"
 		}
 		return storage.VolumeFacts{Filesystem: filesystem, CapacityGroupKey: "same-pool"}, nil
