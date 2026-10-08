@@ -55,7 +55,7 @@ sequenceDiagram
 | repository_scans / repository_entries | `sql:repository_entries` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
 | ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/queue/macro_boundary_workers.go:40`](../../../../server/internal/queue/macro_boundary_workers.go#L40) |
-| Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:187`](../../../../server/internal/storage/repository_fs.go#L187) |
+| Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:181`](../../../../server/internal/storage/repository_fs.go#L181) |
 | ScanWriter (commit coordinator) | `go:commit.ScanWriter` [`server/internal/commit/scan_writer.go:14`](../../../../server/internal/commit/scan_writer.go#L14) |
 
 ## Steps
@@ -64,7 +64,7 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | 1 | admin → api | _alt manual verification_ — POST /storage/repositories/{id}/verifications | `api:POST /api/v1/storage/repositories/{id}/verifications` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
 | 2 | api → scanner | _alt manual verification_ — RequestScan(trigger=manual) | `go:scan.Scanner.RequestScan` [`server/internal/storage/scan/commands.go:28`](../../../../server/internal/storage/scan/commands.go#L28) |
-| 3 | watcher → scanner | _else filesystem events (batched, 10 s)_ — request a subtree scan, or a full scan above 512 events | `go:scan.Watcher.Run` [`server/internal/storage/scan/watcher.go:104`](../../../../server/internal/storage/scan/watcher.go#L104) |
+| 3 | watcher → scanner | _else filesystem events (batched, 10 s)_ — request a subtree scan, or a full scan above 512 events | `go:scan.Watcher.Run` [`server/internal/storage/scan/watcher.go:118`](../../../../server/internal/storage/scan/watcher.go#L118) |
 | 4 | scanner → scanner | _else periodic timer (jittered)_ — RequestAllPeriodic | `go:scan.Scanner.RequestAllPeriodic` [`server/internal/storage/scan/commands.go:47`](../../../../server/internal/storage/scan/commands.go#L47) |
 | 5 | scanner → catalog | insert or coalesce a queued scan |  |
 | 6 | scheduler → worker | one unique ScanRepositoryBatchArgs per repository | `go:jobs.ScanRepositoryBatchArgs` [`server/internal/queue/jobs/macro.go:68`](../../../../server/internal/queue/jobs/macro.go#L68) |
@@ -81,6 +81,10 @@ sequenceDiagram
 ## Disk is the truth
 
 The catalog mirrors each repository tree in repository_entries, one row per file or directory. A full scan is the authority; watcher events only make the next scan sooner. Nothing in this flow unlinks, trashes, or purges a file.
+
+## Replaceable local observation boundaries
+
+RepositoryFS keeps reads rooted and delegates portable-marker verification and native file identity to RepositoryIdentityDetector. Recursive event start/stop uses ChangeWatchBackend; the defaults retain the same local identity and syncthing/notify hints. A full scan remains authoritative.
 
 ## Bounded writer holds
 

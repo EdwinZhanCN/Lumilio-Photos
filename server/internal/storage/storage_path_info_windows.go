@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"golang.org/x/sys/windows"
@@ -41,6 +42,14 @@ func inspectPathPlatform(path string) pathPlatformInfo {
 	// into an NTFS directory.
 	if mountPath, err := windowsVolumeRootPath(path); err == nil {
 		result.MountPath = mountPath
+		if root, err := windows.UTF16PtrFromString(mountPath); err == nil {
+			driveType := windows.GetDriveType(root)
+			if driveType == windows.DRIVE_UNKNOWN || driveType == windows.DRIVE_NO_ROOT_DIR {
+				result.ObservationErr = fmt.Errorf("drive type unavailable for %q", mountPath)
+			}
+			result.Remote = driveType == windows.DRIVE_REMOTE
+			result.Removable = driveType == windows.DRIVE_REMOVABLE
+		}
 	}
 	return result
 }

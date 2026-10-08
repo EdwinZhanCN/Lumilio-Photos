@@ -154,3 +154,42 @@ func TestPeriodicDelayStaysWithinJitterBounds(t *testing.T) {
 }
 
 func nopLogger() *zap.Logger { return zap.NewNop() }
+
+// An injected backend participates in the real watcher lifecycle, including
+// cancellation and release; no native watcher or scheduling sleep is needed.
+type recordingChangeWatch struct {
+	started chan string
+	stopped chan struct{}
+}
+
+func (b recordingChangeWatch) Watch(path string, _ chan<- notify.EventInfo) error {
+	b.started <- path
+	return nil
+}
+func (b recordingChangeWatch) Stop(chan<- notify.EventInfo) { close(b.stopped) }
+
+func TestWatcherUsesInstalledChangeBackend(t *testing.T) {
+	backend := recordingChangeWatch{started: make(chan string, 1), stopped: make(chan struct{})}
+	watcher := &Watcher{config: (WatchConfig{Backend: backend}).withDefaults(), logger: nopLogger()}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	done := make(chan struct{})
+	root := t.TempDir()
+	go func() { defer close(done); watcher.watchRepository(ctx, uuid.New(), root) }()
+	select {
+	case got := <-backend.started:
+		if got != root {
+			t.Fatalf("watched %s, want %s", got, root)
+		}
+	case <-time.After(5 * time.Second):
+		cancel()
+		t.Fatal("backend never started")
+	}
+	cancel()
+	select {
+	case <-backend.stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("backend never stopped")
+	}
+	<-done
+}

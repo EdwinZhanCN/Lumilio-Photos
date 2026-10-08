@@ -19,6 +19,7 @@ flowchart LR
         n_server_internal_artifact["artifact"]
         n_server_internal_storage["storage"]
         n_server_internal_storage_locations["storage/locations"]
+        n_server_internal_storage_marker["storage/marker"]
         n_server_internal_storage_pathsemantics["storage/pathsemantics"]
         n_server_internal_storage_repocfg["storage/repocfg"]
         n_server_internal_storage_rootcfg["storage/rootcfg"]
@@ -41,10 +42,11 @@ flowchart LR
     n_server_internal_storage --> n_server_internal_storage_repocfg
     n_server_internal_storage --> n_server_internal_storage_rootcfg
     n_server_internal_storage_locations --> n_server_internal_storage
+    n_server_internal_storage_repocfg --> n_server_internal_storage_marker
+    n_server_internal_storage_rootcfg --> n_server_internal_storage_marker
     n_server_internal_storage_scan --> n_server_internal_storage
     n_server_internal_storage_scan --> n_server_internal_storage_pathsemantics
-    n_server_internal_storage_testfixture --> n_server_internal_storage_repocfg
-    n_server_internal_storage_testfixture --> n_server_internal_storage_rootcfg
+    n_server_internal_storage_testfixture --> n_server_internal_storage
     n_server_internal_storage_trash --> n_server_internal_storage_scan
     n_g_Storage -.-> n_out_catalog
     n_g_Storage -.-> n_out_domain
@@ -66,6 +68,7 @@ flowchart LR
 | artifact | Package artifact owns the one immutable publication contract for derived pipeline files inside a registered repository. | `mod:server/internal/artifact` [`server/internal/artifact/doc.go`](../../../../server/internal/artifact/doc.go) |
 | storage | Package storage owns Lumilio's on-disk media layout and the lifecycle of repositories. | `mod:server/internal/storage` [`server/internal/storage/doc.go`](../../../../server/internal/storage/doc.go) |
 | storage/locations | Package locations resolves logical Assets to a present physical file immediately before media I/O. It holds the RepositoryFS lifecycle lease for the lifetime of the returned capability and falls through unavailable copies without changing catalog state. | `mod:server/internal/storage/locations` [`server/internal/storage/locations/doc.go`](../../../../server/internal/storage/locations/doc.go) |
+| storage/marker | Package marker owns typed portable-marker readings and guarded atomic replacement. | `mod:server/internal/storage/marker` [`server/internal/storage/marker/doc.go`](../../../../server/internal/storage/marker/doc.go) |
 | storage/pathsemantics | Package pathsemantics turns filesystem-specific name comparison rules into durable repository name keys. | `mod:server/internal/storage/pathsemantics` [`server/internal/storage/pathsemantics/doc.go`](../../../../server/internal/storage/pathsemantics/doc.go) |
 | storage/repocfg | Package repocfg defines a single repository's own configuration: the .lumiliorepo file and the catalog column that mirrors it. | `mod:server/internal/storage/repocfg` [`server/internal/storage/repocfg/doc.go`](../../../../server/internal/storage/repocfg/doc.go) |
 | storage/rootcfg | Package rootcfg owns the portable .lumilioroot marker used to identify an authorized repository container independently from its current mount path. | `mod:server/internal/storage/rootcfg` [`server/internal/storage/rootcfg/doc.go`](../../../../server/internal/storage/rootcfg/doc.go) |

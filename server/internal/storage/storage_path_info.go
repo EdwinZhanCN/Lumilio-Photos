@@ -197,13 +197,16 @@ func filesystemFromMountInfo(reader io.Reader, path string) (string, error) {
 }
 
 type pathPlatformInfo struct {
-	MountID      string
-	MountSource  string
-	MountPath    string
-	Device       string
-	Inode        uint64
-	EffectiveUID string
-	EffectiveGID string
+	ObservationErr error
+	Remote         bool
+	Removable      bool
+	MountID        string
+	MountSource    string
+	MountPath      string
+	Device         string
+	Inode          uint64
+	EffectiveUID   string
+	EffectiveGID   string
 }
 
 func isNetworkFilesystem(filesystem string) bool {

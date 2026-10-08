@@ -193,6 +193,7 @@ type RepositoryManager interface {
 
 // DefaultRepositoryManager implements the RepositoryManager interface
 type DefaultRepositoryManager struct {
+	lockProvider   RepositoryLockProvider
 	database       *sql.DB
 	writer         *catalogtx.Writer
 	readerDatabase *sql.DB
@@ -201,6 +202,7 @@ type DefaultRepositoryManager struct {
 	dirManager     DirectoryManager
 	files          *RepositoryFSFactory
 	logger         *zap.Logger
+	observer       StorageObserver
 	auditProvider  logging.RepositoryAuditProvider
 	initialScan    func(context.Context, string) error
 	ownershipMu    sync.Mutex
@@ -420,13 +422,23 @@ func (rm *DefaultRepositoryManager) validateRepository(path string) (*Validation
 	}
 
 	// Check if directory exists
-	info, err := os.Stat(cleanPath)
+	observer := rm.observer
+	if observer == nil {
+		observer = OSStorageObserver{}
+	}
+	info, err := observer.Stat(cleanPath)
 	if os.IsNotExist(err) {
 		result.Valid = false
 		result.Errors = append(result.Errors, "Repository directory does not exist")
 		return result, nil
 	}
 
+	if err != nil || info == nil {
+		result.Valid = false
+		reading := ReadAccess(info, err)
+		result.Errors = append(result.Errors, fmt.Sprintf("Repository directory observation %s: %v", reading.State, reading.Err))
+		return result, nil
+	}
 	if !info.IsDir() {
 		result.Valid = false
 		result.Errors = append(result.Errors, "Path is not a directory")

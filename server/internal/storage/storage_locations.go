@@ -86,7 +86,7 @@ func (rm *DefaultRepositoryManager) EnsureDefaultStorageLocation(ctx context.Con
 	var config *rootcfg.RootConfig
 	if createdMarker {
 		config = rootcfg.New("Default storage")
-	} else if config, err = rootcfg.Load(cleanPath); err != nil {
+	} else if config, err = rm.identities().LoadLocation(cleanPath); err != nil {
 		return nil, err
 	}
 	if defaultErr == nil && config.ID != existingDefault.StorageLocationID.String() {
@@ -116,7 +116,7 @@ func (rm *DefaultRepositoryManager) EnsureDefaultStorageLocation(ctx context.Con
 		if err != nil {
 			return nil, err
 		}
-		diskConfig, err := rootcfg.Load(cleanPath)
+		diskConfig, err := rm.identities().LoadLocation(cleanPath)
 		if err != nil || diskConfig.ID != registered.StorageLocationID.String() {
 			return nil, fmt.Errorf("%w: default Storage Location identity is invalid", ErrStorageLocationInvalid)
 		}
@@ -245,7 +245,7 @@ func (rm *DefaultRepositoryManager) AddStorageLocation(ctx context.Context, path
 	var config *rootcfg.RootConfig
 	if createdMarker {
 		config = rootcfg.New(storageLocationName)
-	} else if config, err = rootcfg.Load(cleanPath); err != nil {
+	} else if config, err = rm.identities().LoadLocation(cleanPath); err != nil {
 		return nil, err
 	}
 	targetID := config.ID
@@ -406,7 +406,7 @@ func (rm *DefaultRepositoryManager) relocateStorageLocation(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	config, err := rootcfg.Load(cleanPath)
+	config, err := rm.identities().LoadLocation(cleanPath)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (rm *DefaultRepositoryManager) relocateStorageLocation(ctx context.Context,
 		return nil, fmt.Errorf("%w: selected directory has a different .lumilioroot identity", ErrStorageLocationInvalid)
 	}
 	if registered.Path != cleanPath {
-		if originalConfig, originalErr := rootcfg.Load(registered.Path); originalErr == nil && originalConfig.ID == storageLocationID.String() {
+		if originalConfig, originalErr := rm.identities().LoadLocation(registered.Path); originalErr == nil && originalConfig.ID == storageLocationID.String() {
 			return nil, &StorageLocationConflictError{
 				StorageLocationID: storageLocationID.String(), RegisteredPath: registered.Path, RequestedPath: cleanPath,
 				Actions: []string{},
@@ -456,7 +456,7 @@ func (rm *DefaultRepositoryManager) relocateStorageLocation(ctx context.Context,
 		if moveErr != nil {
 			return nil, moveErr
 		}
-		repositoryConfig, loadErr := repocfg.LoadConfigFromFile(requestedRepositoryPath)
+		repositoryConfig, loadErr := rm.identities().LoadRepository(requestedRepositoryPath)
 		if loadErr != nil {
 			return nil, fmt.Errorf("validate repository after Storage Location move: %w", loadErr)
 		}
@@ -629,7 +629,7 @@ func (rm *DefaultRepositoryManager) registerStorageLocation(
 	if registered, err := rm.queries.GetStorageLocation(ctx, storageLocationID); err == nil {
 		if registered.Path != path && !allowMove {
 			actions := []string{"relocate"}
-			if marker, markerErr := rootcfg.Load(registered.Path); markerErr == nil && marker.ID == config.ID {
+			if marker, markerErr := rm.identities().LoadLocation(registered.Path); markerErr == nil && marker.ID == config.ID {
 				actions = nil
 			}
 			return nil, &StorageLocationConflictError{
@@ -689,7 +689,7 @@ func (rm *DefaultRepositoryManager) ReconcileStorageLocations(ctx context.Contex
 		name := storageLocation.Name
 		if info, statErr := os.Stat(storageLocation.Path); statErr != nil || !info.IsDir() {
 			status = dbtypes.StorageLocationStatusOffline
-		} else if config, loadErr := rootcfg.Load(storageLocation.Path); loadErr != nil {
+		} else if config, loadErr := rm.identities().LoadLocation(storageLocation.Path); loadErr != nil {
 			status = dbtypes.StorageLocationStatusError
 		} else if config.ID != storageLocation.StorageLocationID.String() {
 			status = dbtypes.StorageLocationStatusError
@@ -844,7 +844,7 @@ func (rm *DefaultRepositoryManager) resolveStorageLocationForCreate(ctx context.
 }
 
 func validateRegisteredStorageLocationMarker(storageLocation repo.StorageLocation) error {
-	config, err := rootcfg.Load(storageLocation.Path)
+	config, err := (LocalRepositoryIdentityDetector{}).LoadLocation(storageLocation.Path)
 	if err != nil || config.ID != storageLocation.StorageLocationID.String() {
 		return fmt.Errorf("%w: %s", ErrStorageLocationInvalid, storageLocation.Path)
 	}

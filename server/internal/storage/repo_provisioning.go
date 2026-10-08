@@ -30,7 +30,7 @@ var (
 	ErrRepositoryDirectoryConflict           = errors.New("repository storage folder conflicts with an existing directory")
 	ErrRepositoryTargetNotEmpty              = errors.New("repository target directory is not empty")
 	ErrRepositoryStorageNotWritable          = errors.New("repository storage is not writable")
-	ErrRepositoryExistingTargetNotMountPoint = errors.New("existing empty repository target is not a Linux mount point")
+	ErrRepositoryExistingTargetNotMountPoint = errors.New(NotMountedVolumeMessage)
 	ErrRepositoryRiskConfirmationRequired    = errors.New("storage placement risk confirmation is required")
 )
 
