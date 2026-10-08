@@ -67,7 +67,7 @@ flowchart TB
 | Execution governor | Process-wide admission by QoS class (interactive, background, maintenance) against CPU, disk I/O, image and video codec, inference, and memory budgets. | `go:execution.Governor` [`server/internal/execution/governor.go:100`](../../../../server/internal/execution/governor.go#L100) |
 | Processors | Read/compute only; publish derived files, never catalog rows. | `go:processors.AssetProcessor` [`server/internal/processors/asset_processor.go:25`](../../../../server/internal/processors/asset_processor.go#L25) |
 | Lumen Hub (optional ML) |  | `ext:Lumen Hub` |
-| Repository files and artifacts |  | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:187`](../../../../server/internal/storage/repository_fs.go#L187) |
+| Repository files and artifacts |  | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:181`](../../../../server/internal/storage/repository_fs.go#L181) |
 | Commit coordinator | Batches results into bounded writer transactions and checks fences. | `go:commit.Coordinator` [`server/internal/commit/coordinator.go:122`](../../../../server/internal/commit/coordinator.go#L122) |
 | asset_pipeline_state · applied_version | The same rows as desired state; applied_version catches up, or the result is stale and the work is derived again. | `sql:asset_pipeline_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | catalog_operation_receipts · terminal | What the browser's upload queue and the processing monitor wait for. | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |

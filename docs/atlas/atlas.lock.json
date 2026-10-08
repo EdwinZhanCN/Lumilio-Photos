@@ -55,7 +55,7 @@
     "go:queue.New": "7ff14433a555a88d",
     "go:queue.Scheduler.ScheduleOnce": "bc9575d57e2e4f6d",
     "go:queue.SchedulerWake": "94316fdd1837e84d",
-    "go:server/internal/storage.RepositoryFS": "97cdb4acd6fb1e5a"
+    "go:server/internal/storage.RepositoryFS": "33ecd8a928f607fa"
   },
   "bootstrap": {
     "go:service.BootstrapPhaseAdminCreated": "abd6d821069d3256",
@@ -115,7 +115,7 @@
     "go:scan.Watcher.Run": "55c2b231226812f9",
     "go:scan.walkTurn.flush": "809929d3a9c3c596",
     "go:scan.walkTurn.processDirectory": "50f9ef479802e489",
-    "go:server/internal/storage.RepositoryFS": "97cdb4acd6fb1e5a",
+    "go:server/internal/storage.RepositoryFS": "33ecd8a928f607fa",
     "go:service.ApplyAssetActivationTx": "c0e330402a47741e",
     "ts:features/repositories#useRepositoryScan": "e49995664278ffd7"
   },
@@ -146,7 +146,7 @@
     "go:llm.NewChatModel": "e806e80b2393e8f2",
     "go:queue.Scheduler": "b54a23a181b4b496",
     "go:server/app.Run": "246da21c04e13564",
-    "go:server/internal/storage.RepositoryFS": "97cdb4acd6fb1e5a",
+    "go:server/internal/storage.RepositoryFS": "33ecd8a928f607fa",
     "go:service.LumenService": "4d2efa8e41ea1092"
   },
   "upload-file": {

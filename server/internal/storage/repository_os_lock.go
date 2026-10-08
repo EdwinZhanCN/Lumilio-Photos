@@ -83,6 +83,10 @@ func acquirePathLocks(ctx context.Context, paths []string, exclusive bool) (func
 }
 
 func acquirePathLock(ctx context.Context, lockPath string, exclusive bool) (func(), error) {
+	return OSRepositoryLockProvider{}.Acquire(ctx, lockPath, exclusive)
+}
+
+func acquireLocalPathLock(ctx context.Context, lockPath string, exclusive bool) (func(), error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("%w: context is required", ErrRepositoryLockUnavailable)
 	}
@@ -122,6 +126,10 @@ func acquirePathLock(ctx context.Context, lockPath string, exclusive bool) (func
 }
 
 func InspectRepositoryLock(path, targetType string) (RepositoryLockInfo, error) {
+	return OSRepositoryLockProvider{}.Inspect(path, targetType)
+}
+
+func inspectLocalRepositoryLock(path, targetType string) (RepositoryLockInfo, error) {
 	name := ".lumiliorepo.lock"
 	if targetType == "storage_location" {
 		name = ".lumilioroot.lock"

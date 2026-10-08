@@ -108,7 +108,7 @@ func (rm *DefaultRepositoryManager) inspectRepositoryOnDisk(current repo.Reposit
 		return dbtypes.RepositoryReachabilityOffline, nil
 	}
 
-	config, err := repocfg.LoadConfigFromFile(current.Path)
+	config, err := rm.identities().LoadRepository(current.Path)
 	if err != nil {
 		return dbtypes.RepositoryReachabilityIdentityError, nil
 	}

@@ -83,3 +83,16 @@ implementation.
 - **Implement managed Move under the Relocate label.** Rejected: copying,
   verification, cancellation, space planning, and crash recovery need their
   own design and must not be smuggled into the assessment refactor.
+
+## Facts/clarifications 2026-10-07
+
+macOS and Windows ship the Desktop App plus Web App. Linux ships only the
+Docker app on Debian trixie; there is no native Linux desktop.
+The smaller **Existing empty directory / Linux empty mount point versus empty
+folder** question is resolved: retain the mounted-volume constraint
+permanently. An existing empty mount point (including a bind-mounted host
+volume) is allowed; an ordinary existing empty directory is rejected because
+it lives in the container's ephemeral writable layer and its data is lost on
+container recreation. The reason is `storage/not-a-mounted-volume`, with
+instructions to mount a host directory in compose. This clarifies the support
+matrix without changing the five approved decisions or rejection outcome.

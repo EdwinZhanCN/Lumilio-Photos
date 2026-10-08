@@ -38,7 +38,20 @@ type watchReader interface {
 	ListRepositories(context.Context) ([]repo.Repository, error)
 }
 
+// ChangeWatchBackend supplies recursive event hints; full scans remain authority.
+type ChangeWatchBackend interface {
+	Watch(string, chan<- notify.EventInfo) error
+	Stop(chan<- notify.EventInfo)
+}
+type LocalChangeWatchBackend struct{}
+
+func (LocalChangeWatchBackend) Watch(path string, events chan<- notify.EventInfo) error {
+	return notify.Watch(filepath.Join(path, "..."), events, notify.All)
+}
+func (LocalChangeWatchBackend) Stop(events chan<- notify.EventInfo) { notify.Stop(events) }
+
 type WatchConfig struct {
+	Backend ChangeWatchBackend
 	// Delay is how long a batch collects events before it requests a scan.
 	Delay time.Duration
 	// FullScanEvents turns a batch into a full-repository scan.
@@ -68,13 +81,14 @@ func (c WatchConfig) withDefaults() WatchConfig {
 	if c.RetryMax <= 0 {
 		c.RetryMax = 10 * time.Minute
 	}
+	if c.Backend == nil {
+		c.Backend = LocalChangeWatchBackend{}
+	}
 	if c.watch == nil {
-		c.watch = func(path string, events chan<- notify.EventInfo) error {
-			return notify.Watch(filepath.Join(path, "..."), events, notify.All)
-		}
+		c.watch = c.Backend.Watch
 	}
 	if c.stop == nil {
-		c.stop = notify.Stop
+		c.stop = c.Backend.Stop
 	}
 	return c
 }

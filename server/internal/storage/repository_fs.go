@@ -17,7 +17,6 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/storage/repocfg"
 	hashutil "server/internal/utils/hash"
 
 	"github.com/google/uuid"
@@ -74,8 +73,9 @@ type WalkIssue struct {
 }
 
 type RepositoryFSFactory struct {
-	access  *RepositoryAccessCoordinator
-	queries *repo.Queries
+	identity RepositoryIdentityDetector
+	access   *RepositoryAccessCoordinator
+	queries  *repo.Queries
 }
 
 func NewRepositoryFSFactory(access *RepositoryAccessCoordinator, queries *repo.Queries) *RepositoryFSFactory {
@@ -146,19 +146,13 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 		}
 		return fail(classifyStorageLocationError(".lumiliorepo", err))
 	}
-	config, err := repocfg.ParseConfig(marker)
-	if err != nil {
-		return fail(fmt.Errorf("%w: %v", ErrRepositoryMarkerInvalid, err))
+	if err := f.identities().VerifyMarker(marker, repository.RepoID); err != nil {
+		return fail(err)
 	}
-	markerID, err := uuid.Parse(config.ID)
-	if err != nil {
-		return fail(fmt.Errorf("%w: invalid marker UUID: %v", ErrRepositoryMarkerInvalid, err))
-	}
-	if markerID != repository.RepoID {
-		return fail(fmt.Errorf("%w: marker=%s catalog=%s", ErrRepositoryIDMismatch, markerID, repository.RepoID))
-	}
+
 	return &RepositoryFS{
 		repositoryID: repository.RepoID,
+		identity:     f.identities(),
 		root:         root,
 		release:      release,
 	}, nil
@@ -185,6 +179,7 @@ func classifyRepositoryEntryError(name string, err error) error {
 // RepositoryFS owns one os.Root plus the lifecycle read lease associated with
 // it. Close is idempotent and waits for in-flight methods.
 type RepositoryFS struct {
+	identity     RepositoryIdentityDetector
 	mu           sync.RWMutex
 	repositoryID uuid.UUID
 	root         *os.Root
@@ -237,18 +232,7 @@ func (r *RepositoryFS) VerifyIdentity() error {
 	if err != nil {
 		return classifyStorageLocationError(".lumiliorepo", err)
 	}
-	config, err := repocfg.ParseConfig(marker)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrRepositoryMarkerInvalid, err)
-	}
-	markerID, err := uuid.Parse(config.ID)
-	if err != nil {
-		return fmt.Errorf("%w: invalid marker UUID: %v", ErrRepositoryMarkerInvalid, err)
-	}
-	if markerID != r.repositoryID {
-		return fmt.Errorf("%w: marker=%s catalog=%s", ErrRepositoryIDMismatch, markerID, r.repositoryID)
-	}
-	return nil
+	return r.identities().VerifyMarker(marker, r.repositoryID)
 }
 
 func (r *RepositoryFS) Close() error {
@@ -745,7 +729,7 @@ func (r *RepositoryFS) InspectMedia(ctx context.Context, repositoryPath Reposito
 	if !before.Mode().IsRegular() {
 		return FileObservation{}, fmt.Errorf("%w: %s target is not regular", ErrRepositoryEntryUnsupported, repositoryPath.String())
 	}
-	identityKind, identity, changeTime := platformFileIdentity(opened, before)
+	identityKind, identity, changeTime := r.identities().FileIdentity(opened, before)
 	observation := newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime)
 	if mode == HashQuick || mode == HashQuickAndFull {
 		quick, hashErr := hashutil.CalculateQuickHash(opened, before.Size(), hashutil.AlgorithmBLAKE3)
@@ -770,7 +754,7 @@ func (r *RepositoryFS) InspectMedia(ctx context.Context, repositoryPath Reposito
 	if err != nil {
 		return FileObservation{}, err
 	}
-	afterKind, afterIdentity, afterChange := platformFileIdentity(opened, after)
+	afterKind, afterIdentity, afterChange := r.identities().FileIdentity(opened, after)
 	afterObservation := newFileObservation(r.repositoryID, repositoryPath, kind, after, afterKind, afterIdentity, afterChange)
 	if observation.ObservationToken != afterObservation.ObservationToken {
 		return FileObservation{}, fmt.Errorf("%w: %s", ErrRepositoryFileUnstable, repositoryPath.String())
@@ -814,7 +798,7 @@ func (r *RepositoryFS) observeNodeWithHeldRoot(
 	if err != nil || !info.IsDir() {
 		return FileObservation{}, ErrRepositoryEntryUnsupported
 	}
-	identityKind, identity, changeTime := platformFileIdentity(opened, info)
+	identityKind, identity, changeTime := r.identities().FileIdentity(opened, info)
 	return newFileObservation(r.repositoryID, repositoryPath, EntryKindDirectory, info, identityKind, identity, changeTime), nil
 }
 
@@ -849,7 +833,7 @@ func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Ro
 	if err != nil || !before.Mode().IsRegular() {
 		return FileObservation{}, ErrRepositoryEntryUnsupported
 	}
-	identityKind, identity, changeTime := platformFileIdentity(opened, before)
+	identityKind, identity, changeTime := r.identities().FileIdentity(opened, before)
 	return newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime), nil
 }
 

@@ -9,5 +9,9 @@
 // names, identities, contents, and modification times do not depend on the
 // temporary path, wall clock, or host mount classification.
 //
+// [Observer] records read operations and injects platform, mount, access and
+// placeholder facts through the write-incapable storage observer interface.
+// It is configured before use; no native hardware or chmod inference is needed.
+//
 //atlas:group storage
 package testfixture

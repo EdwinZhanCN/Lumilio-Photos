@@ -115,6 +115,12 @@ notes:
       per file or directory. A full scan is the authority; watcher events
       only make the next scan sooner. Nothing in this flow unlinks, trashes,
       or purges a file.
+  - title: Replaceable local observation boundaries
+    body: >-
+      RepositoryFS keeps reads rooted and delegates portable-marker verification
+      and native file identity to RepositoryIdentityDetector. Recursive event
+      start/stop uses ChangeWatchBackend; the defaults retain the same local
+      identity and syncthing/notify hints. A full scan remains authoritative.
   - title: Bounded writer holds
     body: >-
       No filesystem I/O, hashing, or sleeping happens inside a catalog

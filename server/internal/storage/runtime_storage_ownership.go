@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -98,9 +99,9 @@ func (rm *DefaultRepositoryManager) claimRuntimeStoragePath(ctx context.Context,
 		err     error
 	)
 	if kind == "storage_location" {
-		release, err = acquireStorageLocationPathLock(ctx, path, true)
+		release, err = rm.locks().Acquire(ctx, filepath.Join(path, ".lumilioroot.lock"), true)
 	} else {
-		release, err = acquireRepositoryPathLock(ctx, path, true)
+		release, err = rm.locks().Acquire(ctx, filepath.Join(path, ".lumiliorepo.lock"), true)
 	}
 	if err != nil {
 		return fmt.Errorf("claim runtime %s ownership for %s: %w", kind, path, err)

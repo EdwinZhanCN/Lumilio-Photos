@@ -65,7 +65,7 @@ flowchart LR
 | Catalog (SQLite + FTS5 + Vec1) | Product truth. One writer, bounded query-only readers. | `go:db.DB` [`server/internal/db/db.go:47`](../../../../server/internal/db/db.go#L47) |
 | QueueDB (River) | Disposable delivery state; may be recreated. | `go:db.QueueDB` [`server/internal/db/queue.go:35`](../../../../server/internal/db/queue.go#L35) |
 | Bleve OCR index | Rebuildable sidecar fed by a catalog outbox. | `go:bleveocr.Index` [`server/internal/search/bleveocr/index.go:32`](../../../../server/internal/search/bleveocr/index.go#L32) |
-| Storage Locations and Repositories | User media on disk. Originals are never rewritten. | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:187`](../../../../server/internal/storage/repository_fs.go#L187) |
+| Storage Locations and Repositories | User media on disk. Originals are never rewritten. | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:181`](../../../../server/internal/storage/repository_fs.go#L181) |
 | Lumen Hub (ML) | Optional. Semantic, face, OCR, and BioCLIP inference over mDNS or a configured URL. | `ext:Lumen Hub` |
 | LLM provider | Optional. Powers the Lumilio Agent. | `ext:LLM provider` |
 | iCloud Photos | Optional cloud import source. | `ext:iCloud Photos` |

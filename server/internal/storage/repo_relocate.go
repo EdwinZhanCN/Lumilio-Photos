@@ -54,7 +54,7 @@ type RepositoryConflictError struct {
 }
 
 func repositoryConflictActions(registeredPath, repositoryID string) []string {
-	if marker, err := repocfg.LoadConfigFromFile(registeredPath); err == nil && marker.ID == repositoryID {
+	if marker, err := (LocalRepositoryIdentityDetector{}).LoadRepository(registeredPath); err == nil && marker.ID == repositoryID {
 		return []string{"copy"}
 	}
 	return []string{"relocate", "copy"}
@@ -106,7 +106,7 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		return nil, fmt.Errorf("invalid repository at %s: %v", cleanPath, result.Errors)
 	}
 
-	config, err := repocfg.LoadConfigFromFile(cleanPath)
+	config, err := rm.identities().LoadRepository(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load repository configuration: %w", err)
 	}
@@ -114,7 +114,7 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		return nil, fmt.Errorf("%w: %s holds repository %s, not %s",
 			ErrRepositoryIDMismatch, cleanPath, config.ID, id)
 	}
-	if marker, markerErr := repocfg.LoadConfigFromFile(current.Path); markerErr == nil && marker.ID == id {
+	if marker, markerErr := rm.identities().LoadRepository(current.Path); markerErr == nil && marker.ID == id {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
 	}
 
@@ -137,7 +137,7 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	if err != nil {
 		return nil, err
 	}
-	oldMarker, oldMarkerErr := repocfg.LoadConfigFromFile(current.Path)
+	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
 	if oldMarkerErr == nil && oldMarker.ID == id {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
 	}
@@ -243,7 +243,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
-	config, err := repocfg.LoadConfigFromFile(cleanPath)
+	config, err := rm.identities().LoadRepository(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load repository configuration: %w", err)
 	}

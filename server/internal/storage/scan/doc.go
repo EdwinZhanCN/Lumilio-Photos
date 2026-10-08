@@ -42,5 +42,9 @@
 // [server/internal/commit.ScanWriter], capped at [MaxBatchRows] (256). Scans
 // never unlink, trash, or purge Assets; returning files can rebind their Asset.
 //
+// [ChangeWatchBackend] makes recursive hints replaceable; the default
+// [LocalChangeWatchBackend] uses the existing syncthing/notify policy. Losing
+// hints never proves absence; retries and full-scan authority remain unchanged.
+//
 //atlas:group storage
 package scan

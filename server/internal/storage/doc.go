@@ -57,5 +57,13 @@
 // lifecycle leases and identity checks for verify, rename, reconnect, and
 // detach.
 //
+// [StorageObserver] supplies only read/stat/mount facts to
+// [ObserveStorageTarget] and [AssessStorageTarget]. [ClassifyStorage] and
+// [DeriveStorageCapabilities] are pure; mutation capabilities remain conditional
+// until explicit ownership/write preflight. Child observations never depend on
+// parent marker health. [RepositoryLockProvider] and
+// [RepositoryIdentityDetector] keep local ownership and identity replaceable;
+// alternatives are installed before serving, preserving rooted I/O.
+//
 //atlas:group storage
 package storage
