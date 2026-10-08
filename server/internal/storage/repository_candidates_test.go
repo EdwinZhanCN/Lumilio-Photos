@@ -79,24 +79,24 @@ func TestResolveDefaultRepositoryCandidateSupportsMovedOriginalAndSeparateCopy(t
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
 	initializeDefaultStorageForTest(t, manager, rootPath)
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, err = manager.queries.UpdateRepositoryRootMountFingerprint(ctx, repo.UpdateRepositoryRootMountFingerprintParams{
-		RootID: root.RootID, MountFingerprint: "test-replaced-mount", UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	storageLocation, err = manager.queries.UpdateStorageLocationMountFingerprint(ctx, repo.UpdateStorageLocationMountFingerprintParams{
+		StorageLocationID: storageLocation.StorageLocationID, MountFingerprint: "test-replaced-mount", UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "candidate-original", Actor: "test", Name: "Archive",
-		DirectoryName: "archive", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	movedPath := filepath.Join(root.Path, "archive-moved")
+	movedPath := filepath.Join(storageLocation.Path, "archive-moved")
 	if err := os.Rename(created.Repository.Path, movedPath); err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestResolveDefaultRepositoryCandidateSupportsMovedOriginalAndSeparateCopy(t
 		t.Fatalf("candidate relocation audit = %#v", relocateAudit)
 	}
 
-	copyPath := filepath.Join(root.Path, "archive-copy")
+	copyPath := filepath.Join(storageLocation.Path, "archive-copy")
 	if err := os.Mkdir(copyPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -189,12 +189,12 @@ func TestOpenDefaultRepositoryCandidateRequiresMountRiskConfirmation(t *testing.
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
 	initializeDefaultStorageForTest(t, manager, rootPath)
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.queries.UpdateRepositoryRootMountFingerprint(ctx, repo.UpdateRepositoryRootMountFingerprintParams{
-		RootID: root.RootID, MountFingerprint: "test-replaced-mount", UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	if _, err := manager.queries.UpdateStorageLocationMountFingerprint(ctx, repo.UpdateStorageLocationMountFingerprintParams{
+		StorageLocationID: storageLocation.StorageLocationID, MountFingerprint: "test-replaced-mount", UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}); err != nil {
 		t.Fatal(err)
 	}

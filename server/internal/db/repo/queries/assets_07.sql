@@ -2,7 +2,7 @@
 -- Count query matching GetPhotoMapPoints.
 SELECT COUNT(*) as count
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence

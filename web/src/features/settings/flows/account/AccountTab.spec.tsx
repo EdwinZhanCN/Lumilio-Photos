@@ -54,7 +54,9 @@ describe("AccountTab profile", () => {
 
     const screen = await renderAccount(alex);
 
-    await screen.getByLabelText(t("settings.account.displayName"), { exact: true }).fill("New Name");
+    await screen
+      .getByLabelText(t("settings.account.displayName"), { exact: true })
+      .fill("New Name");
     await screen.getByRole("button", { name: t("settings.section.save") }).click();
 
     await expect.element(screen.getByText(t("settings.section.saved"))).toBeVisible();
@@ -68,7 +70,9 @@ describe("AccountTab profile", () => {
 
     const screen = await renderAccount(alex);
 
-    await screen.getByLabelText(t("settings.account.displayName"), { exact: true }).fill("New Name");
+    await screen
+      .getByLabelText(t("settings.account.displayName"), { exact: true })
+      .fill("New Name");
     await screen.getByRole("button", { name: t("settings.section.save") }).click();
 
     await expect

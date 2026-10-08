@@ -1,7 +1,3 @@
-// Package problem defines Lumilio's language-neutral RFC 9457 vocabulary.
-//
-// It is intentionally a leaf package: handlers and transports may depend on
-// these descriptors, while domain packages remain unaware of HTTP problem URIs.
 package problem
 
 import (
@@ -36,6 +32,9 @@ type Extension struct {
 }
 
 var (
+	AssetMissing       = descriptor("asset/missing", http.StatusConflict, "Asset missing", "The Asset has no present file. Reconnect its Repository or return the file and scan again.")
+	AssetOffline       = descriptor("asset/offline", http.StatusConflict, "Asset offline", "All copies of the Asset are in unavailable Repositories.")
+	AssetTrashed       = descriptor("asset/trashed", http.StatusConflict, "Asset trashed", "The Asset is in the Trash. Restore it to open the original.")
 	InvalidCredentials = descriptor("auth/invalid-credentials", http.StatusUnauthorized,
 		"Invalid credentials", "The supplied sign-in credentials were not accepted.")
 	AuthenticationRequired = descriptor("auth/authentication-required", http.StatusUnauthorized,
@@ -99,6 +98,7 @@ var (
 )
 
 var registry = mustRegistry(
+	AssetMissing, AssetOffline, AssetTrashed,
 	InvalidCredentials,
 	AuthenticationRequired,
 	SessionExpired,

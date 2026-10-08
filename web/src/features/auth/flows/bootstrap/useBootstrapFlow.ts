@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useCreateRepository,
+  useSetupPrimaryRepository,
   validateRepositoryName,
   type RepositoryStorageStrategy,
 } from "@/features/repositories";
@@ -24,7 +24,7 @@ export function buildBootstrapPrimaryRepositoryRequest(
   storageStrategy: RepositoryStorageStrategy,
   riskConfirmation?: boolean,
 ) {
-  return { name, role: "primary" as const, storageStrategy, riskConfirmation };
+  return { name, storageStrategy, riskConfirmation };
 }
 
 export function useBootstrapFlow() {
@@ -32,7 +32,7 @@ export function useBootstrapFlow() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const setupQuery = useSetupStatus();
-  const createRepositoryMutation = useCreateRepository();
+  const createRepositoryMutation = useSetupPrimaryRepository();
 
   const [welcomed, setWelcomed] = useState(false);
   const [mfaComplete, setMfaComplete] = useState(false);
@@ -40,14 +40,14 @@ export function useBootstrapFlow() {
   const [region, setRegion] = usePreference("region");
   const defaults = setupQuery.data?.repository_defaults;
   const [repoName, setRepoName] = useState("Primary Storage");
-  const [repoRoot, setRepoRoot] = useState("");
+  const [defaultStorageLocation, setDefaultStorageLocation] = useState("");
   const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
   const [riskConfirmation, setRiskConfirmation] = useState(false);
   const placementRisks = defaults?.risk_warnings ?? [];
 
   useEffect(() => {
     if (!defaults) return;
-    setRepoRoot((current) => current || defaults.default_root || "");
+    setDefaultStorageLocation((current) => current || defaults.storage_location || "");
   }, [defaults]);
 
   const registration = useRegistrationFlow({ onComplete: () => setMfaComplete(true) });
@@ -56,23 +56,16 @@ export function useBootstrapFlow() {
   const canSubmitRepo = useMemo(
     () =>
       repoNameError === null &&
-      repoRoot.trim() !== "" &&
       (placementRisks.length === 0 || riskConfirmation) &&
       !createRepositoryMutation.isPending,
-    [
-      createRepositoryMutation.isPending,
-      placementRisks.length,
-      repoNameError,
-      repoRoot,
-      riskConfirmation,
-    ],
+    [createRepositoryMutation.isPending, placementRisks.length, repoNameError, riskConfirmation],
   );
 
   const submitRepo = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmitRepo) return;
 
-    await createRepositoryMutation.createRepository(
+    await createRepositoryMutation.createPrimaryRepository(
       buildBootstrapPrimaryRepositoryRequest(
         repoName,
         storageStrategy,
@@ -104,7 +97,7 @@ export function useBootstrapFlow() {
     repoName,
     setRepoName,
     repoNameError,
-    repoRoot,
+    defaultStorageLocation,
     storageStrategy,
     setStorageStrategy,
     placementRisks,

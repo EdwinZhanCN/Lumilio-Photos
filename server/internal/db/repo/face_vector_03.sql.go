@@ -18,7 +18,7 @@ FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 JOIN face_cluster_members fcm ON fcm.face_id = fi.id
 WHERE fi.id != ?2
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND COALESCE(a.owner_id, -1) = COALESCE(?3, -1)
   AND COALESCE(fi.embedding_model, '') = COALESCE(?4, '')
   AND fi.embedding IS NOT NULL

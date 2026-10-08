@@ -1,0 +1,130 @@
+id: repository-scan
+kind: sequence
+title: Repository scan (scan index)
+summary: >-
+  How the catalog learns what is on disk. Scan requests from an administrator,
+  the filesystem watcher, or the periodic timer are only queued rows; one
+  River delivery per repository runs bounded walk turns first and hashes only
+  when no walk is due. Absence is never inferred from a hint.
+nodes:
+  - id: admin
+    label: Administrator (Web)
+    anchor: ts:features/repositories#useRepositoryScan
+    shape: actor
+  - id: watcher
+    label: Filesystem watcher
+    anchor: go:scan.Watcher
+  - id: api
+    label: RepositoryScanHandler
+    anchor: go:handler.RepositoryScanHandler
+  - id: scanner
+    label: Scanner
+    anchor: go:scan.Scanner
+  - id: catalog
+    label: repository_scans / repository_entries
+    anchor: sql:repository_entries
+  - id: scheduler
+    label: Catalog scheduler
+    anchor: go:queue.Scheduler
+  - id: worker
+    label: ScanRepositoryBatchWorker
+    anchor: go:queue.ScanRepositoryBatchWorker
+  - id: disk
+    label: Repository files
+    anchor: go:server/internal/storage.RepositoryFS
+  - id: writer
+    label: ScanWriter (commit coordinator)
+    anchor: go:commit.ScanWriter
+steps:
+  - block: alt
+    label: manual verification
+    steps:
+      - from: admin
+        to: api
+        label: POST /storage/repositories/{id}/verifications
+        anchor: api:POST /api/v1/storage/repositories/{id}/verifications
+      - from: api
+        to: scanner
+        label: RequestScan(trigger=manual)
+        anchor: go:scan.Scanner.RequestScan
+    else:
+      - label: filesystem events (batched, 10 s)
+        steps:
+          - from: watcher
+            to: scanner
+            label: request a subtree scan, or a full scan above 512 events
+            anchor: go:scan.Watcher.Run
+      - label: periodic timer (jittered)
+        steps:
+          - from: scanner
+            to: scanner
+            label: RequestAllPeriodic
+            anchor: go:scan.Scanner.RequestAllPeriodic
+  - from: scanner
+    to: catalog
+    label: insert or coalesce a queued scan
+  - from: scheduler
+    to: worker
+    label: one unique ScanRepositoryBatchArgs per repository
+    anchor: go:jobs.ScanRepositoryBatchArgs
+  - block: loop
+    label: walk turns, up to the delivery budget
+    steps:
+      - from: worker
+        to: scanner
+        label: RunTurn
+        anchor: go:scan.Scanner.RunTurn
+      - from: scanner
+        to: disk
+        label: list one directory completely (sorted, stat cache)
+        anchor: go:scan.walkTurn.processDirectory
+      - from: scanner
+        to: writer
+        label: write only the diff — new, changed (pending_hash), restored, missing
+        anchor: go:scan.walkTurn.flush
+      - from: writer
+        to: catalog
+        label: one bounded transaction per batch (≤ 256 rows)
+  - note: A catalog-only row becomes missing only after a positive absence probe with the repository marker re-checked; an offline repository ends the scan as offline.
+    over: scanner,disk
+  - block: loop
+    label: hash turns, when no walk is due
+    steps:
+      - from: worker
+        to: scanner
+        label: HashTurn (32 pending_hash entries)
+        anchor: go:scan.Scanner.HashTurn
+      - from: scanner
+        to: disk
+        label: hash outside any transaction
+      - from: scanner
+        to: writer
+        label: compare-and-swap on the entry revision, bind content to an Asset
+        anchor: go:scan.Scanner.commitHashTx
+      - from: writer
+        to: catalog
+        label: activation requests the Asset's pipeline stages
+        anchor: go:service.ApplyAssetActivationTx
+  - from: worker
+    to: scheduler
+    label: snooze while more work remains; finish records counters
+notes:
+  - title: Disk is the truth
+    body: >-
+      The catalog mirrors each repository tree in repository_entries, one row
+      per file or directory. A full scan is the authority; watcher events
+      only make the next scan sooner. Nothing in this flow unlinks, trashes,
+      or purges a file.
+  - title: Replaceable local observation boundaries
+    body: >-
+      RepositoryFS keeps reads rooted and delegates portable-marker verification
+      and native file identity to RepositoryIdentityDetector. Recursive event
+      start/stop uses ChangeWatchBackend; the defaults retain the same local
+      identity and syncthing/notify hints. A full scan remains authoritative.
+  - title: Bounded writer holds
+    body: >-
+      No filesystem I/O, hashing, or sleeping happens inside a catalog
+      transaction. Write batches are at most 256 rows and are sized to stay
+      inside the 25 ms writer-hold budget, so scanning a 40k-file repository
+      never starves foreground requests.
+related: [asset-lifecycle, background-work, upload-to-catalog]

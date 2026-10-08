@@ -219,7 +219,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		{name: "idle WAL checkpoint suppression", snippet: "walStateAlreadyCheckpointed(walState"},
 		{name: "independent queue WAL checkpoint", snippet: `checkpointWAL("queue"`},
 		{name: "backup source reader", snippet: "Source:   database.ReaderSQL"},
-		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL)"},
+		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL, database.ReaderSQL)"},
 		{name: "event planning reader", snippet: "event.NewServiceWithCatalog(database.Writer, database.Reader"},
 		{name: "event HTTP catalog capabilities", snippet: "handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL"},
 		{name: "agent library reader", snippet: "core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)"},
@@ -239,7 +239,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		pattern *regexp.Regexp
 	}{
 		{name: "raw production read on the writer", pattern: regexp.MustCompile(`\b(?:sqlDB|database\.SQL)\.(?:Query|QueryRow|Prepare)(?:Context)?\(`)},
-		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*\)`)},
+		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*[,)]`)},
 		{name: "backup copy bound to the writer", pattern: regexp.MustCompile(`Source:\s+sqlDB\b`)},
 		{name: "agent library bound to the writer", pattern: regexp.MustCompile(`NewAuthorizedLibraryFactory\(queries, assetService, sqlDB\)`)},
 	} {
@@ -274,12 +274,12 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		return errors.New("storage runtime status performs reconciliation; GET/setup status must read the cached projection without acquiring SQLite's writer")
 	}
 
-	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/repository_roots.go"))
+	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/storage_locations.go"))
 	if err != nil {
 		return fmt.Errorf("read Storage Location list boundary: %w", err)
 	}
-	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error) {\n\tif err := rm.ReconcileRepositoryRoots(ctx)") {
-		return errors.New("ListRepositoryRoots reconciles on a foreground read; background storage reconciliation owns projection writes")
+	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListStorageLocations(ctx context.Context) ([]repo.StorageLocation, error) {\n\tif err := rm.ReconcileStorageLocations(ctx)") {
+		return errors.New("ListStorageLocations reconciles on a foreground read; background storage reconciliation owns projection writes")
 	}
 
 	hostActionSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/host_action.go"))
@@ -298,7 +298,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		if strings.HasSuffix(relative, "_test.go") {
 			return false
 		}
-		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileRepositoryRoots(")
+		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileStorageLocations(")
 	})
 	if err != nil {
 		return err
@@ -414,7 +414,7 @@ func checkAsyncPipelineArchitecture(root string) error {
 		return fmt.Errorf("queue worker inserts child River work:\n%s", strings.Join(childInserts, "\n"))
 	}
 
-	controllerWrites, err := scanROEControllerWriteCapabilities(root)
+	controllerWrites, err := scanScanIndexWriteCapabilities(root)
 	if err != nil {
 		return err
 	}
@@ -431,8 +431,19 @@ func checkAsyncPipelineArchitecture(root string) error {
 	}
 	if len(controllerWrites) > 0 {
 		return fmt.Errorf(
-			"asynchronous ROE controller retains direct catalog-write capability:\n%s\nOnly foreground commands and the registered coordinator commit handler may own catalog writes",
+			"scan index retains direct catalog-write capability:\n%s\nThe scan index writes only through its Writer, which the commit coordinator backs",
 			strings.Join(controllerWrites, "\n"),
+		)
+	}
+
+	assetDeletes, err := scanAssetHardDeletes(root)
+	if err != nil {
+		return err
+	}
+	if len(assetDeletes) > 0 {
+		return fmt.Errorf(
+			"code outside lifecycle.PurgeEntries deletes Assets:\n%s\nAn Asset exists while it has an entry; purge entries through server/internal/lifecycle instead",
+			strings.Join(assetDeletes, "\n"),
 		)
 	}
 
@@ -471,14 +482,13 @@ func checkAsyncPipelineArchitecture(root string) error {
 
 func scanAsyncProducerCapabilities(root string) ([]string, error) {
 	targets := map[string]bool{
-		"server/internal/sourcing/materializer.go":          true,
-		"server/internal/storage/roe/materializer/hash.go":  true,
-		"server/internal/storage/roe/locations/resolver.go": true,
-		"server/internal/processors/asset_processor.go":     true,
-		"server/internal/queue/asset_work_fence.go":         true,
-		"server/internal/queue/enrichment_runner.go":        true,
-		"server/internal/queue/ml_image_loader.go":          true,
-		"server/internal/queue/projection_preparer.go":      true,
+		"server/internal/sourcing/materializer.go":      true,
+		"server/internal/storage/locations/resolver.go": true,
+		"server/internal/processors/asset_processor.go": true,
+		"server/internal/queue/asset_work_fence.go":     true,
+		"server/internal/queue/enrichment_runner.go":    true,
+		"server/internal/queue/ml_image_loader.go":      true,
+		"server/internal/queue/projection_preparer.go":  true,
 	}
 	forbiddenServiceTypes := map[string]bool{
 		"SettingsService":      true,
@@ -559,15 +569,13 @@ func scanAsyncProducerCapabilities(root string) ([]string, error) {
 	return violations, nil
 }
 
-func scanROEControllerWriteCapabilities(root string) ([]string, error) {
-	const controllerDirectory = "server/internal/storage/roe/controller"
-	allowed := map[string]bool{
-		controllerDirectory + "/commands.go":              true,
-		controllerDirectory + "/commit_handler.go":        true,
-		controllerDirectory + "/directory_publication.go": true,
-	}
+// scanScanIndexWriteCapabilities keeps the scan index writing only through
+// its Writer, which production backs with the commit coordinator: no file
+// may import the catalog writer or build its own query set.
+func scanScanIndexWriteCapabilities(root string) ([]string, error) {
+	const scanDirectory = "server/internal/storage/scan"
 	var violations []string
-	err := filepath.WalkDir(filepath.Join(root, controllerDirectory), func(path string, entry os.DirEntry, walkErr error) error {
+	err := filepath.WalkDir(filepath.Join(root, scanDirectory), func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -579,10 +587,6 @@ func scanROEControllerWriteCapabilities(root string) ([]string, error) {
 			return err
 		}
 		relative = filepath.ToSlash(relative)
-		if allowed[relative] {
-			return nil
-		}
-
 		files := token.NewFileSet()
 		parsed, err := parser.ParseFile(files, path, nil, 0)
 		if err != nil {
@@ -593,7 +597,7 @@ func scanROEControllerWriteCapabilities(root string) ([]string, error) {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			position := files.Position(imported.Pos())
 			switch importPath {
-			case "server/internal/db", "server/internal/db/catalogtx":
+			case "server/internal/db":
 				violations = append(violations, fmt.Sprintf("%s:%d:imports catalog write capability %s", relative, position.Line, importPath))
 			case "server/internal/db/repo":
 				alias := "repo"
@@ -607,33 +611,21 @@ func scanROEControllerWriteCapabilities(root string) ([]string, error) {
 				}
 			}
 		}
-
-		seen := map[token.Pos]bool{}
 		ast.Inspect(parsed, func(node ast.Node) bool {
 			selector, ok := node.(*ast.SelectorExpr)
-			if !ok || seen[selector.Pos()] {
+			if !ok {
 				return true
 			}
-			capability := ""
-			switch selector.Sel.Name {
-			case "WithTx", "Writer", "Queries":
-				capability = selector.Sel.Name
-			}
-			if qualifier, ok := selector.X.(*ast.Ident); ok && repoAliases[qualifier.Name] &&
-				(selector.Sel.Name == "New" || selector.Sel.Name == "Queries") {
-				capability = qualifier.Name + "." + selector.Sel.Name
-			}
-			if capability != "" {
-				seen[selector.Pos()] = true
+			if qualifier, ok := selector.X.(*ast.Ident); ok && repoAliases[qualifier.Name] && selector.Sel.Name == "New" {
 				position := files.Position(selector.Pos())
-				violations = append(violations, fmt.Sprintf("%s:%d:references catalog write capability %s", relative, position.Line, capability))
+				violations = append(violations, fmt.Sprintf("%s:%d:builds its own catalog query set with %s.New", relative, position.Line, qualifier.Name))
 			}
 			return true
 		})
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("scan asynchronous ROE controller capabilities: %w", err)
+		return nil, fmt.Errorf("scan scan-index write capabilities: %w", err)
 	}
 	return violations, nil
 }
@@ -848,6 +840,36 @@ func checkRepositoryPathArchitecture(root string) error {
 }
 
 func checkUserFacingTerminology(root string) error {
+	for _, locale := range []string{"en", "zh"} {
+		catalog, err := readJSONCatalog(filepath.Join(root, "web/src/locales", locale, "translation.json"))
+		if err != nil {
+			return err
+		}
+		for _, term := range []struct{ key, en, zh string }{
+			{"assets.lifecycle.missing", "Missing", "缺失"},
+			{"assets.trash.title", "Trash", "回收站"},
+			{"assets.lifecycle.deletePermanently", "Delete permanently", "永久删除"},
+			{"assets.lifecycle.removeMissing", "Remove missing items", "移除缺失项"},
+		} {
+			var value any = catalog
+			for _, part := range strings.Split(term.key, ".") {
+				object, ok := value.(map[string]any)
+				if !ok {
+					value = nil
+					break
+				}
+				value = object[part]
+			}
+			expected := term.en
+			if locale == "zh" {
+				expected = term.zh
+			}
+			if value != expected {
+				return fmt.Errorf("canonical lifecycle term %s (%s): got %v, want %s", term.key, locale, value, expected)
+			}
+		}
+	}
+
 	paths := []string{
 		"README.md", "README.en.md",
 		"web/src", "desktop/frontend/src",
@@ -930,7 +952,7 @@ func allowedPrivateErrorUse(relative, line string) bool {
 	}
 	// Upload-session manifests are private recovery state. The public progress
 	// DTO deliberately omits this diagnostic and exposes only the stable state.
-	return relative == "server/internal/api/handler/asset_handler.go" && strings.Contains(line, "SetSessionError(")
+	return relative == "server/internal/api/handler/asset_upload_handler.go" && strings.Contains(line, "SetSessionError(")
 }
 
 func checkProblemCatalogArtifacts(root string) error {
@@ -1075,6 +1097,15 @@ func userFacingTerminologyViolation(relative, line string) bool {
 func allowedRepositoryTermContext(relative, line string) bool {
 	lower := strings.ToLower(line)
 	trimmed := strings.TrimSpace(line)
+	// The Music browse label is scoped to the listening domain. The Web
+	// terminology test additionally verifies its exact translation key.
+	if strings.HasPrefix(relative, "web/src/features/music/") && strings.Contains(line, `t("music.browse.title", "Library")`) {
+		return true
+	}
+	if relative == "web/src/locales/en/translation.json" && strings.TrimSuffix(trimmed, ",") == `"title": "Library"` {
+		return true
+	}
+
 	if (strings.HasSuffix(relative, ".go") || strings.HasSuffix(relative, ".ts") || strings.HasSuffix(relative, ".tsx")) &&
 		(strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*")) &&
 		!strings.HasPrefix(trimmed, "// @") && !strings.Contains(relative, "schema.d.ts") &&
@@ -1278,4 +1309,47 @@ func scanGovernorConstructionSites(root string) ([]string, error) {
 
 func scanProcessorNakedFFmpegFlags(root string) ([]string, error) {
 	return scanGoLines(root, "server/internal/processors", isProcessorNakedFFmpegFlagViolation)
+}
+
+// assetHardDelete matches a DELETE on the assets table, across line breaks.
+var assetHardDelete = regexp.MustCompile(`(?i)\bdelete\s+from\s+["\x60]?assets["\x60]?(\s|;|$)`)
+
+// scanAssetHardDeletes enforces the Asset lifecycle's single purge path: no
+// server source or query other than lifecycle.PurgeEntries deletes from
+// assets. Tests may.
+func scanAssetHardDeletes(root string) ([]string, error) {
+	const allowed = "server/internal/lifecycle/purge.go"
+	var violations []string
+	err := filepath.WalkDir(filepath.Join(root, "server"), func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			if entry.Name() == "node_modules" || entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		extension := filepath.Ext(path)
+		if (extension != ".go" && extension != ".sql") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if relative == allowed || strings.HasPrefix(relative, "server/tools/architecturecheck/") {
+			return nil
+		}
+		source, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if assetHardDelete.Match(source) {
+			violations = append(violations, relative)
+		}
+		return nil
+	})
+	return violations, err
 }

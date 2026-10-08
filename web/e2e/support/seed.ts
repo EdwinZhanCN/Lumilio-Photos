@@ -1,4 +1,5 @@
 import process from "node:process";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 import { isMFAInvalidError, loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp.ts";
 
 const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657";
@@ -13,8 +14,10 @@ type RequestOptions = {
 
 type Repository = {
   id: string;
-  is_primary?: boolean;
 };
+
+type StorageTargets = components["schemas"]["dto.StorageTargetsResponseDTO"];
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
 
 async function request<T = Record<string, unknown>>(
   pathname: string,
@@ -83,26 +86,29 @@ if (!status.admin_initialized) {
   auth = await loginBootstrap();
 }
 const headers = { authorization: `Bearer ${auth.token}` };
-const repositories = await request<{ repositories: Repository[] }>("/api/v1/repositories", {
-  headers,
-}).catch(() => ({
-  repositories: [],
-}));
-let primary: Repository | undefined = repositories.repositories?.find(
-  (repository) => repository.is_primary,
+const setupStatus = await request<{ primary_repository_initialized?: boolean }>(
+  "/api/v1/setup/status",
+  { headers },
 );
+let primary: Repository | undefined;
+if (setupStatus.primary_repository_initialized) {
+  const { targets } = await request<StorageTargets>("/api/v1/storage/targets", { headers });
+  const primaryTarget = targets?.find((target) => target.role === "primary");
+  if (primaryTarget?.id) primary = { id: primaryTarget.id };
+}
 if (!primary) {
-  const created = await request<{ repository: Repository }>("/api/v1/repositories", {
+  const created = await request<CreateRepositoryResponse>("/api/v1/setup/primary-repository", {
     method: "POST",
     headers,
     body: JSON.stringify({
       name: "E2E Primary",
-      role: "primary",
       storage_strategy: "flat",
-      duplicate_handling: "rename",
     }),
   });
-  primary = created.repository;
+  if (!created.repository?.id) {
+    throw new Error("E2E primary repository creation did not return an id");
+  }
+  primary = { id: created.repository.id };
 }
 
 // Keep the E2E ML surface deliberate. The deterministic external fixture

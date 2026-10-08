@@ -16,7 +16,9 @@ describe("RoleRoute", () => {
     useAuthMock.mockReturnValue({ user: { role: "admin" } });
     const screen = renderWithProviders(
       <MemoryRouter>
-        <RoleRoute requiredRole="admin"><p>monitor</p></RoleRoute>
+        <RoleRoute requiredRole="admin">
+          <p>monitor</p>
+        </RoleRoute>
       </MemoryRouter>,
       { router: false },
     );

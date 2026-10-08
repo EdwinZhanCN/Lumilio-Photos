@@ -1,4 +1,3 @@
-// Package execution owns process-wide admission for fine-grained pipeline work.
 package execution
 
 import (

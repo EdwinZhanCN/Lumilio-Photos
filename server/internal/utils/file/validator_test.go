@@ -233,6 +233,20 @@ func TestValidator_ResolveMedia(t *testing.T) {
 			wantIsRAW: false,
 		},
 		{
+			name:      "AVIF",
+			filename:  "photo.avif",
+			wantType:  dbtypes.AssetTypePhoto,
+			wantMime:  "image/avif",
+			wantIsRAW: false,
+		},
+		{
+			name:      "JXL",
+			filename:  "photo.jxl",
+			wantType:  dbtypes.AssetTypePhoto,
+			wantMime:  "image/jxl",
+			wantIsRAW: false,
+		},
+		{
 			name:       "RAW",
 			filename:   "photo.cr3",
 			wantType:   dbtypes.AssetTypePhoto,
@@ -356,6 +370,8 @@ func TestValidator_GetAssetTypeByExtension(t *testing.T) {
 	}{
 		{".jpg", ".jpg", true, dbtypes.AssetTypePhoto},
 		{".png", ".png", true, dbtypes.AssetTypePhoto},
+		{".avif", ".avif", true, dbtypes.AssetTypePhoto},
+		{".jxl", ".jxl", true, dbtypes.AssetTypePhoto},
 		{".cr2", ".cr2", true, dbtypes.AssetTypePhoto},
 		{".nef", ".nef", true, dbtypes.AssetTypePhoto},
 		{".mp4", ".mp4", true, dbtypes.AssetTypeVideo},

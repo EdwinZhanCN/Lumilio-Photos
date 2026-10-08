@@ -7,7 +7,10 @@ describe("RootErrorFallback", () => {
     const resetErrorBoundary = vi.fn();
 
     const screen = await renderWithProviders(
-      <RootErrorFallback error={new Error("render failed")} resetErrorBoundary={resetErrorBoundary} />,
+      <RootErrorFallback
+        error={new Error("render failed")}
+        resetErrorBoundary={resetErrorBoundary}
+      />,
       { router: false },
     );
 

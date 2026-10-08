@@ -112,7 +112,7 @@ task compose:test
 `task test` includes the architecture guards, `server:test`, and `web:test`; it
 does not include the desktop app or browser E2E. Follow the “Test layers”
 section in
-[FRONTEND.md](docs/FRONTEND.md) when choosing frontend test
+[web/ARCHITECTURE.md](web/ARCHITECTURE.md#test-layers) when choosing frontend test
 file names and runners. Placement:
 [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 

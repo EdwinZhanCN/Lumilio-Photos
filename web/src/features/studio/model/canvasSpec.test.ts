@@ -15,8 +15,16 @@ describe("resolveCanvasGeometry", () => {
   it("resolves padding against the short edge, not the width", () => {
     // The same spec must give a landscape and a portrait photo the same
     // visual weight. A width basis would make portrait margins look thin.
-    const landscape = resolveCanvasGeometry(3000, 2000, spec({ pad: { top: 0, right: 0, bottom: 0.1, left: 0 } }));
-    const portrait = resolveCanvasGeometry(2000, 3000, spec({ pad: { top: 0, right: 0, bottom: 0.1, left: 0 } }));
+    const landscape = resolveCanvasGeometry(
+      3000,
+      2000,
+      spec({ pad: { top: 0, right: 0, bottom: 0.1, left: 0 } }),
+    );
+    const portrait = resolveCanvasGeometry(
+      2000,
+      3000,
+      spec({ pad: { top: 0, right: 0, bottom: 0.1, left: 0 } }),
+    );
 
     expect(landscape.padPx.bottom).toBe(200); // 0.1 x 2000 (height is shorter)
     expect(portrait.padPx.bottom).toBe(200); // 0.1 x 2000 (width is shorter)
@@ -116,7 +124,9 @@ describe("isCanvasActive", () => {
     // A frosted background with zero padding has nowhere to show; treating it
     // as active would allocate a canvas copy for nothing.
     expect(
-      isCanvasActive(spec({ background: { kind: "frosted", blur: 0.06, brightness: 0, overscan: 1.1 } })),
+      isCanvasActive(
+        spec({ background: { kind: "frosted", blur: 0.06, brightness: 0, overscan: 1.1 } }),
+      ),
     ).toBe(false);
   });
 });

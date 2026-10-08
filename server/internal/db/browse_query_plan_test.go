@@ -84,15 +84,15 @@ func seedBrowseScaleCatalog(t *testing.T) (*DB, context.Context, int32, uuid.UUI
 		}
 	}
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	mustExec(`
-		INSERT INTO repository_roots (root_id, name, path, kind, created_at, updated_at)
+		INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at)
 		VALUES (?, 'Plan root', '/', 'external', 1, 1)
-	`, rootID)
+	`, storageLocationID)
 	mustExec(`
-		INSERT INTO repositories (repo_id, name, path, role, reachability, activity, created_at, updated_at, root_id)
+		INSERT INTO repositories (repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id)
 		VALUES (?, 'Plan', '/plan', 'regular', 'active', 'idle', 1, 1, ?)
-	`, repositoryID, rootID)
+	`, repositoryID, storageLocationID)
 
 	var currentStackID uuid.UUID
 	var stackPosition int

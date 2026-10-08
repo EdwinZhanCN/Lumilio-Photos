@@ -47,27 +47,27 @@ var (
 )
 
 type HostActionSummary struct {
-	Name         string `json:"name,omitempty"`
-	Purpose      string `json:"purpose,omitempty"`
-	RootID       string `json:"root_id,omitempty"`
-	RepositoryID string `json:"repository_id,omitempty"`
+	Name              string `json:"name,omitempty"`
+	Purpose           string `json:"purpose,omitempty"`
+	StorageLocationID string `json:"storage_location_id,omitempty"`
+	RepositoryID      string `json:"repository_id,omitempty"`
 }
 
 type HostActionConflict struct {
-	Type           string   `json:"type"`
-	RepositoryID   string   `json:"repository_id,omitempty"`
-	RootID         string   `json:"root_id,omitempty"`
-	RegisteredPath string   `json:"registered_path,omitempty"`
-	RequestedPath  string   `json:"requested_path,omitempty"`
-	Actions        []string `json:"actions,omitempty"`
-	RiskWarnings   []string `json:"risk_warnings,omitempty"`
+	Type              string   `json:"type"`
+	RepositoryID      string   `json:"repository_id,omitempty"`
+	StorageLocationID string   `json:"storage_location_id,omitempty"`
+	RegisteredPath    string   `json:"registered_path,omitempty"`
+	RequestedPath     string   `json:"requested_path,omitempty"`
+	Actions           []string `json:"actions,omitempty"`
+	RiskWarnings      []string `json:"risk_warnings,omitempty"`
 }
 
 type HostActionResult struct {
-	RepositoryID string              `json:"repository_id,omitempty"`
-	RootID       string              `json:"root_id,omitempty"`
-	Name         string              `json:"name,omitempty"`
-	Conflict     *HostActionConflict `json:"conflict,omitempty"`
+	RepositoryID      string              `json:"repository_id,omitempty"`
+	StorageLocationID string              `json:"storage_location_id,omitempty"`
+	Name              string              `json:"name,omitempty"`
+	Conflict          *HostActionConflict `json:"conflict,omitempty"`
 }
 
 type HostAction struct {
@@ -187,8 +187,8 @@ func validateHostActionInput(input CreateHostActionInput) error {
 	switch input.Kind {
 	case HostActionAuthorizeStorageLocation, HostActionOpenRepository:
 	case HostActionLocateStorageLocation:
-		if _, err := uuid.Parse(strings.TrimSpace(input.Summary.RootID)); err != nil {
-			return fmt.Errorf("locate Storage Location requires a valid root_id: %w", err)
+		if _, err := uuid.Parse(strings.TrimSpace(input.Summary.StorageLocationID)); err != nil {
+			return fmt.Errorf("locate Storage Location requires a valid storage_location_id: %w", err)
 		}
 	case HostActionLocateRepository:
 		if _, err := uuid.Parse(strings.TrimSpace(input.Summary.RepositoryID)); err != nil {
@@ -377,20 +377,20 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 	var actionResult HostActionResult
 	switch action.Kind {
 	case HostActionAuthorizeStorageLocation:
-		root, callErr := rm.AddRepositoryRoot(ctx, cleanPath, action.Summary.Name,
+		root, callErr := rm.AddStorageLocation(ctx, cleanPath, action.Summary.Name,
 			LifecycleRequest{RequestID: "host-action:" + action.ActionID, Actor: "desktop_host:" + hostInstanceID, ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID, ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk})
 		if callErr != nil {
-			var conflict *RepositoryRootConflictError
+			var conflict *StorageLocationConflictError
 			if errors.As(callErr, &conflict) {
 				return rm.storeHostActionConflict(ctx, action, cleanPath, HostActionConflict{
-					Type: "storage_location_identity", RootID: conflict.RootID,
+					Type: "storage_location_identity", StorageLocationID: conflict.StorageLocationID,
 					RegisteredPath: conflict.RegisteredPath, RequestedPath: conflict.RequestedPath,
 					Actions: conflict.Actions,
 				}, callErr)
 			}
 			return rm.failHostAction(ctx, actionID, "storage_location_failed", "Storage Location could not be added", callErr)
 		}
-		actionResult = HostActionResult{RootID: root.RootID.String(), Name: root.Name}
+		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	case HostActionOpenRepository:
 		ownerID, callErr := rm.HostOwnerID(ctx)
 		if callErr == nil && ownerID == nil {
@@ -418,7 +418,7 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 			return rm.failHostAction(ctx, actionID, "open_repository_failed", "Repository could not be opened", callErr)
 		}
 	case HostActionLocateStorageLocation:
-		root, callErr := rm.RelocateRepositoryRoot(ctx, action.Summary.RootID, cleanPath, LifecycleRequest{
+		root, callErr := rm.RelocateStorageLocation(ctx, action.Summary.StorageLocationID, cleanPath, LifecycleRequest{
 			RequestID: "host-action-relocate-root:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID,
 			ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk,
@@ -426,7 +426,7 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 		if callErr != nil {
 			return rm.failHostAction(ctx, actionID, "locate_storage_location_failed", "Storage Location could not be reconnected", callErr)
 		}
-		actionResult = HostActionResult{RootID: root.RootID.String(), Name: root.Name}
+		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	case HostActionLocateRepository:
 		repository, callErr := rm.RelocateRepository(ctx, action.Summary.RepositoryID, cleanPath, LifecycleRequest{
 			RequestID: "host-action-relocate:" + action.ActionID, Actor: action.Actor,
@@ -489,7 +489,7 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 		if protocolAction != "relocate" {
 			return rm.failHostAction(ctx, actionID, "unsupported_resolution", "A copied Storage Location cannot be registered automatically", nil)
 		}
-		root, callErr := rm.RelocateRepositoryRoot(ctx, conflict.RootID, action.selectedPath, LifecycleRequest{
+		root, callErr := rm.RelocateStorageLocation(ctx, conflict.StorageLocationID, action.selectedPath, LifecycleRequest{
 			RequestID: "host-action-resolve-relocate-root:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: action.HostInstanceID,
 			ConfirmationType: "update_location",
@@ -497,7 +497,7 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 		if callErr != nil {
 			return rm.failHostAction(ctx, actionID, "resolution_failed", "Storage Location location could not be updated", callErr)
 		}
-		actionResult = HostActionResult{RootID: root.RootID.String(), Name: root.Name}
+		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	} else {
 		var repositoryID string
 		if protocolAction == "relocate" {
@@ -552,22 +552,22 @@ func (rm *DefaultRepositoryManager) hostActionRiskWarnings(ctx context.Context, 
 	warnings := append([]string(nil), info.RiskWarnings...)
 	switch action.Kind {
 	case HostActionOpenRepository:
-		if rootID, err := rm.repositoryRootIDForPath(ctx, selectedPath); err == nil {
-			if root, rootErr := rm.queries.GetRepositoryRoot(ctx, rootID); rootErr == nil {
+		if storageLocationID, err := rm.storageLocationIDForPath(ctx, selectedPath); err == nil {
+			if root, rootErr := rm.queries.GetStorageLocation(ctx, storageLocationID); rootErr == nil {
 				warnings = repositoryCandidateRiskWarnings(root, selectedPath, info)
 			}
 		}
 	case HostActionLocateRepository:
 		if repositoryID, err := uuid.Parse(strings.TrimSpace(action.Summary.RepositoryID)); err == nil {
 			if repository, repositoryErr := rm.queries.GetRepository(ctx, repositoryID); repositoryErr == nil {
-				if root, rootErr := rm.queries.GetRepositoryRoot(ctx, repository.RootID); rootErr == nil {
+				if root, rootErr := rm.queries.GetStorageLocation(ctx, repository.StorageLocationID); rootErr == nil {
 					warnings = repositoryCandidateRiskWarnings(root, selectedPath, info)
 				}
 			}
 		}
 	case HostActionLocateStorageLocation:
-		if rootID, err := uuid.Parse(strings.TrimSpace(action.Summary.RootID)); err == nil {
-			if root, rootErr := rm.queries.GetRepositoryRoot(ctx, rootID); rootErr == nil &&
+		if storageLocationID, err := uuid.Parse(strings.TrimSpace(action.Summary.StorageLocationID)); err == nil {
+			if root, rootErr := rm.queries.GetStorageLocation(ctx, storageLocationID); rootErr == nil &&
 				root.MountFingerprint != "" && info.MountFingerprint != "" && root.MountFingerprint != info.MountFingerprint {
 				warnings = append(warnings, "mount_fingerprint_changed")
 			}
@@ -673,13 +673,13 @@ func hostActionAuditInput(action HostAction, status HostActionStatus, result *Ho
 	targetType, targetID := "runtime_config", ""
 	switch action.Kind {
 	case HostActionAuthorizeStorageLocation, HostActionLocateStorageLocation:
-		targetType, targetID = "storage_location", action.Summary.RootID
+		targetType, targetID = "storage_location", action.Summary.StorageLocationID
 	case HostActionOpenRepository, HostActionLocateRepository:
 		targetType, targetID = "repository", action.Summary.RepositoryID
 	}
 	if result != nil {
-		if result.RootID != "" {
-			targetType, targetID = "storage_location", result.RootID
+		if result.StorageLocationID != "" {
+			targetType, targetID = "storage_location", result.StorageLocationID
 		}
 		if result.RepositoryID != "" {
 			targetType, targetID = "repository", result.RepositoryID

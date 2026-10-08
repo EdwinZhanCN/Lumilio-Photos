@@ -9,10 +9,11 @@ import (
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
 	"desktop/internal/platform"
+	"desktop/internal/runtime"
 	"desktop/internal/state"
 )
 
-func TestShortcutCacheIsDiscardableAndOpenRevalidatesMarker(t *testing.T) {
+func TestShortcutCacheIsDiscardableAndOpenUsesReadablePathOnly(t *testing.T) {
 	root := t.TempDir()
 	paths, err := platform.NewPaths(filepath.Join(root, "app-data"))
 	if err != nil {
@@ -55,8 +56,39 @@ func TestShortcutCacheIsDiscardableAndOpenRevalidatesMarker(t *testing.T) {
 	if err := os.Remove(filepath.Join(location, ".lumilioroot")); err != nil {
 		t.Fatalf("remove marker: %v", err)
 	}
+	if err := controller.OpenLocation(context.Background(), "root-1"); err != nil {
+		t.Fatalf("open after marker removal should still succeed: %v", err)
+	}
+	if err := os.RemoveAll(location); err != nil {
+		t.Fatalf("remove location: %v", err)
+	}
 	if err := controller.OpenLocation(context.Background(), "root-1"); err == nil || operation.ErrorCodeOf(err) != dto.ErrorStorageLocationOffline {
-		t.Fatalf("offline open error = %v", err)
+		t.Fatalf("unreadable path open error = %v", err)
+	}
+}
+
+func TestRefreshShortcutCanOpenIgnoresLocationStatus(t *testing.T) {
+	root := t.TempDir()
+	paths, err := platform.NewPaths(filepath.Join(root, "app-data"))
+	if err != nil {
+		t.Fatalf("paths: %v", err)
+	}
+	if err := paths.Ensure(); err != nil {
+		t.Fatalf("ensure paths: %v", err)
+	}
+	location := filepath.Join(root, "photos")
+	if err := os.Mkdir(location, 0o755); err != nil {
+		t.Fatalf("mkdir location: %v", err)
+	}
+	controller := NewController(Options{Paths: paths, Store: state.New()})
+	items, err := controller.refresh([]runtime.StorageLocation{{
+		ID: "loc-1", Name: "Photos", Path: location, Kind: "default", Status: "offline",
+	}})
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if len(items) != 1 || !items[0].CanOpen || items[0].Status != "offline" {
+		t.Fatalf("refresh items = %#v, err = %v", items, err)
 	}
 }
 

@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"server/internal/storage/marker"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
+
+// CurrentVersion is the .lumiliorepo format since the v26.1.0-rc.1
+// compatibility baseline; pre-release markers have the same shape and are read
+// as-is. The marker lives inside user media folders, so a later format must
+// keep reading every earlier version rather than rejecting it.
+const CurrentVersion = "1.0"
 
 // RepositoryConfig represents the complete .lumiliorepo configuration file structure
 type RepositoryConfig struct {
@@ -65,7 +73,7 @@ type LocalSettings struct {
 // Note: This does not include ID, Name, or CreatedAt as these should be unique per repository
 func DefaultRepositoryConfig() *RepositoryConfig {
 	return &RepositoryConfig{
-		Version:         "1.0",
+		Version:         CurrentVersion,
 		StorageStrategy: "date",
 		LocalSettings: LocalSettings{
 			HandleDuplicateFilenames: "uuid",
@@ -95,7 +103,7 @@ func WithLocalSettings(duplicateHandling string) RepositoryConfigOption {
 // System-managed fields (always auto-generated):
 //   - ID: Unique UUID generated automatically
 //   - CreatedAt: Current timestamp when config is created
-//   - Version: Set to current version ("1.0")
+//   - Version: Set to CurrentVersion
 //
 // User-configurable fields via options:
 //   - StorageStrategy: How files are organized ("date", "cas", "flat")
@@ -170,8 +178,8 @@ func (rc *RepositoryConfig) SaveConfigToFile(repoPath string) error {
 
 // Validate checks if the repository configuration is valid
 func (rc *RepositoryConfig) Validate() error {
-	if rc.Version == "" {
-		return fmt.Errorf("version is required")
+	if version := strings.TrimSpace(rc.Version); version != CurrentVersion {
+		return fmt.Errorf("version must be %s, found %q: a newer Lumilio Photos may have written this marker", CurrentVersion, version)
 	}
 
 	if rc.ID == "" {
@@ -204,9 +212,75 @@ func (rc *RepositoryConfig) Validate() error {
 	return nil
 }
 
-// IsRepositoryRoot checks if a directory contains a .lumiliorepo file
-func IsRepositoryRoot(path string) bool {
+// IsStorageLocation checks if a directory contains a .lumiliorepo file
+func IsStorageLocation(path string) bool {
 	configPath := filepath.Join(path, ".lumiliorepo")
 	_, err := os.Stat(configPath)
 	return err == nil
+}
+
+// ReadMarker preserves access errors separately from marker compatibility.
+func ReadMarker(reader marker.Reader, path string) marker.Reading[RepositoryConfig] {
+	return marker.Read(reader, filepath.Join(path, ".lumiliorepo"), DecodeMarker)
+}
+
+func DecodeMarker(data []byte) marker.Reading[RepositoryConfig] {
+	var config RepositoryConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return marker.Reading[RepositoryConfig]{State: marker.Corrupt, Err: err}
+	}
+	reading := marker.Reading[RepositoryConfig]{Version: config.Version, UUID: config.ID}
+	if strings.TrimSpace(config.Version) == "" {
+		reading.State = marker.Corrupt
+		reading.Err = fmt.Errorf("marker version is required")
+		return reading
+	}
+	if strings.TrimSpace(config.Version) != CurrentVersion {
+		reading.State = marker.UnsupportedVersion
+		return reading
+	}
+	if _, err := uuid.Parse(config.ID); err != nil {
+		reading.State = marker.Corrupt
+		reading.Err = err
+		return reading
+	}
+	if config.CreatedAt.IsZero() {
+		reading.State = marker.Corrupt
+		reading.Err = fmt.Errorf("created_at is required")
+		return reading
+	}
+	if err := config.Validate(); err != nil {
+		reading.State = marker.Corrupt
+		reading.Err = err
+		return reading
+	}
+	reading.State = marker.Valid
+	reading.Config = &config
+	return reading
+}
+
+// SaveGuarded is the P1 atomic primitive; legacy Save callers retain their
+// current transition semantics until they refresh identity under P3 barriers.
+// expectedID == "" means the marker must be positively absent.
+func (config *RepositoryConfig) SaveGuarded(files marker.AtomicFS, path, expectedID string) error {
+	if err := config.Validate(); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	if reading := DecodeMarker(data); reading.State != marker.Valid {
+		return fmt.Errorf("invalid complete marker: %v", reading.Err)
+	}
+	return marker.WriteAtomic(files, filepath.Join(path, ".lumiliorepo"), data, func(current []byte) error {
+		if current == nil && expectedID == "" {
+			return nil
+		}
+		reading := DecodeMarker(current)
+		if expectedID == "" || reading.State != marker.Valid || reading.UUID != expectedID {
+			return marker.ErrIdentityChanged
+		}
+		return nil
+	})
 }

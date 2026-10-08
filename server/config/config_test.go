@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const completeManifest = `schema_version = 6
+const completeManifest = `schema_version = 1
 environment = "development"
 [database]
 path = "data/app-state/library.sqlite3"
@@ -42,6 +42,8 @@ backups_path = "data/app-state/backups"
 [repository_scan]
 interval_seconds = 300
 settle_seconds = 5
+[repository_trash]
+retention_days = 30
 [auth]
 secret_key_file = "data/app-state/secrets/key"
 access_token_ttl = "15m"
@@ -172,9 +174,23 @@ func TestLoadAppConfigRejectsUnknownRemovedAndMissingFields(t *testing.T) {
 		})
 	}
 
-	_, err := LoadAppConfig(writeManifestFixture(t, "schema_version = 3\n"))
+	_, err := LoadAppConfig(writeManifestFixture(t, "schema_version = 1\n"))
 	if err == nil || !strings.Contains(err.Error(), "[server] is required") {
 		t.Fatalf("expected aggregate missing-field error, got %v", err)
+	}
+}
+
+// TestLoadAppConfigRejectsNewerOrPreReleaseSchemaVersion proves the version
+// is checked before the strict decode: a published beta manifest
+// (schema_version = 6) is reported as newer or pre-release, not as a list of
+// field errors.
+func TestLoadAppConfigRejectsNewerOrPreReleaseSchemaVersion(t *testing.T) {
+	for _, version := range []int{SchemaVersion + 1, 6} {
+		contents := strings.Replace(completeManifest, "schema_version = 1", fmt.Sprintf("schema_version = %d\nretired_field = true", version), 1)
+		_, err := LoadAppConfig(writeManifestFixture(t, contents))
+		if err == nil || !strings.Contains(err.Error(), "newer than this build supports") || !strings.Contains(err.Error(), "pre-release") {
+			t.Fatalf("schema_version = %d error = %v", version, err)
+		}
 	}
 }
 

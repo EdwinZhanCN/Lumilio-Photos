@@ -17,6 +17,6 @@ SELECT
     COUNT(*) AS count
 FROM assets a
 WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 GROUP BY 1
 ORDER BY 1;

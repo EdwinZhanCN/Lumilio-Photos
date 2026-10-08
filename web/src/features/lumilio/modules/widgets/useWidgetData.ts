@@ -11,7 +11,7 @@ interface WidgetDataOverrides {
   mode?: WidgetMode;
 }
 
-/** Unified hydration: normalizes a ref/pin/mock source into the handoff's
+/** Unified hydration: normalizes a ref/pin source into the handoff's
  * WidgetData (count, title, mode, liveCount, facets, state). Thin composition
  * over useWidgetMetadata — views that need thumbnails fetch them separately via
  * useWidgetAssetsPreview, so Stat/Timeline never over-fetch images. */

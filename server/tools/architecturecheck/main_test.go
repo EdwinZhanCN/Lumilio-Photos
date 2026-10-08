@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestRepositoryTerminologyTechnicalContextAllowlistIsNarrow(t *testing.T) {
 	for _, line := range []string{
@@ -104,5 +108,43 @@ func TestExecutionCouplingArchitecturePredicates(t *testing.T) {
 	}
 	if isProcessorNakedFFmpegFlagViolation("server/internal/other/something.go", `"-threads", "0"`) {
 		t.Fatal("flag in non-processors file unexpectedly flagged")
+	}
+}
+
+func TestMusicBrowseLabelDoesNotAllowStorageSynonyms(t *testing.T) {
+	line := `t("music.browse.title", "Library")`
+	if !allowedRepositoryTermContext("web/src/features/music/components/MusicNavigation.tsx", line) {
+		t.Fatal("Music navigation label was rejected")
+	}
+	if allowedRepositoryTermContext("web/src/features/settings/Storage.tsx", line) {
+		t.Fatal("Music label exception escaped the listening domain")
+	}
+	if allowedRepositoryTermContext("web/src/features/music/components/MusicNavigation.tsx", `t("storage.title", "Library")`) {
+		t.Fatal("storage synonym was accepted inside Music")
+	}
+}
+
+func TestAssetHardDeletesAreConfinedToPurgeEntries(t *testing.T) {
+	root := t.TempDir()
+	write := func(relative, source string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("server/internal/lifecycle/purge.go", "const q = `DELETE FROM assets WHERE asset_id = ?`")
+	write("server/internal/storage/clean_test.go", "const q = `DELETE FROM assets`")
+	write("server/internal/storage/other.go", "const q = `DELETE FROM asset_tags WHERE asset_id = ?`")
+	write("server/internal/db/repo/queries/purge.sql", "-- name: Purge :exec\nDELETE\n  FROM assets\nWHERE owner_id = ?;")
+	violations, err := scanAssetHardDeletes(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(violations) != 1 || violations[0] != "server/internal/db/repo/queries/purge.sql" {
+		t.Fatalf("violations = %v, want only the multi-line query", violations)
 	}
 }

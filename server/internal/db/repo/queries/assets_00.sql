@@ -57,7 +57,7 @@ WHERE asset_id = sqlc.arg('asset_id')
 
 -- name: GetAssetByID :one
 SELECT * FROM assets
-WHERE asset_id = ?1 AND is_deleted = false;
+WHERE asset_id = ?1 AND lifecycle_state = 'active';
 
 -- name: GetAssetByIDAny :one
 SELECT * FROM assets
@@ -66,7 +66,7 @@ WHERE asset_id = ?1;
 -- name: GetAssetsByIDs :many
 SELECT * FROM assets
 WHERE asset_id IN (sqlc.slice('asset_ids'))
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: GetAssetsByIDsForOwner :many
 WITH filter_params AS (
@@ -75,7 +75,7 @@ WITH filter_params AS (
 SELECT * FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('owner_id')
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: GetAuthorizedAssetIDs :many
 WITH filter_params AS (
@@ -84,7 +84,7 @@ WITH filter_params AS (
 SELECT asset_id FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('owner_id')
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: LockAuthorizedAssetIDs :many
 WITH filter_params AS (
@@ -93,7 +93,7 @@ WITH filter_params AS (
 SELECT asset_id FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('owner_id')
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 ;
 
 -- name: GetAssetExifRaw :one
@@ -106,13 +106,13 @@ WHERE asset_id IN (sqlc.slice('asset_ids'));
 
 -- name: GetAssetsByOwner :many
 SELECT * FROM assets
-WHERE owner_id = ?1 AND is_deleted = false
+WHERE owner_id = ?1 AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3;
 
 -- name: GetAssetsByType :many
 SELECT * FROM assets
-WHERE type = ?1 AND is_deleted = false
+WHERE type = ?1 AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3;
 
@@ -149,19 +149,9 @@ SET specific_metadata = sqlc.arg('specific_metadata'),
     rating = COALESCE(sqlc.narg('rating'), rating)
 WHERE asset_id = sqlc.arg('asset_id');
 
--- name: DeleteAsset :exec
-UPDATE assets
-SET is_deleted = true, deleted_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE asset_id = ?1;
-
--- name: RestoreAsset :exec
-UPDATE assets
-SET is_deleted = false, deleted_at = NULL
-WHERE asset_id = ?1;
-
 -- name: SearchAssets :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
 AND (?1 IS NULL OR original_filename LIKE '%' || ?1 || '%')
 AND (?2 IS NULL OR type = ?2)
 ORDER BY upload_time DESC
@@ -169,60 +159,72 @@ LIMIT ?3 OFFSET ?4;
 
 -- name: GetAssetsByStatus :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
-LIMIT ?2 OFFSET ?3;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsWithWarnings :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = 'warning' AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = 'warning' AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?1 OFFSET ?2;
 
 -- name: GetAssetsWithErrors :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = 'failed' AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = 'failed' AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?1 OFFSET ?2;
 
 -- name: GetAssetsByStatusAndRepository :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1
-  AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT)
+  AND lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
-      AND occurrence.repository_id = ?2
+      AND occurrence.repository_id = sqlc.arg(repository_id)
   )
 ORDER BY upload_time DESC
-LIMIT ?3 OFFSET ?4;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByStatusAndOwner :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND owner_id = sqlc.arg(owner_id) AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
-LIMIT ?3 OFFSET ?4;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountAssetsByStatus :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false;
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND lifecycle_state = 'active';
 
 -- name: CountAssetsByStatusAndRepository :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1
-  AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT)
+  AND lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
-      AND occurrence.repository_id = ?2
+      AND occurrence.repository_id = sqlc.arg(repository_id)
+  );
+
+-- name: CountActiveAssetsByRepository :one
+-- Counts every non-deleted Asset with an active occurrence in the Repository,
+-- whatever its processing state, matching the removal-impact count.
+SELECT COUNT(*) as count
+FROM assets
+WHERE lifecycle_state = 'active'
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = sqlc.arg(repository_id)
   );
 
 -- name: CountAssetsByStatusAndOwner :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false;
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND owner_id = sqlc.arg(owner_id) AND lifecycle_state = 'active';
 
 -- name: GetAssetsByContentHash :many
 SELECT * FROM assets
@@ -231,7 +233,7 @@ WHERE content_id IN (
     FROM content_objects
     WHERE content_objects.full_hash = ?1
   )
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: GetAssetByContentHashAndRepository :one
 SELECT * FROM assets
@@ -240,7 +242,7 @@ WHERE content_id IN (
     FROM content_objects
     WHERE content_objects.full_hash = ?1
   )
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
@@ -306,7 +308,7 @@ WHERE asset_id = ?1
 -- name: GetDistinctCameraModels :many
 SELECT DISTINCT json_extract(a.specific_metadata, char(36) || '.camera_model') as camera_model
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND json_extract(a.specific_metadata, char(36) || '.camera_model') IS NOT NULL
   AND json_extract(a.specific_metadata, char(36) || '.camera_model') != ''
 ORDER BY camera_model;
@@ -314,7 +316,7 @@ ORDER BY camera_model;
 -- name: GetDistinctLenses :many
 SELECT DISTINCT json_extract(a.specific_metadata, char(36) || '.lens_model') as lens_model
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND json_extract(a.specific_metadata, char(36) || '.lens_model') IS NOT NULL
   AND json_extract(a.specific_metadata, char(36) || '.lens_model') != ''
 ORDER BY lens_model;
@@ -336,17 +338,21 @@ SET rating = sqlc.arg('rating'),
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: UpdateAssetDescription :exec
+-- A user edit marks the description, so re-extracted metadata never
+-- overwrites it while an extracted caption keeps following the file.
 UPDATE assets
 SET specific_metadata = json_set(
     COALESCE(specific_metadata, '{}'),
     char(36) || '.description',
-    sqlc.arg('description')
+    sqlc.arg('description'),
+    char(36) || '.description_edited',
+    json('true')
 )
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: GetAssetsByRating :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND rating = sqlc.arg('rating')
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
 ORDER BY upload_time DESC
@@ -354,7 +360,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetLikedAssets :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
 ORDER BY upload_time DESC
@@ -364,7 +370,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 WITH sort_params AS (SELECT CAST(sqlc.arg('sort_order') AS TEXT) AS sort_order)
 SELECT a.* FROM assets a
 CROSS JOIN sort_params
-WHERE a.owner_id = sqlc.arg('owner_id') AND a.is_deleted = false
+WHERE a.owner_id = sqlc.arg('owner_id') AND a.lifecycle_state = 'active'
 ORDER BY
   CASE WHEN sort_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
   CASE WHEN sort_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
@@ -379,7 +385,7 @@ WITH filter_params AS (
 SELECT a.* FROM assets a
 CROSS JOIN filter_params
 WHERE a.type IN (SELECT value FROM json_each(filter_params.types_json))
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY
   CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
   CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
@@ -395,7 +401,7 @@ SELECT a.* FROM assets a
 CROSS JOIN filter_params
 WHERE a.owner_id = sqlc.arg('owner_id')
   AND a.type IN (SELECT value FROM json_each(filter_params.types_json))
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY
   CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
   CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
@@ -413,7 +419,7 @@ WHERE asset_id = ?1;
 
 -- name: GetAssetsByRatingRange :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND rating IS NOT NULL
   AND rating >= sqlc.arg('min_rating')
   AND rating <= sqlc.arg('max_rating')
@@ -423,7 +429,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetLikedAssetsByOwner :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND owner_id = sqlc.arg('owner_id')
 ORDER BY upload_time DESC
@@ -431,7 +437,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetTopRatedAssets :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND rating IS NOT NULL
   AND rating >= sqlc.arg('min_rating')
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
@@ -440,7 +446,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByRatingAndType :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND rating = sqlc.arg('rating')
   AND type = sqlc.arg('asset_type')
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
@@ -449,7 +455,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetLikedAssetsByType :many
 SELECT * FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND type = sqlc.arg('asset_type')
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
@@ -459,7 +465,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 -- name: CountAssetsByRating :many
 SELECT rating, COUNT(*) as count
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND rating IS NOT NULL
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
 GROUP BY rating
@@ -468,7 +474,7 @@ ORDER BY rating DESC;
 -- name: CountLikedAssets :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'));
 
@@ -481,33 +487,33 @@ SELECT
   MAX(rating) as max_rating,
   MIN(rating) as min_rating
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND owner_id = sqlc.arg('owner_id');
 
 -- name: BulkUpdateAssetRating :exec
 UPDATE assets
 SET rating = sqlc.arg('rating')
 WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: BulkUpdateAssetLiked :exec
 UPDATE assets
 SET liked = sqlc.arg('liked')
 WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: BulkToggleAssetLiked :exec
 UPDATE assets
 SET liked = NOT liked
 WHERE asset_id IN (sqlc.slice('asset_ids'))
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: GetAssetsByOwnerWithRatingLiked :many
 WITH sort_params AS (SELECT CAST(sqlc.arg('sort_by') AS TEXT) AS sort_by)
 SELECT a.* FROM assets a
 CROSS JOIN sort_params
 WHERE a.owner_id = sqlc.arg('owner_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (sqlc.narg('has_rating') IS NULL OR
        (sqlc.narg('has_rating') = true AND a.rating IS NOT NULL) OR
        (sqlc.narg('has_rating') = false AND a.rating IS NULL))
@@ -531,7 +537,7 @@ WITH scoped AS (
     occurrence.file_size
   FROM assets asset
   JOIN active_asset_occurrences occurrence ON occurrence.asset_id = asset.asset_id
-  WHERE asset.is_deleted = false
+  WHERE asset.lifecycle_state = 'active'
     AND occurrence.repository_id = sqlc.arg('repository_id')
     AND (sqlc.narg('owner_id') IS NULL OR asset.owner_id = sqlc.narg('owner_id'))
 )

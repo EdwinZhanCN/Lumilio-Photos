@@ -7,20 +7,34 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
-	"server/internal/db/repo"
-	"server/internal/service"
-	roematerializer "server/internal/storage/roe/materializer"
 )
 
 func (c *Coordinator) submitOutcome(ctx context.Context, kind OperationKind, apply func(context.Context, *sql.Tx) (Outcome, error)) (Result, error) {
-	return c.SubmitOperation(ctx, Operation{
+	result, err := c.SubmitOperation(ctx, Operation{
 		Kind: kind,
 		Apply: func(ctx context.Context, tx *sql.Tx) (Result, error) {
 			outcome, err := apply(ctx, tx)
 			return Result{Outcome: outcome}, err
 		},
 	})
+	if err != nil {
+		return result, &unacknowledgedError{cause: err}
+	}
+	return result, nil
 }
+
+// IsUnacknowledged distinguishes a failed Catalog publication from a domain
+// execution failure. Delivery must retry publication without spending a media
+// processing failure budget or reporting success.
+func IsUnacknowledged(err error) bool {
+	var failure *unacknowledgedError
+	return errors.As(err, &failure)
+}
+
+type unacknowledgedError struct{ cause error }
+
+func (e *unacknowledgedError) Error() string { return e.cause.Error() }
+func (e *unacknowledgedError) Unwrap() error { return e.cause }
 
 func (c *Coordinator) ApplyAssetStage(ctx context.Context, payload AssetStageApplied) (Result, error) {
 	if err := validateAssetStage(payload); err != nil {
@@ -58,39 +72,6 @@ func (c *Coordinator) ApplyAssetStack(ctx context.Context, payload AssetStackApp
 	})
 }
 
-func (c *Coordinator) ApplyRepositoryAsset(ctx context.Context, payload RepositoryAssetApplied) (Result, error) {
-	if err := validateRepositoryAsset(payload); err != nil {
-		return Result{}, err
-	}
-	return c.submitOutcome(ctx, OperationKindCatalogRepositoryAsset, func(ctx context.Context, tx *sql.Tx) (Outcome, error) {
-		return applyRepositoryAssets(ctx, tx, payload)
-	})
-}
-
-func (c *Coordinator) ApplyRepositoryKnownContent(ctx context.Context, payload RepositoryKnownContentApplied) (Result, error) {
-	if err := validateRepositoryKnownContent(payload); err != nil {
-		return Result{}, err
-	}
-	if c.catalog.Materializer == nil {
-		return Result{}, errors.New("repository known-content committer is not configured")
-	}
-	return c.submitOutcome(ctx, OperationKindCatalogRepositoryKnownContent, func(ctx context.Context, tx *sql.Tx) (Outcome, error) {
-		return applyRepositoryKnownContentResult(ctx, tx, payload, c.catalog.Materializer)
-	})
-}
-
-func (c *Coordinator) ApplyRepositoryHash(ctx context.Context, payload RepositoryHashApplied) (Result, error) {
-	if err := validateRepositoryHash(payload); err != nil {
-		return Result{}, err
-	}
-	if c.catalog.Materializer == nil {
-		return Result{}, errors.New("repository hash committer is not configured")
-	}
-	return c.submitOutcome(ctx, OperationKindCatalogRepositoryHash, func(ctx context.Context, tx *sql.Tx) (Outcome, error) {
-		return applyRepositoryHashResult(ctx, tx, payload, c.catalog.Materializer)
-	})
-}
-
 func (c *Coordinator) ApplyVideoFrameEmbeddings(ctx context.Context, payload VideoFrameEmbeddingsApplied) (Result, error) {
 	if err := validateVideoFrameEmbeddings(payload); err != nil {
 		return Result{}, err
@@ -124,15 +105,6 @@ func (c *Coordinator) ApplyOperationReceipt(ctx context.Context, payload Operati
 	}
 	return c.submitOutcome(ctx, OperationKindCatalogOperationReceipt, func(ctx context.Context, tx *sql.Tx) (Outcome, error) {
 		return applyOperationReceipts(ctx, tx, payload)
-	})
-}
-
-func (c *Coordinator) ApplyRepositoryEpoch(ctx context.Context, payload RepositoryEpochApplied) (Result, error) {
-	if err := validateRepositoryEpoch(payload); err != nil {
-		return Result{}, err
-	}
-	return c.submitOutcome(ctx, OperationKindCatalogRepositoryEpoch, func(ctx context.Context, tx *sql.Tx) (Outcome, error) {
-		return applyRepositoryEpochs(ctx, tx, payload)
 	})
 }
 
@@ -217,29 +189,6 @@ func validateAssetStack(payload AssetStackApplied) error {
 	return validateAssetIdentity(payload.AssetID, payload.SourceFence, payload.PipelineVersion, payload.DesiredVersion, "asset stack")
 }
 
-func validateRepositoryAsset(payload RepositoryAssetApplied) error {
-	if payload.RepositoryID == uuid.Nil || payload.NodeID == uuid.Nil || payload.AssetID == uuid.Nil || payload.ContentID == uuid.Nil || payload.ObservationRevision <= 0 {
-		return errors.New("invalid repository asset result")
-	}
-	return nil
-}
-
-func validateRepositoryKnownContent(payload RepositoryKnownContentApplied) error {
-	fact := payload.Fact
-	if fact.RepositoryID == uuid.Nil || fact.OwnerID <= 0 || fact.SourceEventKey == "" || fact.Observation.ObservationToken == "" {
-		return errors.New("invalid repository known-content result")
-	}
-	return nil
-}
-
-func validateRepositoryHash(payload RepositoryHashApplied) error {
-	prepared := payload.Prepared
-	if prepared.Node.NodeID == uuid.Nil || prepared.Node.RepositoryID == uuid.Nil || prepared.Node.ObservationRevision <= 0 || prepared.Observation.ObservationToken == "" {
-		return errors.New("invalid repository hash result")
-	}
-	return nil
-}
-
 func validateVideoFrameEmbeddings(payload VideoFrameEmbeddingsApplied) error {
 	if err := validateAssetIdentity(payload.AssetID, payload.SourceFence, payload.PipelineVersion, payload.DesiredVersion, "video frame embedding"); err != nil {
 		return err
@@ -264,13 +213,6 @@ func validateIngestReceipt(payload IngestReceiptApplied, commitID uuid.UUID) err
 func validateOperationReceipt(payload OperationReceiptApplied) error {
 	if payload.ReceiptID == uuid.Nil || payload.Kind == "" {
 		return errors.New("invalid operation receipt result")
-	}
-	return nil
-}
-
-func validateRepositoryEpoch(payload RepositoryEpochApplied) error {
-	if payload.RepositoryID == uuid.Nil || payload.RequestedEpoch == 0 {
-		return errors.New("invalid repository epoch result")
 	}
 	return nil
 }
@@ -320,52 +262,6 @@ func validateReindexProjection(payload ReindexProjectionApplied) error {
 		return errors.New("reindex projection commit is not configured")
 	}
 	return nil
-}
-
-func applyRepositoryHashResult(ctx context.Context, tx *sql.Tx, payload RepositoryHashApplied, materializer *roematerializer.HashApplier) (Outcome, error) {
-	prepared := payload.Prepared
-	if prepared.Node.NodeID == uuid.Nil || prepared.Node.RepositoryID == uuid.Nil || prepared.Node.ObservationRevision <= 0 || prepared.Observation.ObservationToken == "" {
-		return 0, errors.New("invalid repository hash result")
-	}
-	result, err := materializer.ApplyHash(ctx, tx, prepared)
-	if err != nil {
-		return 0, err
-	}
-	if result.Code == roematerializer.ResultStale || result.AssetID == uuid.Nil {
-		return OutcomeStale, nil
-	}
-	if err := serviceApplyAssetActivation(ctx, tx, result.RepositoryID, result.NodeID, result.AssetID, result.ContentID); err != nil {
-		return 0, err
-	}
-	if result.Code == roematerializer.ResultNoop {
-		return OutcomeDuplicate, nil
-	}
-	return OutcomeApplied, nil
-}
-
-func applyRepositoryKnownContentResult(ctx context.Context, tx *sql.Tx, payload RepositoryKnownContentApplied, materializer *roematerializer.HashApplier) (Outcome, error) {
-	fact := payload.Fact
-	if fact.RepositoryID == uuid.Nil || fact.SourceEventKey == "" {
-		return 0, errors.New("invalid repository known-content result")
-	}
-	result, err := materializer.ApplyKnownContent(ctx, tx, fact)
-	if err != nil {
-		return 0, err
-	}
-	if result.Code == roematerializer.ResultStale || result.AssetID == uuid.Nil {
-		return OutcomeStale, nil
-	}
-	if err := serviceApplyAssetActivation(ctx, tx, result.RepositoryID, result.NodeID, result.AssetID, result.ContentID); err != nil {
-		return 0, err
-	}
-	if result.Code == roematerializer.ResultNoop {
-		return OutcomeDuplicate, nil
-	}
-	return OutcomeApplied, nil
-}
-
-func serviceApplyAssetActivation(ctx context.Context, tx *sql.Tx, repositoryID, nodeID, assetID, contentID uuid.UUID) error {
-	return service.ApplyAssetActivationTx(ctx, tx, repo.New(tx), repositoryID, nodeID, assetID, contentID)
 }
 
 func formatOwner(ownerID int32) string {

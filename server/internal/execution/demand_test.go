@@ -61,3 +61,11 @@ func TestDemandCatalogVectors(t *testing.T) {
 		t.Fatalf("location projection demand unexpected: %+v", loc)
 	}
 }
+
+func TestAudioArtworkScalingHasImageCodecAdmission(t *testing.T) {
+	catalog := NewDemandCatalog(ToolSession{Threads: 1})
+	demand := catalog.Demand(StepDerivativesComputeScale, MediaAudio)
+	if demand.ImageCodec != 1 || demand.VideoCodec != 0 || demand.MemoryBytes <= 0 {
+		t.Fatalf("audio artwork scale demand = %+v", demand)
+	}
+}

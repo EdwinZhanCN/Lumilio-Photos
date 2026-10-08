@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"math"
@@ -31,76 +32,118 @@ func TestCapacityDecisionUsesActualTargetVolumeAndSafetyMargin(t *testing.T) {
 	}
 }
 
-func TestWritePreflightRejectsReplacedParentStorageIdentity(t *testing.T) {
-	_, manager := newCatalogRepositoryManager(t)
-	ctx := context.Background()
-	rootPath := filepath.Join(t.TempDir(), "default")
-	initializeDefaultStorageForTest(t, manager, rootPath)
-	repository, err := manager.queries.GetPrimaryRepositoryRecord(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	original, err := rootcfg.Load(rootPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	replacement := rootcfg.New("Replacement")
-	if err := replacement.Save(rootPath); err != nil {
-		t.Fatal(err)
-	}
+// parentStorageLocationFailures covers the Storage Location faults that must
+// never deny a registered child's own work. Each fault leaves the child path,
+// marker, and original bytes intact.
+var parentStorageLocationFailures = []string{"missing_marker", "invalid_marker", "replaced_marker", "offline", "error", "maintenance"}
 
-	if _, err := manager.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), 1); !errors.Is(err, ErrRepositoryUnavailable) {
-		t.Fatalf("write preflight error = %v, want ErrRepositoryUnavailable", err)
-	}
-	if _, err := manager.files.Open(repository); !errors.Is(err, ErrRepositoryUnavailable) {
-		t.Fatalf("RepositoryFS open error = %v, want ErrRepositoryUnavailable", err)
-	}
-	if _, err := manager.RenameRepository(ctx, repository.RepoID.String(), "Must Not Be Written",
-		LifecycleRequest{RequestID: "rename-replaced-parent", Actor: "test"}); !errors.Is(err, ErrRepositoryUnavailable) {
-		t.Fatalf("rename pre-write error = %v, want ErrRepositoryUnavailable", err)
-	}
-	diskRepository, err := repocfg.LoadConfigFromFile(repository.Path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diskRepository.Name == "Must Not Be Written" {
-		t.Fatal("rename wrote the repository marker after parent identity changed")
-	}
-	sidecarPath := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, "asset-1.lumilio-sidecar")
-	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-1", []byte("{}")); !errors.Is(err, ErrRepositoryUnavailable) {
-		t.Fatalf("sidecar pre-write error = %v, want ErrRepositoryUnavailable", err)
-	}
-	for _, path := range []string{sidecarPath, sidecarPath + ".tmp"} {
-		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-			t.Fatalf("sidecar rejection left %s: %v", path, err)
+// failParentStorageLocationForTest makes only the Storage Location unhealthy.
+func failParentStorageLocationForTest(
+	t *testing.T,
+	manager *DefaultRepositoryManager,
+	rootPath string,
+	repository repo.Repository,
+	failure string,
+) {
+	t.Helper()
+	ctx := context.Background()
+	var err error
+	switch failure {
+	case "missing_marker":
+		err = os.Remove(filepath.Join(rootPath, rootcfg.FileName))
+	case "invalid_marker":
+		err = os.WriteFile(filepath.Join(rootPath, rootcfg.FileName), []byte("invalid marker"), 0o644)
+	case "replaced_marker":
+		err = rootcfg.New("Replacement Storage Location").Save(rootPath)
+	default:
+		storageLocation, loadErr := manager.queries.GetStorageLocation(ctx, repository.StorageLocationID)
+		if loadErr != nil {
+			t.Fatal(loadErr)
 		}
+		_, err = manager.queries.UpdateStorageLocationFromDisk(ctx, repo.UpdateStorageLocationFromDiskParams{
+			StorageLocationID: storageLocation.StorageLocationID, Name: storageLocation.Name, Status: dbtypes.StorageLocationStatus(failure),
+			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		})
 	}
-	if matches, err := filepath.Glob(sidecarPath + ".tmp-*"); err != nil || len(matches) != 0 {
-		t.Fatalf("sidecar rejection left temporary files %v (glob error %v)", matches, err)
-	}
-	root, err := manager.queries.GetRepositoryRoot(ctx, repository.RootID)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if root.Status != dbtypes.RepositoryRootStatusError {
-		t.Fatalf("parent status = %q, want error", root.Status)
-	}
-	if err := original.Save(rootPath); err != nil {
-		t.Fatal(err)
-	}
-	if err := manager.ReconcileRepositoryRoots(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := manager.ReconcileAll(ctx); err != nil {
-		t.Fatal(err)
-	}
-	runtimeStatus, err := manager.StorageRuntimeStatus(ctx)
-	if err != nil || runtimeStatus.State != StorageRuntimeStateActive {
-		t.Fatalf("explicit coordination status = %+v, error = %v", runtimeStatus, err)
 	}
 }
 
-func TestSidecarWriteRejectsRootAndRepositoryMaintenance(t *testing.T) {
+// F09: write admission is owned by the child's own path and marker. A parent
+// Storage Location fault never denies capacity preflight, sidecar publication,
+// or rename, and child work never rewrites parent registration.
+func TestChildWritePathsIgnoreParentStorageLocationFailure(t *testing.T) {
+	for _, failure := range parentStorageLocationFailures {
+		t.Run(failure, func(t *testing.T) {
+			_, manager := newCatalogRepositoryManager(t)
+			ctx := context.Background()
+			rootPath := filepath.Join(t.TempDir(), "default")
+			initializeDefaultStorageForTest(t, manager, rootPath)
+			repository, err := manager.queries.GetPrimaryRepositoryRecord(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			failParentStorageLocationForTest(t, manager, rootPath, repository, failure)
+			parentBefore, err := manager.queries.GetStorageLocation(ctx, repository.StorageLocationID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			sidecarData := []byte(`{"asset":"parent-independent"}`)
+			if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-parent-independent", sidecarData); err != nil {
+				t.Fatalf("sidecar write denied by parent %s: %v", failure, err)
+			}
+			stored, err := manager.ReadRepositorySidecar(ctx, repository.RepoID.String(), "asset-parent-independent")
+			if err != nil || !bytes.Equal(stored, sidecarData) {
+				t.Fatalf("sidecar round trip = %q, %v", stored, err)
+			}
+
+			renamed, err := manager.RenameRepository(ctx, repository.RepoID.String(), "Renamed Child",
+				LifecycleRequest{RequestID: "rename-parent-independent-" + failure, Actor: "test"})
+			if err != nil {
+				t.Fatalf("rename denied by parent %s: %v", failure, err)
+			}
+			if renamed.Name != "Renamed Child" || renamed.RepoID != repository.RepoID {
+				t.Fatalf("renamed repository = %+v", renamed)
+			}
+			diskRepository, err := repocfg.LoadConfigFromFile(repository.Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diskRepository.Name != "Renamed Child" || diskRepository.ID != repository.RepoID.String() {
+				t.Fatalf("renamed marker = %+v", diskRepository)
+			}
+
+			// The host volume may legitimately veto a write on its own (for
+			// example real low free space), so the preflight runs after the
+			// other child work and is only required to never produce a
+			// parent-attributed denial.
+			decision, err := manager.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), 1)
+			if errors.Is(err, ErrRepositoryUnavailable) {
+				t.Fatalf("write preflight denied by parent %s: %v", failure, err)
+			}
+			if !decision.Writable || !decision.CapacityKnown || decision.RepositoryPath != repository.Path {
+				t.Fatalf("write preflight did not sample the child target: %+v", decision)
+			}
+			if err != nil && !errors.Is(err, ErrInsufficientSpace) {
+				t.Fatalf("write preflight error = %v", err)
+			}
+
+			parentAfter, err := manager.queries.GetStorageLocation(ctx, repository.StorageLocationID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if parentAfter.Status != parentBefore.Status || parentAfter.UpdatedAt != parentBefore.UpdatedAt {
+				t.Fatalf("child work changed parent registration: before=%+v after=%+v", parentBefore, parentAfter)
+			}
+		})
+	}
+}
+
+// F09: parent Storage Location maintenance is not a write gate; the child's own
+// repository maintenance barrier still is.
+func TestSidecarWriteHonorsRepositoryMaintenanceNotParentStatus(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
@@ -108,21 +151,31 @@ func TestSidecarWriteRejectsRootAndRepositoryMaintenance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, err := manager.queries.GetRepositoryRoot(ctx, repository.RootID)
+	storageLocation, err := manager.queries.GetStorageLocation(ctx, repository.StorageLocationID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := manager.queries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
-		RootID: root.RootID, Name: root.Name, Status: dbtypes.RepositoryRootStatusMaintenance, UpdatedAt: now,
+	if _, err := manager.queries.UpdateStorageLocationFromDisk(ctx, repo.UpdateStorageLocationFromDiskParams{
+		StorageLocationID: storageLocation.StorageLocationID, Name: storageLocation.Name, Status: dbtypes.StorageLocationStatusMaintenance, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-root", []byte("{}")); err == nil {
-		t.Fatal("sidecar write accepted root maintenance")
+	rootSidecar := []byte(`{"asset":"storageLocation-maintenance"}`)
+	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-storageLocation", rootSidecar); err != nil {
+		t.Fatalf("sidecar write denied by parent Storage Location maintenance: %v", err)
 	}
-	if _, err := manager.queries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
-		RootID: root.RootID, Name: root.Name, Status: dbtypes.RepositoryRootStatusActive, UpdatedAt: now,
+	stored, err := manager.ReadRepositorySidecar(ctx, repository.RepoID.String(), "asset-storageLocation")
+	if err != nil || !bytes.Equal(stored, rootSidecar) {
+		t.Fatalf("sidecar written under parent maintenance = %q, %v", stored, err)
+	}
+	rootTarget := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, "asset-storageLocation.lumilio-sidecar")
+	if _, err := os.Stat(rootTarget); err != nil {
+		t.Fatalf("sidecar written under parent maintenance is missing: %v", err)
+	}
+
+	if _, err := manager.queries.UpdateStorageLocationFromDisk(ctx, repo.UpdateStorageLocationFromDiskParams{
+		StorageLocationID: storageLocation.StorageLocationID, Name: storageLocation.Name, Status: dbtypes.StorageLocationStatusActive, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -134,16 +187,14 @@ func TestSidecarWriteRejectsRootAndRepositoryMaintenance(t *testing.T) {
 	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-repository", []byte("{}")); !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("sidecar repository-maintenance error = %v, want ErrRepositoryBusy", err)
 	}
-	for _, assetID := range []string{"asset-root", "asset-repository"} {
-		target := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, assetID+".lumilio-sidecar")
-		for _, path := range []string{target, target + ".tmp"} {
-			if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("sidecar maintenance rejection left %s: %v", path, err)
-			}
+	target := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, "asset-repository.lumilio-sidecar")
+	for _, path := range []string{target, target + ".tmp"} {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("sidecar maintenance rejection left %s: %v", path, err)
 		}
-		if matches, err := filepath.Glob(target + ".tmp-*"); err != nil || len(matches) != 0 {
-			t.Fatalf("sidecar maintenance rejection left temporary files %v (glob error %v)", matches, err)
-		}
+	}
+	if matches, err := filepath.Glob(target + ".tmp-*"); err != nil || len(matches) != 0 {
+		t.Fatalf("sidecar maintenance rejection left temporary files %v (glob error %v)", matches, err)
 	}
 }
 

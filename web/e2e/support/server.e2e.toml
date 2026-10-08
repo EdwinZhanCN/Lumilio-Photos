@@ -1,4 +1,4 @@
-schema_version = 6
+schema_version = 1
 environment = "test"
 
 [database]
@@ -36,6 +36,9 @@ backups_path = "/data/app-state/backups"
 interval_seconds = 3600
 settle_seconds = 1
 
+[repository_trash]
+retention_days = 30
+
 [auth]
 secret_key_file = "/data/app-state/secrets/lumilio_secret_key"
 access_token_ttl = "15m"
@@ -49,7 +52,9 @@ name = "Lumilio Photos E2E"
 [auth.rate_limit]
 ip_attempts = 1000
 subject_attempts = 3
-window = "1s"
+# The lockout spec needs four hashed logins inside one window; 1s was shorter
+# than that on low-power hosts. Recovery waits on `lockout`, not the window.
+window = "10s"
 lockout = "2s"
 max_entries = 10000
 

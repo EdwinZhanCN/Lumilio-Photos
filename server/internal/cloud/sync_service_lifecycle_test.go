@@ -84,13 +84,13 @@ func TestCloudImportCancelAndResumeKeepDurableReceipts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, err := manager.EnsureDefaultRepositoryRoot(ctx, filepath.Join(t.TempDir(), "storage"))
+	root, err := manager.EnsureDefaultStorageLocation(ctx, filepath.Join(t.TempDir(), "storage"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, storage.CreateRepositorySpec{
 		RequestID: "cloud-lifecycle-create", Actor: "test", Name: "Cloud target",
-		DirectoryName: "cloud-target", Role: dbtypes.RepoRolePrimary, RootID: root.RootID.String(),
+		DirectoryName: "cloud-target", Role: dbtypes.RepoRolePrimary, StorageLocationID: root.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)

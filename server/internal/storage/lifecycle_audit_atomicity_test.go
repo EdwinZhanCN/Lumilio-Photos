@@ -22,13 +22,13 @@ func TestRemovalMutationsRollbackWhenLifecycleAuditInsertFails(t *testing.T) {
 		{
 			name: "repository", action: "remove_repository",
 			run: func(ctx context.Context, manager *DefaultRepositoryManager) (string, error) {
-				root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+				storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 				if err != nil {
 					return "", err
 				}
 				created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 					RequestID: "audit-remove-create", Actor: "test", Name: "Audit Remove", DirectoryName: "audit-remove",
-					Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+					Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 				})
 				if err != nil {
 					return "", err
@@ -47,14 +47,14 @@ func TestRemovalMutationsRollbackWhenLifecycleAuditInsertFails(t *testing.T) {
 				if err := os.Mkdir(path, 0o755); err != nil {
 					return "", err
 				}
-				root, err := manager.AddRepositoryRoot(ctx, path, "Audit External")
+				storageLocation, err := manager.AddStorageLocation(ctx, path, "Audit External")
 				if err != nil {
 					return "", err
 				}
-				return root.RootID.String(), manager.DeleteRepositoryRoot(ctx, root.RootID.String(), LifecycleRequest{RequestID: "audit-root-remove", Actor: "web:admin"})
+				return storageLocation.StorageLocationID.String(), manager.DeleteStorageLocation(ctx, storageLocation.StorageLocationID.String(), LifecycleRequest{RequestID: "audit-storageLocation-remove", Actor: "web:admin"})
 			},
 			check: func(ctx context.Context, manager *DefaultRepositoryManager, id string) error {
-				_, err := manager.GetRepositoryRoot(ctx, id)
+				_, err := manager.GetStorageLocation(ctx, id)
 				return err
 			},
 		},

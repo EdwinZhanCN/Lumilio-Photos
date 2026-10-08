@@ -26,6 +26,7 @@ import (
 type riverSQLiteSplitDriver struct {
 	*riversqlite.Driver
 	listenerDriver *riversqlite.Driver
+	continuation   *continuationWake
 }
 
 var _ riverdriver.Driver[*sql.Tx] = (*riverSQLiteSplitDriver)(nil)
@@ -34,11 +35,16 @@ func newRiverSQLiteSplitDriver(writerPool, readerPool *sql.DB) *riverSQLiteSplit
 	return &riverSQLiteSplitDriver{
 		Driver:         riversqlite.New(writerPool),
 		listenerDriver: riversqlite.New(readerPool),
+		continuation:   newContinuationWake(),
 	}
 }
 
 func (d *riverSQLiteSplitDriver) GetListener(params *riverdriver.GetListenenerParams) riverdriver.Listener {
-	return d.listenerDriver.GetListener(params)
+	return &continuationListener{Listener: d.listenerDriver.GetListener(params), wake: d.continuation}
+}
+
+func (d *riverSQLiteSplitDriver) GetExecutor() riverdriver.Executor {
+	return &continuationExecutor{Executor: d.Driver.GetExecutor(), wake: d.continuation}
 }
 
 func runtimeQueueConfigs(macroWorkers int) map[string]river.QueueConfig {

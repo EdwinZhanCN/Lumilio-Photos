@@ -106,3 +106,35 @@ func TestHardLabelCombinesNonContiguousSegments(t *testing.T) {
 		t.Fatalf("hard-labelled segments = %#v", segments)
 	}
 }
+
+func TestSegmentCandidatesPrefersVisualCoverCandidate(t *testing.T) {
+	base := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	items := []Candidate{
+		{MediaItemID: "audio-1", CapturedAt: base, MediaKind: "audio"},
+		{MediaItemID: "photo-1", CapturedAt: base.Add(time.Minute), MediaKind: "photo"},
+		{MediaItemID: "audio-2", CapturedAt: base.Add(2 * time.Minute), MediaKind: "audio"},
+	}
+	segments, err := SegmentCandidates(items, nil, V1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(segments) != 1 {
+		t.Fatalf("expected 1 segment, got %d", len(segments))
+	}
+	if segments[0].CoverCandidateID != "photo-1" {
+		t.Fatalf("cover candidate = %q, want %q", segments[0].CoverCandidateID, "photo-1")
+	}
+
+	// If all candidates are non-visual, fallback to the first candidate.
+	audioOnly := []Candidate{
+		{MediaItemID: "audio-1", CapturedAt: base, MediaKind: "audio"},
+		{MediaItemID: "audio-2", CapturedAt: base.Add(time.Minute), MediaKind: "audio"},
+	}
+	segments, err = SegmentCandidates(audioOnly, nil, V1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if segments[0].CoverCandidateID != "audio-1" {
+		t.Fatalf("cover candidate = %q, want %q", segments[0].CoverCandidateID, "audio-1")
+	}
+}

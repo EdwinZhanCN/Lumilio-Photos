@@ -38,6 +38,7 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 		`CREATE TABLE thumbnails(thumbnail_id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,size TEXT,storage_path TEXT,mime_type TEXT,created_at INTEGER,repository_id TEXT,UNIQUE(asset_id,size))`,
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
+		`CREATE TABLE asset_reindex_requests(receipt_id TEXT PRIMARY KEY,requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
 	} {
 		if _, err := database.Exec(statement); err != nil {
 			t.Fatal(err)

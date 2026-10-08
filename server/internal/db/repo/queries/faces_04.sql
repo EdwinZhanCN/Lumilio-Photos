@@ -13,7 +13,7 @@ FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = sqlc.arg('cluster_id')
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -29,7 +29,7 @@ FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = sqlc.arg('cluster_id')
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -51,7 +51,7 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = sqlc.arg('cluster_id')
   AND fi.id = sqlc.arg('face_id')
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
 	AND fi.repository_id IS NOT NULL
 	AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
 	  SELECT 1 FROM active_asset_occurrences occurrence
@@ -71,7 +71,7 @@ SELECT
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id = sqlc.arg('face_id')
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
 	AND fi.repository_id IS NOT NULL
 	AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
 	  SELECT 1 FROM active_asset_occurrences occurrence
@@ -90,7 +90,7 @@ FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE COALESCE(fcm.is_manual, false) = true
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -136,3 +136,13 @@ SELECT cluster_id, name1, other_cluster_id, name2, avg_similarity
 FROM pair_scores
 ORDER BY 5 DESC
 LIMIT sqlc.arg('limit');
+
+-- name: ListManualFaceAssignmentsForAsset :many
+-- A user's manual person assignments on an Asset's faces, with the face box,
+-- captured before a re-detection replaces the faces.
+SELECT m.cluster_id, f.bounding_box
+FROM face_cluster_members m
+JOIN face_items f ON f.id = m.face_id
+WHERE f.asset_id = sqlc.arg(asset_id)
+  AND m.is_manual = 1
+ORDER BY m.cluster_id, f.id;

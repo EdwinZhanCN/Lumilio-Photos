@@ -24,6 +24,7 @@ const resetStore = () =>
     pendingConfirmation: null,
     connectionError: null,
     usage: null,
+    canRetry: false,
   });
 
 describe("Lumilio chat run lifecycle", () => {
@@ -123,7 +124,9 @@ describe("Lumilio chat run lifecycle", () => {
         callbacks.onSessionInfo("thread-1", "run-2", []);
         callbacks.onRunStatus("run-2", "running");
         expect(
-          useLumilioChatStore.getState().messages[1].blocks.find((block) => block.kind === "confirm"),
+          useLumilioChatStore
+            .getState()
+            .messages[1].blocks.find((block) => block.kind === "confirm"),
         ).toMatchObject({ state: "submitting_approval" });
         callbacks.onSideEvent({
           type: "effect_receipt",
@@ -151,5 +154,83 @@ describe("Lumilio chat run lifecycle", () => {
       .find((block) => block.kind === "confirm");
     expect(confirm).toMatchObject({ state: "committed", receipt: { effect_id: "effect-1" } });
     expect(useLumilioChatStore.getState().pendingConfirmation).toBeNull();
+  });
+
+  it("retries a turn that failed before any output with the same request", async () => {
+    streamAgentMock.mockReset();
+    streamAgentMock
+      .mockImplementationOnce(async () => {
+        throw new Error("network down");
+      })
+      .mockImplementationOnce(async (_path, _body, callbacks: AgentStreamCallbacks) => {
+        callbacks.onSessionInfo("thread-1", "run-2", []);
+        callbacks.onChunk({ output: "Found 3 photos." });
+        callbacks.onRunStatus("run-2", "completed");
+        callbacks.onDone();
+      });
+
+    await useLumilioChatStore.getState().sendMessage("find beaches", { mode: "review" });
+    expect(useLumilioChatStore.getState()).toMatchObject({ canRetry: true, isGenerating: false });
+    expect(useLumilioChatStore.getState().connectionError).toBeInstanceOf(Error);
+
+    await useLumilioChatStore.getState().retryLastMessage();
+
+    expect(streamAgentMock).toHaveBeenCalledTimes(2);
+    expect(streamAgentMock.mock.calls[1][1]).toMatchObject({
+      query: "find beaches",
+      mode: "review",
+    });
+    const { messages, canRetry, connectionError } = useLumilioChatStore.getState();
+    // The failed turn is replaced, not duplicated.
+    expect(messages.map((message) => message.role)).toEqual(["user", "assistant"]);
+    expect(messages[1].blocks[0]).toMatchObject({ kind: "text", markdown: "Found 3 photos." });
+    expect(canRetry).toBe(false);
+    expect(connectionError).toBeNull();
+  });
+
+  it("does not offer a retry once the failed turn produced output", async () => {
+    streamAgentMock.mockReset();
+    streamAgentMock.mockImplementationOnce(
+      async (_path, _body, callbacks: AgentStreamCallbacks) => {
+        callbacks.onSessionInfo("thread-1", "run-1", []);
+        callbacks.onChunk({ output: "Partial" });
+        callbacks.onError(new Error("dropped"));
+      },
+    );
+
+    await useLumilioChatStore.getState().sendMessage("summarize");
+    expect(useLumilioChatStore.getState().canRetry).toBe(false);
+  });
+
+  it("never leaves a confirmation without an effect identity working forever", async () => {
+    streamAgentMock.mockReset();
+    streamAgentMock
+      .mockImplementationOnce(async (_path, _body, callbacks: AgentStreamCallbacks) => {
+        callbacks.onSessionInfo("thread-1", "run-1", []);
+        callbacks.onInterrupt({
+          InterruptContexts: [{ ID: "interrupt-1", IsRootCause: true, Info: { count: 1 } }],
+        });
+        callbacks.onRunStatus("run-1", "awaiting_confirmation");
+        callbacks.onDone();
+      })
+      .mockImplementationOnce(async (_path, _body, callbacks: AgentStreamCallbacks) => {
+        callbacks.onSessionInfo("thread-1", "run-2", []);
+        callbacks.onRunStatus("run-2", "completed");
+        callbacks.onDone();
+      });
+
+    await useLumilioChatStore.getState().sendMessage("tag these");
+    await useLumilioChatStore.getState().confirmInterrupt("interrupt-1", true);
+
+    const state = useLumilioChatStore.getState();
+    expect(state).toMatchObject({
+      isGenerating: false,
+      pendingConfirmation: null,
+      awaitingConfirmation: true,
+    });
+    const confirm = state.messages
+      .flatMap((message) => message.blocks)
+      .find((b) => b.kind === "confirm");
+    expect(confirm).toMatchObject({ state: "failed" });
   });
 });

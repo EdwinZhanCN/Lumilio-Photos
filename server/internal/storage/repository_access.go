@@ -13,28 +13,28 @@ import (
 // against open rooted filesystem handles. A RepositoryFS holds a read lease
 // until Close; relocate/remove/copy identity changes take a write lease.
 type RepositoryAccessCoordinator struct {
-	mu    sync.Mutex
-	locks map[uuid.UUID]*repositoryAccessLock
-	roots map[uuid.UUID]*repositoryAccessLock
+	mu               sync.Mutex
+	locks            map[uuid.UUID]*repositoryAccessLock
+	storageLocations map[uuid.UUID]*repositoryAccessLock
 }
 
 func NewRepositoryAccessCoordinator() *RepositoryAccessCoordinator {
 	return &RepositoryAccessCoordinator{
-		locks: make(map[uuid.UUID]*repositoryAccessLock),
-		roots: make(map[uuid.UUID]*repositoryAccessLock),
+		locks:            make(map[uuid.UUID]*repositoryAccessLock),
+		storageLocations: make(map[uuid.UUID]*repositoryAccessLock),
 	}
 }
 
-func (c *RepositoryAccessCoordinator) rootLockFor(id uuid.UUID) *repositoryAccessLock {
+func (c *RepositoryAccessCoordinator) storageLocationLockFor(id uuid.UUID) *repositoryAccessLock {
 	if c == nil {
 		return nil
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	lock := c.roots[id]
+	lock := c.storageLocations[id]
 	if lock == nil {
 		lock = &repositoryAccessLock{}
-		c.roots[id] = lock
+		c.storageLocations[id] = lock
 	}
 	return lock
 }
@@ -88,7 +88,7 @@ func (c *RepositoryAccessCoordinator) AcquireMutation(id uuid.UUID) func() {
 // Storage Location mutation. Callers acquire the root lease before any child
 // repository write lock.
 func (c *RepositoryAccessCoordinator) AcquireRootRead(id uuid.UUID) func() {
-	lock := c.rootLockFor(id)
+	lock := c.storageLocationLockFor(id)
 	if lock == nil {
 		return func() {}
 	}
@@ -97,7 +97,7 @@ func (c *RepositoryAccessCoordinator) AcquireRootRead(id uuid.UUID) func() {
 }
 
 func (c *RepositoryAccessCoordinator) AcquireRootReadContext(ctx context.Context, id uuid.UUID) (func(), error) {
-	lock := c.rootLockFor(id)
+	lock := c.storageLocationLockFor(id)
 	if lock == nil {
 		return func() {}, nil
 	}
@@ -107,11 +107,11 @@ func (c *RepositoryAccessCoordinator) AcquireRootReadContext(ctx context.Context
 	return lock.acquire(ctx, repositoryAccessRead)
 }
 
-// AcquireRootMutationContext takes the root barrier without waiting past the
+// AcquireStorageLocationMutationContext takes the root barrier without waiting past the
 // caller's deadline. It returns context.Canceled/DeadlineExceeded as
 // resource-busy evidence rather than changing paths while leases are active.
-func (c *RepositoryAccessCoordinator) AcquireRootMutationContext(ctx context.Context, id uuid.UUID) (func(), error) {
-	return acquireWriteLockContext(ctx, c.rootLockFor(id))
+func (c *RepositoryAccessCoordinator) AcquireStorageLocationMutationContext(ctx context.Context, id uuid.UUID) (func(), error) {
+	return acquireWriteLockContext(ctx, c.storageLocationLockFor(id))
 }
 
 // AcquireMutationsContext takes child write locks in stable UUID order and

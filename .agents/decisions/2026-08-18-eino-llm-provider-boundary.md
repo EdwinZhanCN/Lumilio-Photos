@@ -56,7 +56,7 @@ timestamp. Provider changes affect subsequently constructed models while
 in-flight Agent runs retain the model instance with which they started.
 
 The detailed current boundary is documented in
-[`BACKEND.md`](../../docs/BACKEND.md#ml-lumen-and-llm).
+[`server/internal/llm/doc.go`](../../server/internal/llm/doc.go).
 
 ## Alternatives considered
 

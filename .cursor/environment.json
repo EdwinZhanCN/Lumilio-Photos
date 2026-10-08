@@ -1,0 +1,16 @@
+{
+  "name": "Lumilio Photos",
+  "user": "ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "export PATH=\"/usr/local/go/bin:$HOME/go/bin:$HOME/.local/share/vite-plus/bin:$PATH\"; . \"$HOME/.config/vite-plus/env\"; task dev"
+    }
+  ],
+  "ports": [6657, 6680]
+}

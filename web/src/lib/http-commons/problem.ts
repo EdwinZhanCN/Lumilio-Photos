@@ -9,6 +9,9 @@ const INSTANCE_PATTERN = /^urn:lumilio:problem:[0-9a-f]{32}$/;
 
 const KNOWN_TYPES = {
   "about:blank": true,
+  "https://lumilio.org/problems/asset/missing": true,
+  "https://lumilio.org/problems/asset/offline": true,
+  "https://lumilio.org/problems/asset/trashed": true,
   "https://lumilio.org/problems/agent/operation-failed": true,
   "https://lumilio.org/problems/auth/authentication-required": true,
   "https://lumilio.org/problems/auth/invalid-credentials": true,
@@ -254,6 +257,21 @@ function localizeKnownProblem(
       );
     case "https://lumilio.org/problems/service/unavailable":
       return t("apiErrors.service.unavailable", "A required service is unavailable.");
+    case "https://lumilio.org/problems/asset/missing":
+      return t(
+        "apiErrors.asset.missing",
+        "The original file is missing. Return the file and scan its Repository to restore it.",
+      );
+    case "https://lumilio.org/problems/asset/offline":
+      return t(
+        "apiErrors.asset.offline",
+        "The Repository is unavailable. Reconnect it to open this asset.",
+      );
+    case "https://lumilio.org/problems/asset/trashed":
+      return t(
+        "apiErrors.asset.trashed",
+        "This asset is in the Trash. Restore it to open the original.",
+      );
     case "https://lumilio.org/problems/media/invalid-request":
       return t("apiErrors.media.invalidRequest", "The media request could not be processed.");
     case "https://lumilio.org/problems/media/image-embedding-missing":
@@ -277,6 +295,18 @@ function localizeKnownProblem(
 
 function localizeRepositoryConflict(conflictType: string | undefined, t: TFunction): string {
   switch (conflictType) {
+    case "file_changed":
+      return t(
+        "apiErrors.asset.fileChanged",
+        "A file changed since the last scan. Scan its Repository and try again; no files were moved.",
+      );
+    case "not_trashed":
+      return t("apiErrors.asset.notTrashed", "The selected asset has no file in the Trash.");
+    case "move_failed":
+      return t(
+        "apiErrors.asset.moveFailed",
+        "The files could not be moved. The catalog was left unchanged.",
+      );
     case "repository_identity":
       return t(
         "apiErrors.repository.conflicts.identity",

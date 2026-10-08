@@ -98,21 +98,22 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 	rows, err := h.reader.QueryContext(c, `
 SELECT e.event_id FROM events e
 WHERE e.owner_id=? AND e.status='active' AND (? OR e.is_hidden=0)
-AND (?='' OR EXISTS (
+AND EXISTS (
   SELECT 1
   FROM event_media_items emi
   JOIN media_items mi
     ON mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
   WHERE emi.event_id=e.event_id AND emi.owner_id=e.owner_id
-    AND EXISTS (
+    AND mi.media_kind IN ('photo','video','live_photo')
+    AND (?='' OR EXISTS (
       SELECT 1
       FROM media_item_assets scoped_membership
       JOIN active_asset_occurrences occurrence
         ON occurrence.asset_id=scoped_membership.asset_id
       WHERE scoped_membership.media_item_id=mi.media_item_id
         AND occurrence.repository_id=?
-    )
-))
+    ))
+)
 AND (?='' OR e.start_at<? OR (e.start_at=? AND e.event_id<?))
 ORDER BY e.start_at DESC,e.event_id DESC LIMIT ?`,
 		ownerID, includeHidden, repositoryFilter, repositoryFilter,
@@ -300,7 +301,13 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	if request.IsHidden != nil {
 		hidden = *request.IsHidden
 	}
-	result, err := h.writer.ExecContext(c, catalogtx.OperationEventPatch, `
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventPatch, nil)
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(c, `
 UPDATE events SET title_override=?,cover_override_media_item_id=?,is_hidden=?,updated_at=?
 WHERE event_id=? AND owner_id=? AND status='active'`,
 		title, cover, hidden, apiNowMicros(), summary.EventID, ownerID)
@@ -310,6 +317,18 @@ WHERE event_id=? AND owner_id=? AND status='active'`,
 	}
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		h.respondError(c, event.ErrNotFound)
+		return
+	}
+	// Title, cover, and hidden state are reconciliation inputs that every
+	// projection snapshot copies and republishes. Advancing the source
+	// revision in this transaction fences out a projection prepared before
+	// the edit, which would otherwise silently revert it on publish.
+	if err := event.MarkEventFactsChangedTx(c, tx.Raw(), ownerID, "event_user_state_changed"); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	updated, err := h.service.Resolver().Resolve(c, ownerID, summary.EventID)

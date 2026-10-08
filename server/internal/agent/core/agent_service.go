@@ -68,12 +68,12 @@ type agentService struct {
 	auditLogPath   string
 }
 
-func NewAgentService(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string) AgentService {
+func NewAgentService(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string, music ...MusicPlaylistWriter) AgentService {
 	registry := GetRegistry()
 	return &agentService{
 		queries: queries, pool: pool, writer: writer, registry: registry, configProvider: configProvider,
 		store: NewCheckpointStore(queries), refStore: refStore, libraries: libraries,
-		effects: NewEffectRuntime(pool, writer, queries, registry), runs: NewRunRegistry(),
+		effects: NewEffectRuntime(pool, writer, queries, registry, music...), runs: NewRunRegistry(),
 		conversations: conversations, auditLogPath: strings.TrimSpace(auditLogPath),
 	}
 }
@@ -190,7 +190,7 @@ func buildInstruction(today string, hasRefs bool, mode string) string {
 		organizing = "All mutation tools require explicit user confirmation before they commit.\n"
 	}
 	return fmt.Sprintf(
-		"You are a helpful assistant for managing the user's photo library. Today is %s.\n\n"+
+		"You are a helpful assistant for managing the user's photo and local music library. Today is %s.\n\nMusic: use search_music for metadata filters and show_music for auditionable results; never infer mood or acoustic properties that are not stored. When refining or saving a user's attached music selection, use its latest ref and preserve its order. lookup_music_playlists resolves existing targets; save_music_playlist requires confirmation and a committed receipt before claiming success. Tool results never start audio.\n\n"+
 			"REF POLICY:\n- Refs are opaque server-issued handles. Never invent or edit one. %s\n"+
 			"- Obtain refs through producer tools before using observers or mutations.\n"+
 			"- Never expose refs, asset ids, or internal identifiers to the user.\n"+
