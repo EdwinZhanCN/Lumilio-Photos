@@ -270,7 +270,7 @@ repair. No assessment DTO, endpoint, consent token or UI ships in P1.
 ### Facts/clarifications 2026-10-07
 
 macOS and Windows ship the Desktop App plus Web App. Linux ships only the
-Docker app (Ubuntu-based image); there is no native Linux desktop. The
+Docker app on Debian trixie; there is no native Linux desktop. The
 **Existing empty directory / Linux empty mount point versus empty folder**
 question is resolved permanently: an existing empty bind-mounted volume is
 allowed; an ordinary existing empty folder is rejected because it belongs to

@@ -87,7 +87,7 @@ implementation.
 ## Facts/clarifications 2026-10-07
 
 macOS and Windows ship the Desktop App plus Web App. Linux ships only the
-Docker app, using an Ubuntu-based image; there is no native Linux desktop.
+Docker app on Debian trixie; there is no native Linux desktop.
 The smaller **Existing empty directory / Linux empty mount point versus empty
 folder** question is resolved: retain the mounted-volume constraint
 permanently. An existing empty mount point (including a bind-mounted host
