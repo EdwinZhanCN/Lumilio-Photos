@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vite-plus/test";
+import { describe, it, expect, vi } from "vite-plus/test";
 import zeroperlWasmUrl from "@colorhythm/exiftool-wasm/dist/esm/zeroperl-mqcadjqm.wasm?url";
 import { installRandomUUIDCompatibility } from "@/lib/uuid";
 import { preserveExif } from "./exif";
@@ -70,11 +70,23 @@ describe("preserveExif", () => {
     }
   });
 
-  it("returns PNG exports untouched (PNG carries no EXIF)", async () => {
+  it("returns PNG exports untouched (source metadata copying is unsupported)", async () => {
     const canvas = new OffscreenCanvas(8, 8);
     canvas.getContext("2d")!.fillRect(0, 0, 8, 8);
     const png = await canvas.convertToBlob({ type: "image/png" });
     const out = await preserveExif(png, png, { format: "image/png", width: 8, height: 8 });
     expect(out).toBe(png);
+  });
+  it("reports unavailable metadata while retaining the rendered photo", async () => {
+    const exported = await jpeg("rgb(20,30,40)");
+    const unavailable = vi.fn();
+    const output = await preserveExif(exported, new Blob([]), {
+      format: "image/jpeg",
+      width: 80,
+      height: 60,
+      onUnavailable: unavailable,
+    });
+    expect(unavailable).toHaveBeenCalledOnce();
+    expect(await output.arrayBuffer()).toEqual(await exported.arrayBuffer());
   });
 });

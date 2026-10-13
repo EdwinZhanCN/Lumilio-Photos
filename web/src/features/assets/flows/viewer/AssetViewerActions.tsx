@@ -8,6 +8,7 @@ import type { Asset } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 import { useAssetActions } from "../../api/useAssetActions";
+import { AssetActionsDialog } from "./AssetActionsDialog";
 import { AssetExportDialog } from "../export/AssetExportDialog";
 
 interface AssetViewerActionsProps {
@@ -36,6 +37,7 @@ export function AssetViewerActions({
   const { t } = useI18n();
   const navigate = useNavigate();
   const { toggleLike, deleteAsset } = useAssetActions();
+  const [exportAsset, setExportAsset] = useState<Asset | null>(null);
   const [shareAsset, setShareAsset] = useState<Asset | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReady, setDeleteReady] = useState(false);
@@ -114,7 +116,15 @@ export function AssetViewerActions({
 
   return (
     <>
-      <AssetExportDialog
+      {exportAsset && (
+        <AssetExportDialog
+          key={exportAsset.asset_id}
+          asset={exportAsset}
+          onClose={() => setExportAsset(null)}
+        />
+      )}
+      <AssetActionsDialog
+        onExport={setExportAsset}
         asset={asset ?? undefined}
         onOpenStudio={(selectedAsset) => {
           void navigate(`/studio?assetId=${selectedAsset.asset_id}`);
@@ -258,9 +268,9 @@ export function AssetViewerActions({
         <button
           type="button"
           className="btn btn-circle btn-lg"
-          onClick={() => openDialog("asset_export_dialog")}
+          onClick={() => openDialog("asset_actions_dialog")}
           disabled={!asset}
-          aria-label={t("exportModal.share")}
+          aria-label={t("photoExport.actions", "Photo actions")}
         >
           <Share />
         </button>

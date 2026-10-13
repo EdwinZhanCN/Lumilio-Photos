@@ -20,7 +20,7 @@ type TopBarProps = {
   canUndo: boolean;
   beforeActive: boolean;
   isSaving: boolean;
-  isExporting: boolean;
+  exportDisabled: boolean;
   /** Desktop panel visibility (drives the toggle icon state). */
   leftOpen: boolean;
   rightOpen: boolean;
@@ -44,7 +44,7 @@ export function TopBar({
   canUndo,
   beforeActive,
   isSaving,
-  isExporting,
+  exportDisabled,
   leftOpen,
   rightOpen,
   onBack,
@@ -169,10 +169,10 @@ export function TopBar({
         <button
           type="button"
           onClick={onExport}
-          disabled={isExporting}
+          disabled={exportDisabled}
           className="btn btn-sm gap-1.5 border-base-300 bg-base-100 text-base-content/80"
         >
-          {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          <Download size={15} />
           <span className="hidden lg:inline">
             {t("studio.editor.export", { defaultValue: "Export" })}
           </span>
