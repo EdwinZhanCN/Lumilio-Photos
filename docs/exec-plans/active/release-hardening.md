@@ -130,11 +130,12 @@ follow-up in the tech-debt tracker.
 | S10 | #223 acceptance tests: two-copy delete/restore with albums and faces; external deletion hidden from search, albums, counts; duplicate resolution into Trash and back; in-place edit with a real XMP/EXIF write, tags, rating/like, regenerated artifacts; fork and bind-without-merge snapshots; backup-before-delete restore rebuilding Trash from sidecars. Then complete that plan (decisions already recorded) and close #223. | #223 | same |
 | S11 | Smoke-to-CI: a `@smoke` language-switch spec; the removable-Location create journey as the P2 flow spec plus Server injected-fact test (name them in the checklist); `release-smoke.yml` (dispatch: image reference or digest → fresh Compose install from the release bundle → setup → upload → browse → backup/restore; uploads the catalog, config, backup, and markers as the compatibility-fixture artifact). Rewrite the checklist's Results from CI run links. | smoke checkpoint | [rc-smoke-checklist.md](rc-smoke-checklist.md) |
 | S12 | Release notes (en + zh-cn, registry terms), upgrade page, Known issues, the Desktop CI-only verification statement. | notes | [rc-release.md](rc-release.md) Phase 1 |
+| S12b | Desktop correctness review (owner request 2026-10-13, since no machine will launch it): read every `desktop/` path a first launch takes (bootstrap, runtime config and apply journal, onboarding, Storage panel host actions, tray, update controller in its unconfigured state) and every Desktop change from S1 and S2–S8 against the Atlas Desktop runtime lifecycle view; prove each finding with a failing-first Desktop or Server test; `task desktop:test` green on the macOS and Windows jobs. Findings that meet the blocker definition go to the milestone. | Desktop ships unlaunched | this plan, Phase 6 |
 | S13 | Promote: blocker gate (milestone empty), update #210's body, mark ready, CI green on the final head; **Edwin merges**. | #210 | [rc-release.md](rc-release.md) Phase 2 |
 | S14 | Tag: blocker gate again; **Edwin confirms the tag in writing**; the session pushes `v26.1.0-rc.1` on the merged `main` commit and watches the release workflow; verifies the GitHub pre-release, image tags and digest, DMG, Windows installer and portable app. | rc.1 published | [rc-release.md](rc-release.md) Phase 3 |
 | S15 | Post-tag: dispatch `release-smoke` against the published digest; commit the rc.1 compatibility fixture with its CI upgrade test; record digests and results here; complete this plan and rc-release per the exec-plan skill; open the rc.2 checkpoints (Mac pass, published Desktop install, #240). | plans complete | [rc-release.md](rc-release.md) Phases 3–4 |
 
-S9 and S10 touch `storage/scan`, `lifecycle`, and `server/app` tests only,
+S12b runs after S8 and before S13. S9 and S10 touch `storage/scan`, `lifecycle`, and `server/app` tests only,
 so they can run between any two storage sessions; S11 and S12 can run any
 time after S2 (S11 needs the P2 evidence names). S2–S8 are strictly ordered.
 S13–S15 wait for everything before them and for an empty milestone.
@@ -277,6 +278,8 @@ S13–S15 wait for everything before them and for an empty milestone.
   Phase 0.
 - [ ] `dev` → `main` promotion PR, green CI, then the `rc.1` tag; the release
   workflow builds every Desktop and Server artifact.
+- [ ] Desktop correctness review (S12b) done; its findings fixed or filed
+  with a blocker/deferred verdict.
 - [ ] Post-tag checkpoint: the `release-smoke` workflow installs the
   published Docker image by digest and runs setup, upload, browse, and a
   backup/restore round trip (S15). Installing a published Desktop build is

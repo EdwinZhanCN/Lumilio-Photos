@@ -41,7 +41,10 @@ GitHub Actions or in a plain checkout. Specifically:
 4. **Desktop still ships in rc.1.** The release workflow publishes one
    release only when every Server and Desktop artifact succeeds; the
    release notes say that the Desktop builds were verified by automated
-   tests on CI runners, not on a physical machine, since beta.1.
+   tests on CI runners, not on a physical machine, since beta.1. In return
+   a dedicated code-correctness review of the Desktop launch and storage
+   paths runs before promotion (session S12b in the release-hardening
+   plan), with failing-first tests for whatever it finds.
 5. **Nothing else changes.** rc.1 stays quality-gated and issue-gated; the
    blocker definition, the milestone membership, the no-skip rule for
    correctness tests, the all-P0–P8 scope of the storage refactor, and the
