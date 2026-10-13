@@ -304,6 +304,7 @@ Uses: `web-lib`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
+| `web/src/components/PhotoExportDialog` |  |  |
 | `web/src/components/assistant` |  |  |
 | `web/src/components/breadcrumbs` |  |  |
 | `web/src/components/collection` |  |  |
@@ -327,6 +328,7 @@ Non-visual lower layer: the generated OpenAPI client, i18n, preferences, theme, 
 | `web/src/lib/http-commons` |  |  |
 | `web/src/lib/layout` |  |  |
 | `web/src/lib/media` |  |  |
+| `web/src/lib/photo-export` |  |  |
 | `web/src/lib/preferences` |  |  |
 | `web/src/lib/settings` |  |  |
 | `web/src/lib/theme` |  |  |
