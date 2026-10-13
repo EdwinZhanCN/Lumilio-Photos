@@ -1,9 +1,9 @@
 # RC release: notes, pipeline, promotion, tag
 
-Status: active, created 2026-09-24. Phase 0 done (release workflow green on `dev` `c397cf38`); Phase 1 (release notes) next, best written once the milestone blockers land. Child of
-[release-hardening.md](release-hardening.md) (Phase 6). Target: `rc.1` tag on
+Status: active, created 2026-09-24. Phase 0 done (release workflow green on `dev` `c397cf38`). 2026-10-13: Phase 0b added because #210's CI has been red since #241 (`main` holds five commits `dev` lacks, so `verify:generated` reports Atlas drift on the merge ref); Phases 3–4 rewritten for a release driven entirely from Claude Code cloud with no physical machine ([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)). Phase 1 (release notes) is written once the storage refactor's user-visible behaviour is final (after P5). Child of
+[release-hardening.md](release-hardening.md) (Phase 6); the session order lives there. Target: `rc.1` tag on
 `main`, date **TBD** (owner decision 2026-09-24; originally 2026-09-29) until
-the RC blockers #222 and #223 land.
+the RC blockers #222, #223, and #242 land.
 rc.1 is a quality milestone, not a date deadline: the storage refactor completes fully,
 storage-repository bugs are eradicated, and core paths hold up through a stretch of real
 use by Edwin and a few friends. It can be postponed.
@@ -30,7 +30,12 @@ the promotion commit, with bilingual release notes, smoked once.
   validation boundaries hold and [rc-smoke-checklist.md](rc-smoke-checklist.md)
   is closed (the compatibility baseline is done: PR #225, [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
 - Tags and releases are outward-facing: the user confirms before any tag is
-  pushed.
+  pushed. With no machine of their own, the user confirms in writing in the
+  session and the session pushes the tag; the confirmation names the exact
+  `main` commit.
+- Evidence is CI- or checkout-reproducible only (2026-10-13). A step that
+  used to say "on any Docker host" or "on Edwin's Mac" now names a workflow
+  run or is an rc.2 checkpoint; nothing is ticked from memory.
 - **RC blocker gate (hard stop).** The GitHub milestone
   [`v26.1.0-rc.1`](https://github.com/EdwinZhanCN/Lumilio-Photos/milestone/1)
   admits only bugs meeting the blocker definition in release-hardening.md:
@@ -64,6 +69,20 @@ the promotion commit, with bilingual release notes, smoked once.
   and portable app; the GitHub Release job was skipped as designed for a
   dispatch. Artifacts: `windows-amd64-setup`, `windows-amd64`, `dmg-arm64`.
 
+### Phase 0b — Sync `main` into `dev` (S1, do before anything else)
+- [ ] Merge `origin/main` into a branch off `dev` (brings #201's export
+  dialog, `web/src/components/PhotoExportDialog` and
+  `web/src/lib/photo-export`, and the Desktop retry-cleanup test). Resolve
+  conflicts in favour of `dev` for anything the Atlas or storage work
+  rewrote; keep `main`'s new modules.
+- [ ] `task atlas:generate`, then `task atlas:check`. If a view is reported
+  stale, re-read it against the merged code before `task atlas:lock`
+  (`lumilio-atlas`). `task verify:generated` and `task web:test` pass
+  locally; push and confirm the `generated artifacts` job is green on the
+  PR and, after merge, on #210.
+- [ ] Close draft #229: its harness and five regression tests landed through
+  #232–#235, and it no longer merges cleanly.
+
 ### Phase 1 — Release notes (bilingual)
 - [ ] Collect user-facing changes since `v26.1.0-beta.1`:
   `git log --merges --oneline v26.1.0-beta.1..origin/dev` plus PR bodies
@@ -94,6 +113,15 @@ the promotion commit, with bilingual release notes, smoked once.
   pre-release builds (`v1.0.0-beta.*`, `v26.1.0-beta.*`) is not migrated —
   start fresh. From rc.1 on, updates upgrade in place and take an automatic
   backup first ([decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
+- [ ] Behaviour changes from the storage refactor that users must read:
+  network storage (NFS, SMB, AFP, sshfs, WebDAV, Windows network drives) is
+  refused for Storage Locations and Repositories in rc.1; "Relocate" is now
+  "Reconnect" and never moves files; reinstalling over a kept primary
+  Repository asks whether to adopt it; risk confirmation is asked per
+  operation. Use the registry terms.
+- [ ] State plainly that the rc.1 Desktop builds for macOS and Windows were
+  verified by automated tests on CI runners, not on a physical machine,
+  and that in-app updates arrive in rc.2 (#240).
 
 ### Phase 2 — Promote
 - [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
@@ -106,30 +134,35 @@ the promotion commit, with bilingual release notes, smoked once.
 ### Phase 3 — Tag and publish (user confirms first)
 - [ ] Run the RC blocker gate again right before tagging; stop if anything is
   open, and ask the user to confirm there is nothing new to add.
-- [ ] Tag `v26.1.0-rc.1` on the merged `main` commit and push the tag; watch
-  the release workflow to completion (`gh run watch`).
+- [ ] Tag `v26.1.0-rc.1` on the merged `main` commit and push the tag from
+  the session; watch the release workflow to completion through the Actions
+  API and read every job's conclusion.
 - [ ] Verify outputs: GitHub pre-release created with notes; Server image
   `ghcr.io/edwinzhancn/lumilio-server` with the expected tags and a recorded
   digest; Desktop macOS DMG and Windows installer/portable attached.
 
 - [ ] Lock the rc.1 compatibility fixture from the published image and land
-  it via a PR into `dev`: with the published rc.1 image, create a small
-  catalog with user state (album with a cover, renamed Event and person,
-  share link), its config, one backup, and the Storage Location and
-  Repository markers; commit them under a testdata path; add a CI test that
-  upgrades them with the current build on every run and checks counts, user
-  state, and untouched originals. Each later release adds its own fixture.
+  it via a PR into `dev`: the `release-smoke` workflow (built in S11), run
+  against the published rc.1 digest, creates a small catalog with user state
+  (album with a cover, renamed Event and person, share link), its config,
+  one backup, and the Storage Location and Repository markers, and uploads
+  them as a workflow artifact; the session downloads the artifact, commits
+  it under a testdata path, and adds a CI test that upgrades it with the
+  current build on every run and checks counts, user state, and untouched
+  originals. Each later release adds its own fixture.
   From the tag on, the baseline and every released step are frozen
   (`server/migrations/steps/README.md`; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)). This is the last
   item of issue #221's scope.
 
 ### Phase 4 — Post-tag published-artifact checkpoints
-- [ ] Docker: on any Docker host (radxa optional), pull the published image **by digest**, fresh
-  install with `deploy/compose/compose.yml`, setup wizard, upload a photo,
-  view it. (Pull from the registry directly — this checks the registry artifact,
-  not a local build.)
-- [ ] Desktop post-tag checkpoint: the user installs the published build on macOS or Windows,
-  onboarding, import, view.
+- [ ] Docker: dispatch `release-smoke` with the published image **digest**
+  (the workflow pulls from the registry, so this checks the registry
+  artifact, not a local build): fresh install with the release bundle's
+  Compose files, setup wizard, upload a photo, view it, backup → restore.
+  Record the run link and digest here.
+- [ ] Desktop: installing a published macOS or Windows build is the first
+  rc.2 checkpoint, together with the updater proof (#240). Record it as
+  such; do not tick it.
 - [ ] Record digests and results in release-hardening.md; tick Phase 6;
   complete the parent plan per the exec-plan skill.
 
@@ -139,5 +172,6 @@ the promotion commit, with bilingual release notes, smoked once.
   confirmed the tag.
 - Release workflow green for `v26.1.0-rc.1`; every Desktop and Server
   artifact present.
-- Published image digest recorded and smoke-tested from the registry.
+- Published image digest recorded and smoke-tested from the registry by a
+  `release-smoke` workflow run.
 - Bilingual notes published with the pre-release.

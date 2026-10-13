@@ -20,6 +20,19 @@ milestone `v26.1.0-rc.1` lists every issue that blocks the tag (the user adds
 more over the coming days); nothing is promoted or tagged while it has open
 issues — see "RC blocker issues" below.
 
+**2026-10-13 re-plan (owner constraint: no physical machine for the
+foreseeable future; every remaining session runs in Claude Code cloud).**
+Every pre-tag gate is now CI- or checkout-reproducible; the Mac pass and the
+published Desktop install are the first rc.2 checkpoints
+([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)).
+Where things stand: #222/#223 are implemented and wait only on the
+deterministic acceptance tests listed in their 2026-10-07 audit comments;
+the storage refactor is at P1 of P8 (#246, #247) and owns #242; `dev` is
+126 commits ahead of `main`, and #210's CI has been red since #241 because
+`main` carries five commits `dev` never received (the export dialog from
+#201), so `verify:generated` sees Atlas drift on the merge ref. The
+sequenced session list under "Handoff" is the single order of work.
+
 Landed before this plan (`bdd1375..74526ae`): Processing two-pattern pass,
 Agent per-tab transcript and retry, Person Recognition relation decoding, UI
 language normalization (Storage page crash), `asset_handler.go` and desktop
@@ -85,28 +98,46 @@ follow-up in the tech-debt tracker.
   are working on. Each child plan lists its own environment, phases, and
   validation boundaries; keep its `Status:` and checkboxes current in the
   same PR that changes reality.
-- Run the child plans in this order:
-  - repository-index-and-asset-lifecycle first, because it changes the
-    catalog baseline, scanning, Storage, and delete. rc-release Phase 0
-    (release workflow de-risk) is done; the compatibility baseline is done,
-    and an optional Docker checkpoint re-proves its round trip on the new schema.
-  - rc-smoke-checklist Part A only after its last PR merges and an RC image
-    built from that `dev` exists on any Docker host.
-  - rc-release Phases 1–4 last, and only once the RC blocker milestone is
-    empty.
-  - Other blocker issues can be worked in parallel with all of these; rerun
-    the upgrade-restore and smoke rows that a blocker fix touches.
-- Optional remote Docker host `radxa-x4` (Intel N100, 7.5 GiB, Fedora 44, fish shell):
-  build images on the Mac for `linux/amd64`, ship with `docker save | gzip -1
-  | ssh radxa-x4 'gunzip | docker load'`, run there. For the E2E stack, do not
-  use `task web:e2e:up` against the remote (it passes `--build`); use
-  `DOCKER_HOST=ssh://radxa-x4 docker compose -f web/e2e/compose.yml -p
-  lumilio-photos-e2e up -d --no-build --wait`, tunnel ports 16657–16659, and
-  run slices from the Mac with `LUMILIO_E2E_DOCKER_HOST=ssh://radxa-x4`.
-- A real Lumen Hub runs on the radxa at `:50051` (face, siglip, ocr).
-- Required CI runs only on PRs and `main` pushes, and a PR into `dev` only runs the
-  jobs its paths touch; #210's CI is the full baseline. CI fails on any flaky
-  test (`failOnFlakyTests`).
+- Every session: branch from the latest `dev`, one PR into `dev` per
+  session (body says `Closes #<n>` when it closes an issue), the narrowest
+  checks per `lumilio-select-checks`, and never a skipped or quarantined
+  correctness test. A session that ends without a mergeable PR leaves its
+  branch pushed and a one-paragraph note in the child plan's `Status:`.
+- The cloud sandbox has Go, Node, Task, Chromium, and the GitHub MCP tools,
+  but no Docker daemon and no display. Server and Web unit/integration
+  tests run locally; the Compose E2E slices, Desktop native jobs, and
+  anything that needs a published image run only on GitHub Actions, so a
+  session proves those by pushing and reading the PR's checks.
+- Required CI runs only on PRs and `main` pushes, and a PR into `dev` only
+  runs the jobs its paths touch; #210's CI is the full baseline. CI fails
+  on any flaky test (`failOnFlakyTests`).
+- Optional reference hardware (`radxa-x4`, Intel N100) is unavailable; the
+  `lumilio-remote-qualification` skill stays for when it returns (#243).
+
+### Session order (each row is one session and normally one PR into `dev`)
+
+| # | Session | Closes / unblocks | Plan |
+| --- | --- | --- | --- |
+| S1 | Sync `main` into `dev`: merge `origin/main` (five commits, export dialog), run `task atlas:generate` and `task verify:generated`, re-read any Atlas view the new modules make stale before `task atlas:lock`. #210 turns green again. Close the stale draft #229 (its tests landed through #232–#235). | #210 CI | [rc-release.md](rc-release.md) Phase 0b |
+| S2 | Storage P2 — assessment DTOs/endpoints, consent token, capability-backed Create, shared en/zh risk review. | #242 | [storage-repository-lifecycle.md](storage-repository-lifecycle.md) |
+| S3 | Storage P3 — safe command boundary (reassess under barriers, rename refresh, role-aware actions, idempotent receipts). May split into two PRs: commands, then native selection/review. | — | same |
+| S4 | Storage P4 — private preservation and recovery (held inherited Trash, Studio reassociation, journaled staging). Highest data risk; fault injection at every boundary. | — | same |
+| S5 | Storage P5 — setup and startup recovery (Adopt Primary / fresh elsewhere, authenticated setup recovery, startup facade). | leftover-primary dead end | same |
+| S6 | Storage P6 — reconnect journeys and volume semantics. Volume evidence comes from CI filesystem images (Linux loop-mounted vfat/exFAT/casefold-ext4, macOS `hdiutil` APFS/ExFAT); native picker paths from the embedded harness. May split: regular/Location reconnect, then default Apply. | silent Reconnect no-op | same |
+| S7 | Storage P7 — remove competing classifiers and Desktop marker parsing; architecture checks that catch a deliberate violation. | — | same |
+| S8 | Storage P8 — `web:test:storage-recovery` E2E slice wired into `ci.yml` path filters; evidence tables; extract decisions; delete the plan. The Mac pass is recorded as an rc.2 checkpoint, not run. | storage plan complete | same |
+| S9 | #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test or `architecturecheck`. | #222 | [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) |
+| S10 | #223 acceptance tests: two-copy delete/restore with albums and faces; external deletion hidden from search, albums, counts; duplicate resolution into Trash and back; in-place edit with a real XMP/EXIF write, tags, rating/like, regenerated artifacts; fork and bind-without-merge snapshots; backup-before-delete restore rebuilding Trash from sidecars. Then complete that plan (decisions already recorded) and close #223. | #223 | same |
+| S11 | Smoke-to-CI: a `@smoke` language-switch spec; the removable-Location create journey as the P2 flow spec plus Server injected-fact test (name them in the checklist); `release-smoke.yml` (dispatch: image reference or digest → fresh Compose install from the release bundle → setup → upload → browse → backup/restore; uploads the catalog, config, backup, and markers as the compatibility-fixture artifact). Rewrite the checklist's Results from CI run links. | smoke checkpoint | [rc-smoke-checklist.md](rc-smoke-checklist.md) |
+| S12 | Release notes (en + zh-cn, registry terms), upgrade page, Known issues, the Desktop CI-only verification statement. | notes | [rc-release.md](rc-release.md) Phase 1 |
+| S13 | Promote: blocker gate (milestone empty), update #210's body, mark ready, CI green on the final head; **Edwin merges**. | #210 | [rc-release.md](rc-release.md) Phase 2 |
+| S14 | Tag: blocker gate again; **Edwin confirms the tag in writing**; the session pushes `v26.1.0-rc.1` on the merged `main` commit and watches the release workflow; verifies the GitHub pre-release, image tags and digest, DMG, Windows installer and portable app. | rc.1 published | [rc-release.md](rc-release.md) Phase 3 |
+| S15 | Post-tag: dispatch `release-smoke` against the published digest; commit the rc.1 compatibility fixture with its CI upgrade test; record digests and results here; complete this plan and rc-release per the exec-plan skill; open the rc.2 checkpoints (Mac pass, published Desktop install, #240). | plans complete | [rc-release.md](rc-release.md) Phases 3–4 |
+
+S9 and S10 touch `storage/scan`, `lifecycle`, and `server/app` tests only,
+so they can run between any two storage sessions; S11 and S12 can run any
+time after S2 (S11 needs the P2 evidence names). S2–S8 are strictly ordered.
+S13–S15 wait for everything before them and for an empty milestone.
 
 ## Execution phases
 
@@ -155,10 +186,11 @@ follow-up in the tech-debt tracker.
 - [x] Tracker item removed; `lumilio-frontend-i18n` now requires literal keys.
 
 ### Phase 3 — Flow coverage for untested journeys
-- [ ] Tag-time core smoke checkpoint on any Docker host and Edwin's Mac Desktop
-  (Windows if available): setup, upload/browse, Storage create including a
-  removable location, Trash/restore, and language switch; other rows are spot checks. Owned by
-  [rc-smoke-checklist.md](rc-smoke-checklist.md).
+- [ ] Tag-time core smoke checkpoint, run by CI on the promotion head
+  (2026-10-13: no hardware): setup, upload/browse, Storage create including a
+  removable location, Trash/restore, and language switch map to named
+  specs and Server tests; rows without automatable evidence are listed as
+  deferred to rc.2. Owned by [rc-smoke-checklist.md](rc-smoke-checklist.md).
 - [x] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
   - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
@@ -223,8 +255,14 @@ follow-up in the tech-debt tracker.
 - [ ] Agent: per-tool progress and duration in tool chips; copy-answer action.
 
 ### Phase 6 — Release candidate
-- [ ] RC blockers #222 (scan index) and #223 (Asset lifecycle) —
+- [ ] Sync `main` into `dev` so #210's merge ref passes `verify:generated`
+  again (S1; [rc-release.md](rc-release.md) Phase 0b).
+- [ ] RC blockers #222 (scan index) and #223 (Asset lifecycle): implemented;
+  the deterministic acceptance tests from the 2026-10-07 audit remain (S9,
+  S10) —
   [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md).
+- [ ] RC blocker #242 and the storage refactor P2–P8 (S2–S8) —
+  [storage-repository-lifecycle.md](storage-repository-lifecycle.md).
 - [ ] Release notes (user-facing, bilingual per the terminology registry) —
   [rc-release.md](rc-release.md) Phase 1.
 - [x] Compatibility baseline: every app-owned persisted format reset to
@@ -233,13 +271,17 @@ follow-up in the tech-debt tracker.
   locked at tag time in [rc-release.md](rc-release.md) Phase 3.
   (Upgrading from beta.1 is out of scope: pre-release data is not migrated,
   user decision 2026-09-24.)
-- [ ] Release workflow proven on current `dev` (the v26.1.0-beta.2 release run
-  failed in the Windows portable build) — [rc-release.md](rc-release.md)
+- [x] Release workflow proven on current `dev` (the v26.1.0-beta.2 release run
+  failed in the Windows portable build; fixed in #227, dispatch run
+  36334077943 green on `dev` `c397cf38`) — [rc-release.md](rc-release.md)
   Phase 0.
 - [ ] `dev` → `main` promotion PR, green CI, then the `rc.1` tag; the release
   workflow builds every Desktop and Server artifact.
-- [ ] Post-tag checkpoint: smoke the published Docker image by digest on any
-  Docker host (radxa optional), and install one published Desktop build.
+- [ ] Post-tag checkpoint: the `release-smoke` workflow installs the
+  published Docker image by digest and runs setup, upload, browse, and a
+  backup/restore round trip (S15). Installing a published Desktop build is
+  an rc.2 checkpoint
+  ([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)).
 
 ## Validation boundaries
 
@@ -248,7 +290,9 @@ follow-up in the tech-debt tracker.
   lanes are not quarantine.
 - Report zh catalog coverage after a clean extraction at tag time; 100% is
   a target, not a blocking gate.
-- The smoke checklist core rows have tag-time verdicts; other rows are spot checks.
+- The smoke checklist core rows have tag-time verdicts from CI runs on the
+  promotion head; rows that need a physical machine are recorded as rc.2
+  checkpoints, not as passes.
 - No open blocker; tracker entries with owner paths and user impact are
   encouraged for deferred items, but missing materials do not block merges.
 - Milestone `v26.1.0-rc.1` has no open issues.
