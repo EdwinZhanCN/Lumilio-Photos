@@ -95,10 +95,13 @@ func TestStorageSupportBundleRedactsAdversarialEmbeddedPathForms(t *testing.T) {
 
 type createRepositoryManagerStub struct {
 	storage.RepositoryManager
-	hostOwnerID  *int32
-	createdSpec  storage.CreateRepositorySpec
-	createCalled bool
-	createErr    error
+	hostOwnerID     *int32
+	createdSpec     storage.CreateRepositorySpec
+	createCalled    bool
+	createErr       error
+	assessment      *storage.CreateTargetAssessment
+	assessErr       error
+	assessedRequest storage.AssessCreateTargetRequest
 }
 
 type storageDiagnosticsManagerStub struct {
@@ -406,5 +409,137 @@ func TestCreateRepositoryReturnsRegisteredIdentityAsMoveOrCopyConflict(t *testin
 	}
 	if response.ConflictType != "repository_identity" || len(response.Actions) != 2 {
 		t.Fatalf("registered identity conflict = %+v", response)
+	}
+}
+
+func (s *createRepositoryManagerStub) AssessCreateTarget(_ context.Context, request storage.AssessCreateTargetRequest) (*storage.CreateTargetAssessment, error) {
+	s.assessedRequest = request
+	if s.assessErr != nil {
+		return nil, s.assessErr
+	}
+	if s.assessment != nil {
+		return s.assessment, nil
+	}
+	return &storage.CreateTargetAssessment{
+		Intent: request.Intent, DirectoryName: request.DirectoryName, Path: "/Volumes/Backup/" + request.DirectoryName,
+		StorageLocationID: uuid.MustParse("6b767057-d6f1-465c-b816-d1229f622a20"), StorageLocationKind: dbtypes.StorageLocationKindExternal,
+		Risks: []storage.StorageRisk{storage.RiskRemovable, storage.RiskNonDefault}, Token: "v1.review",
+	}, nil
+}
+
+func postStorageJSON(t *testing.T, handle func(*gin.Context), path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
+	handle(ctx)
+	return recorder
+}
+
+func TestCreateRepositoryReturnsTheConsentProblemWithRisksAndToken(t *testing.T) {
+	hostOwnerID := int32(1)
+	manager := &createRepositoryManagerStub{
+		hostOwnerID: &hostOwnerID,
+		createErr:   &storage.StorageRiskConfirmationError{Risks: []storage.StorageRisk{storage.RiskRemovable, storage.RiskNonDefault}, Token: "v1.review"},
+	}
+	handler := NewRepositoryScanHandler(nil, manager)
+
+	recorder := postStorageJSON(t, handler.CreateRepository, "/api/v1/storage/repositories",
+		`{"name":"Archive","directory_name":"archive","storage_location_id":"6b767057-d6f1-465c-b816-d1229f622a20","assessment_token":"v1.old","acknowledged_risks":["removable_storage"]}`)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response problem.StorageConfirmationRequiredDetails
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Type != problem.StorageConfirmationRequired.Type || response.AssessmentToken != "v1.review" ||
+		len(response.Risks) != 2 || response.Risks[0] != "removable_storage" || response.Risks[1] != "non_default_location" {
+		t.Fatalf("consent Problem = %+v", response)
+	}
+	if manager.createdSpec.AssessmentToken != "v1.old" || len(manager.createdSpec.AcknowledgedRisks) != 1 {
+		t.Fatalf("spec did not carry the acknowledgement: %+v", manager.createdSpec)
+	}
+	if strings.Contains(recorder.Body.String(), "/Volumes") {
+		t.Fatalf("consent Problem exposed a host path: %s", recorder.Body.String())
+	}
+}
+
+func TestCreateCommandsMapTypedStorageRefusals(t *testing.T) {
+	hostOwnerID := int32(1)
+	for _, tc := range []struct {
+		err  error
+		want problem.Descriptor
+	}{
+		{storage.ErrStorageAssessmentStale, problem.StorageAssessmentStale},
+		{storage.ErrStorageUnsupportedFilesystem, problem.StorageUnsupportedFilesystem},
+		{storage.ErrRepositoryExistingTargetNotMountPoint, problem.StorageNotMountedVolume},
+		{storage.ErrStoragePermissionDenied, problem.StoragePermissionDenied},
+		{storage.ErrStorageMaterializationRequired, problem.StorageMaterializationRequired},
+		{storage.ErrStorageObservationUnknown, problem.StorageObservationUnknown},
+	} {
+		for name, handle := range map[string]func(*createRepositoryManagerStub) (func(*gin.Context), string, string){
+			"create": func(m *createRepositoryManagerStub) (func(*gin.Context), string, string) {
+				return NewRepositoryScanHandler(nil, m).CreateRepository, "/api/v1/storage/repositories", `{"name":"Archive","directory_name":"archive"}`
+			},
+			"setup": func(m *createRepositoryManagerStub) (func(*gin.Context), string, string) {
+				return NewRepositoryScanHandler(nil, m).CreatePrimaryRepository, "/api/v1/setup/primary-repository", `{"name":"Primary"}`
+			},
+		} {
+			manager := &createRepositoryManagerStub{hostOwnerID: &hostOwnerID, createErr: tc.err}
+			handleFunc, path, body := handle(manager)
+			recorder := postStorageJSON(t, handleFunc, path, body)
+			var response problem.Details
+			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+				t.Fatalf("%s %v: decode: %v", name, tc.err, err)
+			}
+			if recorder.Code != tc.want.Status || response.Type != tc.want.Type {
+				t.Fatalf("%s %v: status %d type %s, want %d %s", name, tc.err, recorder.Code, response.Type, tc.want.Status, tc.want.Type)
+			}
+		}
+	}
+}
+
+func TestAssessStorageTargetReturnsTheReviewWithoutAHostPath(t *testing.T) {
+	hostOwnerID := int32(1)
+	manager := &createRepositoryManagerStub{hostOwnerID: &hostOwnerID}
+	handler := NewRepositoryScanHandler(nil, manager)
+
+	recorder := postStorageJSON(t, handler.AssessStorageTarget, "/api/v1/storage/assessments",
+		`{"intent":"create_repository","storage_location_id":"6b767057-d6f1-465c-b816-d1229f622a20","directory_name":"archive"}`)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response["token"] != "v1.review" || response["intent"] != "create_repository" || response["directory_name"] != "archive" ||
+		response["storage_location_kind"] != "external" || response["support"] != "" {
+		t.Fatalf("assessment body = %s", recorder.Body.String())
+	}
+	if risks, _ := response["risks"].([]any); len(risks) != 2 {
+		t.Fatalf("assessment risks = %v", response["risks"])
+	}
+	if _, exposed := response["path"]; exposed || strings.Contains(recorder.Body.String(), "/Volumes") {
+		t.Fatalf("assessment exposed the resolved path: %s", recorder.Body.String())
+	}
+	if manager.assessedRequest.Intent != storage.IntentCreateRepository || manager.assessedRequest.DirectoryName != "archive" {
+		t.Fatalf("assessment request = %+v", manager.assessedRequest)
+	}
+
+	bad := postStorageJSON(t, handler.AssessStorageTarget, "/api/v1/storage/assessments", `{"intent":"relocate"}`)
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("unknown intent status = %d", bad.Code)
+	}
+	manager.assessErr = storage.ErrRepositoryDirectoryConflict
+	conflict := postStorageJSON(t, handler.AssessStorageTarget, "/api/v1/storage/assessments", `{"intent":"create_repository","directory_name":"Archive"}`)
+	var conflictBody problem.RepositoryConflictDetails
+	if err := json.Unmarshal(conflict.Body.Bytes(), &conflictBody); err != nil || conflict.Code != http.StatusConflict || conflictBody.ConflictType != "repository_directory_conflict" {
+		t.Fatalf("directory conflict review = %d %s", conflict.Code, conflict.Body.String())
 	}
 }

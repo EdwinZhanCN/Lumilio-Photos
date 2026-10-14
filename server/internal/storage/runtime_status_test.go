@@ -120,14 +120,14 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	externalPath = external.Path
-	first, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	first, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "external-first", Actor: "test", Name: "First", DirectoryName: "first",
 		Role: dbtypes.RepoRoleRegular, StorageLocationID: external.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	second, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "external-second", Actor: "test", Name: "Second", DirectoryName: "second",
 		Role: dbtypes.RepoRoleRegular, StorageLocationID: external.StorageLocationID.String(),
 	})

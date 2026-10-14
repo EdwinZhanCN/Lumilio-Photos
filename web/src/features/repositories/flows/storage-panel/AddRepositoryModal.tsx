@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
+  AlertTriangle,
   Check,
   ChevronLeft,
   ChevronRight,
   FolderPlus,
   HardDrive,
   LayoutGrid,
+  RefreshCw,
   X,
 } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n.tsx";
-import { localizeAPIProblem } from "@/lib/http-commons/problem";
+import {
+  localizeAPIProblem,
+  localizeProblemType,
+  normalizeProblem,
+} from "@/lib/http-commons/problem";
 import { useCreateRepository } from "../../api/useCreateRepository";
 import { useRepositoryCandidates } from "../../api/useRepositoryCandidates";
+import { useStorageAssessment } from "../../api/useStorageAssessment";
 import { useStorageLocations } from "../../api/useStorageLocations";
 import {
   StorageStrategyPicker,
@@ -29,6 +36,29 @@ import { getStorageEntityDisplayName } from "../../model/storageEntities";
 
 type CreateRepositoryStep = 0 | 1 | 2 | 3;
 
+/**
+ * A create that ended in a Repository conflict the user must resolve through
+ * another journey (Open Existing, reconnect, diagnose). The Storage Location
+ * and folder are retained so that journey starts where the user already was.
+ */
+export type CreateRepositoryRecovery = {
+  conflictType: string;
+  storageLocationId: string;
+  directoryName: string;
+  repositoryId?: string;
+};
+
+const RECOVERABLE_CONFLICTS = new Set([
+  "existing_repository_found",
+  "repository_identity",
+  "repository_marker_invalid",
+]);
+
+const CONSENT_PROBLEMS = new Set([
+  "https://lumilio.org/problems/storage/confirmation-required",
+  "https://lumilio.org/problems/storage/assessment-stale",
+]);
+
 export default function AddRepositoryModal({
   isOpen,
   onClose,
@@ -43,7 +73,7 @@ export default function AddRepositoryModal({
   canRequestStorageLocation?: boolean;
   onRequestStorageLocation?: () => void;
   showServerCandidates?: boolean;
-  onRecoveryRequired?: (conflictType: string) => void;
+  onRecoveryRequired?: (recovery: CreateRepositoryRecovery) => void;
   initialStorageLocationId?: string;
 }) {
   const { t } = useI18n();
@@ -56,12 +86,15 @@ export default function AddRepositoryModal({
   const [directoryNameCustomized, setDirectoryNameCustomized] = useState(false);
   const [storageLocationId, setStorageLocationId] = useState("");
   const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
-  const [riskConfirmation, setRiskConfirmation] = useState(false);
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [step, setStep] = useState<CreateRepositoryStep>(0);
   const nameError = validateRepositoryName(name);
   const nameErrorMessage = repositoryNameErrorMessage(nameError, t);
   const directoryNameError = validateRepositoryDirectoryName(directoryName);
   const directoryNameErrorMessage = repositoryDirectoryNameErrorMessage(directoryNameError, t);
+  const basicStepValid = nameError === null && directoryNameError === null;
 
   const storageLocations = storageLocationsQuery.data?.storage_locations ?? [];
   const activeStorageLocations = useMemo(
@@ -76,14 +109,31 @@ export default function AddRepositoryModal({
     () => (candidatesQuery.data?.candidates ?? []).filter((candidate) => candidate.can_create),
     [candidatesQuery.data?.candidates],
   );
-  const selectedCandidate = useMemo(
-    () => creatableCandidates.find((candidate) => candidate.directory_name === directoryName),
-    [creatableCandidates, directoryName],
+  // The Server reviews the actual target (this Storage Location, this folder)
+  // when the Review step opens. Candidates only suggest folder names; they
+  // never supply the risks of a different location.
+  const reviewEnabled = isOpen && step === 3 && Boolean(storageLocationId) && basicStepValid;
+  const assessmentQuery = useStorageAssessment(
+    { intent: "create_repository", storageLocationId, directoryName },
+    reviewEnabled,
   );
-  const placementRisks = useMemo(
-    () => Array.from(new Set(selectedCandidate?.risk_warnings ?? [])),
-    [selectedCandidate?.risk_warnings],
-  );
+  const assessment = reviewEnabled ? assessmentQuery.data : undefined;
+  const reviewRisks = useMemo(() => assessment?.risks ?? [], [assessment?.risks]);
+  const reviewProblem = assessment?.problem
+    ? localizeProblemType(
+        `https://lumilio.org/problems/${assessment.problem}`,
+        t,
+        t(
+          "manage.repositories.review.unavailable",
+          "This target cannot be used for a Repository right now.",
+        ),
+      )
+    : null;
+  const assessmentToken = assessment?.token;
+  // An acknowledgement belongs to one token. New facts, a new token, a new review.
+  useEffect(() => {
+    setRiskAcknowledged(false);
+  }, [assessmentToken]);
 
   useEffect(() => {
     if (!isOpen || activeStorageLocations.length === 0) return;
@@ -103,17 +153,23 @@ export default function AddRepositoryModal({
     });
   }, [activeStorageLocations, initialStorageLocationId, isOpen]);
 
-  const handleClose = useCallback(() => {
-    if (createRepositoryMutation.isPending) return;
+  const resetForm = useCallback(() => {
     setName("");
     setDirectoryName("");
     setDirectoryNameCustomized(false);
     setStorageLocationId("");
     setStorageStrategy("date");
-    setRiskConfirmation(false);
+    setRiskAcknowledged(false);
+    setReviewNotice(null);
+    setSubmitError(null);
     setStep(0);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (createRepositoryMutation.isPending) return;
+    resetForm();
     onClose();
-  }, [createRepositoryMutation.isPending, onClose]);
+  }, [createRepositoryMutation.isPending, onClose, resetForm]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -136,56 +192,66 @@ export default function AddRepositoryModal({
         createRepositoryMutation.isPending
       )
         return;
-      if (!storageLocationId) return;
+      if (!storageLocationId || !assessment || assessment.problem) return;
+      if (reviewRisks.length > 0 && !riskAcknowledged) return;
 
+      setSubmitError(null);
+      setReviewNotice(null);
       try {
-        const response = await createRepositoryMutation.createRepository({
+        await createRepositoryMutation.createRepository({
           name,
           directoryName,
           storageLocationId,
           storageStrategy,
-          riskConfirmation,
+          assessmentToken: assessment.token,
+          acknowledgedRisks: reviewRisks,
         });
         showMessage("success", t("manage.repositories.createSuccess", { name }));
-        // The repository was created; these describe risks of where it landed,
-        // such as a cloud-sync folder that may evict originals.
-        for (const warning of response.warnings ?? []) {
-          showMessage("info", warning);
-        }
-        setName("");
-        setDirectoryName("");
-        setDirectoryNameCustomized(false);
-        setStorageLocationId("");
-        setStorageStrategy("date");
-        setRiskConfirmation(false);
-        setStep(0);
+        resetForm();
         onClose();
       } catch (error) {
-        const conflictType = repositoryConflictType(error);
-        if (conflictType && onRecoveryRequired) {
-          setName("");
-          setDirectoryName("");
-          setDirectoryNameCustomized(false);
-          setStorageLocationId("");
-          setStorageStrategy("date");
-          setRiskConfirmation(false);
-          setStep(0);
-          onClose();
-          onRecoveryRequired(conflictType);
+        const problem = normalizeProblem(error);
+        if (problem.kind === "problem" && CONSENT_PROBLEMS.has(problem.type)) {
+          // The target's facts changed between review and command, or the
+          // acknowledgement did not cover them: review the current facts again.
+          setRiskAcknowledged(false);
+          setReviewNotice(localizeAPIProblem(error, t, t("manage.repositories.createFailed")));
+          void assessmentQuery.refetch();
           return;
         }
-        showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.createFailed")));
+        if (
+          problem.kind === "problem" &&
+          problem.conflictType &&
+          RECOVERABLE_CONFLICTS.has(problem.conflictType) &&
+          onRecoveryRequired
+        ) {
+          const recovery: CreateRepositoryRecovery = {
+            conflictType: problem.conflictType,
+            storageLocationId,
+            directoryName,
+            repositoryId: problem.repositoryID,
+          };
+          resetForm();
+          onClose();
+          onRecoveryRequired(recovery);
+          return;
+        }
+        setSubmitError(localizeAPIProblem(error, t, t("manage.repositories.createFailed")));
       }
     },
     [
+      assessment,
+      assessmentQuery,
       createRepositoryMutation,
       directoryName,
       name,
       onClose,
       onRecoveryRequired,
-      storageLocationId,
-      riskConfirmation,
+      resetForm,
+      reviewRisks,
+      riskAcknowledged,
       showMessage,
+      storageLocationId,
       storageStrategy,
       step,
       t,
@@ -200,7 +266,6 @@ export default function AddRepositoryModal({
     t("manage.repositories.createWizard.layout", "Storage layout"),
     t("manage.repositories.createWizard.review", "Review"),
   ];
-  const basicStepValid = nameError === null && directoryNameError === null;
 
   return (
     <div className="modal modal-open z-modal">
@@ -403,7 +468,7 @@ export default function AddRepositoryModal({
                     value={storageLocationId}
                     onChange={(event) => {
                       setStorageLocationId(event.target.value);
-                      setRiskConfirmation(false);
+                      setRiskAcknowledged(false);
                     }}
                     disabled={createRepositoryMutation.isPending || storageLocationsQuery.isLoading}
                     required
@@ -536,12 +601,59 @@ export default function AddRepositoryModal({
                     icon={<LayoutGrid size={15} />}
                   />
                 </dl>
-                <StorageRiskConfirmation
-                  warnings={placementRisks}
-                  checked={riskConfirmation}
-                  onChange={setRiskConfirmation}
-                  disabled={createRepositoryMutation.isPending}
-                />
+                {assessmentQuery.isPending && reviewEnabled ? (
+                  <p className="flex items-center gap-2 text-sm text-base-content/60" role="status">
+                    <span className="loading loading-spinner loading-xs" />
+                    {t("manage.repositories.review.assessing", "Reviewing the storage target…")}
+                  </p>
+                ) : null}
+                {assessmentQuery.isError ? (
+                  <div role="alert" className="alert alert-error alert-soft py-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      {localizeAPIProblem(
+                        assessmentQuery.error,
+                        t,
+                        t(
+                          "manage.repositories.review.failed",
+                          "The storage target could not be reviewed.",
+                        ),
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs gap-1"
+                      onClick={() => void assessmentQuery.refetch()}
+                    >
+                      <RefreshCw size={14} />
+                      {t("manage.repositories.review.retry", "Review again")}
+                    </button>
+                  </div>
+                ) : null}
+                {reviewProblem ? (
+                  <div role="alert" className="alert alert-warning alert-soft py-2 text-sm">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    <span>{reviewProblem}</span>
+                  </div>
+                ) : null}
+                {reviewNotice ? (
+                  <div role="status" className="alert alert-info alert-soft py-2 text-sm">
+                    <RefreshCw size={16} className="shrink-0" />
+                    <span>{reviewNotice}</span>
+                  </div>
+                ) : null}
+                {assessment && !assessment.problem ? (
+                  <StorageRiskConfirmation
+                    risks={reviewRisks}
+                    checked={riskAcknowledged}
+                    onChange={setRiskAcknowledged}
+                    disabled={createRepositoryMutation.isPending}
+                  />
+                ) : null}
+                {submitError ? (
+                  <div role="alert" className="alert alert-error alert-soft py-2 text-sm">
+                    <span>{submitError}</span>
+                  </div>
+                ) : null}
               </section>
             ) : null}
           </div>
@@ -593,8 +705,10 @@ export default function AddRepositoryModal({
                   type="submit"
                   className="btn btn-primary gap-2"
                   disabled={
-                    (placementRisks.length > 0 && !riskConfirmation) ||
-                    createRepositoryMutation.isPending
+                    createRepositoryMutation.isPending ||
+                    !assessment ||
+                    Boolean(assessment.problem) ||
+                    (reviewRisks.length > 0 && !riskAcknowledged)
                   }
                 >
                   {createRepositoryMutation.isPending ? (
@@ -617,11 +731,6 @@ export default function AddRepositoryModal({
       />
     </div>
   );
-}
-
-function repositoryConflictType(error: unknown): string | null {
-  if (!error || typeof error !== "object" || !("conflict_type" in error)) return null;
-  return typeof error.conflict_type === "string" ? error.conflict_type : null;
 }
 
 function ReviewRow({

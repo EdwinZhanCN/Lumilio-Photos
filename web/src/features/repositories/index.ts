@@ -11,6 +11,8 @@ export {
   type RepositoryStorageStrategy,
 } from "./components/StorageStrategyPicker";
 export { StorageRiskConfirmation } from "./components/StorageRiskConfirmation";
+export { storageRiskLabel, type StorageRiskCode } from "./model/storageRiskCopy";
+export { useStorageAssessment, type StorageAssessment } from "./api/useStorageAssessment";
 export {
   useStorageLocations,
   useStorageView,

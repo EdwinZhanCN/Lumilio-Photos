@@ -72,7 +72,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `http` → `ingest`: 2 package import(s), declared
 - `http` → `media`: 4 package import(s), declared
 - `http` → `service`: 2 package import(s), declared
-- `http` → `storage`: 5 package import(s), declared
+- `http` → `storage`: 6 package import(s), declared
 - `http` → `work`: 2 package import(s), declared
 - `ingest` → `catalog`: 8 package import(s), declared
 - `ingest` → `domain`: 1 package import(s), declared

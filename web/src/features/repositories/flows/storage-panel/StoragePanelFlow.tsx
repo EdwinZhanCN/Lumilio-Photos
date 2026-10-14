@@ -113,6 +113,7 @@ export default function StoragePanelFlow({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createStorageLocationId, setCreateStorageLocationId] = useState<string | undefined>();
   const [isCandidateOpen, setIsCandidateOpen] = useState(false);
+  const [candidateFocus, setCandidateFocus] = useState<string | undefined>();
   const [removeLocation, setRemoveLocation] = useState<StorageLocationOption | null>(null);
   const [renameRepository, setRenameRepository] = useState<RepositoryRef | null>(null);
   const [removeRepository, setRemoveRepository] = useState<RepositoryRef | null>(null);
@@ -544,10 +545,38 @@ export default function StoragePanelFlow({
         onRequestStorageLocation={() => setHostAction({ kind: "authorize_storage_location" })}
         showServerCandidates={!nativeHostAvailable}
         initialStorageLocationId={createStorageLocationId}
+        onRecoveryRequired={(recovery) => {
+          // A create found a Repository already at the target. Continue in the
+          // journey that can open it, keeping the Storage Location and folder.
+          if (recovery.conflictType === "repository_marker_invalid") {
+            showMessage(
+              "error",
+              t(
+                "manage.repositories.review.markerInvalid",
+                "The folder holds a Repository marker that needs attention. Open the Storage page diagnostics or choose another folder.",
+              ),
+            );
+            return;
+          }
+          if (nativeHostAvailable) {
+            setHostAction({
+              kind: "open_repository",
+              storageLocationId: recovery.storageLocationId,
+              repositoryId: recovery.repositoryId,
+            });
+            return;
+          }
+          setCandidateFocus(recovery.directoryName);
+          setIsCandidateOpen(true);
+        }}
       />
       <RepositoryCandidateModal
         isOpen={isCandidateOpen}
-        onClose={() => setIsCandidateOpen(false)}
+        focusDirectoryName={candidateFocus}
+        onClose={() => {
+          setIsCandidateOpen(false);
+          setCandidateFocus(undefined);
+        }}
       />
       <NativeHostActionModal
         isOpen={hostAction != null}

@@ -275,7 +275,7 @@ func TestDeleteExternalStorageLocationStillBlocksRegisteredChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	if _, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "external-child", Actor: "test", Name: "Child Repo",
 		DirectoryName: "child-repo", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	}); err != nil {

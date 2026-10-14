@@ -11,18 +11,22 @@ describe("bootstrap primary repository request", () => {
     ).toEqual({
       name: "Primary Storage",
       storage_strategy: "cas",
-      risk_confirmation: undefined,
+      assessment_token: undefined,
+      acknowledged_risks: undefined,
     });
   });
 
-  it("carries the administrator's storage-risk confirmation during first-run setup", () => {
+  it("binds the administrator's risk acknowledgement to the setup assessment token", () => {
     expect(
       buildSetupPrimaryRepositoryRequestBody(
-        buildBootstrapPrimaryRepositoryRequest("Primary Storage", "date", true),
+        buildBootstrapPrimaryRepositoryRequest("Primary Storage", "date", "v1.setup", [
+          "removable_storage",
+        ]),
       ),
     ).toMatchObject({
       storage_strategy: "date",
-      risk_confirmation: true,
+      assessment_token: "v1.setup",
+      acknowledged_risks: ["removable_storage"],
     });
   });
 

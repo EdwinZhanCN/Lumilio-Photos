@@ -43,6 +43,21 @@ func newCatalogRepositoryManager(t *testing.T) (*db.DB, *DefaultRepositoryManage
 	return catalog, manager
 }
 
+// createAcknowledgedForTest reviews the spec's target and acknowledges every
+// reported risk, the way an administrator does through the Web review, so
+// tests that only need a Repository on a non-default Location stay focused.
+func createAcknowledgedForTest(t *testing.T, manager *DefaultRepositoryManager, spec CreateRepositorySpec) (*CreateRepositoryResult, error) {
+	t.Helper()
+	review, err := manager.AssessCreateTarget(context.Background(), AssessCreateTargetRequest{
+		Intent: createIntentForRole(spec.Role), StorageLocationID: spec.StorageLocationID, DirectoryName: spec.DirectoryName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	spec.AssessmentToken, spec.AcknowledgedRisks = review.Token, RiskCodes(review.Risks)
+	return manager.CreateRepository(context.Background(), spec)
+}
+
 func initializeDefaultStorageForTest(t *testing.T, manager *DefaultRepositoryManager, rootPath string) {
 	t.Helper()
 	ctx := context.Background()
@@ -176,8 +191,12 @@ func TestCreateRepositoryRequiresAndAuditsStorageRiskConfirmation(t *testing.T) 
 		RequestID: "risk-confirmation-create", Actor: "web:test-admin", Name: "Risk Archive",
 		DirectoryName: "risk-archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	}
-	if _, err := manager.CreateRepository(ctx, spec); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("unconfirmed risky create error = %v, want ErrRepositoryRiskConfirmationRequired", err)
+	var consent *StorageRiskConfirmationError
+	if _, err := manager.CreateRepository(ctx, spec); !errors.As(err, &consent) || !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
+		t.Fatalf("unconfirmed risky create error = %v, want StorageRiskConfirmationError", err)
+	}
+	if consent.Token == "" || !acknowledgesRisks(RiskCodes(consent.Risks), []StorageRisk{RiskCloudSync, RiskNonDefault}) {
+		t.Fatalf("consent refusal = %+v, want a token and the cloud-sync and non-default risks", consent)
 	}
 	if _, err := os.Stat(filepath.Join(riskyRootPath, "risk-archive")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unconfirmed risky create mutated disk: %v", err)
@@ -197,7 +216,8 @@ func TestCreateRepositoryRequiresAndAuditsStorageRiskConfirmation(t *testing.T) 
 		rejectedRisk.FailureStage != "risk_confirmation" || rejectedRisk.ConfirmationType != "none" {
 		t.Fatalf("rejected risk audit = %#v", rejectedRisk)
 	}
-	spec.RiskConfirmation = true
+	spec.AssessmentToken = consent.Token
+	spec.AcknowledgedRisks = RiskCodes(consent.Risks)
 	created, err := manager.CreateRepository(ctx, spec)
 	if err != nil {
 		t.Fatal(err)
@@ -350,7 +370,7 @@ func TestStorageLocationAndCopyRegistrationUseDurableJournal(t *testing.T) {
 		t.Fatalf("changed Storage Location request error = %v", err)
 	}
 
-	original, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	original, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "create-copy-source", Actor: "test", Name: "Source", DirectoryName: "source",
 		Role: dbtypes.RepoRoleRegular, StorageLocationID: firstRoot.StorageLocationID.String(),
 	})

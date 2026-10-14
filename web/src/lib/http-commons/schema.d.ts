@@ -12896,13 +12896,13 @@ export interface paths {
                         "application/json": components["schemas"]["dto.CreateRepositoryResponseDTO"];
                     };
                 };
-                /** @description Setup already completed */
+                /** @description Setup already completed, Repository conflict, or typed storage refusal */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
+                        "application/problem+json": components["schemas"]["api.RepositoryCreateProblemResponse"];
                     };
                 };
             };
@@ -13693,6 +13693,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/storage/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assess a Repository create target
+         * @description Read-only review of the direct-child folder a create command would use below a registered Storage Location: support, typed refusal, the risks the administrator must acknowledge, and the token those acknowledgements are bound to. Capacity changes keep the token valid; a changed mount, marker, or risk set invalidates it. No path is accepted or returned.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Create target */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.StorageAssessmentRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageAssessmentDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Storage Location or storage folder conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/storage/audit": {
         parameters: {
             query?: never;
@@ -14362,13 +14451,13 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
-                /** @description Repository identity conflict */
+                /** @description Repository conflict or typed storage refusal (confirmation required, stale assessment, unsupported filesystem, not a mounted volume, observation unknown, permission denied, materialization required) */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
+                        "application/problem+json": components["schemas"]["api.RepositoryCreateProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -15354,7 +15443,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
         "api.RepositoryConflictProblemResponse": {
             actions?: string[];
             conflict_type: string;
@@ -15369,6 +15458,7 @@ export interface components {
              */
             type: "https://lumilio.org/problems/repository/conflict";
         };
+        "api.RepositoryCreateProblemResponse": components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"];
         "api.SuccessResponse": {
             /** @example Operation completed successfully */
             message?: string;
@@ -16286,6 +16376,22 @@ export interface components {
         };
         "dto.CreateRepositoryRequestDTO": {
             /**
+             * @description AcknowledgedRisks lists every risk code the administrator acknowledged
+             *     against AssessmentToken. All risks the assessment reported must appear.
+             * @example [
+             *       "removable_storage",
+             *       "non_default_location"
+             *     ]
+             */
+            acknowledged_risks?: string[];
+            /**
+             * @description AssessmentToken is the token returned by the create assessment (or by a
+             *     storage/confirmation-required Problem) for this exact target. It is
+             *     required whenever the target carries risks.
+             * @example v1.0123456789abcdef
+             */
+            assessment_token?: string;
+            /**
              * @description DirectoryName is the single direct-child folder segment below the selected
              *     Storage Location. It is required for regular repositories and omitted for
              *     the primary repository, whose folder is always "primary".
@@ -16298,7 +16404,6 @@ export interface components {
              * @example Family Photos
              */
             name: string;
-            risk_confirmation?: boolean;
             /**
              * @example regular
              * @enum {string}
@@ -16317,12 +16422,15 @@ export interface components {
             storage_strategy?: "date" | "flat" | "cas";
         };
         "dto.CreateRepositoryResponseDTO": {
-            repository?: components["schemas"]["dto.RepositoryDTO"];
             /**
-             * @description Warnings are non-fatal notes about the chosen location, such as it being
-             *     inside a cloud-sync folder. The repository was created regardless.
+             * @description AcknowledgedRisks are the risk codes the administrator acknowledged for
+             *     this placement; empty when the target carried none.
+             * @example [
+             *       "removable_storage"
+             *     ]
              */
-            warnings?: string[];
+            acknowledged_risks?: string[];
+            repository?: components["schemas"]["dto.RepositoryDTO"];
         };
         "dto.CreateShareLinkRequestDTO": {
             allow_download?: boolean;
@@ -17710,9 +17818,9 @@ export interface components {
             storage_strategy?: string;
         };
         "dto.RepositoryDefaultsDTO": {
+            assessment?: components["schemas"]["dto.StorageAssessmentDTO"];
             /** @example rename */
             duplicate_handling?: string;
-            risk_warnings?: string[];
             /** @example /data/storage */
             storage_location?: string;
             /** @example date */
@@ -18004,9 +18112,21 @@ export interface components {
             hidden?: boolean;
         };
         "dto.SetupPrimaryRepositoryRequestDTO": {
+            /**
+             * @example [
+             *       "removable_storage"
+             *     ]
+             */
+            acknowledged_risks?: string[];
+            /**
+             * @description AssessmentToken and AcknowledgedRisks mirror CreateRepositoryRequestDTO;
+             *     the token comes from the setup status assessment or a
+             *     storage/confirmation-required Problem.
+             * @example v1.0123456789abcdef
+             */
+            assessment_token?: string;
             /** @example Primary Repository */
             name: string;
-            risk_confirmation?: boolean;
             /**
              * @example date
              * @enum {string}
@@ -18137,6 +18257,80 @@ export interface components {
         };
         "dto.StartRepositoryCloudImportRequest": {
             credential_id?: string;
+        };
+        /**
+         * @description Assessment reviews the Primary Repository target below the Default
+         *     Storage Location and carries the token the setup create binds to.
+         *     It is absent while the target cannot be assessed.
+         */
+        "dto.StorageAssessmentDTO": {
+            /**
+             * @description CanCreate reports whether the target is reviewable for creation: an
+             *     absent or empty target with no Repository marker on supported storage.
+             */
+            can_create?: boolean;
+            /** @example family-photos */
+            directory_name?: string;
+            /**
+             * @description ExistingRepositoryID is the identity of a valid .lumiliorepo already at the target, if any.
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            existing_repository_id?: string;
+            /**
+             * @example create_repository
+             * @enum {string}
+             */
+            intent?: "create_repository" | "setup_primary";
+            /**
+             * @description MarkerState is the typed reading of the target's Repository marker.
+             * @example absent
+             * @enum {string}
+             */
+            marker_state?: "valid" | "absent" | "permission_denied" | "unknown" | "corrupt" | "unsupported_version";
+            /** @example storage/unsupported-filesystem */
+            problem?: string;
+            /**
+             * @description Risks are the acknowledgements the create command will require.
+             * @example [
+             *       "removable_storage",
+             *       "non_default_location"
+             *     ]
+             */
+            risks?: string[];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            storage_location_id?: string;
+            /**
+             * @example external
+             * @enum {string}
+             */
+            storage_location_kind?: "default" | "external";
+            /**
+             * @description Support is supported, unsupported, or unknown; Problem names the typed
+             *     refusal when Support is not supported or the target needs materialization.
+             * @example supported
+             * @enum {string}
+             */
+            support?: "supported" | "unsupported" | "unknown";
+            /** @example v1.0123456789abcdef */
+            token?: string;
+        };
+        "dto.StorageAssessmentRequestDTO": {
+            /**
+             * @description DirectoryName is the direct-child folder for create_repository; ignored for setup_primary.
+             * @example family-photos
+             */
+            directory_name?: string;
+            /**
+             * @example create_repository
+             * @enum {string}
+             */
+            intent: "create_repository" | "setup_primary";
+            /**
+             * @description StorageLocationID identifies a registered Storage Location. Empty selects
+             *     the configured default; setup_primary always uses the default.
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            storage_location_id?: string;
         };
         "dto.StorageCapacityGroupDTO": {
             /** @example 500000000000 */
@@ -19473,9 +19667,32 @@ export interface components {
              */
             type: "https://lumilio.org/problems/service/unavailable";
         };
-        "api.StorageConfirmationRequiredProblem": {
+        "api.StorageAssessmentStaleProblem": {
             /** Format: uri */
             instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/assessment-stale";
+        };
+        "api.StorageAssessmentStaleProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/assessment-stale";
+        };
+        "api.StorageConfirmationRequiredProblem": {
+            assessment_token: string;
+            /** Format: uri */
+            instance: string;
+            risks: string[];
             /** @constant */
             status: 409;
             /**
@@ -19485,9 +19702,11 @@ export interface components {
             type: "https://lumilio.org/problems/storage/confirmation-required";
         };
         "api.StorageConfirmationRequiredProblemReference": {
+            assessment_token: string;
             /** Format: uri */
             instance: string;
             retryable?: boolean;
+            risks: string[];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -19536,6 +19755,111 @@ export interface components {
              */
             type: "https://lumilio.org/problems/storage/host-action-failed";
         };
+        "api.StorageMaterializationRequiredProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/materialization-required";
+        };
+        "api.StorageMaterializationRequiredProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/materialization-required";
+        };
+        "api.StorageNotAMountedVolumeProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/not-a-mounted-volume";
+        };
+        "api.StorageNotAMountedVolumeProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/not-a-mounted-volume";
+        };
+        "api.StorageObservationUnknownProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/observation-unknown";
+        };
+        "api.StorageObservationUnknownProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/observation-unknown";
+        };
+        "api.StoragePermissionDeniedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/permission-denied";
+        };
+        "api.StoragePermissionDeniedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/permission-denied";
+        };
+        "api.StorageUnsupportedFilesystemProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/unsupported-filesystem";
+        };
+        "api.StorageUnsupportedFilesystemProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/unsupported-filesystem";
+        };
         "api.UploadProcessingFailedProblem": {
             /** Format: uri */
             instance: string;
@@ -19557,7 +19881,7 @@ export interface components {
              */
             type: "https://lumilio.org/problems/upload/processing-failed";
         };
-        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
+        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
         "api.RateLimitedProblemResponse": {
             /** Format: uri */
             instance: string;
@@ -19569,6 +19893,19 @@ export interface components {
              * @constant
              */
             type: "https://lumilio.org/problems/auth/rate-limited";
+        };
+        "api.StorageConfirmationRequiredProblemResponse": {
+            assessment_token: string;
+            /** Format: uri */
+            instance: string;
+            risks: string[];
+            /** @constant */
+            status: 409;
+            /**
+             * Format: uri
+             * @constant
+             */
+            type: "https://lumilio.org/problems/storage/confirmation-required";
         };
     };
     responses: never;

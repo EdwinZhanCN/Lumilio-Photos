@@ -180,9 +180,18 @@ func TestRecoverLifecycleOperationsRollsForwardInterruptedRootRelocate(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
+	// An external Storage Location is a non-default target: the create needs
+	// the review's token and an acknowledgement of its risks.
+	review, err := manager.AssessCreateTarget(ctx, AssessCreateTargetRequest{
+		Intent: IntentCreateRepository, StorageLocationID: storageLocation.StorageLocationID.String(), DirectoryName: "child",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "recovery-storageLocation-child", Actor: "test", Name: "Child", DirectoryName: "child",
 		Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
+		AssessmentToken: review.Token, AcknowledgedRisks: RiskCodes(review.Risks),
 	})
 	if err != nil {
 		t.Fatal(err)

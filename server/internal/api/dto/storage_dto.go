@@ -106,8 +106,15 @@ type StorageLocationRemovalImpactDTO struct {
 
 // SetupPrimaryRepositoryRequestDTO creates the initial primary repository during
 // authenticated first-run setup.
+// SetupPrimaryRepositoryRequestDTO creates the Primary Repository during
+// authenticated setup. The acknowledgement binds to the assessment token the
+// setup status reports for the Default Storage Location's primary target.
 type SetupPrimaryRepositoryRequestDTO struct {
-	Name             string `json:"name" binding:"required" example:"Primary Repository"`
-	StorageStrategy  string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
+	Name            string `json:"name" binding:"required" example:"Primary Repository"`
+	StorageStrategy string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
+	// AssessmentToken and AcknowledgedRisks mirror CreateRepositoryRequestDTO;
+	// the token comes from the setup status assessment or a
+	// storage/confirmation-required Problem.
+	AssessmentToken   string   `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"removable_storage"`
 }

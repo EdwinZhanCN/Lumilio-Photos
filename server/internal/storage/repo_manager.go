@@ -189,6 +189,10 @@ type RepositoryManager interface {
 	// bootstrap helper for the mandatory primary repository.
 	CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*CreateRepositoryResult, error)
 	EnsurePrimaryRepository(ctx context.Context, root string, ownerID *int32) (*repo.Repository, error)
+
+	// AssessCreateTarget reviews a create target read-only and mints the
+	// consent token a later CreateRepository acknowledgement is bound to.
+	AssessCreateTarget(ctx context.Context, request AssessCreateTargetRequest) (*CreateTargetAssessment, error)
 }
 
 // DefaultRepositoryManager implements the RepositoryManager interface
@@ -203,6 +207,8 @@ type DefaultRepositoryManager struct {
 	files          *RepositoryFSFactory
 	logger         *zap.Logger
 	observer       StorageObserver
+	consentOnce    sync.Once
+	consentKey     []byte
 	auditProvider  logging.RepositoryAuditProvider
 	initialScan    func(context.Context, string) error
 	ownershipMu    sync.Mutex

@@ -241,6 +241,7 @@ type StorageControllerInterface interface {
 type RepositoryScanControllerInterface interface {
 	CreatePrimaryRepository(c *gin.Context) // POST /setup/primary-repository - Initial primary during setup
 	CreateRepository(c *gin.Context)
+	AssessStorageTarget(c *gin.Context) // POST /storage/assessments - Read-only create target review
 	ListRepositoryCandidates(c *gin.Context)
 	OpenRepositoryCandidate(c *gin.Context)
 	ResolveRepositoryCandidate(c *gin.Context)
@@ -513,6 +514,7 @@ func NewRouter(
 			{
 				storageAdmin.GET("/view", appInitializedMiddleware, storageController.GetStorageView)
 				storageAdmin.POST("/repositories", repositoryScanController.CreateRepository)
+				storageAdmin.POST("/assessments", repositoryScanController.AssessStorageTarget)
 				storageAdmin.POST("/repositories/:id/rename", appInitializedMiddleware, repositoryScanController.RenameRepository)
 				storageAdmin.POST("/repositories/:id/detach-impact", appInitializedMiddleware, repositoryScanController.PostRepositoryDetachImpact)
 				storageAdmin.POST("/repositories/:id/detach", appInitializedMiddleware, repositoryScanController.DetachRepository)

@@ -162,7 +162,10 @@ func problemSchemaRef(path string, status int) string {
 	if status == 429 {
 		return "#/components/schemas/api.RateLimitedProblemResponse"
 	}
-	if status == 409 && (path == "/api/v1/storage/repositories" || path == "/api/v1/setup/primary-repository" || path == "/api/v1/storage/candidates/open") {
+	if status == 409 && (path == "/api/v1/storage/repositories" || path == "/api/v1/setup/primary-repository") {
+		return "#/components/schemas/api.RepositoryCreateProblemResponse"
+	}
+	if status == 409 && (path == "/api/v1/storage/candidates/open" || path == "/api/v1/storage/assessments") {
 		return "#/components/schemas/api.RepositoryConflictProblemResponse"
 	}
 	return "#/components/schemas/api.ProblemResponse"
@@ -211,6 +214,36 @@ func installProblemSchemas(schemas *yaml.Node) {
 	setMappingValue(schemas, "api.RepositoryConflictProblemResponse", node(problemSchema(
 		problem.RepositoryConflict.Type, problem.RepositoryConflict.Status, problem.RepositoryConflict.Extensions,
 	)))
+	setMappingValue(schemas, "api.StorageConfirmationRequiredProblemResponse", node(problemSchema(
+		problem.StorageConfirmationRequired.Type, problem.StorageConfirmationRequired.Status, problem.StorageConfirmationRequired.Extensions,
+	)))
+	createUnion := make([]any, 0, len(repositoryCreateProblems))
+	createDiscriminator := make(map[string]any, len(repositoryCreateProblems))
+	for _, descriptor := range repositoryCreateProblems {
+		ref := "#/components/schemas/api." + schemaName(descriptor.Type) + "Problem"
+		createUnion = append(createUnion, map[string]any{"$ref": ref})
+		createDiscriminator[descriptor.Type] = ref
+	}
+	setMappingValue(schemas, "api.RepositoryCreateProblemResponse", node(map[string]any{
+		"oneOf": createUnion,
+		"discriminator": map[string]any{
+			"propertyName": "type",
+			"mapping":      createDiscriminator,
+		},
+	}))
+}
+
+// repositoryCreateProblems is the exact 409 vocabulary of the Repository
+// create commands: a Repository conflict or one typed storage refusal.
+var repositoryCreateProblems = []problem.Descriptor{
+	problem.RepositoryConflict,
+	problem.StorageConfirmationRequired,
+	problem.StorageAssessmentStale,
+	problem.StorageUnsupportedFilesystem,
+	problem.StorageNotMountedVolume,
+	problem.StorageObservationUnknown,
+	problem.StoragePermissionDenied,
+	problem.StorageMaterializationRequired,
 }
 
 func problemSchema(problemType string, status int, extensions []problem.Extension) map[string]any {
@@ -257,15 +290,22 @@ func addExtensions(properties map[string]any, required *[]string, extensions []p
 			*required = append(*required, extension.Name)
 		case "array[string]":
 			properties[extension.Name] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+			if requiredExtensions[extension.Name] {
+				*required = append(*required, extension.Name)
+			}
 		default:
 			properties[extension.Name] = map[string]any{"type": "string"}
-			if extension.Name == "conflict_type" {
+			if requiredExtensions[extension.Name] {
 				*required = append(*required, extension.Name)
 			}
 		}
 	}
 	sort.Strings(*required)
 }
+
+// requiredExtensions are the typed members a subtype always carries; the
+// registry's wire structs mark them binding:"required" as well.
+var requiredExtensions = map[string]bool{"conflict_type": true, "risks": true, "assessment_token": true}
 
 func schemaName(problemType string) string {
 	path := strings.TrimPrefix(problemType, problem.Namespace)

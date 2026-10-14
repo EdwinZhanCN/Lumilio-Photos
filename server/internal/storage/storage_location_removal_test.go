@@ -80,7 +80,7 @@ func TestStorageLocationRemovalBlocksDefaultAndRegisteredRepositories(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	created, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "storageLocation-removal-child", Actor: "test", Name: "Archive",
 		DirectoryName: "archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: external.StorageLocationID.String(),
 	})
@@ -121,7 +121,7 @@ func TestRelocateRepositoryRefusesWhileOriginalIdentityIsOnline(t *testing.T) {
 	}
 	_, originalStorageLocationID := makeExternal("original-storageLocation")
 	copyRoot, _ := makeExternal("copy-storageLocation")
-	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	created, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "original-online", Actor: "test", Name: "Original",
 		DirectoryName: "original", Role: dbtypes.RepoRoleRegular, StorageLocationID: originalStorageLocationID,
 	})
@@ -176,7 +176,7 @@ func TestRelocateRepositorySucceedsAcrossRegisteredStorageLocations(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	created, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "cross-storageLocation-source", Actor: "test", Name: "Cross Root",
 		DirectoryName: "cross-storageLocation", Role: dbtypes.RepoRoleRegular, StorageLocationID: firstRoot.StorageLocationID.String(),
 	})

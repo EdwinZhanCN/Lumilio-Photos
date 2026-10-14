@@ -10,7 +10,10 @@ export type CreateRepositoryInput = {
   storageLocationId?: string;
   role?: "primary" | "regular";
   storageStrategy: RepositoryStorageStrategy;
-  riskConfirmation?: boolean;
+  /** Token of the assessment the acknowledgement answers; required when risks exist. */
+  assessmentToken?: string;
+  /** Every risk code the assessment reported, acknowledged for this command only. */
+  acknowledgedRisks?: readonly string[];
 };
 
 export function buildCreateRepositoryRequestBody({
@@ -19,7 +22,8 @@ export function buildCreateRepositoryRequestBody({
   storageLocationId,
   role,
   storageStrategy,
-  riskConfirmation,
+  assessmentToken,
+  acknowledgedRisks,
 }: CreateRepositoryInput) {
   return {
     name,
@@ -27,7 +31,8 @@ export function buildCreateRepositoryRequestBody({
     storage_location_id: storageLocationId,
     role,
     storage_strategy: storageStrategy,
-    risk_confirmation: riskConfirmation,
+    assessment_token: assessmentToken,
+    acknowledged_risks: acknowledgedRisks ? [...acknowledgedRisks] : undefined,
   };
 }
 
@@ -42,7 +47,8 @@ export function useCreateRepository() {
       storageLocationId,
       role,
       storageStrategy,
-      riskConfirmation,
+      assessmentToken,
+      acknowledgedRisks,
     }: CreateRepositoryInput) => {
       const response = await mutation.mutateAsync({
         body: buildCreateRepositoryRequestBody({
@@ -51,7 +57,8 @@ export function useCreateRepository() {
           storageLocationId,
           role,
           storageStrategy,
-          riskConfirmation,
+          assessmentToken,
+          acknowledgedRisks,
         }),
       });
 

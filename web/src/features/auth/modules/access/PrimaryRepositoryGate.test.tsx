@@ -48,7 +48,17 @@ describe("PrimaryRepositoryGate", () => {
             storage_location: "/storage",
             storage_strategy: "date",
             duplicate_handling: "rename",
-            risk_warnings: ["removable_storage"],
+            assessment: {
+              token: "v1.setup",
+              intent: "setup_primary",
+              storage_location_id: "6b767057-d6f1-465c-b816-d1229f622a20",
+              storage_location_kind: "default",
+              directory_name: "primary",
+              support: "supported",
+              risks: ["removable_storage"],
+              can_create: true,
+              marker_state: "absent",
+            },
           },
         }),
       ),
@@ -61,7 +71,7 @@ describe("PrimaryRepositoryGate", () => {
             role: "primary",
             storage_strategy: "cas",
           },
-          warnings: [],
+          acknowledged_risks: ["removable_storage"],
         });
       }),
     );
@@ -90,7 +100,8 @@ describe("PrimaryRepositoryGate", () => {
       .toEqual({
         name: "Primary Storage",
         storage_strategy: "cas",
-        risk_confirmation: true,
+        assessment_token: "v1.setup",
+        acknowledged_risks: ["removable_storage"],
       });
   });
 });

@@ -16,6 +16,12 @@ const ProblemMediaType = problem.MediaType
 type ProblemResponse = problem.Details
 type RateLimitedProblemResponse = problem.RateLimitedDetails
 type RepositoryConflictProblemResponse = problem.RepositoryConflictDetails
+type StorageConfirmationRequiredProblemResponse = problem.StorageConfirmationRequiredDetails
+
+// RepositoryCreateProblemResponse is the OpenAPI placeholder for the create
+// commands' 409 union; openapinormalize replaces its schema with the exact
+// oneOf of repository/conflict and the typed storage refusals.
+type RepositoryCreateProblemResponse = problem.Details
 type ProblemReference = problem.Reference
 
 const (

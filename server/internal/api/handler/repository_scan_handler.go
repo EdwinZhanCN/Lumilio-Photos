@@ -285,7 +285,7 @@ func (h *RepositoryScanHandler) SetBootstrapService(bootstrap bootstrapPhaseRead
 // @Failure 400 {object} api.ProblemResponse "Invalid request"
 // @Failure 401 {object} api.ProblemResponse "Unauthorized"
 // @Failure 403 {object} api.ProblemResponse "Forbidden"
-// @Failure 409 {object} api.RepositoryConflictProblemResponse "Repository identity conflict"
+// @Failure 409 {object} api.RepositoryCreateProblemResponse "Repository conflict or typed storage refusal (confirmation required, stale assessment, unsupported filesystem, not a mounted volume, observation unknown, permission denied, materialization required)"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/storage/repositories [post]
 func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
@@ -350,55 +350,18 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		StorageLocationID: strings.TrimSpace(req.StorageLocationID),
 		OwnerID:           hostOwnerID,
 		StorageStrategy:   req.StorageStrategy,
-		RiskConfirmation:  req.RiskConfirmation,
+		AssessmentToken:   req.AssessmentToken,
+		AcknowledgedRisks: req.AcknowledgedRisks,
 	})
 	if err != nil {
-		var conflict *storage.RepositoryConflictError
-		var existing *storage.ExistingRepositoryFoundError
-		var invalidMarker *storage.RepositoryMarkerInvalidError
-		switch {
-		case errors.Is(err, storage.ErrPrimaryRepositoryExists):
-			writeRepositoryConflict(c, err, "primary_exists")
-		case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
-			writeRepositoryConflict(c, err, "primary_required")
-		case errors.Is(err, storage.ErrStorageLocationOffline):
-			writeRepositoryConflict(c, err, "storage_location_offline")
-		case errors.Is(err, storage.ErrStorageLocationInvalid):
-			writeRepositoryConflict(c, err, "storage_location_invalid")
-		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrInvalidRepositoryName):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrInvalidRepositoryDirectory):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrRepositoryDirectoryConflict):
-			writeRepositoryConflict(c, err, "repository_directory_conflict")
-		case errors.Is(err, storage.ErrRepositoryTargetNotEmpty):
-			writeRepositoryConflict(c, err, "repository_target_not_empty")
-		case errors.Is(err, storage.ErrRepositoryStorageNotWritable):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrRepositoryExistingTargetNotMountPoint):
-			writeRepositoryConflict(c, err, "repository_target_not_mount_point")
-		case errors.Is(err, storage.ErrPathNotAllowed):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired):
-			api.WriteProblem(c, api.KnownProblem(problem.StorageConfirmationRequired, err))
-		case errors.As(err, &conflict):
-			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
-		case errors.As(err, &existing):
-			api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
-		case errors.As(err, &invalidMarker):
-			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
-		default:
-			api.WriteProblem(c, api.BadRequest(err))
-		}
+		writeRepositoryCreateFailure(c, err)
 		return
 	}
 	dbRepo := result.Repository
 
 	api.JSONOK(c, dto.CreateRepositoryResponseDTO{
-		Repository: toRepositoryDTO(dbRepo),
-		Warnings:   result.Warnings,
+		Repository:        toRepositoryDTO(dbRepo),
+		AcknowledgedRisks: storage.RiskCodes(result.AcknowledgedRisks),
 	})
 }
 
@@ -411,7 +374,7 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body dto.SetupPrimaryRepositoryRequestDTO true "Primary repository"
 // @Success 200 {object} dto.CreateRepositoryResponseDTO
-// @Failure 409 {object} api.ProblemResponse "Setup already completed"
+// @Failure 409 {object} api.RepositoryCreateProblemResponse "Setup already completed, Repository conflict, or typed storage refusal"
 // @Router /api/v1/setup/primary-repository [post]
 func (h *RepositoryScanHandler) CreatePrimaryRepository(c *gin.Context) {
 	if h == nil || h.repoManager == nil {
@@ -457,56 +420,125 @@ func (h *RepositoryScanHandler) CreatePrimaryRepository(c *gin.Context) {
 		actor = fmt.Sprintf("web:user:%d", *actorOwnerID)
 	}
 	result, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
-		RequestID:        requestID,
-		Actor:            actor,
-		ActorUserID:      actorOwnerID,
-		HostInstanceID:   lifecycleHostInstanceID(),
-		Name:             req.Name,
-		Role:             dbtypes.RepoRolePrimary,
-		OwnerID:          hostOwnerID,
-		StorageStrategy:  req.StorageStrategy,
-		RiskConfirmation: req.RiskConfirmation,
+		RequestID:         requestID,
+		Actor:             actor,
+		ActorUserID:       actorOwnerID,
+		HostInstanceID:    lifecycleHostInstanceID(),
+		Name:              req.Name,
+		Role:              dbtypes.RepoRolePrimary,
+		OwnerID:           hostOwnerID,
+		StorageStrategy:   req.StorageStrategy,
+		AssessmentToken:   req.AssessmentToken,
+		AcknowledgedRisks: req.AcknowledgedRisks,
 	})
 	if err != nil {
 		if errors.Is(err, storage.ErrPrimaryRepositoryExists) {
 			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
-		var conflict *storage.RepositoryConflictError
-		var existing *storage.ExistingRepositoryFoundError
-		var invalidMarker *storage.RepositoryMarkerInvalidError
-		switch {
-		case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
-			writeRepositoryConflict(c, err, "primary_required")
-		case errors.Is(err, storage.ErrStorageLocationOffline):
-			writeRepositoryConflict(c, err, "storage_location_offline")
-		case errors.Is(err, storage.ErrStorageLocationInvalid):
-			writeRepositoryConflict(c, err, "storage_location_invalid")
-		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrInvalidRepositoryName):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrRepositoryStorageNotWritable):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrPathNotAllowed):
-			api.WriteProblem(c, api.BadRequest(err))
-		case errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired):
-			api.WriteProblem(c, api.KnownProblem(problem.StorageConfirmationRequired, err))
-		case errors.As(err, &conflict):
-			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
-		case errors.As(err, &existing):
-			api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
-		case errors.As(err, &invalidMarker):
-			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
-		default:
-			api.WriteProblem(c, api.BadRequest(err))
-		}
+		writeRepositoryCreateFailure(c, err)
 		return
 	}
 	api.JSONOK(c, dto.CreateRepositoryResponseDTO{
-		Repository: toRepositoryDTO(result.Repository),
-		Warnings:   result.Warnings,
+		Repository:        toRepositoryDTO(result.Repository),
+		AcknowledgedRisks: storage.RiskCodes(result.AcknowledgedRisks),
 	})
+}
+
+// writeRepositoryCreateFailure maps every provisioning and assessment error of
+// the create commands to its registered Problem. Typed storage refusals and
+// the consent gate come first; Repository conflicts keep their stable
+// conflict_type vocabulary.
+func writeRepositoryCreateFailure(c *gin.Context, err error) {
+	var conflict *storage.RepositoryConflictError
+	var existing *storage.ExistingRepositoryFoundError
+	var invalidMarker *storage.RepositoryMarkerInvalidError
+	var consent *storage.StorageRiskConfirmationError
+	switch {
+	case errors.As(err, &consent):
+		api.WriteProblem(c, problem.NewStorageConfirmationRequired(err, storage.RiskCodes(consent.Risks), consent.Token))
+	case errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired):
+		api.WriteProblem(c, problem.NewStorageConfirmationRequired(err, []string{}, ""))
+	case errors.Is(err, storage.ErrStorageAssessmentStale):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageAssessmentStale, err))
+	case errors.Is(err, storage.ErrStorageUnsupportedFilesystem):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageUnsupportedFilesystem, err))
+	case errors.Is(err, storage.ErrRepositoryExistingTargetNotMountPoint):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageNotMountedVolume, err))
+	case errors.Is(err, storage.ErrStoragePermissionDenied):
+		api.WriteProblem(c, api.KnownProblem(problem.StoragePermissionDenied, err))
+	case errors.Is(err, storage.ErrStorageMaterializationRequired):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageMaterializationRequired, err))
+	case errors.Is(err, storage.ErrStorageObservationUnknown):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageObservationUnknown, err))
+	case errors.Is(err, storage.ErrPrimaryRepositoryExists):
+		writeRepositoryConflict(c, err, "primary_exists")
+	case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
+		writeRepositoryConflict(c, err, "primary_required")
+	case errors.Is(err, storage.ErrStorageLocationOffline):
+		writeRepositoryConflict(c, err, "storage_location_offline")
+	case errors.Is(err, storage.ErrStorageLocationInvalid):
+		writeRepositoryConflict(c, err, "storage_location_invalid")
+	case errors.Is(err, storage.ErrRepositoryExistsAtPath):
+		api.WriteProblem(c, api.BadRequest(err))
+	case errors.Is(err, storage.ErrInvalidRepositoryName):
+		api.WriteProblem(c, api.BadRequest(err))
+	case errors.Is(err, storage.ErrInvalidRepositoryDirectory):
+		api.WriteProblem(c, api.BadRequest(err))
+	case errors.Is(err, storage.ErrRepositoryDirectoryConflict):
+		writeRepositoryConflict(c, err, "repository_directory_conflict")
+	case errors.Is(err, storage.ErrRepositoryTargetNotEmpty):
+		writeRepositoryConflict(c, err, "repository_target_not_empty")
+	case errors.Is(err, storage.ErrRepositoryStorageNotWritable):
+		api.WriteProblem(c, api.BadRequest(err))
+	case errors.Is(err, storage.ErrPathNotAllowed):
+		api.WriteProblem(c, api.BadRequest(err))
+	case errors.As(err, &conflict):
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
+	case errors.As(err, &existing):
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
+	case errors.As(err, &invalidMarker):
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
+	default:
+		api.WriteProblem(c, api.BadRequest(err))
+	}
+}
+
+// AssessStorageTarget reviews a Repository create target without changing it.
+// @Summary Assess a Repository create target
+// @Description Read-only review of the direct-child folder a create command would use below a registered Storage Location: support, typed refusal, the risks the administrator must acknowledge, and the token those acknowledgements are bound to. Capacity changes keep the token valid; a changed mount, marker, or risk set invalidates it. No path is accepted or returned.
+// @Tags repositories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.StorageAssessmentRequestDTO true "Create target"
+// @Success 200 {object} dto.StorageAssessmentDTO
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 409 {object} api.RepositoryConflictProblemResponse "Storage Location or storage folder conflict"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
+// @Router /api/v1/storage/assessments [post]
+func (h *RepositoryScanHandler) AssessStorageTarget(c *gin.Context) {
+	if h == nil || h.repoManager == nil {
+		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
+		return
+	}
+	var req dto.StorageAssessmentRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	assessment, err := h.repoManager.AssessCreateTarget(c.Request.Context(), storage.AssessCreateTargetRequest{
+		Intent:            storage.StorageIntent(req.Intent),
+		StorageLocationID: strings.TrimSpace(req.StorageLocationID),
+		DirectoryName:     req.DirectoryName,
+	})
+	if err != nil {
+		writeRepositoryCreateFailure(c, err)
+		return
+	}
+	api.JSONOK(c, dto.ToStorageAssessmentDTO(assessment))
 }
 
 // ListRepositoryCandidates classifies direct children of the configured default Storage Location.

@@ -55,9 +55,15 @@
       "unavailable": "A required service is unavailable."
     },
     "storage": {
-      "confirmationRequired": "Review and confirm the Storage Location risks before continuing.",
+      "assessmentStale": "The storage target changed since it was reviewed. Review it again before continuing.",
+      "confirmationRequired": "Review and acknowledge the storage risks before continuing.",
       "hostActionExpired": "The Desktop approval expired. Start the action again.",
-      "hostActionFailed": "The Desktop could not complete the storage action."
+      "hostActionFailed": "The Desktop could not complete the storage action.",
+      "materializationRequired": "Files in this folder must be downloaded locally before it can be used. Make the folder available offline and try again.",
+      "notMountedVolume": "This folder is not a mounted volume; data stored here would be lost when the container is recreated. Mount a host directory in your compose file.",
+      "observationUnknown": "The storage target could not be inspected. Check the mount and access, then try again.",
+      "permissionDenied": "Lumilio was denied access to the storage target. Grant access or choose another folder.",
+      "unsupportedFilesystem": "Network storage (NFS, SMB, AFP, SSHFS, WebDAV, or a network drive) is not supported for Storage Locations and Repositories in this release. Choose a local disk."
     },
     "upload": {
       "processingFailed": "The upload could not be processed."
@@ -718,6 +724,7 @@
       "storageLocation": "Default Storage Location",
       "storageLocationHint": "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
       "submit": "Create Primary Repository",
+      "targetUnavailable": "The Default Storage Location cannot hold the Primary Repository right now.",
       "title": "Create Primary Repository"
     },
     "register": {
@@ -1460,8 +1467,8 @@
       "createNameRequired": "Enter a Repository name.",
       "createNameTooManyBytes": "The name cannot exceed 240 UTF-8 bytes.",
       "createNameTooManyCharacters": "The name cannot exceed 80 characters.",
-      "createRiskConfirmationDescription": "This target may be removable, network-backed, or managed by cloud-sync software. Confirm that originals are backed up and available offline.",
-      "createRiskConfirmationTitle": "Confirm storage placement risks",
+      "createRiskConfirmationDescription": "Lumilio reviewed this exact target. Acknowledge the risks below for this action only; a changed disk or folder asks again.",
+      "createRiskConfirmationTitle": "Acknowledge storage risks",
       "createSubmit": "Create Repository",
       "createSuccess": "{{name}} was added.",
       "createTitle": "Add Repository",
@@ -1545,6 +1552,21 @@
       "renameSubmit": "Save name",
       "renameSuccess": "Renamed Repository to \"{{name}}\".",
       "renameTitle": "Rename Repository",
+      "review": {
+        "assessing": "Reviewing the storage target…",
+        "failed": "The storage target could not be reviewed.",
+        "markerInvalid": "The folder holds a Repository marker that needs attention. Open the Storage page diagnostics or choose another folder.",
+        "retry": "Review again",
+        "unavailable": "This target cannot be used for a Repository right now."
+      },
+      "risks": {
+        "cloudPlaceholder": "Some files are cloud placeholders that must be downloaded first.",
+        "cloudSyncDirectory": "Managed by cloud-sync software: sync clients may evict originals or duplicate files.",
+        "mountChanged": "The mounted filesystem changed since this location was registered.",
+        "networkFilesystem": "Network filesystem: not supported.",
+        "nonDefaultLocation": "Outside the Default Storage Location: this Storage Location must stay authorized and connected.",
+        "removableStorage": "Removable or external disk: originals disappear while it is unplugged."
+      },
       "scanCoalesced": "A scan is already active for {{name}}; this request joined the existing operation.",
       "scanFailed": "Failed to queue scan.",
       "scanQueued": "Scan queued for {{name}}. You can keep using Lumilio while it runs.",

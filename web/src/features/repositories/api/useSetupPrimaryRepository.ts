@@ -6,18 +6,21 @@ import type { RepositoryStorageStrategy } from "../components/StorageStrategyPic
 export type SetupPrimaryRepositoryInput = {
   name: string;
   storageStrategy: RepositoryStorageStrategy;
-  riskConfirmation?: boolean;
+  assessmentToken?: string;
+  acknowledgedRisks?: readonly string[];
 };
 
 export function buildSetupPrimaryRepositoryRequestBody({
   name,
   storageStrategy,
-  riskConfirmation,
+  assessmentToken,
+  acknowledgedRisks,
 }: SetupPrimaryRepositoryInput) {
   return {
     name,
     storage_strategy: storageStrategy,
-    risk_confirmation: riskConfirmation,
+    assessment_token: assessmentToken,
+    acknowledged_risks: acknowledgedRisks ? [...acknowledgedRisks] : undefined,
   };
 }
 
@@ -26,12 +29,18 @@ export function useSetupPrimaryRepository() {
   const mutation = $api.useMutation("post", "/api/v1/setup/primary-repository");
 
   const createPrimaryRepository = useCallback(
-    async ({ name, storageStrategy, riskConfirmation }: SetupPrimaryRepositoryInput) => {
+    async ({
+      name,
+      storageStrategy,
+      assessmentToken,
+      acknowledgedRisks,
+    }: SetupPrimaryRepositoryInput) => {
       const response = await mutation.mutateAsync({
         body: buildSetupPrimaryRepositoryRequestBody({
           name,
           storageStrategy,
-          riskConfirmation,
+          assessmentToken,
+          acknowledgedRisks,
         }),
       });
 
