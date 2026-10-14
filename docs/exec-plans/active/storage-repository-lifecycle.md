@@ -5,7 +5,12 @@ Status: active, created 2026-10-07; principal owner decisions frozen
 assessment core, stat panic fix, guarded atomic marker primitive, and
 swappable lock/identity/watch adapters. P2–P8 remain outstanding. Each fixing
 PR lands its regression tests and updates this Status and the evidence tables.
-Child of [release-hardening.md](release-hardening.md).
+Child of [release-hardening.md](release-hardening.md); its session order
+(S2–S8, one phase per session, P3 and P6 may split) is the schedule.
+2026-10-13: no physical machine is available for the foreseeable future, so
+the P8 Mac pass is an rc.2 checkpoint and every phase exit below is proven
+by CI, the embedded Desktop harness, and CI filesystem images only
+([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)).
 
 Goal: within the rc.1 storage support policy, creation on a removable
 non-default Storage Location completes; every offered Reconnect reaches
@@ -368,11 +373,15 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   and crash/rollback scenarios pass; evidence tables updated; owning docs
   current; durable decisions extracted, surviving debt moved to the tracker,
   then this plan deleted per the exec-plan skill (no completed archive).
-- Edwin: one Mac pass before the rc tag, recording build SHA, OS/filesystem,
-  and verdict: removable non-default `/Volumes` create in en/zh; externally
-  moved regular reconnect plus wrong-marker/online-copy refusal; reinstall
-  Adopt and separate fresh-elsewhere; default Apply/restart. Windows pass
-  optional. Edwin confirms the tag when P0–P8 and core real-use quality hold.
+- Edwin: review. The Mac pass (removable non-default `/Volumes` create in
+  en/zh; externally moved regular reconnect plus wrong-marker/online-copy
+  refusal; reinstall Adopt and separate fresh-elsewhere; default
+  Apply/restart; Windows optional) is recorded here as the first rc.2
+  checkpoint with its exact steps, not run before rc.1 (2026-10-13). Its
+  rc.1 stand-ins are the embedded Desktop picker-controller and
+  runtime-config harness (R2, R9), the macOS and Windows CI jobs, and the
+  `web:test:storage-recovery` slice. Edwin confirms the tag when P0–P8 and
+  core quality hold.
 
 P1 policy/copy preparation may proceed independently of later transport
 work. After P3 freezes the command contract, P4 recovery design, P5 setup
@@ -500,8 +509,10 @@ gates because they reproduce on GHA or an ordinary dev machine. Journey
 evidence spans local/new, removable/non-default/child-mounted, network refusal,
 cloud residency, Open, same-ID copy/move, regular/Location/default reconnect,
 fresh-catalog reinstall, corrupt/newer/missing markers, repair, rename/detach,
-and private recovery. Real native picker coverage is the single pre-tag Mac
-pass; Windows is optional. No hardware/performance gate per phase.
+and private recovery. Real native picker coverage is an rc.2 checkpoint
+(2026-10-13); for rc.1 the native picker and Apply paths are proven by the
+embedded Desktop harness on the macOS and Windows CI jobs. No
+hardware/performance gate per phase.
 
 ## Risks and optional reference hardware
 
@@ -519,5 +530,6 @@ pass; Windows is optional. No hardware/performance gate per phase.
 
 N100/radxa measurements or a retained-primary Docker run are optional
 reference data for diagnostics/release wording only. They never gate a
-phase, this plan's completion, or rc.1. The required real-machine storage
-validation is one Mac pass before the rc tag; Windows is optional.
+phase, this plan's completion, or rc.1. No real-machine validation gates
+rc.1 (2026-10-13); the Mac pass, with Windows optional, is the first rc.2
+checkpoint.

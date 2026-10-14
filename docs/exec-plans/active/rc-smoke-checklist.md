@@ -1,95 +1,114 @@
-# RC manual smoke checklist
+# RC smoke checkpoint (CI evidence map)
 
-Status: active, created 2026-09-24. Not started. Child of
-[release-hardening.md](release-hardening.md) (Phase 3, "Manual smoke
-checklist"); must finish before the rc.1 tag (date TBD, owner decision
-2026-09-24). Part A starts only after the last PR of
-[repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md)
-(#222, #223) merges; those PRs replace scanning, Storage counts, and delete.
+Status: active, created 2026-09-24 as a manual checklist; rewritten
+2026-10-13 as a CI evidence map because no physical machine is available
+and every session runs in Claude Code cloud
+([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)).
+Child of [release-hardening.md](release-hardening.md) (Phase 3); session S11
+in its order builds the missing evidence and fills Results. Closes before the
+rc.1 tag. Rows marked **rc.2** need a person at a machine and are recorded
+as the first rc.2 checkpoints, never ticked for rc.1.
 
-Goal: a tag-time checkpoint of core flows on a fresh Docker Compose install
-on any Docker host (including this cloud box or Mac Docker) and Desktop on
-Edwin's Mac. Record first-run setup, upload/browse, Storage create including a
-removable Storage Location, Trash/restore, and language switch. Other rows
-are spot checks; Windows is checked if available. This complements E2E.
+Goal: every core flow has a named, CI-run proof on the promotion head of
+`dev` (the head of draft PR #210), in English and with the zh catalog at its
+reported coverage; the published artifact is re-proven by the
+`release-smoke` workflow after the tag.
 
 ## Non-goals
 
-- Re-testing what E2E already proves on every PR: sign-in/TOTP, upload,
-  Storage admin add, share link create/open/revoke, People merge,
-  Agent runtime, video semantic search, backup/restore (restore is covered by
-  the compatibility baseline's RC-build proof, PR #225). Spot-check them only.
-- Fixing cosmetic issues during the run. File them; fix only blockers.
+- Re-proving what a PR into `dev` already runs for the paths it touches; the
+  promotion PR's full run is the proof.
+- Fixing cosmetic issues found while mapping evidence. File them; fix only
+  blockers.
+- Any row that needs Docker on the sandbox host, a display, or a physical
+  disk: those are rc.2 rows or GitHub Actions jobs, never local runs.
 
 ## Fixed contracts
 
-- Build under test: the promotion head of `dev` (the head of draft PR #210).
-  Record its short SHA at the top of the Results section.
+- Build under test: the promotion head of `dev`. Record its short SHA and
+  the CI run link at the top of Results.
 - Blocker definition: see
   [release-hardening.md](release-hardening.md#fixed-contracts). A cosmetic or
   copy issue is never a blocker; a data-loss, blank page, or broken core flow
   always is.
-- Bilingual checkpoint: run core flows in English and switch to 中文 to catch untranslated
-  or broken strings (canonical terms: Storage Location / 存储位置, Repository / 资源库 — see the
-  `lumilio-frontend-i18n` skill's registry).
+- Evidence is a spec or test name plus the CI job that ran it. "Covered by
+  E2E" without a name is not evidence.
+- Bilingual: the language-switch spec runs the core journey after switching
+  to 中文 and asserts canonical terms (Storage Location / 存储位置,
+  Repository / 资源库) from the `lumilio-frontend-i18n` registry; zh catalog
+  coverage is reported from `i18next-cli status` at tag time (target 100%,
+  not a gate).
 
-## Part A — Docker Compose (any Docker host)
+## Part A — Promotion-head CI (replaces "any Docker host")
 
-Install the promotion-head image with `deploy/compose/compose.yml` as the
-first-use guide describes. Use an isolated `rc-smoke` Compose project, data
-directory, and port, then drive a real browser. ML flows are optional spot
-checks with a configured Hub. Intel N100 / radxa-x4 is optional reference
-hardware, never a release prerequisite.
+The `@smoke` slice and the Server gate on #210 are the tag-time smoke. S11
+adds the two missing specs below and names P2's removable-Location evidence.
+The Compose stack used by CI is the E2E image with its baked configuration,
+not the release bundle; the release bundle is proven in Part C.
 
-Seed with a realistic library: the pinned `demo` profile from the assets cache
-(`/Volumes/CodeBase/Projects/Lumilio-Photos/.cache/lumilio-assets/<rev>/demo`,
-see `web/scripts/assets-sync.ts`), uploaded through the UI.
+## Part B — Desktop (rc.2)
 
-## Part B — Desktop (Edwin's Mac; Windows if available)
+Installing a Desktop build, onboarding, importing a folder, tray menu,
+"open in browser" at `localhost:6680`, and restart persistence need a Mac
+or Windows machine. For rc.1 the evidence is the macOS and Windows CI jobs
+(`ci:desktop:native`: Server and Desktop tests plus the CGo build) and the
+embedded Desktop picker-controller and runtime-config harness from the
+storage refactor. The native pass is the first rc.2 checkpoint, next to the
+updater proof (#240).
 
-Install the Desktop build from the promotion head (or the latest CI artifact
-of #210), complete onboarding, import a folder of mixed media, and walk the
-same table. Also check: tray menu open/quit, "open in browser" at
-`localhost:6680`, restart the app and confirm the library persists.
+## Part C — Published artifact (post-tag, `release-smoke` workflow)
 
-## Checklist (core checkpoint rows; other rows are spot checks)
+Built in S11 and dispatched in S15 with the published image digest: fresh
+install from the release bundle's Compose files, setup wizard through the
+browser, upload, browse, open a detail view, backup → restore round trip,
+and the compatibility-fixture artifact. Its run link is the Docker verdict
+in [rc-release.md](rc-release.md) Phase 4.
 
-| Flow | What to check |
-|---|---|
-| First run / setup (core) | Wizard completes; no "Unable to verify system status"; primary Repository created; zh copy renders |
-| Upload / Photos / browse (core) | Upload mixed media, browse the grid, and open a detail view. Spot-check timeline scrubbing, EXIF, zoom, keyboard navigation, and empty states |
-| Video & music | Video play + seek right after import (regression area of #216), music album play/next/queue, lyrics if present |
-| Search | Filename, semantic ("ocean", "portrait"), filters (date, camera, location), no-results state |
-| People | Clusters appear with Hub on, rename (modal), merge, hide; cover choice |
-| Albums / Collections | Create, rename, cover, add/remove from photo view and bulk select, delete |
-| Events | Events list, rename/cover/hide persists after new imports finish (regression area of #213) |
-| Share links | Create from gallery and viewer, open logged out, revoke → "no longer available" |
-| Studio | Open a photo, frame/text tools, export; RAW (NEF) open |
-| Map | Photos with GPS appear; empty state without GPS |
-| Language switch (core) | Switch English / 中文 and confirm the page remains usable with translated copy |
-| Settings / Users | Appearance/theme, create a second user, change password → sign out → sign in (regression area of #214), MFA page |
-| Storage admin (core) | Create a Repository and a Storage Location, including a removable location; asset counts non-zero (#209), scan now, verification badge |
-| Scanning (#222) | Spot-check: copy a folder in and see it appear without a manual scan; move and rename a folder and check that albums survive; unplug an external disk (or stop the share) and check that nothing goes Missing and the Repository shows offline |
-| Trash / restore (#223, core) | Delete a photo and see the file under `<repo>/.lumilio/trash`; restore it with album, rating, and people intact. Spot-check: delete permanently and see it gone from disk; delete on an offline Repository is refused with a reason; resolve a duplicate group and see the duplicates in Trash |
-| Missing and edits (#223) | Delete a file outside Lumilio: it leaves the library and appears in the Missing view on the Storage page, and Remove missing items clears it; edit a photo in another app (save over the file): album, rating, and people are kept |
-| Processing / Monitor | Stage grid settles to idle; retry on a failed item |
-| Agent (Lumilio) | Plain chat with a configured provider if available; otherwise note "not configured" |
+## Checklist
+
+| Flow | Core? | Evidence on the promotion head | Status |
+| --- | --- | --- | --- |
+| First run / setup | core | `@auth-totp` first-admin bootstrap (`auth-totp-bootstrap.spec.ts`); the fresh-bootstrap setup journey from storage P5 (R3: Adopt Primary / fresh elsewhere); the setup wizard itself in Part C | P5 + S11 |
+| Upload / Photos / browse | core | `@smoke` upload, album, viewer, Trash, restore journey (`upload.spec.ts`); `@smoke` scan-and-see (`scan.spec.ts`) | exists |
+| Video & music | spot | `@video-regression` (`video-semantic-regression.spec.ts`); `@smoke` music import and playback (`music.spec.ts`) | exists |
+| Search | spot | `@video-regression` semantic coverage; filename and filter search have no E2E — Server handler tests only | gap, non-blocking |
+| People | spot | `@people` merge with recorded faces (`people-merge.spec.ts`) | exists |
+| Albums / Collections | spot | album create and membership inside `upload.spec.ts` and `trash.spec.ts` | exists |
+| Events | spot | `@smoke` Events rebuild, correct, redirect, freeze (`events.spec.ts`) | exists |
+| Share links | spot | `@smoke` create, open logged out, revoke (`share-links.spec.ts`) | exists |
+| Studio | spot | Vitest browser project (`web/src/features/studio/**` worker and export tests); no E2E | gap, non-blocking |
+| Map | spot | none | gap, non-blocking |
+| Language switch | core | **new** `@smoke` spec (S11): switch to 中文, open Storage and Photos, assert registry terms and no raw keys; switch back | S11 |
+| Settings / Users | spot | `@auth-hardening` logout, lockout, session boundaries (`auth-session.spec.ts`) | exists |
+| Storage admin | core | `@smoke` add Repository, scan, Storage view counts (`storage-admin.spec.ts`); removable non-default Storage Location create = P2's R1 Web flow spec with `nativeHostAvailable=true` and the injected-target Server integration test (name both here when they land) | P2 + S11 |
+| Scanning (#222) | spot | `scan.spec.ts`; watcher and settle follow-up Server tests in `storage/scan` | exists |
+| Trash / restore (#223) | core | `@smoke` Trash restore with album intact and permanent delete gone from disk (`trash.spec.ts`); offline-refusal and duplicate-resolution Server tests (S10) | exists + S10 |
+| Missing and edits (#223) | spot | `server/app` lifecycle regressions: missing file leaves browse, in-place overwrite keeps album; the S10 XMP/EXIF write test | exists + S10 |
+| Processing / Monitor | spot | Server stage catalog tests; no E2E | gap, non-blocking |
+| Agent (Lumilio) | spot | `@agent-runtime` keyless runtime (`agent-runtime.spec.ts`), `@agent-trust` | exists |
+| Backup / restore | core | `@backup-recovery` admin UI backup, download, restore, rollback (`backup-recovery.spec.ts`); Part C round trip on the published image | exists + S15 |
+| Desktop onboarding, import, tray, restart | rc.2 | macOS/Windows CI jobs and the embedded picker harness only | rc.2 |
 
 ## Execution phases
 
-- [ ] Part A core rows run on any Docker host; results recorded below.
-- [ ] Part B core rows run on Edwin's Mac; Windows if available; results recorded below.
-- [ ] Every failure: fix blockers in `dev`; recording deferred findings in the tracker
-  is encouraged; tick release-hardening Phase 3 items; tear down
-  `rc-smoke` on the chosen host; delete this plan.
+- [ ] S11: language-switch spec lands in the `@smoke` slice; P2's
+  removable-Location evidence is named in the table; `release-smoke.yml`
+  exists, is dispatchable with an image reference or digest, and was run
+  once against the `edge` image to prove the workflow itself.
+- [ ] Tag time (S13): the promotion head's CI run link and every core row's
+  verdict are recorded below; zh coverage reported.
+- [ ] Post-tag (S15): Part C run link and digest recorded; Part B written up
+  as rc.2 checkpoints; tick release-hardening Phase 3; delete this plan.
 
 ## Results
 
-(Fill in: build SHA, date, part, one line per flow: verdict, notes, PR or
-tracker link.)
+(Fill in: promotion-head SHA, CI run link, date; one line per core row:
+verdict, spec or test, notes, PR or tracker link. Part C: digest, run link.)
 
 ## Validation boundaries
 
-- Core rows have tag-time verdicts for Docker and Edwin's Mac, including language switch.
-- Other rows are spot checks; missing spot checks do not block the tag.
+- Every core row names a spec or test that ran green in the promotion
+  head's CI, including language switch.
+- Rows that need a physical machine are recorded as rc.2 checkpoints, not
+  passes.
 - No open blocker.
