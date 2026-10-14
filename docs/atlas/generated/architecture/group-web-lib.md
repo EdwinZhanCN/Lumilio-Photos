@@ -28,6 +28,7 @@ flowchart LR
         n_web_src_lib_http_commons["lib/http-commons"]
         n_web_src_lib_layout["lib/layout"]
         n_web_src_lib_media["lib/media"]
+        n_web_src_lib_photo_export["lib/photo-export"]
         n_web_src_lib_preferences["lib/preferences"]
         n_web_src_lib_settings["lib/settings"]
         n_web_src_lib_theme["lib/theme"]
@@ -74,6 +75,7 @@ flowchart LR
 | lib/http-commons |  | `mod:web/src/lib/http-commons` |
 | lib/layout |  | `mod:web/src/lib/layout` |
 | lib/media |  | `mod:web/src/lib/media` |
+| lib/photo-export |  | `mod:web/src/lib/photo-export` |
 | lib/preferences |  | `mod:web/src/lib/preferences` |
 | lib/settings |  | `mod:web/src/lib/settings` |
 | lib/theme |  | `mod:web/src/lib/theme` |

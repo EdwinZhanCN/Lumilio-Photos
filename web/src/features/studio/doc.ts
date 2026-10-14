@@ -37,7 +37,7 @@
  *     DEVELOP --> GEOMETRY["applyGeometry"]
  *     GEOMETRY --> COMPOSE["composeStudioImage"]
  *     EDITOR --> SIDECAR["LumilioSidecarV1"]
- *     EDITOR --> EXPORT["ExportPanel"]
+ *     EDITOR --> EXPORT["PhotoExportDialog"]
  * ```
  *
  * Preview rendering transfers the visible canvas and source blob to a worker.
@@ -46,10 +46,14 @@
  * {@link composeStudioImage} draws the canvas treatment and layers in 2D.
  * Slider previews stay on the GPU; only export encodes a blob.
  *
- * {@link ExportPanel} selects format, quality, and output size.
- * {@link resolveExportSize} prevents upscaling and respects GPU limits, then
+ * {@link PhotoExportDialog} shares format, quality, size, naming and download lifecycle
+ * with Fullscreen. Defaults are JPEG at 92% and maximum available dimensions.
+ * Export snapshots the current edits without saving them; failures keep settings
+ * open for retry. Size choices apply to the final cropped, rotated, framed image.
+ * {@link studioExportSize} prevents upscaling and respects GPU limits, then
  * {@link preserveExif} copies compatible EXIF to the rendered output with an
- * upright orientation.
+ * upright orientation and corrected dimensions. Metadata preservation is best-effort;
+ * failures warn after download. Studio PNG does not copy source metadata.
  *
  * ## Data
  *
@@ -71,8 +75,9 @@
  *
  * @module
  */
+import type { studioExportSize } from "./modules/rendering/exportSize.ts";
 import type PhotoPicker from "../assets/picker/index.ts";
-import type { ExportPanel } from "./flows/editor/export/ExportPanel.tsx";
+import type { PhotoExportDialog } from "../../components/PhotoExportDialog/PhotoExportDialog.tsx";
 import type { CropOverlay } from "./flows/editor/crop/CropOverlay.tsx";
 import type { StudioEditor } from "./flows/editor/StudioEditor.tsx";
 import type { useComposition } from "./flows/editor/useComposition.ts";
@@ -90,10 +95,7 @@ import type {
   StudioEditAdjustments,
 } from "./model/editTypes.ts";
 import type { composeStudioImage } from "./modules/rendering/composeStudioImage.ts";
-import type {
-  mapRectDisplayedToSource,
-  resolveExportSize,
-} from "./modules/rendering/coordinateSystem.ts";
+import type { mapRectDisplayedToSource } from "./modules/rendering/coordinateSystem.ts";
 import type { DevelopEngine } from "./modules/rendering/developEngine.ts";
 import type { applyGeometry } from "./modules/rendering/geometry.ts";
 import type { preserveExif } from "./modules/export/exif.ts";

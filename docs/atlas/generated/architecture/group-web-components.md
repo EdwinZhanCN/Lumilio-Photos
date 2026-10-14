@@ -13,6 +13,7 @@ flowchart LR
         n_in_web_features[/"Web features"/]
     end
     subgraph n_g_Web_components["Web components"]
+        n_web_src_components_PhotoExportDialog["components/PhotoExportDialog"]
         n_web_src_components_assistant["components/assistant"]
         n_web_src_components_breadcrumbs["components/breadcrumbs"]
         n_web_src_components_collection["components/collection"]
@@ -34,6 +35,7 @@ flowchart LR
 | --- | --- | --- |
 | Web app shell |  | `group:web-app` |
 | Web features |  | `group:web-features` |
+| components/PhotoExportDialog |  | `mod:web/src/components/PhotoExportDialog` |
 | components/assistant |  | `mod:web/src/components/assistant` |
 | components/breadcrumbs |  | `mod:web/src/components/breadcrumbs` |
 | components/collection |  | `mod:web/src/components/collection` |

@@ -110,6 +110,7 @@ export function buildPreservedTags(
 }
 
 export type PreserveExifOptions = {
+  onUnavailable?: () => void;
   format: ExifFormat;
   width: number;
   height: number;
@@ -117,7 +118,7 @@ export type PreserveExifOptions = {
 
 /**
  * Return `exportBlob` with the original's EXIF copied onto it. Best-effort:
- * PNG (which has no EXIF) and any failure return the export unchanged, because a
+ * PNG (not supported by this metadata writer) and any failure return the export unchanged, because a
  * missing tag must never block a download.
  */
 export async function preserveExif(
@@ -134,11 +135,17 @@ export async function preserveExif(
       { name: "source", data: originalBlob },
       { args: ["-json", "-n"], fetch: wasmFetch },
     );
-    if (!parsed.success) return exportBlob;
+    if (!parsed.success) {
+      options.onUnavailable?.();
+      return exportBlob;
+    }
 
     const rows = JSON.parse(parsed.data) as Array<Record<string, unknown>>;
     const source = Array.isArray(rows) ? rows[0] : null;
-    if (!source) return exportBlob;
+    if (!source || source.Error) {
+      options.onUnavailable?.();
+      return exportBlob;
+    }
 
     const tags = buildPreservedTags(source, options.width, options.height);
     const name = options.format === "image/webp" ? "export.webp" : "export.jpg";
@@ -148,10 +155,14 @@ export async function preserveExif(
       args: ["-n", "-m"],
       fetch: wasmFetch,
     });
-    if (!written.success) return exportBlob;
+    if (!written.success) {
+      options.onUnavailable?.();
+      return exportBlob;
+    }
 
     return new Blob([written.data], { type: options.format });
   } catch (error) {
+    options.onUnavailable?.();
     console.warn("[studio] EXIF preservation failed; exporting without it", error);
     return exportBlob;
   }
