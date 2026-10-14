@@ -14,7 +14,9 @@ a fix for the video enrich regression #232 left on `dev`. 4b (expiry,
 permanent delete, remove missing, Trash rebuild) merged in #234 and 4c
 (carry-over follow-ups) merged in #235. Phase 5 merged in #237 on 2026-10-05.
 Phase 6 documentation and E2E items are done and locally validated on
-2026-10-05; plan/issue closure remains outstanding. N100 measurements and a Docker
+2026-10-05. The #222 acceptance gaps from the 2026-10-07 audit closed on
+2026-10-14 (rc.1 session S9, see "Acceptance evidence" below); the #223 gaps
+(S10) and plan/issue closure remain outstanding. N100 measurements and a Docker
 round trip are optional reference data, not completion prerequisites. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
@@ -406,14 +408,7 @@ Implementation and evidence for items 1–2 (2026-10-05):
 Remaining deterministic acceptance gaps (audit of `dev` @ `e12c55fa`,
 2026-10-07). These are CI-reproducible and still required before #222/#223
 close:
-- #222: a no-change rescan test that counts hash invocations and entry write
-  statements (today it checks counters and unchanged revisions); album
-  membership and a cross-repository directory move in the move test; an
-  upload-then-scan test that proves zero rehash; a convergence test with the
-  watcher disabled or unavailable (periodic scan only); enforcement (test or
-  `architecturecheck`) of the structural writer budget: at most 256 rows per
-  batch, no file I/O, hashing, sleep, or repository-wide `COUNT` inside a
-  writer transaction.
+- #222: closed 2026-10-14 (S9). Evidence below.
 - #223: two-copy delete/restore asserting album and face preservation;
   external deletion hidden from search, albums, and library counts (browse is
   covered); duplicate resolution moving non-kept files into Trash and
@@ -423,6 +418,44 @@ close:
   backup taken before a delete is restored and the Trash view is rebuilt from
   its sidecars.
 - Process: complete this plan per `lumilio-exec-plan`.
+
+### Acceptance evidence for #222 (S9, 2026-10-14)
+
+Every #222 correctness box now has a deterministic test that observes the
+behaviour from outside the scanner. Hashing is counted by the hash library
+(`hashutil.Computations`, a process-wide counter incremented by every full
+hash and quick fingerprint); entry writes are counted by SQLite itself, through
+audit triggers the scan test fixture installs on `repository_entries`, and the
+fixture's writer records the rows every transaction wrote. All run in
+`task server:test`; the static check runs in `task architecture:check`.
+
+| #222 box | Test | Where |
+| --- | --- | --- |
+| Model test, 64 seeds | `TestModelCatalogConvergesToDisk` | `storage/scan` (Phase 2) |
+| No-change rescan: 0 hashes, 0 entry writes | `TestNoChangeRescanHashesAndWritesNothing` asserts zero hash computations and zero audited entry-row writes, on top of counters and revisions | `storage/scan` |
+| Offline: root, marker, volume | `TestOfflineRepositoryEndsOfflineWithoutEntryChanges` | `storage/scan` (Phase 2) |
+| Marker removed mid-sweep | `TestMarkerRemovedBeforeMissingCommitCommitsNothing` | `storage/scan` (Phase 2) |
+| `EACCES` directory | `TestUnreadableDirectoryKeepsItsChildrenPresent` | `storage/scan` (Phase 2) |
+| Moves within and across repositories keep Asset IDs and albums, old entry removed | `TestMovesKeepAssetIDsAndAlbumsAndRemoveTheOldEntry`: file and directory moves within the repository and across repositories, each Asset in an album before the move and still in it after | `storage/scan` |
+| Duplicate copy | `TestDuplicateCopyIsOneAssetWithTwoEntries` | `storage/scan` (Phase 2) |
+| Missing file returns | `TestMissingFileReturnsWithoutANewAsset` | `storage/scan` (Phase 2) |
+| Upload then scan does not rehash | `TestUploadedContentIsNotRehashedOrDeferredByTheNextScan` (known-content binding of just-landed files inside a 30 s settle window: zero hashes, no file-row writes, no settle follow-up) and `TestScanIndexUploadThenScanDoesNotRehash` (a real HTTP upload into a running Server, then a forced scan: `hashed`, `new_entries`, `changed`, `deferred` all 0 and zero hash computations in the process) | `storage/scan`, `server/app` |
+| Watcher overflow or error schedules a full scan; disabled or unavailable watcher converges on the periodic scan | `TestWatcherTurnsAnEventFloodIntoAFullScan`, `TestWatcherFailureSchedulesAFullScanAndRetries` (Phase 3); `TestScanIndexConvergesWithoutWatcherHints` runs a complete Server with a silent change-watch backend and a 1 s interval (the file is indexed by a `periodic` scan) and with a backend that cannot start (indexed by the full `watcher` scan the failure schedules). The backend is injected through `OperatorControls.ChangeWatchBackend`, the same host seam Desktop uses | `storage/scan`, `server/app` |
+| Racily clean file is rehashed | `TestRacilyCleanEntryIsRehashedUntilItsCheckIsLater` | `storage/scan` (Phase 2) |
+| Settle follow-up | `TestSettleWindowDefersAndSchedulesAFollowUp` | `storage/scan` (Phase 2) |
+| Walk linearity, writer hold p99 | `TestScanCostIsLinearAndWriterHoldIsBounded`, `TestLifecycleRegressionScanCostIsLinear` | Phase 2/3; precise targets in the `perf` lane |
+| Structural writer budget | `TestWriterTransactionsStayWithinTheRowBudget` (1,500 files in one directory, the sizer started at the cap: walk, hash, and sweep transactions each write between 16 and 256 entry rows; the budget is a literal 256, not the scanner's constant) plus the fixture-wide check every scan test runs; statically, `checkScanIndexWriterBudget` in `tools/architecturecheck` rejects filesystem I/O, hashing, sleeping, and `Count*` queries (one allow-listed, keyed by trash ID) inside any `WithTx` body or `*Tx` function of `storage/scan`, and a `MaxBatchRows` above 256 | `storage/scan`, `architecturecheck` |
+
+Red runs recorded for S9: forcing every unchanged file to count as racily
+clean fails the no-change rescan and upload tests (`Changed:40`,
+`Deferred:2`); binding uploads as untrusted fails the upload test
+(`Deferred:2`); `MaxBatchRows = 2048` fails the budget test twice (the
+constant guard, and with that guard removed the measured
+`walk transactions wrote up to 1500 rows`) and the architecture check
+(`MaxBatchRows = 2048 exceeds the 256-row writer batch budget`); removing
+the periodic verifier loop fails the disabled-watcher convergence case
+(`never appeared in library browse; scans: []`). The architecture check's
+own unit test plants each forbidden call and expects the exact findings.
 
 ## Validation boundaries
 

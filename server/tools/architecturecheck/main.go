@@ -80,6 +80,11 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("Async pipeline architecture checks passed")
+
+	if err := checkScanIndexWriterBudget(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Scan index writer budget checks passed")
 }
 
 func fail(err error) {

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -146,5 +147,96 @@ func TestAssetHardDeletesAreConfinedToPurgeEntries(t *testing.T) {
 	}
 	if len(violations) != 1 || violations[0] != "server/internal/db/repo/queries/purge.sql" {
 		t.Fatalf("violations = %v, want only the multi-line query", violations)
+	}
+}
+
+func TestScanIndexWriterTransactionsRejectIOHashingSleepAndCounts(t *testing.T) {
+	root := t.TempDir()
+	write := func(relative, source string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("server/internal/storage/scan/violations.go", `package scan
+
+import (
+	"context"
+	"database/sql"
+	"os"
+	"time"
+
+	hashutil "server/internal/utils/hash"
+	"server/internal/db/repo"
+)
+
+const MaxBatchRows = 512
+
+func (s *Scanner) bad(ctx context.Context, fsys *fsLike) error {
+	data, _ := os.ReadFile("outside")   // outside any transaction: allowed
+	_ = data
+	return s.writer.WithTx(ctx, "op", func(tx *sql.Tx, queries *repo.Queries) error {
+		if _, err := os.Stat("inside"); err != nil {
+			return err
+		}
+		_, _ = hashutil.CalculateReaderHash(nil, hashutil.AlgorithmBLAKE3)
+		_, _ = fsys.InspectMedia(ctx, nil, 0)
+		_, _ = queries.CountRepositoryEntries(ctx, nil)
+		_, _ = queries.CountRepositoryEntriesWithTrashID(ctx, nil)
+		return nil
+	})
+}
+
+func helperTx(ctx context.Context, queries *repo.Queries) error {
+	time.Sleep(time.Millisecond)
+	<-time.After(time.Millisecond)
+	_, err := queries.GetRepositoryEntry(ctx, nil)
+	return err
+}
+`)
+	write("server/internal/storage/scan/clean.go", `package scan
+
+import (
+	"context"
+	"database/sql"
+	"os"
+
+	"server/internal/db/repo"
+)
+
+func (s *Scanner) good(ctx context.Context) error {
+	observation, err := os.Stat("before")
+	if err != nil {
+		return err
+	}
+	return s.writer.WithTx(ctx, "op", func(_ *sql.Tx, queries *repo.Queries) error {
+		_, err := queries.UpdateRepositoryEntryObservedCAS(ctx, observation)
+		return err
+	})
+}
+`)
+	write("server/internal/storage/scan/clean_test.go", `package scan
+
+func (s *Scanner) testOnlyTx() { time.Sleep(time.Second) }
+`)
+	violations, err := scanScanIndexWriterTransactionBodies(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"server/internal/storage/scan/violations.go:13:MaxBatchRows = 512 exceeds the 256-row writer batch budget",
+		"server/internal/storage/scan/violations.go:19:WithTx body calls os.Stat (filesystem I/O) inside a writer transaction",
+		"server/internal/storage/scan/violations.go:22:WithTx body calls hashutil.CalculateReaderHash (content hashing) inside a writer transaction",
+		"server/internal/storage/scan/violations.go:23:WithTx body calls InspectMedia (filesystem I/O) inside a writer transaction",
+		"server/internal/storage/scan/violations.go:24:WithTx body runs the count query CountRepositoryEntries inside a writer transaction",
+		"server/internal/storage/scan/violations.go:31:helperTx calls time.Sleep (sleep) inside a writer transaction",
+		"server/internal/storage/scan/violations.go:32:helperTx calls time.After (sleep) inside a writer transaction",
+	}
+	if strings.Join(violations, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("violations =\n%s\nwant\n%s", strings.Join(violations, "\n"), strings.Join(want, "\n"))
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
 )
 
 func TestFirstScanIndexesTreeAndBindsAssets(t *testing.T) {
@@ -47,6 +48,7 @@ func TestNoChangeRescanHashesAndWritesNothing(t *testing.T) {
 	f.scan(f.primary)
 	f.hash(f.primary)
 	before := f.entries(f.primary)
+	f.resetObservations()
 	// The files are an hour old, so none is racily clean and a rescan is free.
 	scan := f.scan(f.primary)
 	if scan.Status != StatusCompleted || scan.NewEntries+scan.Changed+scan.Missing+scan.Restored != 0 {
@@ -54,6 +56,15 @@ func TestNoChangeRescanHashesAndWritesNothing(t *testing.T) {
 	}
 	if bound := f.hash(f.primary); bound != 0 {
 		t.Fatalf("no-change rescan hashed %d files", bound)
+	}
+	// Counted outside the scanner: the hash library saw no computation and
+	// SQLite recorded no row write to repository_entries (#222: "0 hashes
+	// and 0 entry writes").
+	if hashes := f.hashComputations(); hashes != 0 {
+		t.Fatalf("no-change rescan computed %d content hashes", hashes)
+	}
+	if writes := f.entryWrites(); len(writes) != 0 {
+		t.Fatalf("no-change rescan wrote %d entry rows: %+v", len(writes), writes)
 	}
 	after := f.entries(f.primary)
 	if len(before) != len(after) {
@@ -150,42 +161,62 @@ func TestUnreadableDirectoryKeepsItsChildrenPresent(t *testing.T) {
 	f.mustEntry(f.primary, "locked/a.jpg", StatePresent)
 }
 
-func TestMovesKeepAssetIDsAndRemoveTheOldEntry(t *testing.T) {
+// #222: "Moving a file or directory, within a repository and across
+// repositories: Asset IDs and album membership are unchanged, and the old
+// entry is auto-removed." Album membership is keyed by Asset, so it survives
+// exactly when the Asset ID does; each move is checked for both.
+func TestMovesKeepAssetIDsAndAlbumsAndRemoveTheOldEntry(t *testing.T) {
 	f := newFixture(t, 0)
 	other := f.addRepository("other")
-	f.write(f.primary, "a.jpg", "file move")
-	f.write(f.primary, "album/b.jpg", "directory move")
-	f.write(f.primary, "c.jpg", "repository move")
+	moves := []struct {
+		name, from, to string
+		into           repo.Repository
+	}{
+		{"file within the repository", "a.jpg", "sorted/a.jpg", f.primary},
+		{"directory within the repository", "album/b.jpg", "albums/2026/b.jpg", f.primary},
+		{"file across repositories", "c.jpg", "c.jpg", other},
+		{"directory across repositories", "trip/day1/d.jpg", "trip/day1/d.jpg", other},
+	}
+	for _, move := range moves {
+		f.write(f.primary, move.from, move.name)
+	}
 	f.scan(f.primary)
 	f.hash(f.primary)
-	fileAsset := f.mustEntry(f.primary, "a.jpg", StatePresent).AssetID
-	directoryAsset := f.mustEntry(f.primary, "album/b.jpg", StatePresent).AssetID
-	repositoryAsset := f.mustEntry(f.primary, "c.jpg", StatePresent).AssetID
+	assets := make(map[string]uuid.UUID, len(moves))
+	albums := make(map[string]int64, len(moves))
+	for _, move := range moves {
+		assets[move.name] = f.mustEntry(f.primary, move.from, StatePresent).AssetID.UUID
+		albums[move.name] = f.addToNewAlbum(assets[move.name])
+	}
 
 	f.rename(f.primary, "a.jpg", f.primary, "sorted/a.jpg")
 	f.rename(f.primary, "album", f.primary, "albums/2026")
 	f.rename(f.primary, "c.jpg", other, "c.jpg")
+	f.rename(f.primary, "trip", other, "trip")
 	f.scan(f.primary)
 	f.scan(other)
 	f.hash(f.primary)
 	f.hash(other)
 
-	if got := f.mustEntry(f.primary, "sorted/a.jpg", StatePresent).AssetID; got != fileAsset {
-		t.Fatalf("file move changed the Asset: %v -> %v", fileAsset, got)
-	}
-	if got := f.mustEntry(f.primary, "albums/2026/b.jpg", StatePresent).AssetID; got != directoryAsset {
-		t.Fatalf("directory move changed the Asset: %v -> %v", directoryAsset, got)
-	}
-	if got := f.mustEntry(other, "c.jpg", StatePresent).AssetID; got != repositoryAsset {
-		t.Fatalf("cross-repository move changed the Asset: %v -> %v", repositoryAsset, got)
-	}
-	for _, relative := range []string{"a.jpg", "album/b.jpg", "c.jpg"} {
-		if row, ok := f.entry(f.primary, relative); ok {
-			t.Fatalf("old entry %s survived the move: %+v", relative, row)
+	for _, move := range moves {
+		if got := f.mustEntry(move.into, move.to, StatePresent).AssetID.UUID; got != assets[move.name] {
+			t.Fatalf("%s changed the Asset: %v -> %v", move.name, assets[move.name], got)
+		}
+		f.requireAlbumMember(albums[move.name], assets[move.name])
+		if move.into.RepoID == f.primary.RepoID && move.from == move.to {
+			continue
+		}
+		if row, ok := f.entry(f.primary, move.from); ok {
+			t.Fatalf("%s: old entry %s survived the move: %+v", move.name, move.from, row)
 		}
 	}
-	if count := f.assetCount(); count != 3 {
-		t.Fatalf("assets = %d, want 3", count)
+	for _, directory := range []string{"album", "trip", "trip/day1"} {
+		if row, ok := f.entry(f.primary, directory); ok {
+			t.Fatalf("old directory entry %s survived the move: %+v", directory, row)
+		}
+	}
+	if count := f.assetCount(); count != len(moves) {
+		t.Fatalf("assets = %d, want %d", count, len(moves))
 	}
 }
 
