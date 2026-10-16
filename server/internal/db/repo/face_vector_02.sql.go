@@ -14,7 +14,7 @@ SELECT COUNT(*)
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id != ?1
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND COALESCE(a.owner_id, -1) = COALESCE(?2, -1)
   AND COALESCE(fi.embedding_model, '') = COALESCE(?3, '')
   AND fi.embedding IS NOT NULL

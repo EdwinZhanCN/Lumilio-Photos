@@ -22,16 +22,23 @@ type SetupStatus struct {
 const SetupRuntimeStateInitializing = "initializing"
 
 // RepositoryDefaults is the setup-wizard view of the storage-owned repository
-// defaults plus the immutable default root (the storage root).
+// defaults plus the immutable Default Storage Location path.
 type RepositoryDefaults struct {
-	DefaultRoot       string
+	StorageLocation   string
 	Strategy          string
 	DuplicateHandling string
-	RiskWarnings      []string
+	// Assessment is the Server's review of the Primary Repository target. It
+	// is nil when the Default Storage Location is not registered yet or the
+	// target cannot be resolved; the setup create then reports the exact cause.
+	Assessment *storage.CreateTargetAssessment
 }
 
 type repositoryDefaultsReader interface {
 	GetRepositoryDefaults(ctx context.Context) (storage.RepoDefaults, error)
+}
+
+type createTargetAssessor interface {
+	AssessCreateTarget(ctx context.Context, request storage.AssessCreateTargetRequest) (*storage.CreateTargetAssessment, error)
 }
 
 type storageRuntimeReader interface {
@@ -41,27 +48,30 @@ type storageRuntimeReader interface {
 type setupRepositoryReader interface {
 	repositoryDefaultsReader
 	storageRuntimeReader
+	createTargetAssessor
 }
 
 // SetupService exposes first-run state after the catalog has opened and
 // migrated. There is no separate database initialization endpoint.
 type SetupService struct {
-	bootstrap    BootstrapService
-	repoDefaults repositoryDefaultsReader
-	storage      storageRuntimeReader
-	storageRoot  string
+	bootstrap       BootstrapService
+	repoDefaults    repositoryDefaultsReader
+	storage         storageRuntimeReader
+	assessor        createTargetAssessor
+	storageLocation string
 }
 
 func NewSetupService(
 	bootstrap BootstrapService,
 	repositories setupRepositoryReader,
-	storageRoot string,
+	storageLocation string,
 ) *SetupService {
 	return &SetupService{
-		bootstrap:    bootstrap,
-		repoDefaults: repositories,
-		storage:      repositories,
-		storageRoot:  strings.TrimSpace(storageRoot),
+		bootstrap:       bootstrap,
+		repoDefaults:    repositories,
+		storage:         repositories,
+		assessor:        repositories,
+		storageLocation: strings.TrimSpace(storageLocation),
 	}
 }
 
@@ -98,10 +108,16 @@ func (s *SetupService) Status(ctx context.Context) (SetupStatus, error) {
 			return SetupStatus{}, fmt.Errorf("load repository defaults: %w", err)
 		}
 		status.RepositoryDefaults = &RepositoryDefaults{
-			DefaultRoot:       s.storageRoot,
+			StorageLocation:   s.storageLocation,
 			Strategy:          defaults.Strategy,
 			DuplicateHandling: defaults.DuplicateHandling,
-			RiskWarnings:      storage.StoragePlacementWarnings(s.storageRoot),
+		}
+		if s.assessor != nil && !status.PrimaryRepositoryInitialized {
+			// Read-only review of <default>/primary. A failure here is not a
+			// status failure: the setup create reports the exact typed cause.
+			if assessment, err := s.assessor.AssessCreateTarget(ctx, storage.AssessCreateTargetRequest{Intent: storage.IntentSetupPrimary}); err == nil {
+				status.RepositoryDefaults.Assessment = assessment
+			}
 		}
 	}
 

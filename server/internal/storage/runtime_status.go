@@ -5,9 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"path/filepath"
-
-	"server/internal/db/dbtypes"
 )
 
 const (
@@ -24,37 +21,23 @@ type StorageRuntimeStatus struct {
 	Reason string
 }
 
-// StorageRuntimeStatus derives the global state from the latest reconciled
-// catalog projection. Startup and the background storage reconciler own disk
-// inspection and projection writes; this foreground status read never waits for
-// SQLite's sole writer. Ordinary repository failures are local; only the
-// configured default Storage Location or its fixed primary child can degrade
-// the instance.
+// StorageRuntimeStatus reports whether bootstrap anchors exist in the catalog.
+// After setup completes, individual Repository reachability and Storage Location
+// health projections do not degrade the whole instance; those facts stay local
+// to each Repository and Location summary.
 func (rm *DefaultRepositoryManager) StorageRuntimeStatus(ctx context.Context) (StorageRuntimeStatus, error) {
-	defaultRoot, err := rm.readerQueries.GetDefaultRepositoryRoot(ctx)
-	if err != nil {
+	if _, err := rm.readerQueries.GetDefaultStorageLocation(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return degradedStorageRuntimeStatus(), nil
 		}
 		return StorageRuntimeStatus{}, fmt.Errorf("load default storage location: %w", err)
 	}
-	if defaultRoot.Status != dbtypes.RepositoryRootStatusActive {
-		return degradedStorageRuntimeStatus(), nil
-	}
-
-	primary, err := rm.readerQueries.GetPrimaryRepositoryRecord(ctx)
-	if err != nil {
+	if _, err := rm.readerQueries.GetPrimaryRepositoryRecord(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return degradedStorageRuntimeStatus(), nil
 		}
 		return StorageRuntimeStatus{}, fmt.Errorf("load primary repository: %w", err)
 	}
-	if primary.RootID != defaultRoot.RootID ||
-		primary.Path != filepath.Join(defaultRoot.Path, "primary") ||
-		primary.Reachability != dbtypes.RepositoryReachabilityActive {
-		return degradedStorageRuntimeStatus(), nil
-	}
-
 	return StorageRuntimeStatus{State: StorageRuntimeStateActive}, nil
 }
 

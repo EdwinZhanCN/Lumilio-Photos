@@ -1,3 +1,4 @@
+import { MusicAgentResult } from "@/features/music";
 import { useEffect, useRef } from "react";
 import { AlertTriangle, AtSign, Images, WandSparkles } from "lucide-react";
 import { Markdown } from "./markdown/Markdown";
@@ -33,8 +34,34 @@ function BlockView({ block, isAnimating = false }: { block: Block; isAnimating?:
 }
 
 function WidgetBlockView({ block }: { block: WidgetBlock }) {
+  const { t } = useI18n();
   const threadId = useLumilioChatStore((state) => state.threadId);
+  const sendMessage = useLumilioChatStore((state) => state.sendMessage);
+  const disabled = useLumilioChatStore((state) => state.isGenerating || state.awaitingConfirmation);
   if (!threadId) return null;
+  if (block.widget === "music_tracks")
+    return (
+      <MusicAgentResult
+        key={`${threadId}:${block.refId}`}
+        refId={block.refId}
+        threadId={threadId}
+        title={block.title}
+        disabled={disabled}
+        onSend={(prompt, assetIds) =>
+          void sendMessage(prompt, {
+            mode: "curate",
+            context: [
+              {
+                id: `music:${block.refId}`,
+                type: "selection",
+                label: block.title || t("music.title"),
+                assetIds,
+              },
+            ],
+          })
+        }
+      />
+    );
   return (
     <InlineWidgetCard
       refId={block.refId}
@@ -72,9 +99,7 @@ function TurnScope({ request }: { request: AgentTurnSnapshot }) {
         <span
           key={`${mention.type}:${mention.id}`}
           className={`badge badge-sm gap-1 ${
-            mention.status === "dropped"
-              ? "border-error/30 bg-error/10 text-error"
-              : "badge-ghost"
+            mention.status === "dropped" ? "border-error/30 bg-error/10 text-error" : "badge-ghost"
           }`}
           title={
             mention.status === "dropped"
@@ -104,7 +129,8 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
     const scrollContainer = endRef.current?.closest<HTMLElement>("[data-lumilio-chat-scroll]");
     if (!scrollContainer) return undefined;
     const updateFollow = () => {
-      const distance = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+      const distance =
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
       followLatestRef.current = distance < 96;
     };
     updateFollow();
@@ -123,7 +149,11 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
   const showSpinner = isGenerating && last?.role === "assistant" && last.blocks.length === 0;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-4 py-6" aria-live="polite" aria-relevant="additions text">
+    <div
+      className="mx-auto max-w-3xl space-y-8 px-4 py-6"
+      aria-live="polite"
+      aria-relevant="additions text"
+    >
       {messages.map((message, messageIndex) => {
         if (message.role === "user") {
           const text = message.blocks

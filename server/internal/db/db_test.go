@@ -132,7 +132,7 @@ func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect reopened catalog: %v", err)
 	}
-	if info.ApplicationMigration != currentApplicationMigration || info.RiverMigration == 0 || info.LibraryID == "" {
+	if info.SchemaVersion != SchemaVersion || info.RiverMigration == 0 || info.LibraryID == "" {
 		t.Fatalf("unexpected catalog identity: %+v", info)
 	}
 }
@@ -501,75 +501,89 @@ func TestQueryRouterMatchesSQLiteForEveryGeneratedStatement(t *testing.T) {
 	}
 }
 
-func TestMigrationLedgerRejectsHistoricalChecksumChanges(t *testing.T) {
+func TestMigrateCatalogBaselineIsIdempotentAndLedgerFree(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	database, err := Open(ctx, config.DatabaseConfig{
-		Path: filepath.Join(secureTempDir(t), "migration-checksum.sqlite3"),
+		Path: filepath.Join(secureTempDir(t), "baseline-idempotent.sqlite3"),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close(context.Background())
-	if err := database.Migrate(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
+		t.Fatalf("first baseline: %v", err)
+	}
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
+		t.Fatalf("idempotent restart: %v", err)
+	}
+
+	var version int
+	if err := database.SQL.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.SQL.ExecContext(ctx, `
-		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 9
-	`, strings.Repeat("0", 64)); err != nil {
+	if version != SchemaVersion {
+		t.Fatalf("user_version = %d, want %d", version, SchemaVersion)
+	}
+	var ledger int
+	if err := database.SQL.QueryRowContext(ctx, `
+		SELECT count(*) FROM sqlite_schema
+		WHERE type = 'table' AND name = 'lumilio_schema_migrations'
+	`).Scan(&ledger); err != nil {
 		t.Fatal(err)
 	}
-	err = database.Migrate(ctx)
-	if err == nil || !strings.Contains(err.Error(), "historical migrations are immutable") {
-		t.Fatalf("tampered migration ledger error = %v", err)
+	if ledger != 0 {
+		t.Fatal("migration ledger table still exists")
+	}
+	var strictTables int
+	if err := database.SQL.QueryRowContext(ctx, `
+		SELECT count(*) FROM pragma_table_list
+		WHERE schema = 'main' AND type = 'table' AND strict = 1 AND name NOT LIKE 'sqlite_%'
+	`).Scan(&strictTables); err != nil {
+		t.Fatal(err)
+	}
+	if strictTables < 90 {
+		t.Fatalf("STRICT application tables = %d, want the complete baseline", strictTables)
 	}
 }
 
-func TestMigrationRejectsIncompatibleSchemaGeneration(t *testing.T) {
+func TestMigrateCatalogRejectsIncompatibleSchemaVersion(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	database, err := Open(ctx, config.DatabaseConfig{
-		Path: filepath.Join(secureTempDir(t), "schema-generation.sqlite3"),
+		Path: filepath.Join(secureTempDir(t), "schema-version.sqlite3"),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close(context.Background())
-	if err := database.Migrate(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	var generation int
-	if err := database.SQL.QueryRowContext(ctx, "PRAGMA user_version").Scan(&generation); err != nil {
-		t.Fatal(err)
-	}
-	if generation != schemaGeneration {
-		t.Fatalf("migrated catalog user_version = %d, want %d", generation, schemaGeneration)
-	}
-
-	if _, err := database.SQL.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
-		t.Fatal(err)
-	}
-	err = database.Migrate(ctx)
-	if err == nil || !strings.Contains(err.Error(), "incompatible experimental schema generation") {
-		t.Fatalf("stale-generation catalog error = %v", err)
+	for _, newer := range []int{SchemaVersion + 1, 9} {
+		if _, err := database.SQL.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", newer)); err != nil {
+			t.Fatal(err)
+		}
+		err = database.MigrateCatalog(ctx, nil)
+		if err == nil || !strings.Contains(err.Error(), "newer than this build supports") {
+			t.Fatalf("newer schema version %d error = %v", newer, err)
+		}
 	}
 }
 
-func TestOpenRejectsOldGenerationBeforeDerivedModuleChecks(t *testing.T) {
+func TestOpenRejectsUnversionedCatalogWithTables(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(secureTempDir(t), "old-generation.sqlite3")
+	path := filepath.Join(secureTempDir(t), "unversioned.sqlite3")
 	catalog, err := Open(ctx, config.DatabaseConfig{Path: path})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := catalog.SQL.ExecContext(ctx, `
 		CREATE TABLE assets (id INTEGER);
-		CREATE TABLE media_items (id INTEGER);
-		CREATE TABLE asset_stacks (id INTEGER);
-		PRAGMA user_version = 3;
+		PRAGMA user_version = 0;
 	`); err != nil {
 		_ = catalog.Close(ctx)
 		t.Fatal(err)
@@ -579,13 +593,62 @@ func TestOpenRejectsOldGenerationBeforeDerivedModuleChecks(t *testing.T) {
 	}
 
 	_, err = Open(ctx, config.DatabaseConfig{Path: path})
-	if err == nil || !strings.Contains(err.Error(), "incompatible experimental schema generation") {
-		t.Fatalf("old-generation open error = %v", err)
+	if err == nil || !strings.Contains(err.Error(), "user_version = 0") {
+		t.Fatalf("unversioned catalog open error = %v", err)
+	}
+}
+
+// TestOpenRejectsPreReleaseCatalog proves identity is checked before any
+// version: a pre-release catalog is rejected as pre-release whatever
+// user_version it carries, including the published beta shape (stamp 8 plus the
+// legacy migration ledger) and a stamp that collides with the rc.1 baseline.
+func TestOpenRejectsPreReleaseCatalog(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		userVersion int
+		ledger      bool
+	}{
+		{name: "published beta", userVersion: 8, ledger: true},
+		{name: "internal generation 9", userVersion: 9},
+		{name: "colliding version", userVersion: SchemaVersion},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			path := filepath.Join(secureTempDir(t), "pre-release.sqlite3")
+			catalog, err := Open(ctx, config.DatabaseConfig{Path: path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			statements := fmt.Sprintf(
+				"PRAGMA application_id = %d; PRAGMA user_version = %d;",
+				preReleaseApplicationID,
+				tc.userVersion,
+			)
+			if tc.ledger {
+				statements = "CREATE TABLE lumilio_schema_migrations (version INTEGER PRIMARY KEY);" + statements
+			}
+			if _, err := catalog.SQL.ExecContext(ctx, statements); err != nil {
+				_ = catalog.Close(ctx)
+				t.Fatal(err)
+			}
+			if err := catalog.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = Open(ctx, config.DatabaseConfig{Path: path})
+			if !errors.Is(err, ErrPreReleaseCatalog) {
+				t.Fatalf("pre-release catalog open error = %v, want ErrPreReleaseCatalog", err)
+			}
+			_, err = InspectCatalog(ctx, path)
+			if !errors.Is(err, ErrPreReleaseCatalog) {
+				t.Fatalf("pre-release catalog inspect error = %v, want ErrPreReleaseCatalog", err)
+			}
+		})
 	}
 }
 
 func TestBioAlbumSchemaAndQueryLiteralsShareDomainValue(t *testing.T) {
-	baseline, err := migrations.FS.ReadFile("000009_auth_security_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile(baselineMigrationFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -697,36 +760,24 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	}
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
-	repositoryRootNodeID := uuid.New()
-	fileNodeID := uuid.New()
+	storageLocationID := uuid.New()
+	fileEntryID := uuid.New()
 	contentID := uuid.New()
 	assetID := uuid.New()
-	locationID := uuid.New()
 	mediaItemID := uuid.New()
 	fullHash := strings.Repeat("a", 64)
 	if _, err := database.SQL.ExecContext(ctx, `
-		INSERT INTO repository_roots (root_id, name, path, kind, created_at, updated_at)
+		INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at)
 		VALUES (?, 'Test root', '/', 'external', 1, 1)
-	`, rootID); err != nil {
-		t.Fatalf("insert repository root: %v", err)
+	`, storageLocationID); err != nil {
+		t.Fatalf("insert storage location: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO repositories (
-			repo_id, name, path, role, reachability, activity, created_at, updated_at, root_id
+			repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id
 		) VALUES (?, 'Test', '/test', 'regular', 'active', 'idle', 1, 1, ?)
-	`, repositoryID, rootID); err != nil {
+	`, repositoryID, storageLocationID); err != nil {
 		t.Fatalf("insert repository: %v", err)
-	}
-	if _, err := database.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, created_at, updated_at
-		) VALUES
-			(?, ?, NULL, '', '', 'directory', 1, 1, 1),
-			(?, ?, ?, 'IMG_0001.jpg', 'IMG_0001.jpg', 'file', 1, 1, 1)
-	`, repositoryRootNodeID, repositoryID, fileNodeID, repositoryID, repositoryRootNodeID); err != nil {
-		t.Fatalf("insert repository nodes: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO content_objects (content_id, hash_algorithm, full_hash, file_size, created_at)
@@ -744,11 +795,12 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		t.Fatalf("insert asset: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision, created_at, updated_at
-		) VALUES (?, ?, ?, 1, 1, 1)
-	`, locationID, fileNodeID, assetID); err != nil {
-		t.Fatalf("insert asset location: %v", err)
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, revision, updated_at
+		) VALUES (?, ?, 'IMG_0001.jpg', 'img_0001.jpg', '', 'file', 1, 1, 1, 'present', ?, ?, 1, 1)
+	`, fileEntryID, repositoryID, contentID, assetID); err != nil {
+		t.Fatalf("insert repository entry: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO media_items (
@@ -776,7 +828,6 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	}
 
 	count, err := database.Queries.CountMediaItemsUnified(ctx, repo.CountMediaItemsUnifiedParams{
-		IsDeleted:    false,
 		RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true},
 		AssetIds:     dbtypes.UUIDsJSONParam([]uuid.UUID{assetID}),
 		AssetTypes:   dbtypes.StringsJSONParam([]string{"PHOTO"}),

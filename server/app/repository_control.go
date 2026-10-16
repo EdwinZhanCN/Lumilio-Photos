@@ -21,7 +21,7 @@ import (
 type RepositoryControl interface {
 	ListStorageLocations(ctx context.Context) ([]StorageLocationInfo, error)
 	AddStorageLocation(ctx context.Context, requestID, path, name string) (StorageLocationInfo, []string, error)
-	ResolveStorageLocationConflict(ctx context.Context, rootID, path string) (StorageLocationInfo, error)
+	ResolveStorageLocationConflict(ctx context.Context, storageLocationID, path string) (StorageLocationInfo, error)
 	RemoveStorageLocation(ctx context.Context, id string) error
 	AttachRepository(ctx context.Context, path string) (RepositoryInfo, error)
 	ResolveRepositoryConflict(ctx context.Context, action, repositoryID, path string, requestID ...string) (RepositoryInfo, error)
@@ -79,14 +79,14 @@ type RepositoryIdentityConflict struct {
 }
 
 type StorageLocationIdentityConflict struct {
-	RootID         string   `json:"rootId"`
-	RegisteredPath string   `json:"registeredPath"`
-	RequestedPath  string   `json:"requestedPath"`
-	Actions        []string `json:"actions"`
+	StorageLocationID string   `json:"storageLocationId"`
+	RegisteredPath    string   `json:"registeredPath"`
+	RequestedPath     string   `json:"requestedPath"`
+	Actions           []string `json:"actions"`
 }
 
 func (e *StorageLocationIdentityConflict) Error() string {
-	return fmt.Sprintf("storage location %s is already registered at %s", e.RootID, e.RegisteredPath)
+	return fmt.Sprintf("storage location %s is already registered at %s", e.StorageLocationID, e.RegisteredPath)
 }
 
 func (e *RepositoryIdentityConflict) Error() string {
@@ -102,54 +102,54 @@ func newRepositoryControl(manager storage.RepositoryManager) RepositoryControl {
 }
 
 func (c *repositoryControl) ListStorageLocations(ctx context.Context) ([]StorageLocationInfo, error) {
-	roots, err := c.manager.ListRepositoryRoots(ctx)
+	storageLocations, err := c.manager.ListStorageLocations(ctx)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]StorageLocationInfo, 0, len(roots))
-	for _, root := range roots {
-		impact, err := c.manager.PreviewRepositoryRootRemoval(ctx, root.RootID.String())
+	items := make([]StorageLocationInfo, 0, len(storageLocations))
+	for _, storageLocation := range storageLocations {
+		impact, err := c.manager.PreviewStorageLocationRemoval(ctx, storageLocation.StorageLocationID.String())
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, storageLocationInfo(root, impact))
+		items = append(items, storageLocationInfo(storageLocation, impact))
 	}
 	return items, nil
 }
 
 func (c *repositoryControl) AddStorageLocation(ctx context.Context, requestID, path, name string) (StorageLocationInfo, []string, error) {
-	root, err := c.manager.AddRepositoryRoot(ctx, path, name, desktopLifecycleRequest(requestID, "native_directory_selection", false))
+	storageLocation, err := c.manager.AddStorageLocation(ctx, path, name, desktopLifecycleRequest(requestID, "native_directory_selection", false))
 	if err != nil {
-		var conflict *storage.RepositoryRootConflictError
+		var conflict *storage.StorageLocationConflictError
 		if errors.As(err, &conflict) {
 			return StorageLocationInfo{}, nil, &StorageLocationIdentityConflict{
-				RootID: conflict.RootID, RegisteredPath: conflict.RegisteredPath,
+				StorageLocationID: conflict.StorageLocationID, RegisteredPath: conflict.RegisteredPath,
 				RequestedPath: conflict.RequestedPath, Actions: conflict.Actions,
 			}
 		}
 		return StorageLocationInfo{}, nil, err
 	}
-	impact, err := c.manager.PreviewRepositoryRootRemoval(ctx, root.RootID.String())
+	impact, err := c.manager.PreviewStorageLocationRemoval(ctx, storageLocation.StorageLocationID.String())
 	if err != nil {
 		return StorageLocationInfo{}, nil, err
 	}
-	return storageLocationInfo(*root, impact), storage.RepositoryRootWarnings(root.Path), nil
+	return storageLocationInfo(*storageLocation, impact), storage.StorageLocationWarnings(storageLocation.Path), nil
 }
 
-func (c *repositoryControl) ResolveStorageLocationConflict(ctx context.Context, rootID, path string) (StorageLocationInfo, error) {
-	root, err := c.manager.RelocateRepositoryRoot(ctx, rootID, path, desktopLifecycleRequest("", "update_location", true))
+func (c *repositoryControl) ResolveStorageLocationConflict(ctx context.Context, storageLocationID, path string) (StorageLocationInfo, error) {
+	storageLocation, err := c.manager.RelocateStorageLocation(ctx, storageLocationID, path, desktopLifecycleRequest("", "update_location", true))
 	if err != nil {
 		return StorageLocationInfo{}, err
 	}
-	impact, err := c.manager.PreviewRepositoryRootRemoval(ctx, root.RootID.String())
+	impact, err := c.manager.PreviewStorageLocationRemoval(ctx, storageLocation.StorageLocationID.String())
 	if err != nil {
 		return StorageLocationInfo{}, err
 	}
-	return storageLocationInfo(*root, impact), nil
+	return storageLocationInfo(*storageLocation, impact), nil
 }
 
 func (c *repositoryControl) RemoveStorageLocation(ctx context.Context, id string) error {
-	return c.manager.DeleteRepositoryRoot(ctx, id, desktopLifecycleRequest("", "remove_from_lumilio", false))
+	return c.manager.DeleteStorageLocation(ctx, id, desktopLifecycleRequest("", "remove_from_lumilio", false))
 }
 
 func (c *repositoryControl) AttachRepository(ctx context.Context, path string) (RepositoryInfo, error) {
@@ -269,10 +269,10 @@ func (c *repositoryControl) requireHostOwnerID(ctx context.Context) (*int32, err
 	return ownerID, nil
 }
 
-func storageLocationInfo(root repo.RepositoryRoot, impact storage.RepositoryRootRemovalImpact) StorageLocationInfo {
-	pathInfo := storage.InspectStoragePath(root.Path)
+func storageLocationInfo(storageLocation repo.StorageLocation, impact storage.StorageLocationRemovalImpact) StorageLocationInfo {
+	pathInfo := storage.InspectStoragePath(storageLocation.Path)
 	return StorageLocationInfo{
-		ID: root.RootID.String(), Name: root.Name, Path: root.Path, Kind: string(root.Kind), Status: string(root.Status),
+		ID: storageLocation.StorageLocationID.String(), Name: storageLocation.Name, Path: storageLocation.Path, Kind: string(storageLocation.Kind), Status: string(storageLocation.Status),
 		RepositoryCount: impact.RepositoryCount, ActiveOperationCount: impact.ActiveOperationCount,
 		CanRemove: impact.CanRemove, RemovalBlockedBy: impact.BlockingReason, FilesPreserved: impact.FilesPreserved,
 		Writable: pathInfo.Writable, CapacityKnown: pathInfo.CapacityKnown,

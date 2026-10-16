@@ -28,6 +28,8 @@ var (
 		".tif":  true,
 		".heic": true,
 		".heif": true,
+		".avif": true,
+		".jxl":  true,
 	}
 
 	// Supported RAW photo extensions
@@ -91,6 +93,8 @@ var (
 		"image/tiff":        dbtypes.AssetTypePhoto,
 		"image/heic":        dbtypes.AssetTypePhoto,
 		"image/heif":        dbtypes.AssetTypePhoto,
+		"image/avif":        dbtypes.AssetTypePhoto,
+		"image/jxl":         dbtypes.AssetTypePhoto,
 		"image/x-canon-cr2": dbtypes.AssetTypePhoto,
 		"image/x-canon-cr3": dbtypes.AssetTypePhoto,
 		"image/x-nikon-nef": dbtypes.AssetTypePhoto,
@@ -135,6 +139,8 @@ var (
 		".tif":  "image/tiff",
 		".heic": "image/heic",
 		".heif": "image/heif",
+		".avif": "image/avif",
+		".jxl":  "image/jxl",
 		".cr2":  "image/x-canon-cr2",
 		".cr3":  "image/x-canon-cr3",
 		".nef":  "image/x-nikon-nef",

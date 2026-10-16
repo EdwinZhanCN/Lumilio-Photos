@@ -17,7 +17,7 @@ UPDATE repository_staging_commits
 SET status = 'committing', updated_at = ?2
 WHERE commit_id = ?1
   AND status IN ('prepared', 'committing', 'committed')
-RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
+RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
 `
 
 type ClaimRepositoryStagingCommitParams struct {
@@ -42,7 +42,7 @@ func (q *Queries) ClaimRepositoryStagingCommit(ctx context.Context, arg ClaimRep
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,
@@ -55,17 +55,17 @@ func (q *Queries) ClaimRepositoryStagingCommit(ctx context.Context, arg ClaimRep
 
 const completeRepositoryStagingCommit = `-- name: CompleteRepositoryStagingCommit :one
 UPDATE repository_staging_commits
-SET status = 'completed', node_id = ?2, asset_id = ?3,
+SET status = 'completed', entry_id = ?2, asset_id = ?3,
     failure_code = NULL, failure_detail = NULL,
     completed_at = ?4, updated_at = ?4
 WHERE commit_id = ?1
   AND status IN ('committing', 'committed', 'completed')
-RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
+RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
 `
 
 type CompleteRepositoryStagingCommitParams struct {
 	CommitID    uuid.UUID     `db:"commit_id" json:"commit_id"`
-	NodeID      uuid.NullUUID `db:"node_id" json:"node_id"`
+	EntryID     uuid.NullUUID `db:"entry_id" json:"entry_id"`
 	AssetID     uuid.NullUUID `db:"asset_id" json:"asset_id"`
 	CompletedAt *int64        `db:"completed_at" json:"completed_at"`
 }
@@ -73,7 +73,7 @@ type CompleteRepositoryStagingCommitParams struct {
 func (q *Queries) CompleteRepositoryStagingCommit(ctx context.Context, arg CompleteRepositoryStagingCommitParams) (RepositoryStagingCommit, error) {
 	row := q.db.QueryRowContext(ctx, completeRepositoryStagingCommit,
 		arg.CommitID,
-		arg.NodeID,
+		arg.EntryID,
 		arg.AssetID,
 		arg.CompletedAt,
 	)
@@ -92,7 +92,7 @@ func (q *Queries) CompleteRepositoryStagingCommit(ctx context.Context, arg Compl
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,
@@ -120,7 +120,7 @@ INSERT INTO repository_staging_commits (
     created_at,
     updated_at
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'prepared', ?12, ?12)
-RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
+RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
 `
 
 type CreateRepositoryStagingCommitParams struct {
@@ -168,7 +168,7 @@ func (q *Queries) CreateRepositoryStagingCommit(ctx context.Context, arg CreateR
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,
@@ -180,7 +180,7 @@ func (q *Queries) CreateRepositoryStagingCommit(ctx context.Context, arg CreateR
 }
 
 const getRepositoryStagingCommit = `-- name: GetRepositoryStagingCommit :one
-SELECT commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at FROM repository_staging_commits WHERE commit_id = ?1
+SELECT commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at FROM repository_staging_commits WHERE commit_id = ?1
 `
 
 func (q *Queries) GetRepositoryStagingCommit(ctx context.Context, commitID uuid.UUID) (RepositoryStagingCommit, error) {
@@ -200,7 +200,7 @@ func (q *Queries) GetRepositoryStagingCommit(ctx context.Context, commitID uuid.
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,
@@ -212,7 +212,7 @@ func (q *Queries) GetRepositoryStagingCommit(ctx context.Context, commitID uuid.
 }
 
 const listRecoverableRepositoryStagingCommits = `-- name: ListRecoverableRepositoryStagingCommits :many
-SELECT commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at FROM repository_staging_commits
+SELECT commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at FROM repository_staging_commits
 WHERE status IN ('prepared', 'committing', 'committed')
 ORDER BY updated_at, commit_id
 LIMIT ?1
@@ -241,7 +241,7 @@ func (q *Queries) ListRecoverableRepositoryStagingCommits(ctx context.Context, l
 			&i.QuickFingerprint,
 			&i.QuickFingerprintVersion,
 			&i.Status,
-			&i.NodeID,
+			&i.EntryID,
 			&i.AssetID,
 			&i.FailureCode,
 			&i.FailureDetail,
@@ -267,7 +267,7 @@ UPDATE repository_staging_commits
 SET status = 'committed', target_path = ?2, updated_at = ?3
 WHERE commit_id = ?1
   AND status IN ('prepared', 'committing', 'committed')
-RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
+RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
 `
 
 type MarkRepositoryStagingCommitOnDiskParams struct {
@@ -293,7 +293,7 @@ func (q *Queries) MarkRepositoryStagingCommitOnDisk(ctx context.Context, arg Mar
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,
@@ -310,7 +310,7 @@ SET status = 'quarantined', staging_path = ?2,
     failure_code = ?3, failure_detail = ?4, updated_at = ?5
 WHERE commit_id = ?1
   AND status <> 'completed'
-RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
+RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
 `
 
 type QuarantineRepositoryStagingCommitParams struct {
@@ -344,7 +344,7 @@ func (q *Queries) QuarantineRepositoryStagingCommit(ctx context.Context, arg Qua
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,
@@ -360,7 +360,7 @@ UPDATE repository_staging_commits
 SET target_path = ?2, updated_at = ?3
 WHERE commit_id = ?1
   AND status IN ('prepared', 'committing')
-RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, node_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
+RETURNING commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at
 `
 
 type SetRepositoryStagingCommitTargetParams struct {
@@ -386,7 +386,7 @@ func (q *Queries) SetRepositoryStagingCommitTarget(ctx context.Context, arg SetR
 		&i.QuickFingerprint,
 		&i.QuickFingerprintVersion,
 		&i.Status,
-		&i.NodeID,
+		&i.EntryID,
 		&i.AssetID,
 		&i.FailureCode,
 		&i.FailureDetail,

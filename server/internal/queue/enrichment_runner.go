@@ -107,11 +107,14 @@ func (r *EnrichmentRunner) Run(ctx context.Context, args jobs.EnrichAssetArgs) (
 		return output, errors.New("asset enrichment runner is not configured")
 	}
 	asset, err := r.Reader.GetAssetByIDAny(ctx, args.AssetID)
-	if errors.Is(err, sql.ErrNoRows) || asset.IsDeleted || asset.ContentID != args.SourceFence {
+	if errors.Is(err, sql.ErrNoRows) {
 		return output, nil
 	}
 	if err != nil {
 		return output, fmt.Errorf("load enrichment asset: %w", err)
+	}
+	if asset.LifecycleState != "active" || asset.ContentID != args.SourceFence {
+		return output, nil
 	}
 	var phashResult *EmbeddingResult
 	err = r.executeStep(ctx, EnrichmentStepPHash, func(stepCtx context.Context) error {

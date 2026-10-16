@@ -1,0 +1,139 @@
+id: upload-to-catalog
+kind: sequence
+title: Browser upload to catalog Asset
+summary: >-
+  How a file chosen in the browser becomes a catalog Asset. The HTTP request
+  only stages bytes and records durable intent; everything after that is
+  derived background work, and the browser follows the ingest receipt until it
+  is terminal.
+nodes:
+  - id: web
+    label: Upload queue (Web)
+    anchor: ts:features/upload#runUploadProcess
+  - id: hasher
+    label: Hash worker
+    anchor: ts:useGenerateHashcode
+  - id: api
+    label: AssetHandler
+    anchor: go:handler.AssetHandler
+  - id: staging
+    label: Repository staging
+    anchor: go:server/internal/storage.StagingManager
+  - id: catalog
+    label: Catalog (SQLite)
+    anchor: sql:catalog_operation_receipts
+  - id: scheduler
+    label: Catalog scheduler
+    anchor: go:queue.Scheduler
+  - id: river
+    label: River (QueueDB)
+    anchor: go:queue.IngestMacroWorker
+  - id: materializer
+    label: SourceMaterializer
+    anchor: go:sourcing.SourceMaterializer
+  - id: scanner
+    label: Repository scanner
+    anchor: go:scan.Scanner
+  - id: commits
+    label: Commit coordinator
+    anchor: go:commit.Coordinator
+steps:
+  - from: web
+    to: hasher
+    label: fingerprint each file (BLAKE3 + size)
+    anchor: ts:useGenerateHashcode
+  - from: web
+    to: api
+    label: POST /assets/precheck with hashes
+    anchor: api:POST /api/v1/assets/precheck
+  - from: api
+    to: web
+    label: known files are marked duplicate and skip transport
+    reply: true
+    anchor: go:handler.AssetHandler.PrecheckUpload
+  - block: alt
+    label: small files
+    steps:
+      - from: web
+        to: api
+        label: POST /assets/batch (multipart batch)
+        anchor: api:POST /api/v1/assets/batch
+    else:
+      - label: large files
+        steps:
+          - from: web
+            to: api
+            label: create session, then POST chunks
+            anchor: api:POST /api/v1/assets/batch/sessions
+  - from: api
+    to: staging
+    label: write bytes into the repository's private staging area
+    anchor: go:server/internal/storage.StagingManager.CreateStagingFile
+  - from: api
+    to: api
+    label: re-hash staged bytes and validate the media type
+    anchor: go:handler.AssetHandler.processCompletedUpload
+  - from: api
+    to: catalog
+    label: one transaction — staging commit + pending ingest receipt
+    anchor: go:handler.AssetHandler.enqueueStagingCommit
+  - from: api
+    to: web
+    label: receipt_id per file ("processing")
+    reply: true
+  - from: web
+    to: api
+    label: follow receipts (SSE, falls back to polling)
+    anchor: ts:waitForUploadOperations
+  - from: scheduler
+    to: catalog
+    label: read pending ingest receipts
+    anchor: go:queue.Scheduler.ScheduleOnce
+  - from: scheduler
+    to: river
+    label: insert IngestAssetArgs{CommitID, ReceiptID}
+    anchor: go:jobs.IngestAssetArgs
+  - from: river
+    to: materializer
+    label: run under the execution governor
+    anchor: go:server/app.pipelineRuntime.ingest
+  - from: materializer
+    to: staging
+    label: claim commit, verify bytes, move staging file into inbox/
+    anchor: go:sourcing.SourceMaterializer.MaterializeCommit
+  - from: materializer
+    to: scanner
+    label: bind the on-disk file as known content
+    anchor: go:scan.Scanner.BindKnownContent
+  - from: scanner
+    to: catalog
+    label: repository entry + Asset, request analyze/derivatives/transcode/enrich
+    anchor: go:service.ApplyAssetActivationTx
+  - from: river
+    to: commits
+    label: acknowledge the ingest receipt
+    anchor: go:commit.Coordinator.ApplyIngestReceipt
+  - from: commits
+    to: catalog
+    label: receipt becomes terminal; wake the scheduler
+  - from: api
+    to: web
+    label: terminal status for every receipt — refresh asset queries
+    reply: true
+    anchor: go:handler.AssetHandler.StreamUploadOperationStatus
+  - note: The requested stages are now pending desired state; the scheduler derives their River jobs on the next pass (see Background work).
+    over: scheduler,river
+notes:
+  - title: Why the request never does the work
+    body: >-
+      The HTTP handler's only durable effect is one catalog transaction that
+      records the staged file and a pending receipt. If the Server, River, or
+      QueueDB dies afterwards, the next scheduler pass derives the same
+      ingest job again from the catalog. Nothing is lost and nothing runs
+      twice past the commit coordinator's fences.
+  - title: Identity
+    body: >-
+      The browser fingerprint is only a precheck hint. The server re-hashes
+      the staged bytes, and the materializer re-verifies them before the move,
+      so the catalog identity (full BLAKE3 + size) never trusts the client.
+related: [background-work, asset-lifecycle, repository-scan]

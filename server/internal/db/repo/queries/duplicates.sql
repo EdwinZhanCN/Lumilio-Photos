@@ -10,7 +10,7 @@ SELECT mia.asset_id, COALESCE(asm.stack_id, mia.media_item_id) AS stack_id
 FROM media_item_assets mia
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
 INNER JOIN assets a ON a.asset_id = mia.asset_id
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -26,7 +26,7 @@ SELECT a.asset_id, a.owner_id, content.file_size, a.taken_time, a.upload_time, a
 FROM assets a
 JOIN content_objects content ON content.content_id = a.content_id
 JOIN embeddings e ON e.asset_id = a.asset_id
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
@@ -43,7 +43,7 @@ SELECT a.asset_id, content.file_size, a.taken_time, a.upload_time, a.rating, e.v
 FROM assets a
 JOIN content_objects content ON content.content_id = a.content_id
 JOIN embeddings e ON e.asset_id = a.asset_id
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND a.asset_id IN (sqlc.slice('asset_ids'))
   AND e.embedding_type = 'phash'

@@ -1,6 +1,3 @@
-// Package storage adapts the in-process repository control handoff into the
-// small, cache-backed surface needed by Tray and Settings. The cache is
-// derived state: corruption is quarantined and never prevents Host startup.
 package storage
 
 import (
@@ -20,6 +17,7 @@ import (
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 	"desktop/internal/runtime"
 	"desktop/internal/state"
 )
@@ -107,9 +105,9 @@ func (c *Controller) OpenLocation(ctx context.Context, id string) error {
 		if item.ID != id {
 			continue
 		}
-		path, err := validateShortcutPath(item.Path)
-		if err != nil {
-			return operation.NewError(dto.ErrorStorageLocationOffline, "storage location is offline or no longer authorized")
+		path, ok := shortcutOpenPath(item.Path)
+		if !ok {
+			return operation.NewError(dto.ErrorStorageLocationOffline, "storage location path is unavailable")
 		}
 		c.openMu.Lock()
 		open := c.open
@@ -204,6 +202,9 @@ func (c *Controller) ApproveHostAction(requestID string, expectedVersion uint64,
 	if selected.ExpectedVersion != 0 && selected.ExpectedVersion != currentVersion {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorStaleVersion, "host action expected a different storage version")
 	}
+	if selected.Status == "needs_decision" && len(selected.RiskWarnings) == 0 {
+		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "host action awaits an administrator recovery decision in the Web app")
+	}
 	riskConfirmation := selected.Status == "needs_decision" && len(selected.RiskWarnings) > 0
 	canonical := ""
 	if !riskConfirmation {
@@ -288,9 +289,8 @@ func (c *Controller) syncOperations() {
 func (c *Controller) refresh(locations []runtime.StorageLocation) ([]dto.StorageShortcut, error) {
 	items := make([]dto.StorageShortcut, 0, len(locations))
 	for _, location := range locations {
-		path, pathErr := canonicalShortcutPath(location.Path)
+		path, canOpen := shortcutOpenPath(location.Path)
 		status := strings.TrimSpace(location.Status)
-		canOpen := pathErr == nil && !strings.EqualFold(status, "offline") && !strings.EqualFold(status, "error")
 		if path == "" {
 			path = cleanCandidatePath(location.Path)
 		}
@@ -298,8 +298,6 @@ func (c *Controller) refresh(locations []runtime.StorageLocation) ([]dto.Storage
 			ID: location.ID, Name: location.Name, Path: path, Kind: location.Kind, Status: status, CanOpen: canOpen,
 			RepositoryCount: location.RepositoryCount, ActiveOperationCount: location.ActiveOperationCount,
 			CanRemove: location.CanRemove, RemovalBlockedBy: location.RemovalBlockedBy, FilesPreserved: location.FilesPreserved,
-			Writable: location.Writable, CapacityKnown: location.CapacityKnown, TotalBytes: location.TotalBytes,
-			AvailableBytes: location.AvailableBytes, Filesystem: location.Filesystem,
 		})
 	}
 	cache, err := c.loadCache()
@@ -336,7 +334,7 @@ func (c *Controller) loadCache() (cacheFile, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var cache cacheFile
-	if err := decoder.Decode(&cache); err != nil || cache.SchemaVersion != cacheSchemaVersion {
+	if err := decoder.Decode(&cache); err != nil || stateversion.Check("storage shortcut cache", cache.SchemaVersion, cacheSchemaVersion) != nil {
 		_ = os.Rename(c.paths.ShortcutsFile, c.paths.ShortcutsFile+fmt.Sprintf(".corrupt.%d", time.Now().UnixNano()))
 		return cacheFile{SchemaVersion: cacheSchemaVersion}, fmt.Errorf("storage shortcut cache is invalid")
 	}
@@ -352,15 +350,15 @@ func (c *Controller) saveCache(cache cacheFile) error {
 	return platform.WriteAtomic(c.paths.ShortcutsFile, append(data, '\n'), 0o600)
 }
 
-func validateShortcutPath(path string) (string, error) {
+// shortcutOpenPath reports whether the registered Location directory can be
+// opened in the file manager. Marker validity and catalog status are separate
+// registration projections and must not veto a readable path.
+func shortcutOpenPath(path string) (string, bool) {
 	clean, err := canonicalShortcutPath(path)
 	if err != nil {
-		return "", err
+		return cleanCandidatePath(path), false
 	}
-	if _, err := os.Stat(filepath.Join(clean, ".lumilioroot")); err != nil {
-		return "", err
-	}
-	return clean, nil
+	return clean, true
 }
 
 func canonicalShortcutPath(path string) (string, error) {

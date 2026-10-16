@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useCreateRepository,
+  useSetupPrimaryRepository,
   validateRepositoryName,
   type RepositoryStorageStrategy,
 } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
-import { localizeProblem } from "@/lib/http-commons/problem";
+import { localizeProblem, localizeProblemType, normalizeProblem } from "@/lib/http-commons/problem";
 import { usePreference } from "@/lib/preferences/preferences";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
 import { useRegistrationFlow } from "../registration/useRegistrationFlow.ts";
@@ -22,9 +22,10 @@ const FLOW_INDEX: Record<string, number> = {
 export function buildBootstrapPrimaryRepositoryRequest(
   name: string,
   storageStrategy: RepositoryStorageStrategy,
-  riskConfirmation?: boolean,
+  assessmentToken?: string,
+  acknowledgedRisks?: readonly string[],
 ) {
-  return { name, role: "primary" as const, storageStrategy, riskConfirmation };
+  return { name, storageStrategy, assessmentToken, acknowledgedRisks };
 }
 
 export function useBootstrapFlow() {
@@ -32,7 +33,7 @@ export function useBootstrapFlow() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const setupQuery = useSetupStatus();
-  const createRepositoryMutation = useCreateRepository();
+  const createRepositoryMutation = useSetupPrimaryRepository();
 
   const [welcomed, setWelcomed] = useState(false);
   const [mfaComplete, setMfaComplete] = useState(false);
@@ -40,15 +41,32 @@ export function useBootstrapFlow() {
   const [region, setRegion] = usePreference("region");
   const defaults = setupQuery.data?.repository_defaults;
   const [repoName, setRepoName] = useState("Primary Storage");
-  const [repoRoot, setRepoRoot] = useState("");
+  const [defaultStorageLocation, setDefaultStorageLocation] = useState("");
   const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
-  const [riskConfirmation, setRiskConfirmation] = useState(false);
-  const placementRisks = defaults?.risk_warnings ?? [];
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
+  // The Server's review of <default>/primary; its token binds the acknowledgement.
+  const assessment = defaults?.assessment;
+  const placementRisks = useMemo(() => assessment?.risks ?? [], [assessment?.risks]);
+  const assessmentToken = assessment?.token;
+  const reviewProblem = assessment?.problem
+    ? localizeProblemType(
+        `https://lumilio.org/problems/${assessment.problem}`,
+        t,
+        t("auth.primaryRepository.targetUnavailable", {
+          defaultValue:
+            "The Default Storage Location cannot hold the Primary Repository right now.",
+        }),
+      )
+    : null;
 
   useEffect(() => {
     if (!defaults) return;
-    setRepoRoot((current) => current || defaults.default_root || "");
+    setDefaultStorageLocation((current) => current || defaults.storage_location || "");
   }, [defaults]);
+
+  useEffect(() => {
+    setRiskAcknowledged(false);
+  }, [assessmentToken]);
 
   const registration = useRegistrationFlow({ onComplete: () => setMfaComplete(true) });
   const current = mfaComplete ? 5 : welcomed ? (FLOW_INDEX[registration.step] ?? 1) : 0;
@@ -56,15 +74,15 @@ export function useBootstrapFlow() {
   const canSubmitRepo = useMemo(
     () =>
       repoNameError === null &&
-      repoRoot.trim() !== "" &&
-      (placementRisks.length === 0 || riskConfirmation) &&
+      !reviewProblem &&
+      (placementRisks.length === 0 || riskAcknowledged) &&
       !createRepositoryMutation.isPending,
     [
       createRepositoryMutation.isPending,
       placementRisks.length,
       repoNameError,
-      repoRoot,
-      riskConfirmation,
+      reviewProblem,
+      riskAcknowledged,
     ],
   );
 
@@ -72,13 +90,28 @@ export function useBootstrapFlow() {
     event.preventDefault();
     if (!canSubmitRepo) return;
 
-    await createRepositoryMutation.createRepository(
-      buildBootstrapPrimaryRepositoryRequest(
-        repoName,
-        storageStrategy,
-        placementRisks.length > 0 ? riskConfirmation : undefined,
-      ),
-    );
+    try {
+      await createRepositoryMutation.createPrimaryRepository(
+        buildBootstrapPrimaryRepositoryRequest(
+          repoName,
+          storageStrategy,
+          assessmentToken,
+          placementRisks.length > 0 ? placementRisks : undefined,
+        ),
+      );
+    } catch (error) {
+      const problem = normalizeProblem(error);
+      if (
+        problem.kind === "problem" &&
+        (problem.type === "https://lumilio.org/problems/storage/confirmation-required" ||
+          problem.type === "https://lumilio.org/problems/storage/assessment-stale")
+      ) {
+        // Facts changed since the status was loaded: fetch the current review.
+        setRiskAcknowledged(false);
+        await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
+      }
+      return;
+    }
     await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
     void navigate("/", { replace: true });
   };
@@ -104,12 +137,13 @@ export function useBootstrapFlow() {
     repoName,
     setRepoName,
     repoNameError,
-    repoRoot,
+    defaultStorageLocation,
     storageStrategy,
     setStorageStrategy,
     placementRisks,
-    riskConfirmation,
-    setRiskConfirmation,
+    reviewProblem,
+    riskAcknowledged,
+    setRiskAcknowledged,
     canSubmitRepo,
     submitRepo,
     repoError,

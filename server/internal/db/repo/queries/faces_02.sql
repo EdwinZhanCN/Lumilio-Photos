@@ -94,7 +94,7 @@ JOIN (
        OR repository_id = sqlc.narg('repository_id')
     GROUP BY asset_id
 ) occurrence ON occurrence.asset_id = a.asset_id
-WHERE COALESCE(a.is_deleted, false) = false
+WHERE COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= sqlc.arg('min_confidence')

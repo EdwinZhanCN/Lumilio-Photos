@@ -54,7 +54,7 @@ func (w *ScanRepositoryBatchWorker) Work(ctx context.Context, job *river.Job[job
 	if err != nil {
 		return err
 	}
-	if job.Args.RepositoryID == uuid.Nil || job.Args.RequestedEpoch == 0 || job.Args.DesiredVersion != job.Args.RequestedEpoch {
+	if job.Args.RepositoryID == uuid.Nil {
 		return ErrMacroStageUnavailable
 	}
 	more, err := w.Execute(ctx, qos, job.Args)

@@ -8,12 +8,12 @@ import (
 )
 
 type countingStorageReconciler struct {
-	roots atomic.Int32
-	repos atomic.Int32
+	storageLocations atomic.Int32
+	repos            atomic.Int32
 }
 
-func (r *countingStorageReconciler) ReconcileRepositoryRoots(context.Context) error {
-	r.roots.Add(1)
+func (r *countingStorageReconciler) ReconcileStorageLocations(context.Context) error {
+	r.storageLocations.Add(1)
 	return nil
 }
 
@@ -30,10 +30,10 @@ func TestStorageReconcilerRunsWithoutManagePageTraffic(t *testing.T) {
 
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if reconciler.roots.Load() > 0 && reconciler.repos.Load() > 0 {
+		if reconciler.storageLocations.Load() > 0 && reconciler.repos.Load() > 0 {
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatalf("background reconciliation did not run: roots=%d repos=%d", reconciler.roots.Load(), reconciler.repos.Load())
+	t.Fatalf("background reconciliation did not run: storage_locations=%d repos=%d", reconciler.storageLocations.Load(), reconciler.repos.Load())
 }

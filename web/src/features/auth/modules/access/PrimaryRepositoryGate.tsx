@@ -4,12 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   StorageStrategyPicker,
   StorageRiskConfirmation,
-  useCreateRepository,
+  useSetupPrimaryRepository,
   validateRepositoryName,
   type RepositoryStorageStrategy,
 } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
-import { localizeProblem } from "@/lib/http-commons/problem";
+import { localizeProblem, localizeProblemType, normalizeProblem } from "@/lib/http-commons/problem";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
 import { repositoryNameErrorMessage } from "../../model/repositoryNameValidation.ts";
 
@@ -17,28 +17,45 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const setupQuery = useSetupStatus();
-  const createMutation = useCreateRepository();
+  const createMutation = useSetupPrimaryRepository();
   const defaults = setupQuery.data?.repository_defaults;
   const primaryReady = setupQuery.data?.primary_repository_initialized ?? false;
   const [name, setName] = useState("Primary Storage");
-  const [root, setRoot] = useState("");
+  const [storageLocationPath, setStorageLocationPath] = useState("");
   const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
-  const [riskConfirmation, setRiskConfirmation] = useState(false);
-  const placementRisks = defaults?.risk_warnings ?? [];
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
+  // The Server reviewed <default>/primary; its token binds the acknowledgement.
+  const assessment = defaults?.assessment;
+  const placementRisks = useMemo(() => assessment?.risks ?? [], [assessment?.risks]);
+  const assessmentToken = assessment?.token;
+  const reviewProblem = assessment?.problem
+    ? localizeProblemType(
+        `https://lumilio.org/problems/${assessment.problem}`,
+        t,
+        t("auth.primaryRepository.targetUnavailable", {
+          defaultValue:
+            "The Default Storage Location cannot hold the Primary Repository right now.",
+        }),
+      )
+    : null;
 
   useEffect(() => {
     if (!defaults) return;
-    setRoot((current) => current || defaults.default_root || "");
+    setStorageLocationPath((current) => current || defaults.storage_location || "");
   }, [defaults]);
+
+  useEffect(() => {
+    setRiskAcknowledged(false);
+  }, [assessmentToken]);
 
   const nameError = validateRepositoryName(name);
   const canSubmit = useMemo(
     () =>
       nameError === null &&
-      root.trim() !== "" &&
-      (placementRisks.length === 0 || riskConfirmation) &&
+      !reviewProblem &&
+      (placementRisks.length === 0 || riskAcknowledged) &&
       !createMutation.isPending,
-    [createMutation.isPending, nameError, placementRisks.length, riskConfirmation, root],
+    [createMutation.isPending, nameError, placementRisks.length, reviewProblem, riskAcknowledged],
   );
 
   if (setupQuery.isLoading) {
@@ -73,8 +90,10 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
                   "Restore the configured Default Storage Location and its Primary Repository without changing either marker identity. Other available Repositories remain usable.",
                 )}
               </p>
-              {defaults?.default_root ? (
-                <code className="mt-1 block truncate text-xs">{defaults.default_root}/primary</code>
+              {defaults?.storage_location ? (
+                <code className="mt-1 block truncate text-xs">
+                  {defaults.storage_location}/primary
+                </code>
               ) : null}
             </div>
             <button
@@ -97,16 +116,27 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit) return;
-    await createMutation.createRepository({
-      name,
-      role: "primary",
-      storageStrategy,
-      riskConfirmation: placementRisks.length > 0 ? riskConfirmation : undefined,
-    });
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }),
-      queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/assets/indexing/repositories"] }),
-    ]);
+    try {
+      await createMutation.createPrimaryRepository({
+        name,
+        storageStrategy,
+        assessmentToken,
+        acknowledgedRisks: placementRisks.length > 0 ? placementRisks : undefined,
+      });
+    } catch (error) {
+      const problem = normalizeProblem(error);
+      if (
+        problem.kind === "problem" &&
+        (problem.type === "https://lumilio.org/problems/storage/confirmation-required" ||
+          problem.type === "https://lumilio.org/problems/storage/assessment-stale")
+      ) {
+        // Facts changed since the status was loaded: fetch the current review.
+        setRiskAcknowledged(false);
+        await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
+      }
+      return;
+    }
+    await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
   };
 
   const error = createMutation.error
@@ -150,6 +180,11 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
         )}
 
         {error && <div className="alert alert-error mb-4 text-sm">{error}</div>}
+        {reviewProblem && (
+          <div role="alert" className="alert alert-warning mb-4 text-sm">
+            {reviewProblem}
+          </div>
+        )}
 
         <form onSubmit={submit} className="space-y-4">
           <div className="fieldset gap-1">
@@ -185,18 +220,18 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
 
           <label className="form-control">
             <span className="label-text mb-1 font-medium">
-              {t("auth.primaryRepository.root", {
+              {t("auth.primaryRepository.storageLocation", {
                 defaultValue: "Default Storage Location",
               })}
             </span>
             <input
               className="input input-bordered w-full bg-base-200 font-mono text-sm"
-              value={root}
+              value={storageLocationPath}
               readOnly
               tabIndex={-1}
             />
             <span className="label-text-alt mt-1 text-base-content/50">
-              {t("auth.primaryRepository.rootHint", {
+              {t("auth.primaryRepository.storageLocationHint", {
                 defaultValue:
                   "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
               })}
@@ -211,9 +246,9 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
           />
 
           <StorageRiskConfirmation
-            warnings={placementRisks}
-            checked={riskConfirmation}
-            onChange={setRiskConfirmation}
+            risks={placementRisks}
+            checked={riskAcknowledged}
+            onChange={setRiskAcknowledged}
             disabled={createMutation.isPending}
           />
 

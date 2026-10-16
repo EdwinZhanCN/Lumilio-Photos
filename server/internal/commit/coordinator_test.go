@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"server/internal/db/catalogtx"
+	"server/internal/pipeline"
 )
 
 func TestCoordinatorSnapshotUsesBoundedHistogramsAndReportsPressure(t *testing.T) {
@@ -373,6 +374,7 @@ func TestAssetStageCommitCompletesReceiptOnlyAfterEveryBoundStage(t *testing.T) 
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER DEFAULT 0,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
+		`CREATE TABLE asset_reindex_requests(receipt_id TEXT PRIMARY KEY,requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
 	} {
 		if _, err := database.Exec(statement); err != nil {
 			t.Fatal(err)
@@ -426,6 +428,7 @@ func TestAssetStageTerminalFailureProjectsProductAndReceiptFailure(t *testing.T)
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER DEFAULT 0,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
+		`CREATE TABLE asset_reindex_requests(receipt_id TEXT PRIMARY KEY,requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
 	} {
 		if _, err := database.Exec(statement); err != nil {
 			t.Fatal(err)
@@ -467,5 +470,78 @@ func TestAssetStageTerminalFailureProjectsProductAndReceiptFailure(t *testing.T)
 	}
 	if err := database.QueryRow(`SELECT state,terminal_error FROM catalog_operation_receipts WHERE receipt_id=?`, receiptID.String()).Scan(&receiptState, &receiptError); err != nil || receiptState != "failed" || receiptError != "attempts_exhausted" {
 		t.Fatalf("receipt = %q/%q, err=%v", receiptState, receiptError, err)
+	}
+}
+
+// A paged reindex binds stages page by page. Settling one page's stages must
+// not complete the receipt while a later page is still unrequested: the
+// scheduler only continues pending receipts, so an early completion strands
+// every later page (a global semantic reset would leave those assets without
+// vectors) and reports completion the operation has not reached.
+func TestReindexReceiptStaysPendingUntilEveryPageIsRequested(t *testing.T) {
+	_, database := testWriter(t)
+	for _, statement := range []string{
+		`CREATE TABLE assets(asset_id TEXT PRIMARY KEY,type TEXT,status TEXT,updated_at INTEGER)`,
+		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER DEFAULT 0,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
+		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
+		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
+		`CREATE TABLE asset_reindex_requests(receipt_id TEXT PRIMARY KEY,requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
+	} {
+		if _, err := database.Exec(statement); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assetID, fence, receiptID := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC().UnixMicro()
+	for _, statement := range []struct {
+		query string
+		args  []any
+	}{
+		{`INSERT INTO assets VALUES(?, 'PHOTO', '{"state":"processing"}', ?)`, []any{assetID.String(), now}},
+		{`INSERT INTO catalog_operation_receipts VALUES(?, 'reindex', ?, 1, 0, 'pending', NULL, ?, ?)`, []any{receiptID.String(), receiptID.String(), now, now}},
+		// Page one was applied and advanced the cursor: revision 2 is the next page.
+		{`INSERT INTO asset_reindex_requests VALUES(?, 2, 1, ?)`, []any{receiptID.String(), now}},
+		{`INSERT INTO asset_pipeline_state VALUES(?,?, 'enrich', 'asset-v1', 1, 0, NULL, ?)`, []any{assetID.String(), fence.String(), now}},
+		{`INSERT INTO asset_pipeline_receipt_stages VALUES(?,?, 'enrich',1)`, []any{receiptID.String(), assetID.String()}},
+	} {
+		if _, err := database.Exec(statement.query, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commitTx := func(apply func(*sql.Tx) error) {
+		tx, err := database.BeginTx(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := apply(tx); err != nil {
+			_ = tx.Rollback()
+			t.Fatal(err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	receiptState := func() string {
+		var state string
+		if err := database.QueryRow(`SELECT state FROM catalog_operation_receipts WHERE receipt_id=?`, receiptID.String()).Scan(&state); err != nil {
+			t.Fatal(err)
+		}
+		return state
+	}
+
+	commitTx(func(tx *sql.Tx) error {
+		_, err := applyAssetStages(context.Background(), tx, AssetStageApplied{AssetID: assetID, SourceFence: fence, Stage: "enrich", PipelineVersion: "asset-v1", DesiredVersion: 1})
+		return err
+	})
+	if state := receiptState(); state != "pending" {
+		t.Fatalf("with a later page outstanding, receipt state=%q; want pending", state)
+	}
+
+	// The final page finishes the receipt once every bound stage has applied.
+	commitTx(func(tx *sql.Tx) error {
+		return pipeline.FinishReindexTx(context.Background(), tx, receiptID, 2)
+	})
+	if state := receiptState(); state != "completed" {
+		t.Fatalf("after the final page, receipt state=%q; want completed", state)
 	}
 }

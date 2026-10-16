@@ -156,29 +156,44 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 	return set, true
 }
 
-func queryIncludesDeletedAssets(isDeleted *bool) bool {
-	return isDeleted != nil && *isDeleted
+// queriesNonActiveAssets reports whether a query asks for missing or trashed
+// Assets, which the active-only Asset reads would drop.
+func queriesNonActiveAssets(lifecycleState *string) bool {
+	return lifecycleState != nil && *lifecycleState != "" && *lifecycleState != aggregatesearch.LifecycleActive
 }
 
-func (s *assetService) runHydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error) {
-	if s.hydrateAssetsInOrderFn != nil {
-		return s.hydrateAssetsInOrderFn(ctx, ids, isDeleted)
+// assetsInLifecycleState loads Asset rows in the requested lifecycle state
+// (nil means active), in no particular order.
+func (s *assetService) assetsInLifecycleState(ctx context.Context, ids []uuid.UUID, lifecycleState *string) ([]repo.Asset, error) {
+	if !queriesNonActiveAssets(lifecycleState) {
+		return s.readQueries.GetAssetsByIDs(ctx, ids)
 	}
-	return s.hydrateAssetsInOrder(ctx, ids, isDeleted)
+	rows, err := s.readQueries.GetAssetsByIDsAny(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	kept := rows[:0]
+	for _, row := range rows {
+		if row.LifecycleState == *lifecycleState {
+			kept = append(kept, row)
+		}
+	}
+	return kept, nil
+}
+
+func (s *assetService) runHydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID, lifecycleState *string) ([]repo.Asset, error) {
+	if s.hydrateAssetsInOrderFn != nil {
+		return s.hydrateAssetsInOrderFn(ctx, ids, lifecycleState)
+	}
+	return s.hydrateAssetsInOrder(ctx, ids, lifecycleState)
 }
 
 // hydrateAssetsInOrder fetches asset rows preserving the given id order.
-func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error) {
+func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID, lifecycleState *string) ([]repo.Asset, error) {
 	if len(ids) == 0 {
 		return []repo.Asset{}, nil
 	}
-	var rows []repo.Asset
-	var err error
-	if queryIncludesDeletedAssets(isDeleted) {
-		rows, err = s.readQueries.GetAssetsByIDsAny(ctx, ids)
-	} else {
-		rows, err = s.readQueries.GetAssetsByIDs(ctx, ids)
-	}
+	rows, err := s.assetsInLifecycleState(ctx, ids, lifecycleState)
 	if err != nil {
 		return nil, err
 	}
@@ -195,16 +210,16 @@ func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID
 	return out, nil
 }
 
-func (s *assetService) runPageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error) {
+func (s *assetService) runPageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, lifecycleState *string) ([]repo.Asset, error) {
 	if s.pageAssetsBySortFn != nil {
-		return s.pageAssetsBySortFn(ctx, ids, sortBy, limit, offset, isDeleted)
+		return s.pageAssetsBySortFn(ctx, ids, sortBy, limit, offset, lifecycleState)
 	}
-	return s.pageAssetsBySort(ctx, ids, sortBy, limit, offset, isDeleted)
+	return s.pageAssetsBySort(ctx, ids, sortBy, limit, offset, lifecycleState)
 }
 
 // pageAssetsBySort orders a membership set by the requested presentation
 // sort (newest first) and returns the requested page of rows.
-func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error) {
+func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, lifecycleState *string) ([]repo.Asset, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -235,5 +250,5 @@ func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, so
 	if offset >= end {
 		return []repo.Asset{}, nil
 	}
-	return s.hydrateAssetsInOrder(ctx, ordered[offset:end], isDeleted)
+	return s.hydrateAssetsInOrder(ctx, ordered[offset:end], lifecycleState)
 }

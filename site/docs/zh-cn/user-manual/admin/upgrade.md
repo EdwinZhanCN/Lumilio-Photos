@@ -13,6 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/app/app.go
 - server/internal/db/migration.go
+- server/cmd/config_cli.go
 - desktop/internal/update
 - deploy/compose/compose.yml
 -->
@@ -20,6 +21,20 @@ code-evidence:
 # 安全升级
 
 升级会自动运行兼容数据库迁移，但这不是跳过备份的理由。配置 schema、容器挂载、Desktop 资源和派生工具也可能变化。
+
+## 升级会如何处理数据
+
+- **数据库**：新版本变更数据库 schema 时，启动过程会先在备份目录写入一份 `pre-upgrade-…` 数据库快照，再升级数据库。保留策略不会删除这份快照，备份列表会把它显示为恢复点。任一升级步骤失败时，Server 不会启动，日志会写明失败的步骤和这份快照。
+- **恢复旧备份**：由较早受支持版本创建的备份可以恢复，下次启动时按同样方式升级。
+- **Server 配置文件**：Server 不会自行改写 `server.toml`。新版本变更配置格式时，启动会停止并提示显式升级：
+
+  ```bash
+  docker compose run --rm lumilio server config upgrade --config /data/app-state/server.toml
+  ```
+
+  原文件保存为 `server.toml.bak`，你手动添加的注释只保留在该文件中。默认 Docker 配置内置在镜像中，Desktop 会自动升级自身配置，二者都无需此步骤。
+- **降级**：任何版本都会拒绝由更新版本写入的数据库、备份或配置。回退时使用升级前快照。
+- **预发布数据**：预发布构建（`v1.0.0-beta.*`、`v26.1.0-beta.*`）的数据不会迁移到 `v26.1.0-rc.1` 及之后的版本。Server 会将这类数据库标明为预发布数据并拒绝打开；请把它移到别处，改用新数据库。原始媒体和资源库不受影响。
 
 ## 升级前
 

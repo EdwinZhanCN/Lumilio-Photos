@@ -3,42 +3,52 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"server/internal/api"
+	"server/internal/db/catalogtx"
+	"server/internal/processing"
 
 	"github.com/gin-gonic/gin"
 )
 
-// QueueHandler handles River queue monitoring endpoints (read-only)
+// QueueHandler serves the administrator Processing read model and its one
+// command, stage retry. Reads use query-only pools; retry is bound separately
+// to the Catalog writer.
 type QueueHandler struct {
-	dbpool *sql.DB
+	dbpool     *sql.DB
+	catalog    *sql.DB
+	processing *processing.Reader
+	retrier    *processing.Retrier
 }
 
-// NewQueueHandler creates a new queue handler
-func NewQueueHandler(dbpool *sql.DB) *QueueHandler {
+// NewQueueHandler binds the QueueDB and Catalog reader pools.
+func NewQueueHandler(dbpool, catalog *sql.DB) *QueueHandler {
 	return &QueueHandler{
-		dbpool: dbpool,
+		dbpool:     dbpool,
+		catalog:    catalog,
+		processing: processing.NewReader(catalog, dbpool),
 	}
 }
 
-// JobStatsResponse represents overall job statistics
-type JobStatsResponse struct {
-	Available int64 `json:"available"`
-	Scheduled int64 `json:"scheduled"`
-	Running   int64 `json:"running"`
-	Retryable int64 `json:"retryable"`
-	Completed int64 `json:"completed"`
-	Cancelled int64 `json:"cancelled"`
-	Discarded int64 `json:"discarded"`
+// SetRetryWriter enables stage retry through the Catalog writer.
+func (h *QueueHandler) SetRetryWriter(writer *catalogtx.Writer) {
+	h.retrier = processing.NewRetrier(writer)
 }
 
-// QueueSummaryResponse represents aggregated queue activity.
-type QueueSummaryResponse struct {
-	Queues      []QueueSummaryDTO `json:"queues"`
-	GeneratedAt time.Time         `json:"generated_at"`
+// DeliveryStatsDTO contains queue execution diagnostics, not file completion counts.
+type DeliveryStatsDTO struct {
+	Available int64             `json:"available"`
+	Scheduled int64             `json:"scheduled"`
+	Running   int64             `json:"running"`
+	Retryable int64             `json:"retryable"`
+	Completed int64             `json:"completed"`
+	Cancelled int64             `json:"cancelled"`
+	Discarded int64             `json:"discarded"`
+	Queues    []QueueSummaryDTO `json:"queues"`
 }
 
 // QueueSummaryDTO represents a single queue's aggregated activity.
@@ -70,75 +80,118 @@ type QueueErrorSampleDTO struct {
 	FinalizedAt *time.Time `json:"finalized_at,omitempty"`
 }
 
-// GetQueueSummary godoc
-// @Summary Get queue summaries
-// @Description Get aggregated processing activity per queue, including recent error samples
+// GetProcessing godoc
+// @Summary Get processing stages
+// @Description One card per processing stage in a declared unit, plus overall totals. Catalog facts, with River supplying only running and retryable deliveries; not an atomic cross-database snapshot.
 // @Tags Queue
-// @Accept json
 // @Produce json
-// @Param error_limit query int false "Recent error samples per queue (default: 5, max: 20)"
-// @Success 200 {object} QueueSummaryResponse
-// @Router /api/v1/admin/river/queue-summary [get]
-func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
+// @Success 200 {object} processing.Summary
+// @Router /api/v1/admin/processing [get]
+func (h *QueueHandler) GetProcessing(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
+	summary, err := h.processing.Summary(ctx)
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+		return
+	}
+	api.JSONOK(c, summary)
+}
 
-	errorLimit := parseErrorLimit(c.DefaultQuery("error_limit", "5"))
+// GetProcessingStageItems godoc
+// @Summary List a processing stage's items
+// @Description One bounded page of a stage's failed (newest first) or queued (oldest first) subjects. Failures carry reason codes, never raw errors.
+// @Tags Queue
+// @Produce json
+// @Param stage path string true "Stage ID" Enums(import,scan,metadata,thumbnails,video,analysis,events,places,text_search,backup)
+// @Param state query string true "Item state" Enums(failed,queued)
+// @Param limit query int false "Page size (max 50)"
+// @Param cursor query string false "Cursor from the previous page"
+// @Success 200 {object} processing.ItemsPage
+// @Router /api/v1/admin/processing/stages/{stage}/items [get]
+func (h *QueueHandler) GetProcessingStageItems(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	state := processing.ItemState(c.Query("state"))
+	if state != processing.ItemsFailed && state != processing.ItemsQueued {
+		api.WriteProblem(c, api.BadRequest(errors.New("state must be failed or queued")))
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	page, err := h.processing.Items(ctx, processing.StageID(c.Param("stage")), state, limit, c.Query("cursor"))
+	if errors.Is(err, processing.ErrUnknownStage) {
+		api.WriteProblem(c, api.NotFound(err))
+		return
+	}
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+		return
+	}
+	api.JSONOK(c, page)
+}
+
+// RetryProcessingStage godoc
+// @Summary Retry a processing stage's failures
+// @Description Re-requests at most 500 failed subjects of a stage through the Catalog. Import, Scan, and Backup are not retryable here.
+// @Tags Queue
+// @Produce json
+// @Param stage path string true "Stage ID" Enums(metadata,thumbnails,video,analysis,events,places,text_search)
+// @Success 200 {object} processing.RetryResult
+// @Router /api/v1/admin/processing/stages/{stage}/retry [post]
+func (h *QueueHandler) RetryProcessingStage(c *gin.Context) {
+	if h.retrier == nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusServiceUnavailable, errors.New("processing retry is not configured")))
+		return
+	}
+	result, err := h.retrier.Retry(c.Request.Context(), processing.StageID(c.Param("stage")))
+	switch {
+	case errors.Is(err, processing.ErrUnknownStage):
+		api.WriteProblem(c, api.NotFound(err))
+	case errors.Is(err, processing.ErrStageNotRetryable):
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+	case err != nil:
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+	default:
+		api.JSONOK(c, result)
+	}
+}
+
+// GetProcessingDiagnostics godoc
+// @Summary Get processing delivery diagnostics
+// @Description Disposable River delivery totals and per-queue summaries with recent error samples. Delivery records are not file progress.
+// @Tags Queue
+// @Produce json
+// @Param error_limit query int false "Recent error samples per queue (default: 5, max: 20)"
+// @Success 200 {object} DeliveryStatsDTO
+// @Router /api/v1/admin/processing/diagnostics [get]
+func (h *QueueHandler) GetProcessingDiagnostics(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
 	queues, err := h.loadQueueSummaries(ctx)
 	if err != nil {
 		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 		return
 	}
-
+	errorLimit := parseErrorLimit(c.DefaultQuery("error_limit", "5"))
 	if len(queues) > 0 && errorLimit > 0 {
 		if err := h.attachQueueErrorSamples(ctx, queues, errorLimit); err != nil {
 			api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 			return
 		}
 	}
-
-	api.JSONOK(c, QueueSummaryResponse{
-		Queues:      queues,
-		GeneratedAt: time.Now(),
-	})
-}
-
-// GetJobStats godoc
-// @Summary Get job statistics
-// @Description Get aggregated statistics about jobs by state
-// @Tags Queue
-// @Accept json
-// @Produce json
-// @Success 200 {object} JobStatsResponse
-// @Router /api/v1/admin/river/stats [get]
-func (h *QueueHandler) GetJobStats(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-	defer cancel()
-
-	// Count jobs by state using direct DB query for accurate counts
-	stats := JobStatsResponse{}
-
-	// Query for each state count
-	stateQueries := map[string]*int64{
-		"available": &stats.Available,
-		"scheduled": &stats.Scheduled,
-		"running":   &stats.Running,
-		"retryable": &stats.Retryable,
-		"completed": &stats.Completed,
-		"cancelled": &stats.Cancelled,
-		"discarded": &stats.Discarded,
+	deliveries := DeliveryStatsDTO{Queues: queues}
+	err = h.dbpool.QueryRowContext(ctx, `SELECT
+ COUNT(*) FILTER (WHERE state='available'), COUNT(*) FILTER (WHERE state='scheduled'),
+ COUNT(*) FILTER (WHERE state='running'), COUNT(*) FILTER (WHERE state='retryable'),
+ COUNT(*) FILTER (WHERE state='completed'), COUNT(*) FILTER (WHERE state='cancelled'),
+ COUNT(*) FILTER (WHERE state='discarded') FROM river_job`).Scan(
+		&deliveries.Available, &deliveries.Scheduled, &deliveries.Running, &deliveries.Retryable,
+		&deliveries.Completed, &deliveries.Cancelled, &deliveries.Discarded)
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+		return
 	}
-
-	for state, countPtr := range stateQueries {
-		query := `SELECT COUNT(*) FROM river_job WHERE state = ?`
-		err := h.dbpool.QueryRowContext(ctx, query, state).Scan(countPtr)
-		if err != nil {
-			api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
-			return
-		}
-	}
-
-	api.JSONOK(c, stats)
+	api.JSONOK(c, deliveries)
 }
 
 func parseErrorLimit(raw string) int {

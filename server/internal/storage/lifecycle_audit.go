@@ -74,6 +74,12 @@ func (rm *DefaultRepositoryManager) RecordLifecycleAudit(ctx context.Context, in
 	return recordLifecycleAuditWithQueries(ctx, rm.queries, input)
 }
 
+// RecordLifecycleAuditTx records one lifecycle outcome inside the caller's
+// catalog transaction, for lifecycle work owned outside this package.
+func RecordLifecycleAuditTx(ctx context.Context, queries *repo.Queries, input LifecycleAuditInput) (LifecycleAuditEvent, error) {
+	return recordLifecycleAuditWithQueries(ctx, queries, input)
+}
+
 func recordLifecycleAuditWithQueries(ctx context.Context, queries *repo.Queries, input LifecycleAuditInput) (LifecycleAuditEvent, error) {
 	normalizeLifecycleAuditInput(&input)
 	details, err := json.Marshal(input.Details)

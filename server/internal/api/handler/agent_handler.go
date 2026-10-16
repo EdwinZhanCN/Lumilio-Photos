@@ -720,3 +720,29 @@ func (h *AgentHandler) GetTools(c *gin.Context) {
 	}
 	api.JSONOK(c, result)
 }
+
+// GetRefMusic hydrates an owned music ref in exact selection order.
+// @Summary Hydrate music selection
+// @Tags agent
+// @Produce json
+// @Param id path string true "Ref ID"
+// @Param thread_id query string true "Thread ID"
+// @Success 200 {object} dto.AgentMusicRefDTO
+// @Failure 404 {object} api.ProblemResponse
+// @Router /api/v1/agent/refs/{id}/music [get]
+func (h *AgentHandler) GetRefMusic(c *gin.Context) {
+	r, ok := h.resolveRef(c)
+	if !ok {
+		return
+	}
+	rows, err := h.libraries.ForUser(r.Scope.UserID).MusicTracks(c.Request.Context(), r.AssetIDs)
+	if err != nil {
+		api.WriteProblem(c, api.NotFound(errors.New("ref not found")))
+		return
+	}
+	tracks := make([]dto.MusicTrackDTO, 0, len(rows))
+	for _, row := range rows {
+		tracks = append(tracks, dto.MusicTrackDTO{TrackID: row.TrackID.String(), OwnerID: r.Scope.UserID, Title: row.Title, ArtistName: row.ArtistName, AlbumTitle: row.AlbumTitle, Genre: row.Genre, Duration: row.Duration, Rating: row.Rating, Liked: row.Liked, OriginalFilename: row.OriginalFilename, MimeType: row.MimeType})
+	}
+	api.JSONOK(c, dto.AgentMusicRefDTO{Tracks: tracks, Total: r.Count(), Truncated: r.Truncated})
+}

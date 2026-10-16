@@ -23,7 +23,7 @@ WHERE al.user_id = ?1
       FROM album_assets aa
       JOIN assets a ON a.asset_id = aa.asset_id
       WHERE aa.album_id = al.album_id
-        AND a.is_deleted = false
+        AND a.lifecycle_state = 'active'
         AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
           WHERE occurrence.asset_id = a.asset_id
             AND occurrence.repository_id = ?2)
@@ -32,7 +32,7 @@ WHERE al.user_id = ?1
       SELECT 1
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
-        AND a_cover.is_deleted = false
+        AND a_cover.lifecycle_state = 'active'
         AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
           WHERE occurrence.asset_id = a_cover.asset_id
             AND occurrence.repository_id = ?2)
@@ -117,7 +117,7 @@ const getAlbumAssetCount = `-- name: GetAlbumAssetCount :one
 SELECT COUNT(*) as count
 FROM album_assets aa
 JOIN assets a ON aa.asset_id = a.asset_id
-WHERE aa.album_id = ?1 AND a.is_deleted = false
+WHERE aa.album_id = ?1 AND a.lifecycle_state = 'active'
 `
 
 func (q *Queries) GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error) {
@@ -132,7 +132,7 @@ SELECT COUNT(*) as count
 FROM album_assets aa
 JOIN assets a ON aa.asset_id = a.asset_id
 WHERE aa.album_id = ?1
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (
     ?2 IS NULL
     OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -154,10 +154,10 @@ func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAsse
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE aa.album_id = ?1 AND a.is_deleted = false
+WHERE aa.album_id = ?1 AND a.lifecycle_state = 'active'
 ORDER BY aa.position ASC, aa.added_time ASC
 `
 
@@ -174,8 +174,7 @@ type GetAlbumAssetsRow struct {
 	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
 	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
 	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	LifecycleState       string                   `db:"lifecycle_state" json:"lifecycle_state"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating               *int64                   `db:"rating" json:"rating"`
 	Liked                bool                     `db:"liked" json:"liked"`
@@ -212,8 +211,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -241,11 +239,11 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 }
 
 const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = ?1
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (
     ?2 IS NULL
     OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -273,8 +271,7 @@ type GetAlbumAssetsScopedRow struct {
 	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
 	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
 	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	LifecycleState       string                   `db:"lifecycle_state" json:"lifecycle_state"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating               *int64                   `db:"rating" json:"rating"`
 	Liked                bool                     `db:"liked" json:"liked"`
@@ -311,8 +308,7 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -374,7 +370,7 @@ SELECT
     FROM album_assets aa_count
     JOIN assets a_count ON a_count.asset_id = aa_count.asset_id
     WHERE aa_count.album_id = al.album_id
-      AND a_count.is_deleted = false
+      AND a_count.lifecycle_state = 'active'
       AND (
         ?1 IS NULL
         OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -387,7 +383,7 @@ SELECT
       SELECT a_cover.asset_id
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
-        AND a_cover.is_deleted = false
+        AND a_cover.lifecycle_state = 'active'
         AND (
           ?1 IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -401,7 +397,7 @@ SELECT
       FROM album_assets aa_cover
       JOIN assets a_scope ON a_scope.asset_id = aa_cover.asset_id
       WHERE aa_cover.album_id = al.album_id
-        AND a_scope.is_deleted = false
+        AND a_scope.lifecycle_state = 'active'
         AND (
           ?1 IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -511,7 +507,7 @@ WITH page_albums AS (
         FROM album_assets aa_exists
         JOIN assets a_exists ON a_exists.asset_id = aa_exists.asset_id
         WHERE aa_exists.album_id = al.album_id
-          AND a_exists.is_deleted = false
+          AND a_exists.lifecycle_state = 'active'
           AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
             WHERE occurrence.asset_id = a_exists.asset_id
               AND occurrence.repository_id = ?1)
@@ -520,7 +516,7 @@ WITH page_albums AS (
         SELECT 1
         FROM assets a_cover_exists
         WHERE a_cover_exists.asset_id = al.cover_asset_id
-          AND a_cover_exists.is_deleted = false
+          AND a_cover_exists.lifecycle_state = 'active'
           AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
             WHERE occurrence.asset_id = a_cover_exists.asset_id
               AND occurrence.repository_id = ?1)
@@ -543,7 +539,7 @@ SELECT
     FROM album_assets aa_count
     JOIN assets a_count ON a_count.asset_id = aa_count.asset_id
     WHERE aa_count.album_id = al.album_id
-      AND a_count.is_deleted = false
+      AND a_count.lifecycle_state = 'active'
       AND (
         ?1 IS NULL
         OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -556,7 +552,7 @@ SELECT
       SELECT a_cover.asset_id
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
-        AND a_cover.is_deleted = false
+        AND a_cover.lifecycle_state = 'active'
         AND (
           ?1 IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -570,7 +566,7 @@ SELECT
       FROM album_assets aa_cover
       JOIN assets a_scope ON a_scope.asset_id = aa_cover.asset_id
       WHERE aa_cover.album_id = al.album_id
-        AND a_scope.is_deleted = false
+        AND a_scope.lifecycle_state = 'active'
         AND (
           ?1 IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -701,14 +697,14 @@ func (q *Queries) GetAssetAlbums(ctx context.Context, assetID uuid.UUID) ([]GetA
 }
 
 const listBioAlbumAssetsMissingSpeciesPredictions = `-- name: ListBioAlbumAssetsMissingSpeciesPredictions :many
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM album_assets aa
 JOIN albums al ON al.album_id = aa.album_id
 JOIN assets a ON a.asset_id = aa.asset_id
 WHERE aa.album_id = ?1
   AND al.album_type = 'bio'
   AND a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND NOT EXISTS (
     SELECT 1
     FROM species_predictions sp
@@ -739,8 +735,7 @@ func (q *Queries) ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Contex
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,

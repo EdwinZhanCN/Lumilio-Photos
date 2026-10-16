@@ -1,5 +1,6 @@
 export { AuthProvider } from "./state/AuthProvider";
 export { useAuth } from "./state/useAuth";
+export { useSignOut } from "./flows/sign-out/useSignOut";
 export { default as ProtectedRoute } from "./modules/access/ProtectedRoute";
 export { default as BootstrapGate } from "./modules/access/BootstrapGate";
 export { default as PrimaryRepositoryGate } from "./modules/access/PrimaryRepositoryGate";

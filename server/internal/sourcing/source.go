@@ -1,6 +1,3 @@
-// Package sourcing defines the recoverable staged-source abstraction that
-// decouples upload and cloud acquisition from Repository commit and ROE
-// publication.
 package sourcing
 
 import (

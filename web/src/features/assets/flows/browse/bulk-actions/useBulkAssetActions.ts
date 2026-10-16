@@ -1,3 +1,4 @@
+import { useAssetLifecycle } from "@/lib/assets/useAssetLifecycle";
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Asset } from "@/lib/assets/types";
@@ -9,7 +10,8 @@ import { useAssetSelection } from "../selection/useAssetSelection";
 export function useBulkAssetActions(resolvedAssetIds?: string[]) {
   const selection = useAssetSelection();
   const queryClient = useQueryClient();
-  const { deleteAsset, batchUpdateAssets } = useAssetActions();
+  const { batchUpdateAssets } = useAssetActions();
+  const { trash } = useAssetLifecycle();
   const { mutateAsync: addAssetToAlbum } = $api.useMutation(
     "post",
     "/api/v1/albums/{id}/assets/{assetId}",
@@ -35,9 +37,9 @@ export function useBulkAssetActions(resolvedAssetIds?: string[]) {
   );
 
   const bulkDelete = useCallback(async () => {
-    await Promise.all(targetIds().map(deleteAsset));
+    await trash.mutateAsync({ body: { asset_ids: targetIds() } });
     selection.clear();
-  }, [deleteAsset, selection, targetIds]);
+  }, [trash, selection, targetIds]);
 
   const bulkDownload = useCallback(
     (assets?: Asset[]) => downloadAssets(targetIds(), assets),

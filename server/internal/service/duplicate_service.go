@@ -14,6 +14,7 @@ import (
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage/trash"
 	"server/internal/utils/phash"
 
 	"github.com/google/uuid"
@@ -162,6 +163,8 @@ type MergeGroupParams struct {
 	DuplicateAssetIDs []uuid.UUID // optional; defaults to all non-keeper members
 	Policy            MergeMetadataPolicy
 	RequireOwner      *int32 // non-nil: foreign/NULL-owner groups are treated as not found
+	// Trash names the actor that moves the non-kept files into the trash.
+	Trash trash.Request
 }
 
 // MergeGroupResult summarizes a merge for the API caller.
@@ -172,10 +175,10 @@ type MergeGroupResult struct {
 	RecoveredBytes   int64
 }
 
-// AssetDeleter abstracts the assetService.DeleteAsset path so the duplicate
-// service does not import the full asset service and can move files to trash.
+// AssetDeleter is Delete: it moves Assets' files into their repository
+// trash, refusing the whole request when anything blocks a move.
 type AssetDeleter interface {
-	DeleteAsset(ctx context.Context, id uuid.UUID) error
+	DeleteAssets(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
 }
 
 type duplicateService struct {
@@ -836,7 +839,27 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 		policy = DefaultMergePolicy()
 	}
 
-	// Stage 1: metadata merge in a single transaction so partial failures leave
+	// Stage 1: Delete moves the non-kept duplicates' files into their
+	// repository trash, the same flow as deleting them by hand. It refuses the
+	// whole set when a repository is offline or a file changed, so a refused
+	// merge leaves the group pending and nothing merged. The trashed
+	// duplicates keep their metadata, which the merge below reads.
+	if s.assetDeleter == nil {
+		return MergeGroupResult{}, errors.New("duplicate resolution needs the repository trash")
+	}
+	if _, err := s.queries.GetAssetByID(ctx, uuidToPG(params.KeeperAssetID)); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return MergeGroupResult{}, ErrDuplicateKeeperInvalid
+		}
+		return MergeGroupResult{}, fmt.Errorf("load keeper asset: %w", err)
+	}
+	deleteRequest := params.Trash
+	deleteRequest.AssetIDs = duplicates
+	if _, err := s.assetDeleter.DeleteAssets(ctx, deleteRequest); err != nil {
+		return MergeGroupResult{}, err
+	}
+
+	// Stage 2: metadata merge in a single transaction so partial failures leave
 	// no half-merged keeper.
 	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationDuplicateMerge, nil)
 	if err != nil {
@@ -918,33 +941,16 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 		return MergeGroupResult{}, fmt.Errorf("commit merge tx: %w", err)
 	}
 
-	// Stage 2: soft-delete the duplicate assets outside the transaction so we
-	// can also move the files into the per-repository trash bin via the asset
-	// service. Each delete is independent and idempotent enough that partial
-	// failure leaves the group in a recoverable state (status=merged, some
-	// assets still alive); the user can dismiss/re-detect to clean up.
 	recovered := int64(0)
-	deleted := make([]uuid.UUID, 0, len(duplicates))
 	for _, dupID := range duplicates {
-		if s.assetDeleter != nil {
-			if err := s.assetDeleter.DeleteAsset(ctx, dupID); err != nil {
-				s.logger.Warn("soft delete duplicate failed",
-					zap.String("asset_id", dupID.String()),
-					zap.Error(err),
-				)
-				continue
-			}
-		}
 		if m, ok := members[dupID]; ok {
 			recovered += m.FileSize
 		}
-		deleted = append(deleted, dupID)
 	}
-
 	return MergeGroupResult{
 		GroupID:          params.GroupID,
 		KeeperAssetID:    params.KeeperAssetID,
-		MergedDuplicates: deleted,
+		MergedDuplicates: duplicates,
 		RecoveredBytes:   recovered,
 	}, nil
 }
@@ -1004,7 +1010,7 @@ func computeKeeperPreferences(
 	}
 
 	for _, id := range duplicates {
-		dup, err := q.GetAssetByID(ctx, uuidToPG(id))
+		dup, err := q.GetAssetByIDAny(ctx, uuidToPG(id))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("load duplicate %s: %w", id, err)
 		}

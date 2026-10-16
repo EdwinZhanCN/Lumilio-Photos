@@ -206,12 +206,12 @@ func (q *Queries) EventCandidateTimeBounds(ctx context.Context, ownerID *int32) 
 
 const getEventAssetIDsForAgent = `-- name: GetEventAssetIDsForAgent :many
 SELECT COALESCE(
-  CASE WHEN primary_asset.is_deleted = 0 THEN primary_asset.asset_id END,
+  CASE WHEN primary_asset.lifecycle_state = 'active' THEN primary_asset.asset_id END,
   (
     SELECT a.asset_id FROM media_item_assets mia
     JOIN assets a ON a.asset_id=mia.asset_id
     WHERE mia.media_item_id=emi.media_item_id
-      AND a.owner_id=emi.owner_id AND a.is_deleted=0
+      AND a.owner_id=emi.owner_id AND a.lifecycle_state = 'active'
     ORDER BY mia.position,mia.asset_id LIMIT 1
   )
 ) AS resolved_asset_id

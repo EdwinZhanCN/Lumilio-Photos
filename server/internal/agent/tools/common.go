@@ -129,6 +129,7 @@ func RegisterAll() {
 	RegisterShow()
 	RegisterBulkLike()
 	RegisterCreateAlbum()
+	RegisterMusic()
 	RegisterAddToAlbum()
 	RegisterTagAssets()
 }

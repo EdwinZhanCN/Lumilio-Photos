@@ -35,7 +35,7 @@ func TestCloudSyncProviderRecognizesKnownLocations(t *testing.T) {
 	}
 
 	for path, provider := range cases {
-		warnings := RepositoryRootWarnings(path)
+		warnings := StorageLocationWarnings(path)
 		if len(warnings) != 1 || !strings.Contains(warnings[0], provider) {
 			t.Fatalf("path %q warnings = %v, want one mentioning %s", path, warnings, provider)
 		}

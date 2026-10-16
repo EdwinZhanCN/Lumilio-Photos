@@ -18,7 +18,7 @@ FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = ?1
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (?2 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -128,7 +128,7 @@ SELECT
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id = ?1
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
 	AND fi.repository_id IS NOT NULL
 	AND (?2 IS NULL OR EXISTS (
 	  SELECT 1 FROM active_asset_occurrences occurrence
@@ -177,7 +177,7 @@ FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE COALESCE(fcm.is_manual, false) = true
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -240,7 +240,7 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = ?1
   AND fi.id = ?2
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
 	AND fi.repository_id IS NOT NULL
 	AND (?3 IS NULL OR EXISTS (
 	  SELECT 1 FROM active_asset_occurrences occurrence
@@ -287,6 +287,45 @@ func (q *Queries) GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScop
 	return i, err
 }
 
+const listManualFaceAssignmentsForAsset = `-- name: ListManualFaceAssignmentsForAsset :many
+SELECT m.cluster_id, f.bounding_box
+FROM face_cluster_members m
+JOIN face_items f ON f.id = m.face_id
+WHERE f.asset_id = ?1
+  AND m.is_manual = 1
+ORDER BY m.cluster_id, f.id
+`
+
+type ListManualFaceAssignmentsForAssetRow struct {
+	ClusterID   int32        `db:"cluster_id" json:"cluster_id"`
+	BoundingBox dbtypes.JSON `db:"bounding_box" json:"bounding_box"`
+}
+
+// A user's manual person assignments on an Asset's faces, with the face box,
+// captured before a re-detection replaces the faces.
+func (q *Queries) ListManualFaceAssignmentsForAsset(ctx context.Context, assetID uuid.UUID) ([]ListManualFaceAssignmentsForAssetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listManualFaceAssignmentsForAsset, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListManualFaceAssignmentsForAssetRow
+	for rows.Next() {
+		var i ListManualFaceAssignmentsForAssetRow
+		if err := rows.Scan(&i.ClusterID, &i.BoundingBox); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPersonFacesScoped = `-- name: ListPersonFacesScoped :many
 SELECT
     fi.id,
@@ -302,7 +341,7 @@ FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = ?1
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (?2 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id

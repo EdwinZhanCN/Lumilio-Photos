@@ -176,10 +176,10 @@ func groupPendingDocuments(rows []repo.GetOCRDocumentsByAssetIDsRow) map[string]
 		source, ok := documents[assetID]
 		if !ok {
 			source = SourceDocument{
-				AssetID:   assetID,
-				AssetType: row.AssetType,
-				IsDeleted: row.IsDeleted,
-				Revision:  row.Revision,
+				AssetID:        assetID,
+				AssetType:      row.AssetType,
+				LifecycleState: row.LifecycleState,
+				Revision:       row.Revision,
 			}
 			if row.OwnerID != nil {
 				source.OwnerID = *row.OwnerID

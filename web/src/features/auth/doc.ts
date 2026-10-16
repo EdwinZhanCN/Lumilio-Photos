@@ -39,7 +39,9 @@
  * passkey, and recovery-code onboarding. {@link useMFAFlow} owns authenticated
  * MFA management, with its `mfa` and `action` URL parameters authoritative.
  * {@link useBootstrapFlow} composes first-admin registration with repository
- * creation without copying either domain's server state.
+ * creation without copying either domain's server state. {@link useSignOut}
+ * is the only sign-out path: it awaits `logout` before opening `/login`, so the
+ * login form never mounts while the session is still authenticated.
  *
  * {@link ProtectedRoute}, {@link BootstrapGate}, and
  * {@link PrimaryRepositoryGate} are composition capabilities, not page
@@ -72,6 +74,7 @@ import type { useBootstrapFlow } from "./flows/bootstrap/useBootstrapFlow.ts";
 import type { useMFAFlow } from "./flows/mfa/useMFAFlow.ts";
 import type { useRegistrationFlow } from "./flows/registration/useRegistrationFlow.ts";
 import type { useLoginFlow } from "./flows/sign-in/useLoginFlow.ts";
+import type { useSignOut } from "./flows/sign-out/useSignOut.ts";
 import type { normalizeUsernameInput } from "./model/credentialPolicy.ts";
 import type BootstrapGate from "./modules/access/BootstrapGate.tsx";
 import type PrimaryRepositoryGate from "./modules/access/PrimaryRepositoryGate.tsx";

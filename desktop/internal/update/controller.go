@@ -16,6 +16,7 @@ import (
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 	"desktop/internal/state"
 )
 
@@ -305,7 +306,10 @@ func (c *Controller) loadStaged() (*verifiedArtifact, error) {
 	if err := decoder.Decode(&pointer); err != nil {
 		return nil, err
 	}
-	if pointer.SchemaVersion != stagingSchemaVersion || pointer.Channel == "" || pointer.Version == "" || pointer.SHA256 == "" {
+	if err := stateversion.Check("update staging pointer", pointer.SchemaVersion, stagingSchemaVersion); err != nil {
+		return nil, err
+	}
+	if pointer.Channel == "" || pointer.Version == "" || pointer.SHA256 == "" {
 		return nil, errors.New("invalid update staging pointer")
 	}
 	directory, err := safeJoin(c.stagingDir, pointer.Directory)
@@ -376,6 +380,12 @@ func (c *Controller) start(requestID string, expectedVersion uint64, phase strin
 	c.commit(func(update *dto.UpdateSnapshot) { update.Phase = phase; update.Version++ })
 	go func() {
 		result, workErr := work(context.Background())
+		// Publish the result before the operation turns terminal, so anyone
+		// who observes the finished operation also observes its snapshot.
+		c.commit(func(update *dto.UpdateSnapshot) {
+			*update = result
+			update.Version++
+		})
 		if workErr != nil {
 			failure := workErr
 			if result.Error.Code != "" {
@@ -385,10 +395,6 @@ func (c *Controller) start(requestID string, expectedVersion uint64, phase strin
 		} else {
 			_ = c.operations.Succeed(receipt.OperationID)
 		}
-		c.commit(func(update *dto.UpdateSnapshot) {
-			*update = result
-			update.Version++
-		})
 		c.syncOperations()
 	}()
 	return receipt, nil

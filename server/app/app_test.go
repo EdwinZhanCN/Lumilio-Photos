@@ -28,46 +28,46 @@ type fakeRiverStopper struct {
 }
 
 type fakeDefaultStorageRuntimeManager struct {
-	ensureRoot *repo.RepositoryRoot
-	ensureErr  error
-	roots      []repo.RepositoryRoot
-	listErr    error
+	ensureStorageLocation *repo.StorageLocation
+	ensureErr             error
+	storageLocations      []repo.StorageLocation
+	listErr               error
 }
 
-func (fake fakeDefaultStorageRuntimeManager) EnsureDefaultRepositoryRoot(context.Context, string, ...storage.LifecycleRequest) (*repo.RepositoryRoot, error) {
-	return fake.ensureRoot, fake.ensureErr
+func (fake fakeDefaultStorageRuntimeManager) EnsureDefaultStorageLocation(context.Context, string, ...storage.LifecycleRequest) (*repo.StorageLocation, error) {
+	return fake.ensureStorageLocation, fake.ensureErr
 }
 
-func (fake fakeDefaultStorageRuntimeManager) ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error) {
-	return fake.roots, fake.listErr
+func (fake fakeDefaultStorageRuntimeManager) ListStorageLocations(context.Context) ([]repo.StorageLocation, error) {
+	return fake.storageLocations, fake.listErr
 }
 
 func TestDefaultStorageRecoveryKeepsRuntimeStartableInDegradedMode(t *testing.T) {
-	registered := repo.RepositoryRoot{
-		RootID: uuid.New(), Kind: dbtypes.RepositoryRootKindDefault,
-		Status: dbtypes.RepositoryRootStatusOffline, Path: "/missing/default",
+	registered := repo.StorageLocation{
+		StorageLocationID: uuid.New(), Kind: dbtypes.StorageLocationKindDefault,
+		Status: dbtypes.StorageLocationStatusOffline, Path: "/missing/default",
 	}
-	root, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
-		ensureErr: storage.ErrRepositoryRootOffline,
-		roots:     []repo.RepositoryRoot{registered},
+	storageLocation, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr:        storage.ErrStorageLocationOffline,
+		storageLocations: []repo.StorageLocation{registered},
 	}, registered.Path)
 	if err != nil {
 		t.Fatalf("registered default storage stopped runtime startup: %v", err)
 	}
-	if !degraded || root == nil || root.RootID != registered.RootID {
-		t.Fatalf("degraded result = root %#v degraded %t", root, degraded)
+	if !degraded || storageLocation == nil || storageLocation.StorageLocationID != registered.StorageLocationID {
+		t.Fatalf("degraded result = storage location %#v degraded %t", storageLocation, degraded)
 	}
 
 	_, degraded, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
-		ensureErr: storage.ErrRepositoryRootOffline,
+		ensureErr: storage.ErrStorageLocationOffline,
 	}, "/fresh/unavailable")
 	if err == nil || degraded {
 		t.Fatalf("fresh initialization failure = %v degraded %t", err, degraded)
 	}
 
 	_, degraded, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
-		ensureErr: storage.ErrRepositoryRootInvalid,
-		roots:     []repo.RepositoryRoot{registered},
+		ensureErr:        storage.ErrStorageLocationInvalid,
+		storageLocations: []repo.StorageLocation{registered},
 	}, "/different/identity")
 	if err == nil || degraded {
 		t.Fatalf("invalid migration target = %v degraded %t", err, degraded)
@@ -80,15 +80,15 @@ func TestDefaultStorageRecoveryCanonicalizesOfflinePathAliases(t *testing.T) {
 	if err := os.Symlink(realParent, aliasParent); err != nil {
 		t.Skipf("filesystem does not permit symlink fixture: %v", err)
 	}
-	registered := repo.RepositoryRoot{
-		RootID: uuid.New(), Kind: dbtypes.RepositoryRootKindDefault,
-		Status: dbtypes.RepositoryRootStatusOffline, Path: filepath.Join(realParent, "offline-default"),
+	registered := repo.StorageLocation{
+		StorageLocationID: uuid.New(), Kind: dbtypes.StorageLocationKindDefault,
+		Status: dbtypes.StorageLocationStatusOffline, Path: filepath.Join(realParent, "offline-default"),
 	}
 	root, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
-		ensureErr: storage.ErrRepositoryRootOffline,
-		roots:     []repo.RepositoryRoot{registered},
+		ensureErr:        storage.ErrStorageLocationOffline,
+		storageLocations: []repo.StorageLocation{registered},
 	}, filepath.Join(aliasParent, "offline-default"))
-	if err != nil || !degraded || root == nil || root.RootID != registered.RootID {
+	if err != nil || !degraded || root == nil || root.StorageLocationID != registered.StorageLocationID {
 		t.Fatalf("canonical offline alias was not recognized: root=%#v degraded=%t err=%v", root, degraded, err)
 	}
 }

@@ -122,7 +122,7 @@ func TestHostActionEndpointsRejectAnotherActor(t *testing.T) {
 	}{
 		{method: http.MethodGet, path: "/api/v1/host-actions/action-1", call: handler.GetHostAction},
 		{method: http.MethodPost, path: "/api/v1/host-actions/action-1/resolve", body: `{"resolution":"add_separate"}`, call: handler.ResolveHostAction},
-		{method: http.MethodDelete, path: "/api/v1/host-actions/action-1", call: handler.CancelHostAction},
+		{method: http.MethodPost, path: "/api/v1/storage/native-tasks/action-1/cancel", call: handler.CancelHostAction},
 	} {
 		recorder := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(recorder)

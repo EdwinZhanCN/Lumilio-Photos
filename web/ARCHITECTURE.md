@@ -9,7 +9,6 @@ This document defines where frontend code belongs and which imports are allowed.
 | `src/app/`                | Application composition only: root providers, routing, shell, fatal-error handling, and process-wide effects. Domain behavior does not belong here.                                                                                       |
 | `src/features/<feature>/` | One product/domain capability. A feature owns its routes, flows, model rules, API adapters, state lifecycles, tests, and feature-specific styles.                                                                                         |
 | `src/components/`         | Reusable presentational UI with no feature/API/store dependency. Components accept plain data and callbacks; semantic families such as `collection` are allowed when multiple domains use them. Do not create a generic `shared/` bucket. |
-| `src/hooks/`              | Generic React mechanisms used across domains. Workflow-specific hooks belong in their feature; a small stable query/type contract shared by several features may live under a named `lib/<concept>` namespace.                            |
 | `src/lib/`                | Non-visual lower-layer code: HTTP/runtime adapters, algorithms, formatting, preferences, and stable contracts shared across features (for example `albums`, `assets`, or `upload`). It must not import or orchestrate a feature.          |
 | `src/contexts/`           | Truly application-wide infrastructure such as global notifications or worker access. Feature-scoped contexts stay inside their feature.                                                                                                   |
 | `src/workers/`            | Browser worker entry points and the shared worker client. Feature-owned algorithms stay with their feature; a `.worker.*` entry point may register a worker-safe feature runner.                                                          |
@@ -48,7 +47,10 @@ src/features/<feature>/
 - A small feature omits unused directories. Uniformity means identical directory semantics, not identical directory counts.
 - The Assets feature expresses its main journeys as `flows/browse`, `flows/viewer`, and `flows/export`; pure filtering and browse-item rules live in `model`. It keeps `map/` and `picker/` as reviewed public sub-entry exceptions whose entry files remain narrow.
 - The Events feature owns its cursor-backed index, Event detail orchestration,
-  mutations, and presentation fallbacks. Event detail composes
+  mutations, and presentation fallbacks. List and detail apply Repository
+  Browse Scope as a read projection after owner authorization; counts, cover,
+  and gallery come from that same resolved set. Rebuild status is polled only
+  while a source revision is pending. Event detail composes
   `@/features/assets`; neutral bulk-action selection contracts remain in
   `src/lib/assets` so Assets does not depend on Events.
 - The only handwritten documentation sources under `web/` are this file and
@@ -66,7 +68,7 @@ e2e -> public browser UI -> real API / database / storage / queues
 ```
 
 - Lower layers (`components`, `config`, `contexts`, `hooks`, `lib`, `types`, and shared worker code) never import features.
-- Nothing imports `app` except `main.tsx` and modules already inside `app`. `app` is the composition root and may import route implementations directly; this does not make those paths public to other features. Playwright E2E tests exercise public browser UI against isolated real services and do not import production feature internals.
+- Nothing imports `app` except `main.tsx` and modules already inside `app`. `app` is the composition root and may import route implementations directly; this does not make those paths public to other features. Playwright E2E tests exercise public browser UI against isolated real services and do not import production feature internals. Attempts own distinct users and repositories through the shared workspace fixture; a global queue reaching zero is not completion for one test.
 - Inside one feature, use relative imports. Do not import `@/features/<same-feature>/...` and do not route internal code through the feature's root public barrel. A cohesive submodule may use its own local `index.ts` through a relative path. Use the `@/...` alias when an import leaves the feature.
 - Between features, import `@/features/<feature>` unless an approved narrow entry applies. The target feature's `index.ts` is its explicit public contract.
 - Keep `index.ts` narrow. Export only symbols with real cross-feature consumers; do not expose internals merely to shorten a path.
@@ -123,6 +125,106 @@ flowchart TD
 - A component that performs asset, album, repository, people, upload, or other product behavior is a feature component. A semantic presentational family may live in `components` when it has plain props and no feature dependency.
 - Keep worker transport and scheduling in `workers`/`lib/workers`; keep the operation itself with the feature or neutral library that owns its semantics. A worker entry may register only the feature runner imports explicitly allowlisted in the boundary checker.
 
+## Runtime composition
+
+`src/main.tsx` wraps the whole application in a root error boundary whose
+fallback uses a plain document link, so it still works when the router itself
+fails. `src/app/App.tsx` mounts, in order: `I18nProvider`, `PreferencesEffects`,
+`GlobalProvider`, `QueryClientProvider`, `AuthProvider`, the router and
+bootstrap gates, worker and upload providers, then the shell.
+
+`src/app/router/routes.tsx` is the authoritative route table and
+`src/app/router/AppRouter.tsx` its gates. Authenticated routes render inside
+`src/app/shell/AppShellLayout.tsx` (navigation, scroll container, and the
+global ChatDock, which lazy-loads its renderer and mounts no queries while
+collapsed). Studio, Map, Lumilio, Monitor, and Settings are route-level lazy
+chunks. The final `*` route is a public 404 page outside setup and
+authentication gates, so an invalid URL is explained rather than redirected.
+`src/app/status/HealthPoller.tsx` owns runtime health polling.
+
+## Server contract
+
+OpenAPI is the only source of HTTP types. Use `$api` from
+`src/lib/http-commons/queryClient.ts` (`$api.useQuery`, `$api.useInfiniteQuery`,
+`$api.useMutation`); never hand-edit `src/lib/http-commons/schema.d.ts`, never
+declare ad-hoc request or response types for an endpoint OpenAPI describes, and
+treat an `as` cast on a response as a contract bug
+([lumilio-api-contract-change](../.agents/skills/lumilio-api-contract-change/SKILL.md)).
+
+Failures stay structured until presentation. `src/lib/http-commons/problem.ts`
+validates the generated RFC 9457 Problem and Problem Reference unions and
+separates registered Problems from unknown or malformed bodies, network
+failures, and aborts. Manual fetch, XHR, download, and SSE adapters return that
+same structure and never build messages from response text. Rendering calls
+`localizeProblem`/`localizeProblemReference` with an already-localized fallback;
+known types may override it through literal `apiErrors` keys. Behaviour branches
+only on HTTP status or the exact Problem `type`, never on translated copy, and a
+language change re-localizes a repeated failure without touching server state.
+Architecture checks require every registered type to have a literal case and
+non-empty English and Simplified Chinese strings.
+
+## Session and storage of credentials
+
+The browser keeps only the short-lived access token and the session-bound CSRF
+proof; the refresh credential is a host-only `HttpOnly` cookie and never enters
+a DTO or browser storage. `src/lib/http-commons/client.ts` sends credentials,
+recovers the CSRF proof from the session endpoint, attaches `X-CSRF-Token` to
+unsafe typed-client requests, and serializes refresh and logout under the
+`lumilio-auth-refresh` Web Lock so tabs cannot replay a rotated credential.
+Every session exit goes through `src/features/auth/state/resetSession.ts`, which
+clears credentials, user-scoped caches and preferences, and in-flight Query and
+Lumilio work before another user signs in.
+
+## Repository scoping
+
+List pages use `useBrowseScope`; upload alone uses `useWorkingRepository`; entity
+actions use the entity's own `repository_id`. Ordinary users upload from
+`/manage` (`GET /api/v1/storage/targets`); storage administration lives on
+`/storage` over admin-only `/api/v1/storage/*`. Person and album pages take no
+repository parameter.
+
+## Browser runtime and large libraries
+
+Development (`web/vite.config.ts`) and the Server's SPA handler
+(`server/internal/api/spa.go`) both send `Cross-Origin-Opener-Policy:
+same-origin` and `Cross-Origin-Embedder-Policy: credentialless`, which the
+WASM and worker paths rely on. The Server serves the built SPA itself; there is
+no separate web image.
+
+Galleries keep full scroll geometry but mount only an overscanned window;
+offscreen media nodes are removed and inactive list/search queries have bounded
+cache lifetimes. The Home map loads only when visible and requests a bounded
+preview; the Map route queries map points for its current viewport; the Places
+rail drains location clusters but never map points.
+`web/scripts/check-bundle-budget.ts` checks a 420 KiB gzip budget for the
+production entry chunk when running `vp run test:bundle`; it is not in CI.
+
+## Test layers
+
+Vitest 5 through Vite+ owns the unit and browser test projects.
+
+The file name and directory choose the runner (`web/vite.config.ts`
+`test.projects`); do not invent other conventions. Placement, GPU self-skip,
+and proving a guard can fail:
+[lumilio-write-a-test](../.agents/skills/lumilio-write-a-test/SKILL.md).
+
+| Layer              | File                      | Runner / Vitest project                      | Answers                                                                            |
+| ------------------ | ------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Unit               | `*.test.ts`               | `unit` — Node, no DOM                        | React-free rules, transforms, codecs, validators, reducers, migrations, algorithms |
+| Component          | `*.test.tsx`              | `integration` — Browser Mode (real Chromium) | one component or small tree: semantics, state, interaction                         |
+| Flow integration   | `*.spec.tsx`              | `integration` — Browser Mode + MSW           | flows, routes, Router, Query, HTTP workflows                                       |
+| Browser capability | `*.browser.test.ts`       | `browser` — Chromium                         | Worker, WASM, SSE, Blob, Canvas/WebGL                                              |
+| Full E2E           | `web/e2e/specs/*.spec.ts` | Playwright + real services                   | key user paths on the real API, database, storage, and queues                      |
+
+The `unit` project excludes `*.browser.test.ts` and `src/workers/**`, so an
+accidental browser dependency fails instead of hiding. Core browsing UI belongs
+to Playwright
+([decision](../.agents/decisions/2026-08-14-frontend-test-layer-assignment.md)).
+Playwright attempts own distinct state through the shared workspace fixture,
+assert repository- or operation-scoped facts (a global queue reaching zero is
+not completion for one test), and a retry-only pass is a failure
+([determinism decision](../.agents/decisions/2026-09-03-test-matrix-determinism.md)).
+
 ## Validation
 
 Run focused tests while editing, then the repository gates from the project root:
@@ -139,7 +241,7 @@ If no direct test covers the change, run the nearest characterization tests plus
 
 `task web:test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `vp node scripts/check-source-boundaries.ts` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
 
-Also run `vp run test:bundle` from `web/` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths: it builds the production app and enforces the bundle budget. Browser-capability tests (`*.browser.test.ts`) run in real Chromium as part of `task web:test`.
+Also run `vp run test:bundle` from `web/` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths: it builds the production app and checks the bundle budget (a local check, not a CI gate). Browser-capability tests (`*.browser.test.ts`) run in real Chromium as part of `task web:test`.
 
 ## Placement decision
 
@@ -148,7 +250,7 @@ Before adding a file, ask in order:
 1. Does it implement one feature's workflow, UI, state, or API orchestration? Put it in that feature.
 2. Is it a small non-visual query/type contract shared by several features with no feature dependency? Put it in a named `lib/<concept>` namespace.
 3. Is it presentational UI reusable across unrelated features through plain props? Put it in `components`.
-4. Is it a generic React mechanism with no workflow ownership and multiple consumers? Put it in `hooks`.
+4. Is it a generic React mechanism with no workflow ownership and multiple consumers? Create `src/hooks/` for it (the directory does not exist until it has a real consumer).
 5. Is it non-visual feature-neutral infrastructure or an algorithm? Put it beside the closest existing concept in `lib`.
 6. Is it only application composition or process-wide wiring? Put it in `app` or, for a true global provider, `contexts`.
 

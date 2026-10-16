@@ -62,11 +62,11 @@ type EnrichAssetArgs struct {
 func (EnrichAssetArgs) Kind() string                 { return "enrich_asset" }
 func (EnrichAssetArgs) InsertOpts() river.InsertOpts { return macroOpts() }
 
+// ScanRepositoryBatchArgs advances one repository's scan index. The scan and
+// entry rows carry all progress, so one active macro per repository is the
+// whole identity.
 type ScanRepositoryBatchArgs struct {
-	RepositoryID   uuid.UUID `json:"repositoryId" river:"unique"`
-	RequestedEpoch uint64    `json:"requestedEpoch" river:"unique"`
-	DesiredVersion uint64    `json:"desiredVersion" river:"unique"`
-	Frontier       string    `json:"frontier,omitempty" river:"unique"`
+	RepositoryID uuid.UUID `json:"repositoryId" river:"unique"`
 }
 
 func (ScanRepositoryBatchArgs) Kind() string                 { return "scan_repository_batch" }

@@ -32,7 +32,7 @@ WITH page_ids AS (
     FROM assets a
     JOIN species_predictions sp ON a.asset_id = sp.asset_id
     WHERE sp.label LIKE '%' || sqlc.arg('query') || '%'
-      AND a.is_deleted = false
+      AND a.lifecycle_state = 'active'
     GROUP BY a.asset_id, a.upload_time
     ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
     LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')

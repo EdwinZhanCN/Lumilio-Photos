@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MappingVersion = "1"
+	MappingVersion = "2"
 	zhAnalyzerName = "lumilio_zh"
 	zhBigramName   = "lumilio_cjk_bigram"
 )
@@ -51,7 +51,7 @@ func NewMapping() (*mapping.IndexMappingImpl, error) {
 	documentMapping.AddFieldMappingsAt("owner_id", numericField())
 	documentMapping.AddFieldMappingsAt("repository_id", keywordField())
 	documentMapping.AddFieldMappingsAt("asset_type", keywordField())
-	documentMapping.AddFieldMappingsAt("is_deleted", booleanField())
+	documentMapping.AddFieldMappingsAt("lifecycle_state", keywordField())
 	documentMapping.AddFieldMappingsAt("revision", numericField())
 	indexMapping.DefaultMapping = documentMapping
 
@@ -79,14 +79,6 @@ func keywordField() *mapping.FieldMapping {
 
 func numericField() *mapping.FieldMapping {
 	field := bleve.NewNumericFieldMapping()
-	field.Store = false
-	field.IncludeInAll = false
-	field.DocValues = false
-	return field
-}
-
-func booleanField() *mapping.FieldMapping {
-	field := bleve.NewBooleanFieldMapping()
 	field.Store = false
 	field.IncludeInAll = false
 	field.DocValues = false

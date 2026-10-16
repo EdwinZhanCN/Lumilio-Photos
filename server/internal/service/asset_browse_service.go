@@ -305,7 +305,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 
 			// Best Results exists only when the set exceeds the showcase size.
 			if len(refs) >= params.TopResultsLimit {
-				top, err := s.browseItemsForMediaRefs(ctx, refs[:params.TopResultsLimit], bestTsByItem, params.IsDeleted)
+				top, err := s.browseItemsForMediaRefs(ctx, refs[:params.TopResultsLimit], bestTsByItem, params.LifecycleState)
 				if err != nil {
 					return SearchBrowseResult{}, err
 				}
@@ -313,7 +313,7 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 			}
 
 			if params.EnhancementMode != SearchEnhancementModeOnly {
-				page, err := s.pageMediaRefsBySort(ctx, refs, params.SortBy, params.Limit, params.Offset, bestTsByItem, params.IsDeleted)
+				page, err := s.pageMediaRefsBySort(ctx, refs, params.SortBy, params.Limit, params.Offset, bestTsByItem, params.LifecycleState)
 				if err != nil {
 					return SearchBrowseResult{}, err
 				}
@@ -410,9 +410,9 @@ func (s *assetService) queryAggregateBrowseItems(ctx context.Context, params Que
 
 	var items []BrowseItem
 	if params.StackMode == StackModeExpanded {
-		items, err = s.browseItemsForMediaRefs(ctx, refs, nil, params.IsDeleted)
+		items, err = s.browseItemsForMediaRefs(ctx, refs, nil, params.LifecycleState)
 	} else {
-		items, err = s.collapseRefsToBrowseItems(ctx, refs, facts, params.OwnerID, params.IsDeleted)
+		items, err = s.collapseRefsToBrowseItems(ctx, refs, facts, params.OwnerID, params.LifecycleState)
 	}
 	if err != nil {
 		return BrowseQueryResult{}, err
@@ -497,7 +497,7 @@ func (s *assetService) resolveSearchMediaRefs(ctx context.Context, fused fusedSe
 // browseItemsForMediaRefs hydrates refs into flat media-item browse rows,
 // preserving the given ref order and dropping refs whose primary asset is no
 // longer visible.
-func (s *assetService) browseItemsForMediaRefs(ctx context.Context, refs []mediaRef, bestTsByItem map[uuid.UUID]*int32, isDeleted *bool) ([]BrowseItem, error) {
+func (s *assetService) browseItemsForMediaRefs(ctx context.Context, refs []mediaRef, bestTsByItem map[uuid.UUID]*int32, lifecycleState *string) ([]BrowseItem, error) {
 	if len(refs) == 0 {
 		return []BrowseItem{}, nil
 	}
@@ -510,7 +510,7 @@ func (s *assetService) browseItemsForMediaRefs(ctx context.Context, refs []media
 		refByPrimary[ref.PrimaryAssetID] = ref
 	}
 
-	assets, err := s.runHydrateAssetsInOrder(ctx, primaryIDs, isDeleted)
+	assets, err := s.runHydrateAssetsInOrder(ctx, primaryIDs, lifecycleState)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +538,7 @@ func (s *assetService) browseItemsForMediaRefs(ctx context.Context, refs []media
 // pageMediaRefsBySort orders a media-item membership set by the requested
 // presentation sort (newest first, keyed on primary assets) and returns the
 // requested page as browse rows.
-func (s *assetService) pageMediaRefsBySort(ctx context.Context, refs []mediaRef, sortBy string, limit, offset int, bestTsByItem map[uuid.UUID]*int32, isDeleted *bool) ([]BrowseItem, error) {
+func (s *assetService) pageMediaRefsBySort(ctx context.Context, refs []mediaRef, sortBy string, limit, offset int, bestTsByItem map[uuid.UUID]*int32, lifecycleState *string) ([]BrowseItem, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -578,7 +578,7 @@ func (s *assetService) pageMediaRefsBySort(ctx context.Context, refs []mediaRef,
 	if offset >= end {
 		return []BrowseItem{}, nil
 	}
-	return s.browseItemsForMediaRefs(ctx, ordered[offset:end], bestTsByItem, isDeleted)
+	return s.browseItemsForMediaRefs(ctx, ordered[offset:end], bestTsByItem, lifecycleState)
 }
 
 // collapseRefsToBrowseItems groups ranked media-item refs into presentation
@@ -586,7 +586,7 @@ func (s *assetService) pageMediaRefsBySort(ctx context.Context, refs []mediaRef,
 // at the stack's first appearance (input order). Stack covers prefer the
 // designated cover media item, then the lowest-position visible member.
 // ownerID restricts member lists to items the caller may see (nil = admin).
-func (s *assetService) collapseRefsToBrowseItems(ctx context.Context, refs []mediaRef, facts map[uuid.UUID]repo.GetMediaItemBrowseFactsByIDsRow, ownerID *int32, isDeleted *bool) ([]BrowseItem, error) {
+func (s *assetService) collapseRefsToBrowseItems(ctx context.Context, refs []mediaRef, facts map[uuid.UUID]repo.GetMediaItemBrowseFactsByIDsRow, ownerID *int32, lifecycleState *string) ([]BrowseItem, error) {
 	if len(refs) == 0 {
 		return []BrowseItem{}, nil
 	}
@@ -713,7 +713,7 @@ func (s *assetService) collapseRefsToBrowseItems(ctx context.Context, refs []med
 			assetIDs = append(assetIDs, cover.PrimaryAssetID)
 		}
 	}
-	assetByID, err := s.assetsByIDsMap(ctx, assetIDs, isDeleted)
+	assetByID, err := s.assetsByIDsMap(ctx, assetIDs, lifecycleState)
 	if err != nil {
 		return nil, err
 	}
@@ -774,19 +774,13 @@ func (s *assetService) mediaItemFactsByIDs(ctx context.Context, mediaItemIDs []u
 	return facts, nil
 }
 
-// assetsByIDsMap fetches asset rows keyed by ID (visibility follows isDeleted).
-func (s *assetService) assetsByIDsMap(ctx context.Context, ids []uuid.UUID, isDeleted *bool) (map[uuid.UUID]repo.Asset, error) {
+// assetsByIDsMap fetches asset rows keyed by ID (visibility follows lifecycleState).
+func (s *assetService) assetsByIDsMap(ctx context.Context, ids []uuid.UUID, lifecycleState *string) (map[uuid.UUID]repo.Asset, error) {
 	out := make(map[uuid.UUID]repo.Asset, len(ids))
 	if len(ids) == 0 {
 		return out, nil
 	}
-	var rows []repo.Asset
-	var err error
-	if queryIncludesDeletedAssets(isDeleted) {
-		rows, err = s.readQueries.GetAssetsByIDsAny(ctx, ids)
-	} else {
-		rows, err = s.readQueries.GetAssetsByIDs(ctx, ids)
-	}
+	rows, err := s.assetsInLifecycleState(ctx, ids, lifecycleState)
 	if err != nil {
 		return nil, err
 	}
@@ -995,7 +989,7 @@ func countCollapsedBrowseItemsUnifiedParams(params QueryAssetsParams, in unified
 		AssetTypes:       in.assetTypes,
 		TagNames:         in.tagNames,
 		StackKinds:       in.stackKinds,
-		IsDeleted:        in.isDeleted,
+		LifecycleState:   in.lifecycleState,
 		Query:            in.query,
 		AssetType:        params.AssetType,
 		OwnerID:          params.OwnerID,
@@ -1029,7 +1023,7 @@ func getCollapsedBrowseItemsUnifiedParams(params QueryAssetsParams, in unifiedQu
 		AssetTypes:       in.assetTypes,
 		TagNames:         in.tagNames,
 		StackKinds:       in.stackKinds,
-		IsDeleted:        in.isDeleted,
+		LifecycleState:   in.lifecycleState,
 		Query:            in.query,
 		AssetType:        params.AssetType,
 		OwnerID:          params.OwnerID,

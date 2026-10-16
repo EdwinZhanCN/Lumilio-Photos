@@ -1,6 +1,3 @@
-// Package runtimeconfig stores the complete, schema-versioned Server intent
-// and its crash-recoverable current/LKG pointers. It never reads secrets or
-// fills missing manifest fields; strict validation belongs to server/config.
 package runtimeconfig
 
 import (
@@ -18,6 +15,7 @@ import (
 
 	"desktop/internal/control/dto"
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 
 	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
@@ -93,7 +91,11 @@ func Canonicalize(data []byte) ([]byte, error) {
 }
 
 func (s *Store) Validate(path string, data []byte) (Validation, error) {
-	data, err := s.projectHostMediaPaths(data)
+	data, err := upgradeIntent(data)
+	if err != nil {
+		return Validation{}, err
+	}
+	data, err = s.projectHostMediaPaths(data)
 	if err != nil {
 		return Validation{}, err
 	}
@@ -259,7 +261,7 @@ func (s *Store) validateStoragePathChange(candidate string) error {
 	if currentPath == candidatePath {
 		return nil
 	}
-	newRootID, err := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
+	newStorageLocationID, err := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
 	if err != nil {
 		return fmt.Errorf("selected default storage location has no valid .lumilioroot marker: %w", err)
 	}
@@ -271,8 +273,8 @@ func (s *Store) validateStoragePathChange(candidate string) error {
 	// the selected directory is the same portable root and primary repository.
 	// A true move normally leaves the old path offline; the Server then performs
 	// the authoritative comparison against the catalog during controlled restart.
-	if oldRootID, loadErr := loadPortableMarkerID(filepath.Join(currentPath, ".lumilioroot")); loadErr == nil {
-		if oldRootID != newRootID {
+	if oldStorageLocationID, loadErr := loadPortableMarkerID(filepath.Join(currentPath, ".lumilioroot")); loadErr == nil {
+		if oldStorageLocationID != newStorageLocationID {
 			return errors.New("selected default storage location has a different .lumilioroot identity")
 		}
 		oldPrimaryID, primaryErr := loadPortableMarkerID(filepath.Join(currentPath, "primary", ".lumiliorepo"))
@@ -440,6 +442,10 @@ func (s *Store) LoadCurrentConfig() (config.AppConfig, error) {
 	if err != nil {
 		return config.AppConfig{}, err
 	}
+	data, err = upgradeIntent(data)
+	if err != nil {
+		return config.AppConfig{}, err
+	}
 	data, err = s.projectHostMediaPaths(data)
 	if err != nil {
 		return config.AppConfig{}, err
@@ -459,7 +465,10 @@ func (s *Store) LoadPointer(path string) (Pointer, error) {
 	if err := json.Unmarshal(data, &pointer); err != nil {
 		return Pointer{}, fmt.Errorf("decode runtime pointer: %w", err)
 	}
-	if pointer.SchemaVersion != PointerSchemaVersion || !validFingerprint(pointer.Fingerprint) {
+	if err := stateversion.Check("runtime pointer", pointer.SchemaVersion, PointerSchemaVersion); err != nil {
+		return Pointer{}, fmt.Errorf("invalid runtime pointer %q: %w", path, err)
+	}
+	if !validFingerprint(pointer.Fingerprint) {
 		return Pointer{}, fmt.Errorf("invalid runtime pointer %q", path)
 	}
 	return pointer, nil
@@ -468,6 +477,22 @@ func (s *Store) LoadPointer(path string) (Pointer, error) {
 func (s *Store) CurrentPointer() (Pointer, error) { return s.LoadPointer(s.paths.RuntimeCurrent) }
 
 func (s *Store) LastKnownGoodPointer() (Pointer, error) { return s.LoadPointer(s.paths.RuntimeLKG) }
+
+// upgradeIntent brings an intent written at an older supported server
+// schema_version to the current one. Desktop owns its intents, so it upgrades
+// them in memory instead of pointing the user at `server config upgrade`; the
+// stored intent is left as written, and the next applied change stores a
+// current one under its own fingerprint.
+func upgradeIntent(data []byte) ([]byte, error) {
+	upgrade, err := config.UpgradeManifest(data)
+	if err != nil {
+		return nil, fmt.Errorf("upgrade runtime intent: %w", err)
+	}
+	if upgrade.Data == nil {
+		return data, nil
+	}
+	return upgrade.Data, nil
+}
 
 func (s *Store) LoadIntent(fingerprint string) ([]byte, error) {
 	if !validFingerprint(fingerprint) {
@@ -565,7 +590,10 @@ func (s *Store) Reconcile() (ReconcileResult, error) {
 	if err := json.Unmarshal(data, &journal); err != nil {
 		return ReconcileResult{}, fmt.Errorf("decode runtime apply journal: %w", err)
 	}
-	if journal.SchemaVersion != PointerSchemaVersion || !validFingerprint(journal.CandidateFingerprint) {
+	if err := stateversion.Check("runtime apply journal", journal.SchemaVersion, PointerSchemaVersion); err != nil {
+		return ReconcileResult{}, err
+	}
+	if !validFingerprint(journal.CandidateFingerprint) {
 		return ReconcileResult{}, fmt.Errorf("unsupported or incomplete runtime apply journal")
 	}
 	current, err := s.CurrentPointer()

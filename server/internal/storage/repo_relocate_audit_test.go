@@ -14,19 +14,19 @@ func TestRepositoryRelocationRollsBackCatalogWhenAuditPersistenceFails(t *testin
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
 	initializeDefaultStorageForTest(t, manager, rootPath)
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "relocate-audit-original", Actor: "test", Name: "Archive",
-		DirectoryName: "archive", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	originalPath := created.Repository.Path
-	movedPath := filepath.Join(root.Path, "archive-moved")
+	movedPath := filepath.Join(storageLocation.Path, "archive-moved")
 	if err := os.Rename(originalPath, movedPath); err != nil {
 		t.Fatal(err)
 	}

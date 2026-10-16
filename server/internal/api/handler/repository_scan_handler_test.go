@@ -15,7 +15,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
+	"server/internal/storage/scan"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -95,42 +95,45 @@ func TestStorageSupportBundleRedactsAdversarialEmbeddedPathForms(t *testing.T) {
 
 type createRepositoryManagerStub struct {
 	storage.RepositoryManager
-	hostOwnerID  *int32
-	createdSpec  storage.CreateRepositorySpec
-	createCalled bool
-	createErr    error
+	hostOwnerID     *int32
+	createdSpec     storage.CreateRepositorySpec
+	createCalled    bool
+	createErr       error
+	assessment      *storage.CreateTargetAssessment
+	assessErr       error
+	assessedRequest storage.AssessCreateTargetRequest
 }
 
 type storageDiagnosticsManagerStub struct {
 	storage.RepositoryManager
-	roots        []repo.RepositoryRoot
-	repositories []*repo.Repository
+	storageLocations []repo.StorageLocation
+	repositories     []*repo.Repository
 }
 
 type repositoryScanServiceStub struct {
-	cancelled    repo.RepositoryScanRun
+	cancelled    repo.RepositoryScan
 	cancelErr    error
 	repositoryID string
 	operationID  string
 }
 
-func (*repositoryScanServiceStub) EnqueueManualScan(context.Context, string, string, bool) (roecontroller.Receipt, error) {
-	return roecontroller.Receipt{}, nil
+func (*repositoryScanServiceStub) RequestScan(context.Context, string, string, string) (scan.Receipt, error) {
+	return scan.Receipt{}, nil
 }
 
-func (*repositoryScanServiceStub) GetScanRun(context.Context, string, string) (repo.RepositoryScanRun, error) {
-	return repo.RepositoryScanRun{}, nil
+func (*repositoryScanServiceStub) GetScan(context.Context, string, string) (repo.RepositoryScan, error) {
+	return repo.RepositoryScan{}, nil
 }
 
-func (*repositoryScanServiceStub) GetLatestScanRun(context.Context, string) (repo.RepositoryScanRun, error) {
-	return repo.RepositoryScanRun{}, nil
+func (*repositoryScanServiceStub) GetLatestScan(context.Context, string) (repo.RepositoryScan, error) {
+	return repo.RepositoryScan{}, nil
 }
 
-func (*repositoryScanServiceStub) ListScanRuns(context.Context, string, int32, int32) ([]repo.RepositoryScanRun, error) {
+func (*repositoryScanServiceStub) ListScans(context.Context, string, int32, int32) ([]repo.RepositoryScan, error) {
 	return nil, nil
 }
 
-func (stub *repositoryScanServiceStub) CancelScanRun(_ context.Context, repositoryID, operationID string) (repo.RepositoryScanRun, error) {
+func (stub *repositoryScanServiceStub) CancelScan(_ context.Context, repositoryID, operationID string) (repo.RepositoryScan, error) {
 	stub.repositoryID = repositoryID
 	stub.operationID = operationID
 	return stub.cancelled, stub.cancelErr
@@ -140,15 +143,15 @@ func TestCancelRepositoryScanReturnsDurableCancellationState(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repositoryID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	operationID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
-	stub := &repositoryScanServiceStub{cancelled: repo.RepositoryScanRun{
-		RunID: operationID, RepositoryID: repositoryID, RequestedEpoch: 2,
-		Mode: "manual", Status: roecontroller.StatusCrawling,
+	stub := &repositoryScanServiceStub{cancelled: repo.RepositoryScan{
+		ScanID: operationID, RepositoryID: repositoryID,
+		Trigger: scan.TriggerManual, Status: scan.StatusWalking,
 		CancellationRequested: 1, CreatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}}
 	handler := NewRepositoryScanHandler(stub, nil)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories/"+repositoryID.String()+"/scans/"+operationID.String()+"/cancel", nil)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories/"+repositoryID.String()+"/verifications/"+operationID.String()+"/cancel", nil)
 	ctx.Params = gin.Params{
 		{Key: "id", Value: repositoryID.String()},
 		{Key: "operation_id", Value: operationID.String()},
@@ -174,8 +177,8 @@ func TestCancelRepositoryScanReturnsDurableCancellationState(t *testing.T) {
 	}
 }
 
-func (s *storageDiagnosticsManagerStub) ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error) {
-	return s.roots, nil
+func (s *storageDiagnosticsManagerStub) ListStorageLocations(context.Context) ([]repo.StorageLocation, error) {
+	return s.storageLocations, nil
 }
 
 func (s *storageDiagnosticsManagerStub) ListRepositories() ([]*repo.Repository, error) {
@@ -183,23 +186,23 @@ func (s *storageDiagnosticsManagerStub) ListRepositories() ([]*repo.Repository, 
 }
 
 func TestStorageDiagnosticsCarriesStorageEntitySemantics(t *testing.T) {
-	rootID := uuid.MustParse("8df0b4a5-5c67-44d9-80d0-ea4119ae26f9")
+	storageLocationID := uuid.MustParse("8df0b4a5-5c67-44d9-80d0-ea4119ae26f9")
 	repositoryID := uuid.MustParse("6fd24928-9c5c-4b03-a8cc-84971654144c")
 	manager := &storageDiagnosticsManagerStub{
-		roots: []repo.RepositoryRoot{{
-			RootID: rootID,
-			Name:   "legacy default name",
-			Path:   t.TempDir(),
-			Kind:   dbtypes.RepositoryRootKindDefault,
-			Status: dbtypes.RepositoryRootStatusActive,
+		storageLocations: []repo.StorageLocation{{
+			StorageLocationID: storageLocationID,
+			Name:              "legacy default name",
+			Path:              t.TempDir(),
+			Kind:              dbtypes.StorageLocationKindDefault,
+			Status:            dbtypes.StorageLocationStatusActive,
 		}},
 		repositories: []*repo.Repository{{
-			RepoID:       repositoryID,
-			RootID:       rootID,
-			Name:         "legacy primary name",
-			Path:         t.TempDir(),
-			Role:         dbtypes.RepoRolePrimary,
-			Reachability: dbtypes.RepositoryReachabilityActive,
+			RepoID:            repositoryID,
+			StorageLocationID: storageLocationID,
+			Name:              "legacy primary name",
+			Path:              t.TempDir(),
+			Role:              dbtypes.RepoRolePrimary,
+			Reachability:      dbtypes.RepositoryReachabilityActive,
 		}},
 	}
 
@@ -210,7 +213,7 @@ func TestStorageDiagnosticsCarriesStorageEntitySemantics(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("diagnostic count = %d, want 2", len(items))
 	}
-	if items[0].Kind != string(dbtypes.RepositoryRootKindDefault) || items[0].Role != "" {
+	if items[0].Kind != string(dbtypes.StorageLocationKindDefault) || items[0].Role != "" {
 		t.Fatalf("Storage Location semantics = kind %q role %q", items[0].Kind, items[0].Role)
 	}
 	if items[1].Kind != "" || items[1].Role != string(dbtypes.RepoRolePrimary) {
@@ -247,7 +250,7 @@ func TestCreateRepositoryUsesHostOwnerNotActingAdmin(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -277,7 +280,7 @@ func TestCreateRepositoryRejectsInvalidNameBeforeManagerCall(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":" Family","directory_name":"family"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":" Family","directory_name":"family"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -298,7 +301,7 @@ func TestCreateRepositoryRejectsMissingRegularStorageFolder(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -325,7 +328,7 @@ func TestCreateRepositoryReturnsExistingMarkerAsStructuredRecoveryFact(t *testin
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -359,7 +362,7 @@ func TestCreateRepositoryReturnsInvalidMarkerAsStructuredRecoveryFact(t *testing
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -391,7 +394,7 @@ func TestCreateRepositoryReturnsRegisteredIdentityAsMoveOrCopyConflict(t *testin
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -406,5 +409,137 @@ func TestCreateRepositoryReturnsRegisteredIdentityAsMoveOrCopyConflict(t *testin
 	}
 	if response.ConflictType != "repository_identity" || len(response.Actions) != 2 {
 		t.Fatalf("registered identity conflict = %+v", response)
+	}
+}
+
+func (s *createRepositoryManagerStub) AssessCreateTarget(_ context.Context, request storage.AssessCreateTargetRequest) (*storage.CreateTargetAssessment, error) {
+	s.assessedRequest = request
+	if s.assessErr != nil {
+		return nil, s.assessErr
+	}
+	if s.assessment != nil {
+		return s.assessment, nil
+	}
+	return &storage.CreateTargetAssessment{
+		Intent: request.Intent, DirectoryName: request.DirectoryName, Path: "/Volumes/Backup/" + request.DirectoryName,
+		StorageLocationID: uuid.MustParse("6b767057-d6f1-465c-b816-d1229f622a20"), StorageLocationKind: dbtypes.StorageLocationKindExternal,
+		Risks: []storage.StorageRisk{storage.RiskRemovable, storage.RiskNonDefault}, Token: "v1.review",
+	}, nil
+}
+
+func postStorageJSON(t *testing.T, handle func(*gin.Context), path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
+	handle(ctx)
+	return recorder
+}
+
+func TestCreateRepositoryReturnsTheConsentProblemWithRisksAndToken(t *testing.T) {
+	hostOwnerID := int32(1)
+	manager := &createRepositoryManagerStub{
+		hostOwnerID: &hostOwnerID,
+		createErr:   &storage.StorageRiskConfirmationError{Risks: []storage.StorageRisk{storage.RiskRemovable, storage.RiskNonDefault}, Token: "v1.review"},
+	}
+	handler := NewRepositoryScanHandler(nil, manager)
+
+	recorder := postStorageJSON(t, handler.CreateRepository, "/api/v1/storage/repositories",
+		`{"name":"Archive","directory_name":"archive","storage_location_id":"6b767057-d6f1-465c-b816-d1229f622a20","assessment_token":"v1.old","acknowledged_risks":["removable_storage"]}`)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response problem.StorageConfirmationRequiredDetails
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Type != problem.StorageConfirmationRequired.Type || response.AssessmentToken != "v1.review" ||
+		len(response.Risks) != 2 || response.Risks[0] != "removable_storage" || response.Risks[1] != "non_default_location" {
+		t.Fatalf("consent Problem = %+v", response)
+	}
+	if manager.createdSpec.AssessmentToken != "v1.old" || len(manager.createdSpec.AcknowledgedRisks) != 1 {
+		t.Fatalf("spec did not carry the acknowledgement: %+v", manager.createdSpec)
+	}
+	if strings.Contains(recorder.Body.String(), "/Volumes") {
+		t.Fatalf("consent Problem exposed a host path: %s", recorder.Body.String())
+	}
+}
+
+func TestCreateCommandsMapTypedStorageRefusals(t *testing.T) {
+	hostOwnerID := int32(1)
+	for _, tc := range []struct {
+		err  error
+		want problem.Descriptor
+	}{
+		{storage.ErrStorageAssessmentStale, problem.StorageAssessmentStale},
+		{storage.ErrStorageUnsupportedFilesystem, problem.StorageUnsupportedFilesystem},
+		{storage.ErrRepositoryExistingTargetNotMountPoint, problem.StorageNotMountedVolume},
+		{storage.ErrStoragePermissionDenied, problem.StoragePermissionDenied},
+		{storage.ErrStorageMaterializationRequired, problem.StorageMaterializationRequired},
+		{storage.ErrStorageObservationUnknown, problem.StorageObservationUnknown},
+	} {
+		for name, handle := range map[string]func(*createRepositoryManagerStub) (func(*gin.Context), string, string){
+			"create": func(m *createRepositoryManagerStub) (func(*gin.Context), string, string) {
+				return NewRepositoryScanHandler(nil, m).CreateRepository, "/api/v1/storage/repositories", `{"name":"Archive","directory_name":"archive"}`
+			},
+			"setup": func(m *createRepositoryManagerStub) (func(*gin.Context), string, string) {
+				return NewRepositoryScanHandler(nil, m).CreatePrimaryRepository, "/api/v1/setup/primary-repository", `{"name":"Primary"}`
+			},
+		} {
+			manager := &createRepositoryManagerStub{hostOwnerID: &hostOwnerID, createErr: tc.err}
+			handleFunc, path, body := handle(manager)
+			recorder := postStorageJSON(t, handleFunc, path, body)
+			var response problem.Details
+			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+				t.Fatalf("%s %v: decode: %v", name, tc.err, err)
+			}
+			if recorder.Code != tc.want.Status || response.Type != tc.want.Type {
+				t.Fatalf("%s %v: status %d type %s, want %d %s", name, tc.err, recorder.Code, response.Type, tc.want.Status, tc.want.Type)
+			}
+		}
+	}
+}
+
+func TestAssessStorageTargetReturnsTheReviewWithoutAHostPath(t *testing.T) {
+	hostOwnerID := int32(1)
+	manager := &createRepositoryManagerStub{hostOwnerID: &hostOwnerID}
+	handler := NewRepositoryScanHandler(nil, manager)
+
+	recorder := postStorageJSON(t, handler.AssessStorageTarget, "/api/v1/storage/assessments",
+		`{"intent":"create_repository","storage_location_id":"6b767057-d6f1-465c-b816-d1229f622a20","directory_name":"archive"}`)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response["token"] != "v1.review" || response["intent"] != "create_repository" || response["directory_name"] != "archive" ||
+		response["storage_location_kind"] != "external" || response["support"] != "" {
+		t.Fatalf("assessment body = %s", recorder.Body.String())
+	}
+	if risks, _ := response["risks"].([]any); len(risks) != 2 {
+		t.Fatalf("assessment risks = %v", response["risks"])
+	}
+	if _, exposed := response["path"]; exposed || strings.Contains(recorder.Body.String(), "/Volumes") {
+		t.Fatalf("assessment exposed the resolved path: %s", recorder.Body.String())
+	}
+	if manager.assessedRequest.Intent != storage.IntentCreateRepository || manager.assessedRequest.DirectoryName != "archive" {
+		t.Fatalf("assessment request = %+v", manager.assessedRequest)
+	}
+
+	bad := postStorageJSON(t, handler.AssessStorageTarget, "/api/v1/storage/assessments", `{"intent":"relocate"}`)
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("unknown intent status = %d", bad.Code)
+	}
+	manager.assessErr = storage.ErrRepositoryDirectoryConflict
+	conflict := postStorageJSON(t, handler.AssessStorageTarget, "/api/v1/storage/assessments", `{"intent":"create_repository","directory_name":"Archive"}`)
+	var conflictBody problem.RepositoryConflictDetails
+	if err := json.Unmarshal(conflict.Body.Bytes(), &conflictBody); err != nil || conflict.Code != http.StatusConflict || conflictBody.ConflictType != "repository_directory_conflict" {
+		t.Fatalf("directory conflict review = %d %s", conflict.Code, conflict.Body.String())
 	}
 }

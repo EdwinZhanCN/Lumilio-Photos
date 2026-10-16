@@ -231,12 +231,12 @@ WITH page_ids AS (
     FROM assets a
     JOIN species_predictions sp ON a.asset_id = sp.asset_id
     WHERE sp.label LIKE '%' || ?1 || '%'
-      AND a.is_deleted = false
+      AND a.lifecycle_state = 'active'
     GROUP BY a.asset_id, a.upload_time
     ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
     LIMIT ?3 OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.best_score DESC, p.upload_time DESC, p.asset_id DESC
@@ -270,8 +270,7 @@ func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsByS
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,

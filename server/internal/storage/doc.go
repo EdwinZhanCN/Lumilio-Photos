@@ -6,26 +6,33 @@
 //
 // # Responsibilities
 //
-//   - RepositoryManager (repo_manager.go): repository lifecycle — create,
-//     register existing, look up, list, update, remove — keeping the database
-//     records and the on-disk repository in sync. It is the consumer-facing
-//     contract; constructors return the concrete *DefaultRepositoryManager and
-//     callers depend on the narrow slice they need.
-//   - DirectoryManager (directory_manager.go): the structure *inside* a single
-//     repository — inbox, staging, trash, sidecars, system directories — plus
-//     the file operations over them (commit, trash, recover, sidecar I/O).
-//   - StagingManager (staging_manager.go): transient staging files used while an
-//     asset is being ingested, before it is committed into a repository.
-//   - roe (subpackage): bounded, resumable repository observation, native
-//     change hints, exact-content identity, Locations, and outbox delivery.
-//   - repocfg (subpackage): a single repository's own configuration — the
-//     .lumiliorepo file and the DB config column (storage strategy, filename
-//     preservation, duplicate handling). This is per-repository mutable
-//     behaviour and is owned here, decoupled from the global settings service.
+//   - [RepositoryManager]: repository lifecycle — create, register existing,
+//     look up, list, update, relocate, remove — keeping catalog records and
+//     the on-disk repository in sync. Constructors return the concrete
+//     [DefaultRepositoryManager]; callers depend on the narrow slice they
+//     need. Removal purges the repository's entries through
+//     [server/internal/lifecycle.PurgeRepositoryEntriesTx].
+//   - [DirectoryManager]: the structure inside one repository — inbox,
+//     staging, trash, sidecars, system directories — and the file operations
+//     over them.
+//   - [StagingManager]: transient staging files for uploads and cloud
+//     imports, before the sourcing pipeline commits them into the inbox.
+//   - [RepositoryFS] and [RepositoryFSFactory]: every repository file
+//     operation is rooted here and serialized against relocation and
+//     removal; nothing else opens repository paths.
+//   - [server/internal/storage/scan]: the repository scan index. The catalog
+//     mirrors each repository tree in repository_entries; walks diff
+//     directories against it and a bounded hash pass binds content to Assets.
+//   - [server/internal/storage/trash]: journaled Delete and Restore through
+//     the repository trash.
+//   - [server/internal/storage/locations]: resolves an Asset to a present
+//     file just before media I/O.
+//   - [server/internal/storage/repocfg] and [server/internal/storage/rootcfg]:
+//     the .lumiliorepo and .lumilioroot files.
 //   - Repository ownership is deliberately not per-repository. The first
-//     account is the Host Owner and is used as every repository's fallback
-//     owner for filesystem discovery; explicit upload owners and stable cloud
-//     binding owners still win.
+//     account is the Host Owner and is every repository's fallback owner for
+//     filesystem discovery; explicit upload owners and stable cloud binding
+//     owners still win.
 //
 // # Storage layout
 //
@@ -40,4 +47,23 @@
 // Cloud sessions, secrets, logs, and backups are app-private state configured
 // outside storage.path. Repository staging remains repository-owned under
 // .lumilio because it is recoverable work tied to that repository.
+//
+// Identity and admission: repositories.role is primary or regular, and the
+// instance is set up only when an admin exists and exactly one active primary
+// Repository exists. Additional Storage Locations are storage_locations rows
+// keyed by the UUID in .lumilioroot; their summaries are catalog projections
+// that never authorize or deny child Repository I/O. Admission is decided per
+// Repository: [UploadAdmission] for upload and cloud materialization,
+// lifecycle leases and identity checks for verify, rename, reconnect, and
+// detach.
+//
+// [StorageObserver] supplies only read/stat/mount facts to
+// [ObserveStorageTarget] and [AssessStorageTarget]. [ClassifyStorage] and
+// [DeriveStorageCapabilities] are pure; mutation capabilities remain conditional
+// until explicit ownership/write preflight. Child observations never depend on
+// parent marker health. [RepositoryLockProvider] and
+// [RepositoryIdentityDetector] keep local ownership and identity replaceable;
+// alternatives are installed before serving, preserving rooted I/O.
+//
+//atlas:group storage
 package storage

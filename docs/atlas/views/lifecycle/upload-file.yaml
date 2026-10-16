@@ -1,0 +1,74 @@
+id: upload-file
+kind: lifecycle
+title: Upload queue — one file
+summary: >-
+  The browser-side state of one file in the global upload queue. The queue is
+  intentionally not persisted: progress survives route changes but not a
+  reload. A file only reaches completed when its server ingest receipt is
+  terminal, not when its bytes finish uploading.
+enum: ts:FileUploadStatus
+direction: LR
+nodes:
+  - id: pending
+    label: pending
+    member: pending
+    anchor: ts:features/upload#FileUploadStatus
+    note: Queued; hashing in the worker.
+  - id: uploading
+    label: uploading
+    member: uploading
+    anchor: ts:features/upload#createUploadTransport
+    note: Batch or chunked transport in flight.
+  - id: processing
+    label: processing
+    member: processing
+    anchor: ts:waitForUploadOperations
+    note: Bytes accepted; following the ingest receipt.
+  - id: completed
+    label: completed
+    member: completed
+    anchor: go:commit.Coordinator.ApplyIngestReceipt
+    note: The server ingest receipt is terminal and successful.
+  - id: duplicate
+    label: duplicate
+    member: duplicate
+    anchor: ts:DUPLICATE_STATUS
+    note: Precheck found the same content; the file was never sent.
+  - id: failed
+    label: failed
+    member: failed
+    anchor: ts:features/upload#runUploadProcess
+    note: Transport or ingest failed; the File stays queued for retry.
+transitions:
+  - from: "[*]"
+    to: pending
+    label: file added to the queue
+  - from: pending
+    to: duplicate
+    label: precheck matched hash + size
+    anchor: ts:precheckUploads
+  - from: pending
+    to: uploading
+    label: transport starts
+  - from: uploading
+    to: processing
+    label: server returned a receipt
+  - from: uploading
+    to: failed
+    label: transport error
+  - from: processing
+    to: completed
+    label: receipt terminal, success
+  - from: processing
+    to: failed
+    label: receipt terminal, ingest error
+  - from: failed
+    to: pending
+    label: retry
+notes:
+  - title: Server and browser agree on "done"
+    body: >-
+      The browser waits on the same ingest receipt the commit coordinator
+      completes (see the upload sequence), so a file never shows completed
+      while the Asset is not yet in the catalog.
+related: [upload-to-catalog]

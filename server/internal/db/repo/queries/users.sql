@@ -121,7 +121,7 @@ LEFT JOIN (
   SELECT owner_id AS user_id, COUNT(*) AS asset_count
   FROM assets
   WHERE owner_id IS NOT NULL
-    AND is_deleted = false
+    AND lifecycle_state = 'active'
   GROUP BY owner_id
 ) asset_counts ON asset_counts.user_id = u.user_id
 LEFT JOIN (

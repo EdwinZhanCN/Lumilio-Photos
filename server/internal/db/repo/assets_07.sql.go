@@ -12,7 +12,7 @@ import (
 const countPhotoMapPoints = `-- name: CountPhotoMapPoints :one
 SELECT COUNT(*) as count
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence

@@ -18,13 +18,13 @@ func TestOpenRepositoryRejectsUnavailableCloudPlaceholderBeforeCatalogMutation(t
 	ctx := context.Background()
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-placeholder", Actor: "test", Name: "Placeholder Archive",
-		DirectoryName: "placeholder-archive", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "placeholder-archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -50,13 +50,13 @@ func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T)
 	ctx := context.Background()
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-reopen-source", Actor: "test", Name: "Reopened Archive",
-		DirectoryName: "reopened", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "reopened", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -140,13 +140,13 @@ func TestRenameRepositoryChangesOnlyDisplayName(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "rename-only", Actor: "test", Name: "Before", DirectoryName: "stable-folder",
-		Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(), StorageStrategy: "cas", DuplicateHandling: "rename",
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(), StorageStrategy: "cas", DuplicateHandling: "rename",
 	})
 	if err != nil {
 		t.Fatal(err)

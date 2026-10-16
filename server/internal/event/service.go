@@ -286,7 +286,8 @@ SELECT mi.media_item_id,
        CASE WHEN capture.taken_time IS NOT NULL THEN capture.capture_offset_minutes END,
        COALESCE(primary_asset.gps_latitude, component.gps_latitude),
        COALESCE(primary_asset.gps_longitude, component.gps_longitude),
-       asm.stack_id
+       asm.stack_id,
+       mi.media_kind
 FROM media_items mi
 LEFT JOIN assets primary_asset ON primary_asset.asset_id = mi.primary_asset_id
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
@@ -304,7 +305,8 @@ LEFT JOIN assets component ON component.asset_id = (
  WHEN 'raw_original' THEN 2 WHEN 'original' THEN 3 WHEN 'edited_version' THEN 4
  WHEN 'alternative' THEN 5 WHEN 'component' THEN 6 WHEN 'live_photo_video' THEN 7 ELSE 8 END,
  mia.position, mia.asset_id LIMIT 1)
-WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
+WHERE mi.owner_id=? AND mi.media_kind IN ('photo','video','live_photo')
+ORDER BY 2, mi.media_item_id`
 	rows, err := database.QueryContext(ctx, query, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("load Event candidates: %w", err)
@@ -312,15 +314,15 @@ WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
 	defer rows.Close()
 	var result []Candidate
 	for rows.Next() {
-		var id, source string
+		var id, source, kind string
 		var micros int64
 		var offset sql.NullInt64
 		var lat, lon sql.NullFloat64
 		var stack sql.NullString
-		if err := rows.Scan(&id, &micros, &source, &offset, &lat, &lon, &stack); err != nil {
+		if err := rows.Scan(&id, &micros, &source, &offset, &lat, &lon, &stack, &kind); err != nil {
 			return nil, err
 		}
-		item := Candidate{MediaItemID: id, CapturedAt: time.UnixMicro(micros).UTC(), TimeSource: source}
+		item := Candidate{MediaItemID: id, CapturedAt: time.UnixMicro(micros).UTC(), TimeSource: source, MediaKind: kind}
 		if offset.Valid {
 			sign := "+"
 			value := offset.Int64
@@ -343,7 +345,14 @@ WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
 func loadConstraints(ctx context.Context, database queryer, ownerID int32) ([]Constraint, error) {
 	rows, err := database.QueryContext(ctx, `
 SELECT kind, event_id, left_media_item_id, right_media_item_id
-FROM event_constraints WHERE owner_id=?
+FROM event_constraints ec WHERE owner_id=?
+  AND EXISTS (SELECT 1 FROM media_items mi
+              WHERE mi.media_item_id=ec.left_media_item_id AND mi.owner_id=ec.owner_id
+                AND mi.media_kind IN ('photo','video','live_photo'))
+  AND (ec.right_media_item_id IS NULL OR EXISTS (
+       SELECT 1 FROM media_items mi
+       WHERE mi.media_item_id=ec.right_media_item_id AND mi.owner_id=ec.owner_id
+         AND mi.media_kind IN ('photo','video','live_photo')))
 ORDER BY kind, event_id, left_media_item_id, right_media_item_id`, ownerID)
 	if err != nil {
 		return nil, err
@@ -372,6 +381,9 @@ SELECT e.event_id, e.start_at, e.end_at, e.cover_override_media_item_id,
        emi.media_item_id
 FROM events e
 LEFT JOIN event_media_items emi ON emi.event_id=e.event_id AND emi.owner_id=e.owner_id
+  AND EXISTS (SELECT 1 FROM media_items mi
+              WHERE mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
+                AND mi.media_kind IN ('photo','video','live_photo'))
 WHERE e.owner_id=? AND e.status='active'
 ORDER BY e.created_at, e.event_id, emi.position, emi.media_item_id`, ownerID)
 	if err != nil {
@@ -515,7 +527,9 @@ func (s *Service) publishTx(ctx context.Context, tx *sql.Tx, ownerID int32, segm
 		eventRows = append(eventRows, eventRow)
 
 		coverRow := eventCoverRow{EventID: assignment.EventID}
-		if len(segment.MediaItemIDs) > 0 {
+		if segment.CoverCandidateID != "" {
+			coverRow.GeneratedCover = optionalString(segment.CoverCandidateID)
+		} else if len(segment.MediaItemIDs) > 0 {
 			coverRow.GeneratedCover = optionalString(segment.MediaItemIDs[0])
 		}
 		if retained && previous.CoverOverrideID != "" && contains(segment.MediaItemIDs, previous.CoverOverrideID) {
@@ -581,6 +595,17 @@ FROM event_owner_state WHERE owner_id=?`, ownerID).
 	}
 	if expectedRevision == nil {
 		expectedRevision = &sourceRevision
+	}
+
+	// Constraints referring to ineligible media cannot participate in future
+	// rebuilds. Keep every correction whose endpoints are photo/video media.
+	if _, err := tx.ExecContext(ctx, `
+DELETE FROM event_constraints
+WHERE owner_id=? AND (
+ left_media_item_id IN (SELECT media_item_id FROM media_items WHERE owner_id=? AND media_kind NOT IN ('photo','video','live_photo'))
+ OR right_media_item_id IN (SELECT media_item_id FROM media_items WHERE owner_id=? AND media_kind NOT IN ('photo','video','live_photo'))
+)`, ownerID, ownerID, ownerID); err != nil {
+		return err
 	}
 
 	// Remove the old complete membership set before inserting the new one.
@@ -1019,7 +1044,8 @@ SELECT COALESCE(max(position)+1,0) FROM event_media_items WHERE event_id=? AND o
 		if err := tx.QueryRowContext(ctx, `
 SELECT mi.media_item_id FROM media_items mi
 JOIN media_item_assets mia ON mia.media_item_id=mi.media_item_id
-WHERE mia.asset_id=? AND mi.owner_id=?`, assetID, ownerID).Scan(&mediaID); err != nil {
+WHERE mia.asset_id=? AND mi.owner_id=?
+  AND mi.media_kind IN ('photo','video','live_photo')`, assetID, ownerID).Scan(&mediaID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return Summary{}, ErrNotFound
 			}
@@ -1087,21 +1113,34 @@ INSERT OR IGNORE INTO event_constraints(
 
 func repairEventTx(ctx context.Context, tx *sql.Tx, ownerID int32, eventID string, now int64) error {
 	var start, end int64
-	var cover string
+	var cover sql.NullString
 	err := tx.QueryRowContext(ctx, `
 SELECT min(COALESCE(a.taken_time,a.upload_time,mi.created_at)),
        max(COALESCE(a.taken_time,a.upload_time,mi.created_at)),
-       (SELECT media_item_id FROM event_media_items WHERE event_id=? AND owner_id=? ORDER BY position,media_item_id LIMIT 1)
+       COALESCE(
+         (SELECT emi_cover.media_item_id
+          FROM event_media_items emi_cover
+          JOIN media_items mi_cover ON mi_cover.media_item_id=emi_cover.media_item_id AND mi_cover.owner_id=emi_cover.owner_id
+          WHERE emi_cover.event_id=? AND emi_cover.owner_id=?
+            AND mi_cover.media_kind IN ('photo','video','live_photo')
+          ORDER BY emi_cover.position,emi_cover.media_item_id
+          LIMIT 1),
+         (SELECT media_item_id FROM event_media_items WHERE event_id=? AND owner_id=? ORDER BY position,media_item_id LIMIT 1)
+       )
 FROM event_media_items emi
 JOIN media_items mi ON mi.media_item_id=emi.media_item_id
 LEFT JOIN assets a ON a.asset_id=mi.primary_asset_id
-WHERE emi.event_id=? AND emi.owner_id=?`, eventID, ownerID, eventID, ownerID).Scan(&start, &end, &cover)
+WHERE emi.event_id=? AND emi.owner_id=?`, eventID, ownerID, eventID, ownerID, eventID, ownerID).Scan(&start, &end, &cover)
 	if err != nil {
 		return err
 	}
+	var coverVal *string
+	if cover.Valid {
+		coverVal = &cover.String
+	}
 	_, err = tx.ExecContext(ctx, `
 UPDATE events SET start_at=?,end_at=?,generated_cover_media_item_id=?,updated_at=?
-WHERE event_id=? AND owner_id=?`, start, end, cover, now, eventID, ownerID)
+WHERE event_id=? AND owner_id=?`, start, end, coverVal, now, eventID, ownerID)
 	return err
 }
 

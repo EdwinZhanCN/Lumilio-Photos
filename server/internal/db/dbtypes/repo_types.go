@@ -27,18 +27,18 @@ const (
 	RepoRoleRegular RepoRole = "regular"
 )
 
-type RepositoryRootKind string
+type StorageLocationKind string
 
 const (
-	RepositoryRootKindDefault  RepositoryRootKind = "default"
-	RepositoryRootKindExternal RepositoryRootKind = "external"
+	StorageLocationKindDefault  StorageLocationKind = "default"
+	StorageLocationKindExternal StorageLocationKind = "external"
 )
 
-type RepositoryRootStatus string
+type StorageLocationStatus string
 
 const (
-	RepositoryRootStatusActive      RepositoryRootStatus = "active"
-	RepositoryRootStatusOffline     RepositoryRootStatus = "offline"
-	RepositoryRootStatusError       RepositoryRootStatus = "error"
-	RepositoryRootStatusMaintenance RepositoryRootStatus = "maintenance"
+	StorageLocationStatusActive      StorageLocationStatus = "active"
+	StorageLocationStatusOffline     StorageLocationStatus = "offline"
+	StorageLocationStatusError       StorageLocationStatus = "error"
+	StorageLocationStatusMaintenance StorageLocationStatus = "maintenance"
 )

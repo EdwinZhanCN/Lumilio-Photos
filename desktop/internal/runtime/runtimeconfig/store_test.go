@@ -289,9 +289,9 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(current, "primary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	currentRootID := uuid.NewString()
+	currentStorageLocationID := uuid.NewString()
 	currentPrimaryID := uuid.NewString()
-	writePortableStorageIdentity(t, current, currentRootID, currentPrimaryID)
+	writePortableStorageIdentity(t, current, currentStorageLocationID, currentPrimaryID)
 	draft.Settings.StoragePath = current
 	draft, err = store.PatchDraft(draft.TOML, draft.Settings)
 	if err != nil {
@@ -312,7 +312,7 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(candidate, "primary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writePortableStorageIdentity(t, candidate, currentRootID, uuid.NewString())
+	writePortableStorageIdentity(t, candidate, currentStorageLocationID, uuid.NewString())
 	draft.Settings.StoragePath = candidate
 	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil || !strings.Contains(err.Error(), "primary repository identity") {
 		t.Fatalf("different primary identity error = %v", err)
@@ -323,10 +323,10 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 	}
 }
 
-func writePortableStorageIdentity(t *testing.T, rootPath, rootID, primaryID string) {
+func writePortableStorageIdentity(t *testing.T, rootPath, storageLocationID, primaryID string) {
 	t.Helper()
 	markers := map[string]string{
-		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + rootID + "\n",
+		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + storageLocationID + "\n",
 		filepath.Join(rootPath, "primary", ".lumiliorepo"): "version: \"1.0\"\nid: " + primaryID + "\n",
 	}
 	for path, contents := range markers {

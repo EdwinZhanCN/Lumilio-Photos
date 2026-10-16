@@ -61,7 +61,7 @@ SELECT mia.asset_id
 FROM media_item_assets mia
 JOIN assets a ON a.asset_id = mia.asset_id
 WHERE mia.media_item_id = sqlc.arg('media_item_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY
   CASE mia.relation
     WHEN 'jpeg_original' THEN 0
@@ -110,7 +110,7 @@ FROM asset_stack_members asm
 JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 JOIN assets a ON a.asset_id = mi.primary_asset_id
 WHERE asm.stack_id = sqlc.arg('stack_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (sqlc.narg('owner_id') IS NULL OR mi.owner_id = sqlc.narg('owner_id'))
 ORDER BY asm.position ASC, asm.created_at ASC;
 
@@ -140,7 +140,7 @@ FROM asset_stack_members asm
 JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 JOIN assets a ON a.asset_id = mi.primary_asset_id
 WHERE asm.stack_id = sqlc.arg('stack_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (sqlc.narg('owner_id') IS NULL OR mi.owner_id = sqlc.narg('owner_id'));
 
 -- name: GetStackMemberCountAny :one
@@ -209,7 +209,7 @@ SELECT a.asset_id,
        CAST(lower(a.original_filename) AS TEXT) AS base_name
 FROM assets a
 JOIN media_item_assets mia ON mia.asset_id = a.asset_id
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -240,7 +240,7 @@ JOIN assets component ON component.asset_id = mia.asset_id
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
 WHERE mi.repository_id = ?1
   AND mi.media_kind = 'photo'
-  AND primary_asset.is_deleted = false
+  AND primary_asset.lifecycle_state = 'active'
   AND asm.media_item_id IS NULL
 GROUP BY mi.media_item_id, primary_asset.asset_id
 ORDER BY COALESCE(primary_asset.taken_time, primary_asset.upload_time), mi.media_item_id;
@@ -301,7 +301,7 @@ RETURNING *;
 SELECT asset_id, type
 FROM assets
 WHERE owner_id = sqlc.arg('owner_id')
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
   AND type IN ('PHOTO', 'VIDEO')
   AND json_extract(specific_metadata, '$.content_identifier')
       = CAST(sqlc.arg('content_identifier') AS TEXT)
@@ -325,7 +325,7 @@ WITH identified AS (
          CAST(json_extract(a.specific_metadata, '$.content_identifier') AS TEXT) AS content_identifier
   FROM assets a
   JOIN media_item_assets mia ON mia.asset_id = a.asset_id
-  WHERE a.is_deleted = false
+  WHERE a.lifecycle_state = 'active'
     AND EXISTS (
       SELECT 1 FROM active_asset_occurrences occurrence
       WHERE occurrence.asset_id = a.asset_id

@@ -198,18 +198,18 @@ func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Rea
 		rawJSON = nil
 	}
 
-	return e.parseMetadata(rawData, assetType), common, rawJSON, nil
+	return e.parseMetadata(rawData, rawJSON, assetType), common, rawJSON, nil
 }
 
 // parseMetadata parses raw metadata based on asset type
-func (e *Extractor) parseMetadata(rawData map[string]string, assetType dbtypes.AssetType) interface{} {
+func (e *Extractor) parseMetadata(rawData map[string]string, rawJSON json.RawMessage, assetType dbtypes.AssetType) interface{} {
 	switch assetType {
 	case dbtypes.AssetTypePhoto:
 		return parsePhotoMetadata(rawData)
 	case dbtypes.AssetTypeVideo:
 		return parseVideoMetadata(rawData)
 	case dbtypes.AssetTypeAudio:
-		return parseAudioMetadata(rawData)
+		return parseAudioMetadataWithRaw(rawData, rawJSON)
 	default:
 		return nil
 	}
@@ -228,30 +228,30 @@ func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader,
 	cmd := exec.CommandContext(ctxWithTimeout, e.config.ExifToolPath, args...)
 	sysproc.HideConsole(cmd)
 
-	// Set up pipes
-	stdin, stdout, stderr, err := e.setupPipes(cmd)
-	if err != nil {
-		return nil, nil, err
+	// Let os/exec own the copy goroutines and process lifetime. Its stdin
+	// copier tolerates a child closing its input early (ExifTool does this for
+	// JXL codestreams); Run still waits for exit and drains both output streams.
+	// Track source failures separately so a reader's EPIPE cannot be mistaken
+	// for the child's successful early close.
+	source := &metadataSourceReader{reader: reader, cancel: cancel}
+	var output, diagnostics bytes.Buffer
+	cmd.Stdin = bufio.NewReaderSize(source, e.config.BufferSize)
+	cmd.Stdout = &output
+	cmd.Stderr = &diagnostics
+	runErr := cmd.Run()
+	if source.err != nil {
+		return nil, nil, fmt.Errorf("reading metadata source: %w", source.err)
 	}
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return nil, nil, fmt.Errorf("failed to start exiftool: %w", err)
+	if err := ctxWithTimeout.Err(); err != nil {
+		return nil, nil, fmt.Errorf("exiftool execution canceled: %w", err)
 	}
-
-	// Handle I/O concurrently with true streaming
-	outputBuffer, err := e.handleStreamingIO(stdin, stdout, stderr, reader)
-	if err != nil {
-		cmd.Process.Kill()
-		return nil, nil, err
+	if runErr != nil {
+		return nil, nil, fmt.Errorf("exiftool command failed: %w", runErr)
 	}
-
-	// Wait for command completion
-	if err := cmd.Wait(); err != nil {
-		return nil, nil, fmt.Errorf("exiftool command failed: %w", err)
+	if containsCriticalError(diagnostics.String()) {
+		return nil, nil, fmt.Errorf("exiftool reported error: %s", diagnostics.String())
 	}
-
-	return e.parseExifToolOutput(outputBuffer.Bytes())
+	return e.parseExifToolOutput(output.Bytes())
 }
 
 // buildExifToolArgs builds command line arguments for exiftool
@@ -274,78 +274,21 @@ func (e *Extractor) buildExifToolArgs(tags []string) []string {
 	return args
 }
 
-// setupPipes sets up stdin, stdout, and stderr pipes for the command
-func (e *Extractor) setupPipes(cmd *exec.Cmd) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create stdin pipe: %w", err)
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		stdin.Close()
-		return nil, nil, nil, fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		stdin.Close()
-		stdout.Close()
-		return nil, nil, nil, fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
-
-	return stdin, stdout, stderr, nil
+// metadataSourceReader records errors from the media source, independently of
+// errors writing to the subprocess pipe. Run joins its reader before inspection.
+type metadataSourceReader struct {
+	reader io.Reader
+	cancel context.CancelFunc
+	err    error
 }
 
-// handleStreamingIO handles I/O operations with true streaming (no memory buffering)
-func (e *Extractor) handleStreamingIO(stdin io.WriteCloser, stdout, stderr io.ReadCloser, reader io.Reader) (*bytes.Buffer, error) {
-	var outputBuffer, errorBuffer bytes.Buffer
-	done := make(chan error, 3)
-
-	// Stream data directly from reader to stdin without buffering entire file
-	go func() {
-		defer stdin.Close()
-
-		// Use buffered reader for efficient streaming with optimized buffer size
-		bufferedReader := bufio.NewReaderSize(reader, e.config.BufferSize)
-		copyBuffer := make([]byte, e.config.BufferSize)
-
-		// For large files, use progress-aware copying to avoid timeouts
-		_, err := io.CopyBuffer(stdin, bufferedReader, copyBuffer)
-		done <- err
-	}()
-
-	// Read from stdout
-	go func() {
-		defer stdout.Close()
-		_, err := io.Copy(&outputBuffer, stdout)
-		done <- err
-	}()
-
-	// Read from stderr
-	go func() {
-		defer stderr.Close()
-		_, err := io.Copy(&errorBuffer, stderr)
-		done <- err
-	}()
-
-	// Wait for all I/O operations
-	for i := 0; i < 3; i++ {
-		if err := <-done; err != nil && err != io.EOF {
-			return nil, fmt.Errorf("I/O error during exiftool execution: %w", err)
-		}
+func (r *metadataSourceReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if err != nil && err != io.EOF {
+		r.err = err
+		r.cancel()
 	}
-
-	// Check for any critical errors in stderr (ignore warnings)
-	if errorBuffer.Len() > 0 {
-		errorStr := errorBuffer.String()
-		// Only return error if it's a critical error, not a warning
-		if containsCriticalError(errorStr) {
-			return nil, fmt.Errorf("exiftool reported error: %s", errorStr)
-		}
-	}
-
-	return &outputBuffer, nil
+	return n, err
 }
 
 // containsCriticalError checks if stderr contains critical errors (not warnings)

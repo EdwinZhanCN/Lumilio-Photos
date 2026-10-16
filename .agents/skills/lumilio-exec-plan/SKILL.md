@@ -65,7 +65,8 @@ work lands).
    into `.agents/decisions/YYYY-MM-DD-topic.md`. A decision nobody will
    revisit needs no record.
 3. Move surviving debt to `tech-debt-tracker.md`; update the owning reference
-   docs (BACKEND.md, FRONTEND.md, feature `doc.ts`) in the same change.
+   docs (package `doc.go`, feature `doc.ts`, `web/ARCHITECTURE.md`, Atlas
+   views) in the same change.
 4. Delete the plan file. Git history retains the full record; do not keep a
    trimmed copy anywhere.
 

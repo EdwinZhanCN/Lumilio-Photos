@@ -53,7 +53,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository identity: %w", err)
 	}
-	rootID, err := rm.repositoryRootIDForPath(ctx, cleanPath)
+	storageLocationID, err := rm.storageLocationIDForPath(ctx, cleanPath)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		RequestID: request.RequestID,
 		Kind:      lifecycleKindOpenRepository,
 		Payload: openRepositoryOperationPayload{
-			Path: cleanPath, RootID: rootID.String(), OwnerID: defaultOwnerID, Role: dbtypes.RepoRoleRegular, RiskConfirmation: request.RiskConfirmation,
+			Path: cleanPath, StorageLocationID: storageLocationID.String(), OwnerID: defaultOwnerID, Role: dbtypes.RepoRoleRegular, RiskConfirmation: request.RiskConfirmation,
 		},
 		Actor:          request.Actor,
 		ActorUserID:    request.ActorUserID,
@@ -101,7 +101,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		return failPrepared(fmt.Errorf("look up repository identity: %w", lookupErr))
 	}
 
-	releaseRoot := rm.acquireRepositoryRootRead(rootID)
+	releaseStorageLocation := rm.acquireStorageLocationRead(storageLocationID)
 	releaseMutation := rm.acquireRepositoryMutation(repositoryID)
 	locksReleased := false
 	releaseLocks := func() {
@@ -110,7 +110,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		}
 		locksReleased = true
 		releaseMutation()
-		releaseRoot()
+		releaseStorageLocation()
 	}
 	defer releaseLocks()
 
@@ -139,7 +139,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		return nil, rollback(fmt.Errorf("persist open-repository filesystem phase: %w", err))
 	}
 
-	databaseRepository, err := rm.addRepository(ctx, cleanPath, defaultOwnerID, dbtypes.RepoRoleRegular, true, rootID)
+	databaseRepository, err := rm.addRepository(ctx, cleanPath, defaultOwnerID, dbtypes.RepoRoleRegular, true, storageLocationID)
 	if err != nil {
 		return nil, rollback(err)
 	}

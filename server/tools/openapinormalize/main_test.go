@@ -52,6 +52,7 @@ func TestGeneratedAPIErrorsUseOnlyProblemJSON(t *testing.T) {
 					"#/components/schemas/api.ProblemResponse",
 					"#/components/schemas/api.RateLimitedProblemResponse",
 					"#/components/schemas/api.RepositoryConflictProblemResponse",
+					"#/components/schemas/api.RepositoryCreateProblemResponse",
 				}, ref)
 				checked++
 			}

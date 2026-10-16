@@ -87,9 +87,10 @@ tasks:
       - web:dev
 
   test:
-    desc: Run repository architecture, Server, and Web tests
+    desc: Run repository architecture, Atlas, Server, and Web tests
     cmds:
       - task: architecture:check
+      - task: atlas:check
       - task: test:modules
 
   test:modules:
@@ -110,6 +111,38 @@ tasks:
     desc: Check repository architecture constraints
     cmds:
       - go -C server run ./tools/architecturecheck
+
+  # The Atlas spans Server, Desktop, and Web, so its targets live here. The Web
+  # facts are extracted first; the Go tool joins them with the Go packages.
+  atlas:
+    desc: Open the Atlas code map in the internal docs site (http://localhost:6690/atlas/)
+    cmds:
+      - task: atlas:data
+      - task: site:atlas
+
+  atlas:data:
+    desc: Write the Atlas site model to .local/atlas; an open Atlas page hot-reloads
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas data
+
+  atlas:generate:
+    desc: Regenerate docs/atlas/generated; fails on broken anchors, undeclared dependencies, or stale views
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas generate
+
+  atlas:check:
+    desc: Fail if any Atlas anchor, dependency declaration, package doc, or generated file is out of sync
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas check
+
+  atlas:lock:
+    desc: Mark every Atlas view verified against the current code (only after re-reading stale views)
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas lock
 
   compose:test:
     desc: Validate every Docker Compose configuration
@@ -276,7 +309,8 @@ tasks:
       - task: dto
       - task: config:examples
       - task: web:docs
-      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
+      - task: atlas:generate
+      - git diff --exit-code -- docs/atlas server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
 
   # CI contracts exist only when they orchestrate more than one module target.
   # One-to-one wrappers are forbidden: workflows call the module target
@@ -295,6 +329,7 @@ tasks:
       - task: site:install:ci
       - task: site:checks
       - task: site:build
+      - task: site:build:atlas
 
   ci:desktop:panel:
     desc: Install and build the Desktop control panel frontend

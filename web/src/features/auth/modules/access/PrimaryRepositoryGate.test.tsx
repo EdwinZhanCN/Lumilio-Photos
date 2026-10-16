@@ -15,7 +15,7 @@ describe("PrimaryRepositoryGate", () => {
           runtime_state: "degraded",
           runtime_reason: "storage_recovery_required",
           repository_defaults: {
-            default_root: "/configured/storage",
+            storage_location: "/configured/storage",
             storage_strategy: "date",
             duplicate_handling: "rename",
           },
@@ -45,14 +45,24 @@ describe("PrimaryRepositoryGate", () => {
           admin_initialized: true,
           primary_repository_initialized: false,
           repository_defaults: {
-            default_root: "/storage",
+            storage_location: "/storage",
             storage_strategy: "date",
             duplicate_handling: "rename",
-            risk_warnings: ["removable_storage"],
+            assessment: {
+              token: "v1.setup",
+              intent: "setup_primary",
+              storage_location_id: "6b767057-d6f1-465c-b816-d1229f622a20",
+              storage_location_kind: "default",
+              directory_name: "primary",
+              support: "supported",
+              risks: ["removable_storage"],
+              can_create: true,
+              marker_state: "absent",
+            },
           },
         }),
       ),
-      http.post("*/api/v1/repositories", async ({ request }) => {
+      http.post("*/api/v1/setup/primary-repository", async ({ request }) => {
         requestBody = await request.json();
         return HttpResponse.json({
           repository: {
@@ -61,7 +71,7 @@ describe("PrimaryRepositoryGate", () => {
             role: "primary",
             storage_strategy: "cas",
           },
-          warnings: [],
+          acknowledged_risks: ["removable_storage"],
         });
       }),
     );
@@ -89,9 +99,9 @@ describe("PrimaryRepositoryGate", () => {
       .poll(() => requestBody)
       .toEqual({
         name: "Primary Storage",
-        role: "primary",
         storage_strategy: "cas",
-        risk_confirmation: true,
+        assessment_token: "v1.setup",
+        acknowledged_risks: ["removable_storage"],
       });
   });
 });

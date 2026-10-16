@@ -68,7 +68,12 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so `task ci:desktop:panel` runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT.
+                  run-install: false
 
             - uses: actions/setup-go@v6
               with:
