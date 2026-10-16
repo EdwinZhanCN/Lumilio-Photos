@@ -224,6 +224,10 @@ type Querier interface {
 	DeleteLocationClusterAsset(ctx context.Context, arg DeleteLocationClusterAssetParams) (int64, error)
 	DeleteLocationClusterIfEmpty(ctx context.Context, clusterID uuid.UUID) (int64, error)
 	DeleteMediaItem(ctx context.Context, mediaItemID uuid.UUID) error
+	// The Trash rebuild recorded a trashed row for an Asset at a path a scan
+	// had already marked missing (the file left for the trash before the catalog
+	// knew); the missing row stands for the same file and is superseded.
+	DeleteMissingRepositoryEntriesAtTrashedPath(ctx context.Context, arg DeleteMissingRepositoryEntriesAtTrashedPathParams) (int64, error)
 	// A present entry for the Asset now exists, so its missing entries were
 	// moves or deletions of copies, removed like Syncthing's findRename.
 	DeleteMissingRepositoryEntriesForAsset(ctx context.Context, assetID uuid.NullUUID) (int64, error)
@@ -546,6 +550,11 @@ type Querier interface {
 	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	HasOtherPresentRepositoryEntry(ctx context.Context, arg HasOtherPresentRepositoryEntryParams) (int64, error)
+	// A catalog restored from a backup taken before a Delete still lists the
+	// file at its path; the trashed row the Trash rebuild records for the same
+	// Asset and path supersedes it, so the vanished row is dropped instead of
+	// becoming missing.
+	HasTrashedRepositoryEntryAtPath(ctx context.Context, arg HasTrashedRepositoryEntryAtPathParams) (int64, error)
 	IncrementCloudImportRunCounts(ctx context.Context, arg IncrementCloudImportRunCountsParams) (CloudImportRun, error)
 	IncrementShareLinkView(ctx context.Context, shareID uuid.UUID) error
 	IncrementUserAuthVersion(ctx context.Context, userID int32) (User, error)

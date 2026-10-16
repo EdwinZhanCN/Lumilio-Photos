@@ -303,6 +303,31 @@ func (q *Queries) CountRepositoryLifecycle(ctx context.Context, repositoryID uui
 	return i, err
 }
 
+const deleteMissingRepositoryEntriesAtTrashedPath = `-- name: DeleteMissingRepositoryEntriesAtTrashedPath :execrows
+DELETE FROM repository_entries
+WHERE asset_id = ?1
+  AND repository_id = ?2
+  AND path_key = ?3
+  AND state = 'missing'
+`
+
+type DeleteMissingRepositoryEntriesAtTrashedPathParams struct {
+	AssetID      uuid.NullUUID `db:"asset_id" json:"asset_id"`
+	RepositoryID uuid.UUID     `db:"repository_id" json:"repository_id"`
+	PathKey      string        `db:"path_key" json:"path_key"`
+}
+
+// The Trash rebuild recorded a trashed row for an Asset at a path a scan
+// had already marked missing (the file left for the trash before the catalog
+// knew); the missing row stands for the same file and is superseded.
+func (q *Queries) DeleteMissingRepositoryEntriesAtTrashedPath(ctx context.Context, arg DeleteMissingRepositoryEntriesAtTrashedPathParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteMissingRepositoryEntriesAtTrashedPath, arg.AssetID, arg.RepositoryID, arg.PathKey)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteMissingRepositoryEntriesForAsset = `-- name: DeleteMissingRepositoryEntriesForAsset :execrows
 DELETE FROM repository_entries
 WHERE asset_id = ?1
@@ -645,6 +670,40 @@ func (q *Queries) HasOtherPresentRepositoryEntry(ctx context.Context, arg HasOth
 	var present int64
 	err := row.Scan(&present)
 	return present, err
+}
+
+const hasTrashedRepositoryEntryAtPath = `-- name: HasTrashedRepositoryEntryAtPath :one
+SELECT EXISTS (
+    SELECT 1 FROM repository_entries
+    WHERE asset_id = ?1
+      AND repository_id = ?2
+      AND path_key = ?3
+      AND entry_id <> ?4
+      AND state = 'trashed'
+) AS trashed
+`
+
+type HasTrashedRepositoryEntryAtPathParams struct {
+	AssetID      uuid.NullUUID `db:"asset_id" json:"asset_id"`
+	RepositoryID uuid.UUID     `db:"repository_id" json:"repository_id"`
+	PathKey      string        `db:"path_key" json:"path_key"`
+	EntryID      uuid.UUID     `db:"entry_id" json:"entry_id"`
+}
+
+// A catalog restored from a backup taken before a Delete still lists the
+// file at its path; the trashed row the Trash rebuild records for the same
+// Asset and path supersedes it, so the vanished row is dropped instead of
+// becoming missing.
+func (q *Queries) HasTrashedRepositoryEntryAtPath(ctx context.Context, arg HasTrashedRepositoryEntryAtPathParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, hasTrashedRepositoryEntryAtPath,
+		arg.AssetID,
+		arg.RepositoryID,
+		arg.PathKey,
+		arg.EntryID,
+	)
+	var trashed int64
+	err := row.Scan(&trashed)
+	return trashed, err
 }
 
 const insertRepositoryEntry = `-- name: InsertRepositoryEntry :one

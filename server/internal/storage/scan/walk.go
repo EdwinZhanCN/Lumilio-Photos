@@ -727,12 +727,26 @@ func (t *walkTurn) sweep(ctx context.Context, directory repo.RepositoryEntry) er
 
 // removeEntryTx applies the outcome for a vanished entry: a directory or an
 // entry that never held an Asset is deleted; an entry whose Asset is present
-// elsewhere was moved or was a copy and is deleted; otherwise the entry
-// becomes missing so the Asset keeps its metadata. A scan never deletes an
-// Asset's last entry.
+// elsewhere was moved or was a copy and is deleted; an entry whose Asset the
+// Trash already holds at this very path (a catalog restored from a backup
+// taken before the Delete) is superseded by the trashed row and deleted;
+// otherwise the entry becomes missing so the Asset keeps its metadata. A
+// scan never deletes an Asset's last entry.
 func removeEntryTx(ctx context.Context, queries *repo.Queries, row repo.RepositoryEntry, now time.Time) (counters, error) {
 	var outcome counters
 	if row.Kind == KindDirectory || !row.AssetID.Valid {
+		_, err := queries.DeleteRepositoryEntryCAS(ctx, repo.DeleteRepositoryEntryCASParams{
+			EntryID: row.EntryID, ExpectedRevision: row.Revision,
+		})
+		return outcome, err
+	}
+	trashed, err := queries.HasTrashedRepositoryEntryAtPath(ctx, repo.HasTrashedRepositoryEntryAtPathParams{
+		AssetID: row.AssetID, RepositoryID: row.RepositoryID, PathKey: row.PathKey, EntryID: row.EntryID,
+	})
+	if err != nil {
+		return outcome, err
+	}
+	if trashed == 1 {
 		_, err := queries.DeleteRepositoryEntryCAS(ctx, repo.DeleteRepositoryEntryCASParams{
 			EntryID: row.EntryID, ExpectedRevision: row.Revision,
 		})

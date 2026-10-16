@@ -34,7 +34,7 @@ stateDiagram-v2
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
 | [*] | active | a hashed file or bound upload creates the Asset | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:44`](../../../../server/internal/storage/scan/known.go#L44) |
-| active | missing | scan proves the last present file vanished | `go:scan.removeEntryTx` [`server/internal/storage/scan/walk.go:733`](../../../../server/internal/storage/scan/walk.go#L733) |
+| active | missing | scan proves the last present file vanished | `go:scan.removeEntryTx` [`server/internal/storage/scan/walk.go:735`](../../../../server/internal/storage/scan/walk.go#L735) |
 | missing | active | the file returns, or the same content is re-uploaded | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:66`](../../../../server/internal/storage/scan/walk.go#L66) |
 | active | trashed | user Delete moves every file into the repository trash | `go:trash.Service.Delete` [`server/internal/storage/trash/delete.go:62`](../../../../server/internal/storage/trash/delete.go#L62) |
 | trashed | active | Restore, or a new present copy appears | `go:trash.Service.Restore` [`server/internal/storage/trash/restore.go:61`](../../../../server/internal/storage/trash/restore.go#L61) |
@@ -44,6 +44,10 @@ stateDiagram-v2
 ## Where the state is written
 
 Only the asset_lifecycle_entry_insert, _update, and _delete triggers in the catalog baseline write assets.lifecycle_state, so the state cannot drift from the entries. A lifecycle change re-publishes the OCR document and lets the logical media item serve from an active component.
+
+## One row per file path
+
+A catalog restored from a backup taken before a Delete lists the file as present while the repository trash holds it. The scan drops that vanished row instead of marking it missing when the Trash already holds the Asset at the same path, and the Trash rebuild drops a missing row at the path it adopts, so the Asset ends trashed, not missing, whichever runs first.
 
 ## What never deletes an Asset
 

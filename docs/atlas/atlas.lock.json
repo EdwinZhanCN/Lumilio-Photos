@@ -22,7 +22,7 @@
     "go:lifecycle.StateTrashed": "9e264c34ca88bcc2",
     "go:scan.Scanner.BindKnownContent": "590e7e233eeedcc0",
     "go:scan.Scanner.RunTurn": "a1473f9f545da4b4",
-    "go:scan.removeEntryTx": "8f255a571145c3e0",
+    "go:scan.removeEntryTx": "8a5ced808ff0baba",
     "go:trash.Service.Delete": "5d29f9ec5fdfb1b6",
     "go:trash.Service.Restore": "76bff1719d10c1f4"
   },
