@@ -613,8 +613,7 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 		storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID(), RiskConfirmation: req.RiskConfirmation},
 	)
 	if err != nil {
-		if errors.Is(err, storage.ErrRepositoryOriginalOnline) || errors.Is(err, storage.ErrRepositoryBusy) {
-			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+		if writeRepositoryCommandFailure(c, err) {
 			return
 		}
 		api.WriteProblem(c, api.BadRequest(err))
@@ -678,6 +677,42 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 		return
 	}
 	api.JSONOK(c, toRepositoryDTO(repository))
+}
+
+// writeRepositoryCommandFailure maps the typed refusals of the Repository
+// commands (rename, detach, reconnect) to their Problems. Policy refusals
+// carry the withheld action with its blockers and alternatives; barrier,
+// ownership, identity, and original-online refusals are their own types.
+// Anything else falls through to the caller.
+func writeRepositoryCommandFailure(c *gin.Context, err error) bool {
+	var unavailable *storage.RepositoryActionUnavailableError
+	switch {
+	case errors.As(err, &unavailable):
+		api.WriteProblem(c, problem.NewStorageActionUnavailable(err, string(unavailable.Action),
+			storage.BlockerCodes(unavailable.Blockers), storage.AlternativeCodes(unavailable.Alternatives)))
+	case errors.Is(err, storage.ErrLifecycleRequestConflict):
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+	case errors.Is(err, storage.ErrLifecycleOperationRunning), errors.Is(err, storage.ErrRepositoryBusy):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageBusy, err))
+	case errors.Is(err, storage.ErrRepositoryOwnershipUnavailable):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageOwnershipUnavailable, err))
+	case errors.Is(err, storage.ErrRepositoryIDMismatch):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageIdentityMismatch, err))
+	case errors.Is(err, storage.ErrRepositoryOriginalOnline):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageOriginalOnline, err))
+	case errors.Is(err, storage.ErrRepositoryOffline):
+		api.WriteProblem(c, api.KnownProblem(problem.RepositoryUnavailable, err))
+	default:
+		return false
+	}
+	return true
+}
+
+func toLifecycleReceiptDTO(receipt storage.LifecycleReceipt) dto.LifecycleReceiptDTO {
+	return dto.LifecycleReceiptDTO{
+		OperationID: receipt.OperationID, RequestID: receipt.RequestID,
+		Kind: receipt.Kind, Status: receipt.Status, Replayed: receipt.Replayed,
+	}
 }
 
 func writeRepositoryConflict(c *gin.Context, cause error, conflictType string) {
@@ -937,9 +972,10 @@ func (h *RepositoryScanHandler) getRepositoryRemovalImpact(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RenameRepositoryRequestDTO true "New display name"
-// @Success 200 {object} dto.RepositoryDTO
+// @Success 200 {object} dto.RenameRepositoryResponseDTO
 // @Failure 400 {object} api.ProblemResponse
 // @Failure 404 {object} api.ProblemResponse
+// @Failure 409 {object} api.RepositoryCommandProblemResponse "Action withheld by the role-aware policy, Repository busy, ownership held elsewhere, identity mismatch, or a reused Idempotency-Key with another payload"
 // @Router /api/v1/storage/repositories/{id}/rename [post]
 func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
@@ -949,7 +985,7 @@ func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 		return
 	}
 	requestID, actor := lifecycleRequestFromWeb(c)
-	updated, err := h.repoManager.RenameRepository(c.Request.Context(), id, request.Name, storage.LifecycleRequest{
+	renamed, err := h.repoManager.RenameRepository(c.Request.Context(), id, request.Name, storage.LifecycleRequest{
 		RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID(),
 	})
 	if err != nil {
@@ -957,10 +993,15 @@ func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
+		if writeRepositoryCommandFailure(c, err) {
+			return
+		}
 		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
-	api.JSONOK(c, toRepositoryDTO(updated))
+	api.JSONOK(c, dto.RenameRepositoryResponseDTO{
+		Repository: toRepositoryDTO(&renamed.Repository), Operation: toLifecycleReceiptDTO(renamed.Receipt),
+	})
 }
 
 // DetachRepository removes a non-primary repository registration.
@@ -972,7 +1013,10 @@ func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RemoveRepositoryRequestDTO true "Exact repository-name confirmation"
-// @Success 200 {object} api.SuccessResponse
+// @Success 200 {object} dto.DetachRepositoryResponseDTO
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
+// @Failure 409 {object} api.RepositoryCommandProblemResponse "Action withheld by the role-aware policy (the Primary is protected), Repository busy, or a reused Idempotency-Key with another payload"
 // @Router /api/v1/storage/repositories/{id}/detach [post]
 func (h *RepositoryScanHandler) DetachRepository(c *gin.Context) {
 	h.detachRepository(c)
@@ -980,37 +1024,37 @@ func (h *RepositoryScanHandler) DetachRepository(c *gin.Context) {
 
 func (h *RepositoryScanHandler) detachRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
-
-	existing, err := h.repoManager.GetRepository(id)
-	if err != nil {
-		api.WriteProblem(c, api.NotFound(err))
-		return
-	}
 	var req dto.RemoveRepositoryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	requestID, actor := lifecycleRequestFromWeb(c)
+	request := storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID()}
+
+	existing, err := h.repoManager.GetRepository(id)
+	if err != nil {
+		// A retry after a completed detach finds no row; the journal answers it.
+		if receipt, replayErr := h.repoManager.RemoveRepository(c.Request.Context(), id, request); replayErr == nil && receipt.Replayed {
+			api.JSONOK(c, dto.DetachRepositoryResponseDTO{Operation: toLifecycleReceiptDTO(receipt), FilesPreserved: true})
+			return
+		}
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if req.ConfirmationName != existing.Name {
 		api.WriteProblem(c, api.BadRequest(errors.New("repository name confirmation does not match")))
 		return
 	}
-	if existing.Role == dbtypes.RepoRolePrimary {
-		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, storage.ErrPrimaryRepositoryNotRemovable))
-		return
-	}
-
-	requestID, actor := lifecycleRequestFromWeb(c)
-	if err := h.repoManager.RemoveRepository(c.Request.Context(), id, storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID()}); err != nil {
-		if errors.Is(err, storage.ErrPrimaryRepositoryNotRemovable) || errors.Is(err, storage.ErrRepositoryBusy) {
-			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+	receipt, err := h.repoManager.RemoveRepository(c.Request.Context(), id, request)
+	if err != nil {
+		if writeRepositoryCommandFailure(c, err) {
 			return
 		}
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-
-	api.JSONOK(c, api.SuccessResponse{Message: "Repository registration removed; files were preserved"})
+	api.JSONOK(c, dto.DetachRepositoryResponseDTO{Operation: toLifecycleReceiptDTO(receipt), FilesPreserved: true})
 }
 
 func lifecycleRequestFromWeb(c *gin.Context) (string, string) {

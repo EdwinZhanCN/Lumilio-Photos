@@ -38,7 +38,13 @@ type Props = {
   isScanning: boolean;
 };
 
-/** Row commands. Destructive entries sit last and are the only colored item. */
+/**
+ * Row commands. Rename, Remove, and the native reconnect entry render only
+ * when the Server's role-aware policy lists them for this row, so the menu
+ * never offers a command the Server would refuse on the same facts; the
+ * Primary never shows them. Destructive entries sit last and are the only
+ * colored item.
+ */
 export default function RepositoryRowActions({
   row,
   onCommand,
@@ -46,6 +52,9 @@ export default function RepositoryRowActions({
   isScanning,
 }: Props) {
   const { t } = useI18n();
+  const allows = (action: (typeof row.actions)[number]) => row.actions.includes(action);
+  const showRepositorySection = allows("rename");
+  const showDangerZone = allows("detach");
 
   return (
     <AnchoredMenu
@@ -112,7 +121,7 @@ export default function RepositoryRowActions({
               <MapPin className="size-4" aria-hidden />,
               t("storagePanel.action.rebuild", "Rebuild location"),
             )}
-            {nativeHostAvailable
+            {nativeHostAvailable && allows("reconnect")
               ? item(
                   "locate",
                   <FolderSearch className="size-4" aria-hidden />,
@@ -123,18 +132,20 @@ export default function RepositoryRowActions({
             <li role="none" className="menu-title">
               {t("storagePanel.menuRepository", "Repository")}
             </li>
-            {item(
-              "rename",
-              <Pencil className="size-4" aria-hidden />,
-              t("storagePanel.action.rename", "Rename Repository"),
-            )}
+            {showRepositorySection
+              ? item(
+                  "rename",
+                  <Pencil className="size-4" aria-hidden />,
+                  t("storagePanel.action.rename", "Rename Repository"),
+                )
+              : null}
             {item(
               "cloudSources",
               <Cloud className="size-4" aria-hidden />,
               t("storagePanel.action.cloudSources", "Cloud sources"),
             )}
 
-            {row.role === "primary" ? null : (
+            {!showDangerZone ? null : (
               <>
                 <li role="none" className="menu-title text-error">
                   {t("storagePanel.menuDanger", "Danger zone")}

@@ -30,6 +30,7 @@ const (
 	lifecycleKindSwitchDefaultStorage   = "switch_default_storage_location"
 	lifecycleKindRelocateStorage        = "relocate_storage_location"
 	lifecycleKindRenameRepository       = "rename_repository"
+	lifecycleKindDetachRepository       = "detach_repository"
 	// Trash and restore journals are recovered by storage/trash.
 	LifecycleKindTrashAssets   = "trash_assets"
 	LifecycleKindRestoreAssets = "restore_assets"
@@ -159,6 +160,17 @@ type renameRepositoryRollbackData struct {
 type renameRepositoryOperationResult struct {
 	RepositoryID string `json:"repository_id"`
 	Name         string `json:"name"`
+}
+
+type detachRepositoryOperationPayload struct {
+	RepositoryID string `json:"repository_id"`
+	Path         string `json:"path"`
+	Name         string `json:"name"`
+}
+
+type detachRepositoryOperationResult struct {
+	RepositoryID   string `json:"repository_id"`
+	FilesPreserved bool   `json:"files_preserved"`
 }
 
 func (rm *DefaultRepositoryManager) markInitialScanQueued(ctx context.Context, operationID string) error {
@@ -538,6 +550,10 @@ func (rm *DefaultRepositoryManager) RecoverLifecycleOperations(ctx context.Conte
 			if err := rm.recoverRenameRepositoryOperation(ctx, operation); err != nil {
 				return err
 			}
+		case lifecycleKindDetachRepository:
+			if err := rm.recoverDetachRepositoryOperation(ctx, operation); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("%w: unsupported operation kind %q", ErrLifecycleRecoveryRequired, operation.Kind)
 		}
@@ -568,6 +584,10 @@ func (rm *DefaultRepositoryManager) claimLifecycleRecoveryTargets(ctx context.Co
 	case lifecycleKindCreateRepository, lifecycleKindOpenRepository,
 		lifecycleKindRegisterRepositoryCopy, lifecycleKindRenameRepository:
 		// The common payload path is the repository mutation target.
+	case lifecycleKindDetachRepository:
+		// Detach changes no file; its tree may already be gone or belong to
+		// someone else, so recovery claims nothing on disk.
+		return nil
 	default:
 		return fmt.Errorf("%w: unsupported operation kind %q", ErrLifecycleRecoveryRequired, operation.Kind)
 	}
@@ -597,9 +617,10 @@ func (rm *DefaultRepositoryManager) recoverRenameRepositoryOperation(ctx context
 	}
 
 	// The requested new name is the deterministic roll-forward state. Either
-	// side may have committed immediately before a crash.
+	// side may have committed immediately before a crash. The write is
+	// guarded: a marker that no longer carries this identity is left alone.
 	diskConfig.Name = payload.NewName
-	if err := diskConfig.SaveConfigToFile(payload.Path); err != nil {
+	if err := diskConfig.SaveGuarded(rm.markers(), payload.Path, repositoryID.String()); err != nil {
 		return fmt.Errorf("recover rename marker: %w", err)
 	}
 	if _, err := rm.queries.UpdateRepository(ctx, repo.UpdateRepositoryParams{
@@ -611,6 +632,28 @@ func (rm *DefaultRepositoryManager) recoverRenameRepositoryOperation(ctx context
 	}
 	return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID,
 		renameRepositoryOperationResult{RepositoryID: repositoryID.String(), Name: payload.NewName})
+}
+
+// recoverDetachRepositoryOperation: the removal commits its journal in the
+// same transaction, so a running detach at startup never reached that
+// commit; the row is still there and nothing happened.
+func (rm *DefaultRepositoryManager) recoverDetachRepositoryOperation(ctx context.Context, operation repo.LifecycleOperation) error {
+	var payload detachRepositoryOperationPayload
+	if err := json.Unmarshal(operation.Payload, &payload); err != nil {
+		return fmt.Errorf("%w: decode detach payload: %v", ErrLifecycleRecoveryRequired, err)
+	}
+	repositoryID, err := uuid.Parse(payload.RepositoryID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid detach repository ID", ErrLifecycleRecoveryRequired)
+	}
+	if _, err := rm.queries.GetRepository(ctx, repositoryID); errors.Is(err, sql.ErrNoRows) {
+		return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID,
+			detachRepositoryOperationResult{RepositoryID: payload.RepositoryID, FilesPreserved: true})
+	} else if err != nil {
+		return fmt.Errorf("recover detach: %w", err)
+	}
+	return rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, true,
+		errors.New("repository detach was interrupted before its catalog commit"), nil)
 }
 
 func (rm *DefaultRepositoryManager) recoverOpenRepositoryOperation(ctx context.Context, operation repo.LifecycleOperation) error {

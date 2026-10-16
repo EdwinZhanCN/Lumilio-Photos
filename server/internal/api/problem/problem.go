@@ -90,6 +90,24 @@ var (
 		"Storage target access denied", "The Server was denied access to the storage target.")
 	StorageMaterializationRequired = descriptor("storage/materialization-required", http.StatusConflict,
 		"Storage target must be downloaded first", "The storage target holds cloud placeholders whose content is not available locally.")
+	StorageActionUnavailable = Descriptor{
+		Type: Namespace + "storage/action-unavailable", Status: http.StatusConflict,
+		Title: "Repository action unavailable", Definition: "The role-aware storage policy withholds this Repository action on the current facts, so the command was not run.",
+		Recovery: "Read the blockers and take one of the listed alternatives; the same action is not retried automatically.",
+		Extensions: []Extension{
+			{Name: "action", Schema: "string", Description: "The withheld action: verify, rename, detach, or reconnect."},
+			{Name: "blockers", Schema: "array[string]", Description: "Stable codes naming why the action is withheld."},
+			{Name: "alternatives", Schema: "array[string]", Description: "Stable codes naming legal entries to take instead."},
+		},
+	}
+	StorageBusy = descriptor("storage/busy", http.StatusConflict,
+		"Repository busy", "Another storage command holds the Repository barrier, so this command did not start.")
+	StorageOwnershipUnavailable = descriptor("storage/ownership-unavailable", http.StatusConflict,
+		"Repository ownership unavailable", "Another process owns the Repository tree, so this Server cannot take the exclusive ownership the command needs.")
+	StorageIdentityMismatch = descriptor("storage/identity-mismatch", http.StatusConflict,
+		"Repository identity mismatch", "The marker at the path carries a different Repository identity than the registration the command targets.")
+	StorageOriginalOnline = descriptor("storage/original-online", http.StatusConflict,
+		"Original Repository still online", "The registered Repository is still present at its original path, so there is nothing to reconnect.")
 	ServiceUnavailable = descriptor("service/unavailable", http.StatusServiceUnavailable,
 		"Service unavailable", "A required optional service is currently unavailable.")
 	InvalidMediaRequest = descriptor("media/invalid-request", http.StatusUnprocessableEntity,
@@ -136,6 +154,11 @@ var registry = mustRegistry(
 	StorageObservationUnknown,
 	StoragePermissionDenied,
 	StorageMaterializationRequired,
+	StorageActionUnavailable,
+	StorageBusy,
+	StorageOwnershipUnavailable,
+	StorageIdentityMismatch,
+	StorageOriginalOnline,
 	ServiceUnavailable,
 	InvalidMediaRequest,
 	ImageEmbeddingMissing,
@@ -217,6 +240,15 @@ type StorageConfirmationRequiredDetails struct {
 	AssessmentToken string   `json:"assessment_token" binding:"required" example:"v1.0123456789abcdef"`
 }
 
+// StorageActionUnavailableDetails carries the withheld action, why it is
+// withheld, and the legal alternatives, as stable codes only.
+type StorageActionUnavailableDetails struct {
+	Details
+	Action       string   `json:"action" binding:"required" example:"rename"`
+	Blockers     []string `json:"blockers" binding:"required" example:"primary_protected"`
+	Alternatives []string `json:"alternatives,omitempty" example:"default_configuration"`
+}
+
 // Reference is the transport-neutral equivalent used by streams and
 // persisted asynchronous operation DTOs. It intentionally has no HTTP status.
 type Reference struct {
@@ -273,6 +305,7 @@ const (
 	rateLimitedBody
 	repositoryConflictBody
 	storageConfirmationRequiredBody
+	storageActionUnavailableBody
 )
 
 // Failure pairs one safe public descriptor with its private diagnostic cause.
@@ -288,6 +321,9 @@ type Failure struct {
 	actions           []string
 	risks             []string
 	assessmentToken   string
+	action            string
+	blockers          []string
+	alternatives      []string
 }
 
 // About creates a generic about:blank failure for a status whose meaning and
@@ -334,6 +370,16 @@ func NewStorageConfirmationRequired(cause error, risks []string, assessmentToken
 	}
 }
 
+// NewStorageActionUnavailable creates the exact typed refusal of a
+// role-aware Repository action.
+func NewStorageActionUnavailable(cause error, action string, blockers, alternatives []string) Failure {
+	return Failure{
+		descriptor: StorageActionUnavailable, status: StorageActionUnavailable.Status, cause: cause,
+		kind: storageActionUnavailableBody, action: action,
+		blockers: append([]string{}, blockers...), alternatives: append([]string(nil), alternatives...),
+	}
+}
+
 func (f Failure) Status() int            { return f.status }
 func (f Failure) Type() string           { return f.descriptor.Type }
 func (f Failure) Cause() error           { return f.cause }
@@ -354,6 +400,10 @@ func (f Failure) Body(instance string) any {
 	case storageConfirmationRequiredBody:
 		return StorageConfirmationRequiredDetails{
 			Details: base, Risks: append([]string{}, f.risks...), AssessmentToken: f.assessmentToken,
+		}
+	case storageActionUnavailableBody:
+		return StorageActionUnavailableDetails{
+			Details: base, Action: f.action, Blockers: append([]string{}, f.blockers...), Alternatives: append([]string(nil), f.alternatives...),
 		}
 	default:
 		return base

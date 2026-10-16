@@ -33,7 +33,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		return nil, fmt.Errorf("invalid repository path: %w", err)
 	}
 	if err := rm.claimRuntimeStoragePath(ctx, "repository", cleanPath); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrRepositoryOwnershipUnavailable, err)
 	}
 	validation, err := rm.validateRepository(cleanPath)
 	if err != nil {

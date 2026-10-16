@@ -53,9 +53,13 @@
 // Repository exists. Additional Storage Locations are storage_locations rows
 // keyed by the UUID in .lumilioroot; their summaries are catalog projections
 // that never authorize or deny child Repository I/O. Admission is decided per
-// Repository: [UploadAdmission] for upload and cloud materialization,
-// lifecycle leases and identity checks for verify, rename, reconnect, and
-// detach.
+// Repository: [UploadAdmission] for upload and cloud materialization, and
+// the role-aware action policy [DeriveRepositoryActions] for verify, rename,
+// detach, and reconnect. A command re-derives that policy on the row it reads
+// under its mutation lease, refreshes the complete marker there, writes it
+// with a guarded atomic replace, journals the operation, and returns a
+// [LifecycleReceipt] a retry with the same request receives again; a withheld
+// action is a [RepositoryActionUnavailableError] with stable blocker codes.
 //
 // [StorageObserver] supplies only read/stat/mount facts to
 // [ObserveStorageTarget] and [AssessStorageTarget]. [ClassifyStorage] and

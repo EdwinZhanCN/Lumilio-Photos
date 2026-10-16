@@ -528,7 +528,7 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if !impact.PrivateStateFound || impact.PrivateStateBytes < int64(len("private-state")) {
 		t.Fatalf("private-state impact = %+v", impact)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "remove-regular", Actor: "test",
 	}); err != nil {
 		t.Fatal(err)
@@ -569,7 +569,7 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, primary.RepoID.String()); !errors.Is(err, ErrPrimaryRepositoryNotRemovable) {
+	if _, err := manager.RemoveRepository(ctx, primary.RepoID.String()); !errors.Is(err, ErrPrimaryRepositoryNotRemovable) {
 		t.Fatalf("primary removal error = %v, want ErrPrimaryRepositoryNotRemovable", err)
 	}
 }
@@ -678,7 +678,7 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	if impact.AssetCount != 1 || impact.CatalogMediaBytes != 12 || impact.AlbumCount != 1 || impact.ActiveTaskCount != 0 {
 		t.Fatalf("shared-location removal impact = %+v", impact)
 	}
-	if err := manager.RemoveRepository(ctx, target.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, target.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -775,7 +775,7 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	}
 	cancelContext, cancel := context.WithCancel(ctx)
 	cancel()
-	err = manager.RemoveRepository(cancelContext, created.Repository.RepoID.String())
+	_, err = manager.RemoveRepository(cancelContext, created.Repository.RepoID.String())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("remove with cancelled context = %v, want context.Canceled", err)
 	}
@@ -788,7 +788,7 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("remove during running worker = %v, want ErrRepositoryBusy", err)
 	}
 	if _, err := manager.queries.FinishRepositoryActivity(ctx, repo.FinishRepositoryActivityParams{
@@ -812,7 +812,7 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, detachedDuringRootMutation.Repository.RepoID.String(), LifecycleRequest{
+	if _, err := manager.RemoveRepository(ctx, detachedDuringRootMutation.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "remove-during-storageLocation-mutation", Actor: "test",
 	}); err != nil {
 		rootRelease()

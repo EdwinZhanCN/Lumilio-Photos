@@ -168,6 +168,9 @@ func problemSchemaRef(path string, status int) string {
 	if status == 409 && (path == "/api/v1/storage/candidates/open" || path == "/api/v1/storage/assessments") {
 		return "#/components/schemas/api.RepositoryConflictProblemResponse"
 	}
+	if status == 409 && repositoryCommandPaths[path] {
+		return "#/components/schemas/api.RepositoryCommandProblemResponse"
+	}
 	return "#/components/schemas/api.ProblemResponse"
 }
 
@@ -231,6 +234,39 @@ func installProblemSchemas(schemas *yaml.Node) {
 			"mapping":      createDiscriminator,
 		},
 	}))
+	commandUnion := make([]any, 0, len(repositoryCommandProblems))
+	commandDiscriminator := make(map[string]any, len(repositoryCommandProblems))
+	for _, descriptor := range repositoryCommandProblems {
+		ref := "#/components/schemas/api." + schemaName(descriptor.Type) + "Problem"
+		commandUnion = append(commandUnion, map[string]any{"$ref": ref})
+		commandDiscriminator[descriptor.Type] = ref
+	}
+	setMappingValue(schemas, "api.RepositoryCommandProblemResponse", node(map[string]any{
+		"oneOf": commandUnion,
+		"discriminator": map[string]any{
+			"propertyName": "type",
+			"mapping":      commandDiscriminator,
+		},
+	}))
+}
+
+// repositoryCommandPaths are the Repository commands whose 409 is the exact
+// command vocabulary below.
+var repositoryCommandPaths = map[string]bool{
+	"/api/v1/storage/repositories/{id}/rename": true,
+	"/api/v1/storage/repositories/{id}/detach": true,
+	"/api/v1/storage/candidates/resolve":       true,
+}
+
+// repositoryCommandProblems is the exact 409 vocabulary of the Repository
+// commands: a role-aware action refusal, a held barrier, ownership held
+// elsewhere, an identity mismatch, or an original that is still online.
+var repositoryCommandProblems = []problem.Descriptor{
+	problem.StorageActionUnavailable,
+	problem.StorageBusy,
+	problem.StorageOwnershipUnavailable,
+	problem.StorageIdentityMismatch,
+	problem.StorageOriginalOnline,
 }
 
 // repositoryCreateProblems is the exact 409 vocabulary of the Repository
@@ -305,7 +341,7 @@ func addExtensions(properties map[string]any, required *[]string, extensions []p
 
 // requiredExtensions are the typed members a subtype always carries; the
 // registry's wire structs mark them binding:"required" as well.
-var requiredExtensions = map[string]bool{"conflict_type": true, "risks": true, "assessment_token": true}
+var requiredExtensions = map[string]bool{"conflict_type": true, "risks": true, "assessment_token": true, "action": true, "blockers": true}
 
 func schemaName(problemType string) string {
 	path := strings.TrimPrefix(problemType, problem.Namespace)

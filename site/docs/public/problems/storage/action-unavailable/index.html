@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Repository action unavailable · Lumilio API Problem</title>
+  <style>body{max-width:52rem;margin:4rem auto;padding:0 1.5rem;font:16px/1.6 system-ui,sans-serif;color:#202124}code{background:#f3f4f6;padding:.15rem .35rem;border-radius:.25rem}dt{font-weight:700;margin-top:1rem}dd{margin-left:0}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #ddd;padding:.6rem}</style>
+</head>
+<body>
+  <p><a href="/problems/">Lumilio API Problems</a></p>
+  <h1>Repository action unavailable</h1>
+  <dl>
+    <dt>Type</dt><dd><code>https://lumilio.org/problems/storage/action-unavailable</code></dd>
+    <dt>Normal HTTP status</dt><dd>409</dd>
+    <dt>Definition</dt><dd>The role-aware storage policy withholds this Repository action on the current facts, so the command was not run.</dd>
+    <dt>Recovery</dt><dd>Read the blockers and take one of the listed alternatives; the same action is not retried automatically.</dd>
+  </dl>
+  <h2>Extension members</h2>
+  <table><thead><tr><th>Name</th><th>Schema</th><th>Meaning</th></tr></thead><tbody><tr><td><code>action</code></td><td>string</td><td>The withheld action: verify, rename, detach, or reconnect.</td></tr><tr><td><code>blockers</code></td><td>array[string]</td><td>Stable codes naming why the action is withheld.</td></tr><tr><td><code>alternatives</code></td><td>array[string]</td><td>Stable codes naming legal entries to take instead.</td></tr></tbody></table>
+  <p>Runtime clients identify this condition by <code>type</code>; they do not dereference this page automatically.</p>
+</body>
+</html>

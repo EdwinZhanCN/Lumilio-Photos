@@ -88,14 +88,16 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	if err != nil {
 		return nil, err
 	}
-	if current.Role == dbtypes.RepoRolePrimary {
-		return nil, fmt.Errorf("%w: primary repository location follows the default Storage Location", ErrPathNotAllowed)
+	// The role-aware policy on the projected row, before the destination is
+	// even looked at; the decision that counts is re-derived under the lease.
+	if err := rm.admitReconnect(ctx, *current); err != nil {
+		return nil, err
 	}
 	if current.Path == cleanPath {
 		return current, nil
 	}
 	if err := rm.claimRuntimeStoragePath(ctx, "repository", cleanPath); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrRepositoryOwnershipUnavailable, err)
 	}
 
 	result, err := rm.validateRepository(cleanPath)
@@ -140,6 +142,9 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
 	if oldMarkerErr == nil && oldMarker.ID == id {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
+	}
+	if err := rm.admitReconnect(ctx, *current); err != nil {
+		return nil, err
 	}
 	if current.Activity != dbtypes.RepositoryActivityIdle {
 		if oldMarkerErr == nil && !repositoryReachabilityAllowsStaleActivityDetach(current.Reachability) {
@@ -228,6 +233,34 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	)
 
 	return &dbRepo, nil
+}
+
+// admitReconnect applies the role-aware policy to a reconnect. The catalog
+// may still project an original as active after it went away, so the marker
+// probe, not the projection, decides whether there is something to
+// reconnect: an original that is positively online is ErrRepositoryOriginalOnline,
+// any other withheld verdict is the typed refusal with its blockers.
+func (rm *DefaultRepositoryManager) admitReconnect(ctx context.Context, current repo.Repository) error {
+	facts, err := rm.repositoryActionFacts(ctx, current)
+	if err != nil {
+		return err
+	}
+	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
+	originalOnline := oldMarkerErr == nil && oldMarker.ID == current.RepoID.String()
+	if facts.Reachability == dbtypes.RepositoryReachabilityActive && !originalOnline {
+		facts.Reachability = dbtypes.RepositoryReachabilityOffline
+	}
+	verdict := DeriveRepositoryActions(facts).Verdict(ActionReconnect)
+	if verdict.Allowed() {
+		return nil
+	}
+	if len(verdict.Blockers) == 1 && verdict.Blockers[0] == BlockerOriginalAvailable {
+		return fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
+	}
+	return &RepositoryActionUnavailableError{
+		RepositoryID: current.RepoID.String(), Action: ActionReconnect,
+		Blockers: verdict.Blockers, Alternatives: verdict.Alternatives,
+	}
 }
 
 // RegisterRepositoryCopy registers a duplicated repository directory as a new,
