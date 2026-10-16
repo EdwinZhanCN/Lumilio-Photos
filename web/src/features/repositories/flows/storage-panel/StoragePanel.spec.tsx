@@ -69,6 +69,24 @@ const storageViewFixture = {
       activity: "idle",
       asset_count: 12_480,
       verification: { status: "completed" },
+      actions: ["verify"],
+      unavailable_actions: [
+        {
+          action: "rename",
+          blockers: ["primary_protected"],
+          alternatives: ["default_configuration"],
+        },
+        {
+          action: "detach",
+          blockers: ["primary_protected"],
+          alternatives: ["default_configuration"],
+        },
+        {
+          action: "reconnect",
+          blockers: ["primary_protected", "original_available"],
+          alternatives: ["default_configuration"],
+        },
+      ],
     },
     {
       id: "repo-family",
@@ -82,6 +100,8 @@ const storageViewFixture = {
       activity: "idle",
       asset_count: 8830,
       verification: { status: "completed" },
+      actions: ["verify", "rename", "detach"],
+      unavailable_actions: [{ action: "reconnect", blockers: ["original_available"] }],
     },
     {
       id: "repo-2019",
@@ -95,6 +115,8 @@ const storageViewFixture = {
       activity: "idle",
       asset_count: 24_910,
       verification: { status: "offline" },
+      actions: ["verify", "rename", "detach"],
+      unavailable_actions: [{ action: "reconnect", blockers: ["original_available"] }],
     },
     {
       id: "repo-offline",
@@ -106,6 +128,11 @@ const storageViewFixture = {
       activity: "idle",
       asset_count: 3402,
       verification: { status: "completed" },
+      actions: ["detach", "reconnect"],
+      unavailable_actions: [
+        { action: "verify", blockers: ["repository_offline"] },
+        { action: "rename", blockers: ["repository_offline"] },
+      ],
     },
     {
       id: "repo-detached",
@@ -116,6 +143,11 @@ const storageViewFixture = {
       activity: "idle",
       asset_count: 640,
       verification: { status: "never" },
+      actions: ["detach", "reconnect"],
+      unavailable_actions: [
+        { action: "verify", blockers: ["identity_problem"] },
+        { action: "rename", blockers: ["identity_problem"] },
+      ],
     },
   ],
 } satisfies StorageViewResponse;
@@ -414,22 +446,29 @@ test("row commands follow the Repository: the primary offers no removal", async 
       exact: true,
     });
 
-  // The primary Repository cannot be removed, so its menu offers no entry for it.
+  // The Primary is protected by the Server's role-aware policy: its menu
+  // offers neither Rename nor Remove, only what the Server lists.
+  const renameCopy = t("storagePanel.action.rename", { defaultValue: "Rename Repository" });
   await openMenu("Primary Repository").click();
   await expect
     .element(
       screen.getByRole("menuitem", {
-        name: t("storagePanel.action.rename", { defaultValue: "Rename Repository" }),
+        name: t("storagePanel.action.scan", { defaultValue: "Scan now" }),
         exact: true,
       }),
     )
     .toBeVisible();
-  expect(
-    [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent?.trim()),
-  ).not.toContain(removeCopy);
+  const primaryItems = [...document.querySelectorAll('[role="menuitem"]')].map((b) =>
+    b.textContent?.trim(),
+  );
+  expect(primaryItems).not.toContain(removeCopy);
+  expect(primaryItems).not.toContain(renameCopy);
   await userEvent.keyboard("{Escape}");
 
   await openMenu("Family Archive").click();
+  await expect
+    .element(screen.getByRole("menuitem", { name: renameCopy, exact: true }))
+    .toBeVisible();
   await expect
     .element(screen.getByRole("menuitem", { name: removeCopy, exact: true }))
     .toBeVisible();

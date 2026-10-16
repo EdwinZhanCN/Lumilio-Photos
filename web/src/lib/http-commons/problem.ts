@@ -32,13 +32,18 @@ const KNOWN_TYPES = {
   "https://lumilio.org/problems/repository/scan-incomplete": true,
   "https://lumilio.org/problems/repository/unavailable": true,
   "https://lumilio.org/problems/service/unavailable": true,
+  "https://lumilio.org/problems/storage/action-unavailable": true,
   "https://lumilio.org/problems/storage/assessment-stale": true,
+  "https://lumilio.org/problems/storage/busy": true,
   "https://lumilio.org/problems/storage/confirmation-required": true,
   "https://lumilio.org/problems/storage/host-action-expired": true,
   "https://lumilio.org/problems/storage/host-action-failed": true,
+  "https://lumilio.org/problems/storage/identity-mismatch": true,
   "https://lumilio.org/problems/storage/materialization-required": true,
   "https://lumilio.org/problems/storage/not-a-mounted-volume": true,
   "https://lumilio.org/problems/storage/observation-unknown": true,
+  "https://lumilio.org/problems/storage/original-online": true,
+  "https://lumilio.org/problems/storage/ownership-unavailable": true,
   "https://lumilio.org/problems/storage/permission-denied": true,
   "https://lumilio.org/problems/storage/unsupported-filesystem": true,
   "https://lumilio.org/problems/upload/processing-failed": true,
@@ -56,6 +61,9 @@ export type NormalizedProblem =
       actions?: readonly string[];
       risks?: readonly string[];
       assessmentToken?: string;
+      action?: string;
+      blockers?: readonly string[];
+      alternatives?: readonly string[];
     }
   | { kind: "abort" }
   | { kind: "network" }
@@ -71,6 +79,9 @@ export type NormalizedProblemReference = {
   actions?: readonly string[];
   risks?: readonly string[];
   assessmentToken?: string;
+  action?: string;
+  blockers?: readonly string[];
+  alternatives?: readonly string[];
 };
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -99,7 +110,21 @@ function safeExtensions(source: Record<string, unknown>) {
     source.assessment_token.length <= 256
       ? source.assessment_token
       : undefined;
-  return { retryAfterSeconds, conflictType, repositoryID, actions, risks, assessmentToken };
+  const action =
+    typeof source.action === "string" && source.action.length <= 64 ? source.action : undefined;
+  const blockers = boundedCodes(source.blockers);
+  const alternatives = boundedCodes(source.alternatives);
+  return {
+    retryAfterSeconds,
+    conflictType,
+    repositoryID,
+    actions,
+    risks,
+    assessmentToken,
+    action,
+    blockers,
+    alternatives,
+  };
 }
 
 /** A short list of stable codes; anything longer or non-string is dropped whole. */
@@ -219,6 +244,7 @@ function localizeKnownProblem(
   facts: {
     retryAfterSeconds?: number;
     conflictType?: string;
+    blockers?: readonly string[];
   },
   t: TFunction,
   operationFallback: string,
@@ -283,6 +309,28 @@ function localizeKnownProblem(
       return t(
         "apiErrors.storage.assessmentStale",
         "The storage target changed since it was reviewed. Review it again before continuing.",
+      );
+    case "https://lumilio.org/problems/storage/action-unavailable":
+      return localizeStorageActionUnavailable(facts.blockers, t);
+    case "https://lumilio.org/problems/storage/busy":
+      return t(
+        "apiErrors.storage.busy",
+        "Another storage command is still working on this Repository. Wait for it to finish, then try again.",
+      );
+    case "https://lumilio.org/problems/storage/ownership-unavailable":
+      return t(
+        "apiErrors.storage.ownershipUnavailable",
+        "Another Lumilio process owns this Repository folder. Stop it, then try again.",
+      );
+    case "https://lumilio.org/problems/storage/identity-mismatch":
+      return t(
+        "apiErrors.storage.identityMismatch",
+        "The folder holds a different Repository than the one you chose. Nothing was changed.",
+      );
+    case "https://lumilio.org/problems/storage/original-online":
+      return t(
+        "apiErrors.storage.originalOnline",
+        "This Repository is still available at its registered location, so there is nothing to reconnect.",
       );
     case "https://lumilio.org/problems/storage/unsupported-filesystem":
       return t(
@@ -354,6 +402,64 @@ function localizeKnownProblem(
       return t("apiErrors.upload.processingFailed", "The upload could not be processed.");
     default:
       return assertNever(problemType);
+  }
+}
+
+/**
+ * The first blocker names the reason an action is withheld; the Server lists
+ * them most specific first. Unknown codes fall back to the generic refusal
+ * rather than rendering a raw identifier.
+ */
+function localizeStorageActionUnavailable(
+  blockers: readonly string[] | undefined,
+  t: TFunction,
+): string {
+  switch (blockers?.[0]) {
+    case "primary_protected":
+      return t(
+        "apiErrors.storage.actionUnavailable.primaryProtected",
+        "The Primary Repository follows the Default Storage Location. Change it through the storage configuration instead.",
+      );
+    case "repository_offline":
+      return t(
+        "apiErrors.storage.actionUnavailable.repositoryOffline",
+        "The Repository is offline. Reconnect it or remove it from Lumilio instead.",
+      );
+    case "identity_problem":
+      return t(
+        "apiErrors.storage.actionUnavailable.identityProblem",
+        "The Repository marker at the registered location needs attention before this action can run.",
+      );
+    case "recovery_required":
+      return t(
+        "apiErrors.storage.actionUnavailable.recoveryRequired",
+        "An interrupted storage operation must be recovered before this action can run.",
+      );
+    case "maintenance":
+      return t(
+        "apiErrors.storage.actionUnavailable.maintenance",
+        "The Repository is being removed. Wait for that to finish.",
+      );
+    case "repository_busy":
+      return t(
+        "apiErrors.storage.actionUnavailable.repositoryBusy",
+        "The Repository is busy with a scan or import. Wait for it to finish, then try again.",
+      );
+    case "pending_operation":
+      return t(
+        "apiErrors.storage.actionUnavailable.pendingOperation",
+        "Another storage operation on this Repository is still running. Wait for it to finish, then try again.",
+      );
+    case "original_available":
+      return t(
+        "apiErrors.storage.actionUnavailable.originalAvailable",
+        "This Repository is still available at its registered location, so there is nothing to reconnect.",
+      );
+    default:
+      return t(
+        "apiErrors.storage.actionUnavailable.generic",
+        "This action is not available for the Repository right now.",
+      );
   }
 }
 

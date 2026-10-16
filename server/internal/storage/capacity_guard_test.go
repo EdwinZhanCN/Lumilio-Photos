@@ -80,10 +80,20 @@ func TestChildWritePathsIgnoreParentStorageLocationFailure(t *testing.T) {
 			ctx := context.Background()
 			rootPath := filepath.Join(t.TempDir(), "default")
 			initializeDefaultStorageForTest(t, manager, rootPath)
-			repository, err := manager.queries.GetPrimaryRepositoryRecord(ctx)
+			primary, err := manager.queries.GetPrimaryRepositoryRecord(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
+			// A regular child: the Primary is protected from rename by the
+			// role-aware policy (P3), independently of its parent's health.
+			child, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+				RequestID: "parent-independent-child-" + failure, Actor: "test", Name: "Child",
+				DirectoryName: "child", Role: dbtypes.RepoRoleRegular, StorageLocationID: primary.StorageLocationID.String(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			repository := *child.Repository
 			failParentStorageLocationForTest(t, manager, rootPath, repository, failure)
 			parentBefore, err := manager.queries.GetStorageLocation(ctx, repository.StorageLocationID)
 			if err != nil {
@@ -99,8 +109,12 @@ func TestChildWritePathsIgnoreParentStorageLocationFailure(t *testing.T) {
 				t.Fatalf("sidecar round trip = %q, %v", stored, err)
 			}
 
-			renamed, err := manager.RenameRepository(ctx, repository.RepoID.String(), "Renamed Child",
+			renamedResult, err := manager.RenameRepository(ctx, repository.RepoID.String(), "Renamed Child",
 				LifecycleRequest{RequestID: "rename-parent-independent-" + failure, Actor: "test"})
+			var renamed *repo.Repository
+			if renamedResult != nil {
+				renamed = &renamedResult.Repository
+			}
 			if err != nil {
 				t.Fatalf("rename denied by parent %s: %v", failure, err)
 			}

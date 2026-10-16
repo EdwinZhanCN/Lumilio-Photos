@@ -26,6 +26,21 @@ export type RepositoryState =
 
 export type VerificationState = "never" | "verified" | "partial" | "failed";
 
+/** The closed row-command vocabulary the Server's role-aware policy emits. */
+export type RepositoryAction = "verify" | "rename" | "detach" | "reconnect";
+
+export type RepositoryActionBlock = {
+  action: RepositoryAction;
+  blockers: string[];
+  alternatives: string[];
+};
+
+const REPOSITORY_ACTIONS: readonly RepositoryAction[] = ["verify", "rename", "detach", "reconnect"];
+
+function isRepositoryAction(value: unknown): value is RepositoryAction {
+  return typeof value === "string" && (REPOSITORY_ACTIONS as readonly string[]).includes(value);
+}
+
 export type RepositoryCapacity = {
   capacityGroupId: string;
   totalBytes: number | null;
@@ -54,6 +69,13 @@ export type RepositoryRow = {
   storage: StorageLabel;
   filesystem: string;
   capacity: RepositoryCapacity | null;
+  /**
+   * Row commands the Server admits on current facts. The menu renders from
+   * this list and never invents a protected action; a missing list means the
+   * Server offered nothing beyond reading.
+   */
+  actions: RepositoryAction[];
+  unavailableActions: RepositoryActionBlock[];
 };
 
 export type StorageLocationGroup = {
@@ -165,6 +187,18 @@ function mapRepositoryRow(
     storage: deriveStorageLabel(repository.mount_path),
     filesystem: repository.filesystem ?? "",
     capacity: capacityGroupId && group ? { capacityGroupId, ...group } : null,
+    actions: (repository.actions ?? []).filter(isRepositoryAction),
+    unavailableActions: (repository.unavailable_actions ?? []).flatMap((block) =>
+      isRepositoryAction(block.action)
+        ? [
+            {
+              action: block.action,
+              blockers: block.blockers ?? [],
+              alternatives: block.alternatives ?? [],
+            },
+          ]
+        : [],
+    ),
   };
 }
 
