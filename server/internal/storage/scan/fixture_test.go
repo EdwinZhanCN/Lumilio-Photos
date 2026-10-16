@@ -25,28 +25,94 @@ import (
 )
 
 // recordingWriter measures every catalog write transaction the scanner opens,
-// so tests can assert the writer-hold budget from outside the scanner.
+// so tests can assert the writer-hold budget from outside the scanner, and
+// counts the repository_entries rows each transaction wrote through the
+// audit triggers installEntryWriteAudit installs: the structural writer
+// budget (#222 invariant 6) is at most MaxBatchRows rows per transaction.
 type recordingWriter struct {
 	database  *db.DB
 	mu        sync.Mutex
 	durations []time.Duration
+	rowsPerTx []int
 }
 
 func (w *recordingWriter) WithTx(ctx context.Context, operation catalogtx.Operation, fn func(*sql.Tx, *repo.Queries) error) error {
 	return w.database.WithTx(ctx, operation, func(tx *sql.Tx, queries *repo.Queries) error {
+		before, err := countEntryWrites(ctx, tx)
+		if err != nil {
+			return err
+		}
 		started := time.Now()
-		err := fn(tx, queries)
+		err = fn(tx, queries)
+		took := time.Since(started)
+		if err != nil {
+			return err
+		}
+		after, err := countEntryWrites(ctx, tx)
+		if err != nil {
+			return err
+		}
 		w.mu.Lock()
-		w.durations = append(w.durations, time.Since(started))
+		w.durations = append(w.durations, took)
+		w.rowsPerTx = append(w.rowsPerTx, after-before)
 		w.mu.Unlock()
-		return err
+		return nil
 	})
 }
 
 func (w *recordingWriter) reset() {
 	w.mu.Lock()
 	w.durations = nil
+	w.rowsPerTx = nil
 	w.mu.Unlock()
+}
+
+// maxRowsPerTx is the largest number of repository_entries rows one
+// transaction wrote since the last reset.
+func (w *recordingWriter) maxRowsPerTx() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	largest := 0
+	for _, rows := range w.rowsPerTx {
+		largest = max(largest, rows)
+	}
+	return largest
+}
+
+type queryRower interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func countEntryWrites(ctx context.Context, database queryRower) (int, error) {
+	var count int
+	err := database.QueryRowContext(ctx, `SELECT count(*) FROM scan_test_entry_writes`).Scan(&count)
+	return count, err
+}
+
+// installEntryWriteAudit records every row written to repository_entries,
+// by the SQLite engine itself, so a test can prove a scan wrote nothing
+// without trusting the scanner's own counters.
+func installEntryWriteAudit(ctx context.Context, tb testing.TB, database *db.DB) {
+	tb.Helper()
+	statements := []string{
+		`CREATE TABLE scan_test_entry_writes (operation TEXT NOT NULL, kind TEXT NOT NULL, path TEXT NOT NULL)`,
+		`CREATE TRIGGER scan_test_entry_insert AFTER INSERT ON repository_entries BEGIN
+			INSERT INTO scan_test_entry_writes (operation, kind, path) VALUES ('insert', NEW.kind, NEW.path); END`,
+		`CREATE TRIGGER scan_test_entry_update AFTER UPDATE ON repository_entries BEGIN
+			INSERT INTO scan_test_entry_writes (operation, kind, path) VALUES ('update', NEW.kind, NEW.path); END`,
+		`CREATE TRIGGER scan_test_entry_delete AFTER DELETE ON repository_entries BEGIN
+			INSERT INTO scan_test_entry_writes (operation, kind, path) VALUES ('delete', OLD.kind, OLD.path); END`,
+	}
+	for _, statement := range statements {
+		if _, err := database.SQL.ExecContext(ctx, statement); err != nil {
+			tb.Fatalf("install entry write audit: %v", err)
+		}
+	}
+}
+
+// entryWrite is one audited row write to repository_entries.
+type entryWrite struct {
+	Operation, Kind, Path string
 }
 
 func (w *recordingWriter) p99() time.Duration {
@@ -91,6 +157,8 @@ type fixture struct {
 	location uuid.UUID
 	repos    map[uuid.UUID]string
 	primary  repo.Repository
+	// hashBaseline is the process hash count at the last resetObservations.
+	hashBaseline uint64
 }
 
 func hostSemantics() pathsemantics.Semantics { return pathsemantics.HostDefault() }
@@ -110,6 +178,7 @@ func newFixture(tb testing.TB, settle time.Duration) *fixture {
 	if err := database.Migrate(ctx); err != nil {
 		tb.Fatal(err)
 	}
+	installEntryWriteAudit(ctx, tb, database)
 	owner, err := database.Queries.CreateUser(ctx, repo.CreateUserParams{
 		Username: "scan-owner", Password: "unused", DisplayName: "Scan Owner",
 		Role: "admin", WebauthnUserHandle: []byte("scan-owner-handle"),
@@ -144,7 +213,54 @@ func newFixture(tb testing.TB, settle time.Duration) *fixture {
 		tb.Fatal(err)
 	}
 	f.primary = f.addRepository("primary")
+	// Every test using the fixture holds the scanner to the structural
+	// writer budget, whatever else it asserts.
+	tb.Cleanup(func() {
+		if largest := f.writer.maxRowsPerTx(); largest > writerRowBudget {
+			tb.Errorf("a scan writer transaction wrote %d repository_entries rows, budget %d", largest, writerRowBudget)
+		}
+	})
 	return f
+}
+
+// resetObservations forgets the hashes computed and the entry rows written so
+// far, so the next assertion covers only what follows.
+func (f *fixture) resetObservations() {
+	f.t.Helper()
+	f.writer.reset()
+	f.hashBaseline = hashutil.Computations()
+	if _, err := f.database.SQL.ExecContext(f.ctx, `DELETE FROM scan_test_entry_writes`); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// hashComputations is how many content hashes the process computed since the
+// last resetObservations.
+func (f *fixture) hashComputations() uint64 {
+	return hashutil.Computations() - f.hashBaseline
+}
+
+// entryWrites lists the repository_entries row writes SQLite recorded since
+// the last resetObservations, in the order they happened.
+func (f *fixture) entryWrites() []entryWrite {
+	f.t.Helper()
+	rows, err := f.database.ReaderSQL.QueryContext(f.ctx, `SELECT operation, kind, path FROM scan_test_entry_writes ORDER BY rowid`)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer rows.Close()
+	var writes []entryWrite
+	for rows.Next() {
+		var write entryWrite
+		if err := rows.Scan(&write.Operation, &write.Kind, &write.Path); err != nil {
+			f.t.Fatal(err)
+		}
+		writes = append(writes, write)
+	}
+	if err := rows.Err(); err != nil {
+		f.t.Fatal(err)
+	}
+	return writes
 }
 
 func (f *fixture) addRepository(name string) repo.Repository {

@@ -83,6 +83,12 @@ type OperatorControls struct {
 	// workers are available. Desktop uses this typed handoff instead of probing
 	// its own loopback listener to establish generation ownership.
 	RuntimeReady func(RuntimeInfo)
+	// ChangeWatchBackend supplies the recursive filesystem hints the scan
+	// watcher turns into scan requests. Nil uses the native syncthing/notify
+	// watcher. A host or test without a usable native watcher installs its
+	// own; hints only shorten latency, and the periodic full scan stays the
+	// authority whatever backend is installed.
+	ChangeWatchBackend scan.ChangeWatchBackend
 }
 
 // RuntimeInfo describes the listener published by one server generation. It
@@ -658,7 +664,8 @@ func run(
 		repositoryScanner.RequestAllPeriodic, observationLogger)
 	// Filesystem events only shorten latency; the periodic full scan above is
 	// the authority when events are lost.
-	go scan.NewWatcher(database.ReaderQueries, repositoryScanner, observationLogger, scan.WatchConfig{}).Run(ctx)
+	go scan.NewWatcher(database.ReaderQueries, repositoryScanner, observationLogger,
+		scan.WatchConfig{Backend: controls.ChangeWatchBackend}).Run(ctx)
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()

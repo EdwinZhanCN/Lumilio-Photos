@@ -23,6 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"server/config"
+	"server/internal/storage/scan"
 )
 
 // blackboxServer is one complete in-process Server generation driven only
@@ -61,7 +62,20 @@ var blackboxActiveScanStatuses = map[string]bool{
 
 const blackboxPollInterval = 100 * time.Millisecond
 
+// blackboxOptions are the host-side knobs a test may turn: the manifest's
+// periodic scan interval and the change-watch backend the Server is handed
+// through OperatorControls, the seam the Desktop host also uses.
+type blackboxOptions struct {
+	scanIntervalSeconds int
+	changeWatch         scan.ChangeWatchBackend
+}
+
 func startBlackboxServer(tb testing.TB) *blackboxServer {
+	tb.Helper()
+	return startBlackboxServerWith(tb, blackboxOptions{})
+}
+
+func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxServer {
 	tb.Helper()
 	root := tb.TempDir()
 	if err := os.Chmod(root, 0o700); err != nil {
@@ -89,6 +103,9 @@ func startBlackboxServer(tb testing.TB) *blackboxServer {
 	manifest = blackboxSetKey(tb, manifest, "discovery_enabled", "false")
 	manifest = blackboxSetKey(tb, manifest, "discovery_mdns_enabled", "false")
 	manifest = blackboxSetKey(tb, manifest, "settle_seconds", "1")
+	if options.scanIntervalSeconds > 0 {
+		manifest = blackboxSetKey(tb, manifest, "interval_seconds", fmt.Sprint(options.scanIntervalSeconds))
+	}
 	manifest = blackboxSetKey(tb, manifest, "level", `"error"`)
 	manifestPath := filepath.Join(root, "config", "server.toml")
 	appConfig, err := config.LoadAppConfigBytes(manifestPath, manifest)
@@ -102,7 +119,8 @@ func startBlackboxServer(tb testing.TB) *blackboxServer {
 	done := make(chan error, 1)
 	go func() {
 		done <- Run(ctx, appConfig, OperatorControls{
-			RuntimeReady: func(info RuntimeInfo) { ready <- info },
+			RuntimeReady:       func(info RuntimeInfo) { ready <- info },
+			ChangeWatchBackend: options.changeWatch,
 		})
 	}()
 	tb.Cleanup(func() {

@@ -126,7 +126,7 @@ follow-up in the tech-debt tracker.
 | S6 | Storage P6 — reconnect journeys and volume semantics. Volume evidence comes from CI filesystem images (Linux loop-mounted vfat/exFAT/casefold-ext4, macOS `hdiutil` APFS/ExFAT); native picker paths from the embedded harness. May split: regular/Location reconnect, then default Apply. | silent Reconnect no-op | same |
 | S7 | Storage P7 — remove competing classifiers and Desktop marker parsing; architecture checks that catch a deliberate violation. | — | same |
 | S8 | Storage P8 — `web:test:storage-recovery` E2E slice wired into `ci.yml` path filters; evidence tables; extract decisions; delete the plan. The Mac pass is recorded as an rc.2 checkpoint, not run. | storage plan complete | same |
-| S9 | #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test or `architecturecheck`. | #222 | [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) |
+| S9 | **In PR.** #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test and `architecturecheck`. | #222 | [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) |
 | S10 | #223 acceptance tests: two-copy delete/restore with albums and faces; external deletion hidden from search, albums, counts; duplicate resolution into Trash and back; in-place edit with a real XMP/EXIF write, tags, rating/like, regenerated artifacts; fork and bind-without-merge snapshots; backup-before-delete restore rebuilding Trash from sidecars. Then complete that plan (decisions already recorded) and close #223. | #223 | same |
 | S11 | Smoke-to-CI: a `@smoke` language-switch spec; the removable-Location create journey as the P2 flow spec plus Server injected-fact test (name them in the checklist); `release-smoke.yml` (dispatch: image reference or digest → fresh Compose install from the release bundle → setup → upload → browse → backup/restore; uploads the catalog, config, backup, and markers as the compatibility-fixture artifact). Rewrite the checklist's Results from CI run links. | smoke checkpoint | [rc-smoke-checklist.md](rc-smoke-checklist.md) |
 | S12 | Release notes (en + zh-cn, registry terms), upgrade page, Known issues, the Desktop CI-only verification statement. | notes | [rc-release.md](rc-release.md) Phase 1 |
@@ -256,11 +256,11 @@ S13–S15 wait for everything before them and for an empty milestone.
 - [ ] Agent: per-tool progress and duration in tool chips; copy-answer action.
 
 ### Phase 6 — Release candidate
-- [ ] Sync `main` into `dev` so #210's merge ref passes `verify:generated`
-  again (S1; [rc-release.md](rc-release.md) Phase 0b).
+- [x] Sync `main` into `dev` so #210's merge ref passes `verify:generated`
+  again (S1, #249; [rc-release.md](rc-release.md) Phase 0b).
 - [ ] RC blockers #222 (scan index) and #223 (Asset lifecycle): implemented;
-  the deterministic acceptance tests from the 2026-10-07 audit remain (S9,
-  S10) —
+  of the deterministic acceptance tests from the 2026-10-07 audit, the #222
+  set is in PR (S9) and the #223 set remains (S10) —
   [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md).
 - [ ] RC blocker #242 and the storage refactor P2–P8 (S2–S8) —
   [storage-repository-lifecycle.md](storage-repository-lifecycle.md).

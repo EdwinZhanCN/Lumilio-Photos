@@ -6,9 +6,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 
 	"github.com/zeebo/blake3"
 )
+
+// computations counts every content hash this process computed, full and
+// quick alike. The scan index promises that an unchanged file, or one Lumilio
+// wrote itself, is never hashed again; tests read this counter to hold it to
+// that from outside the scanner.
+var computations atomic.Uint64
+
+// Computations returns how many content hashes (full file hashes and quick
+// fingerprints) this process has computed so far.
+func Computations() uint64 { return computations.Load() }
 
 const (
 	// ChunkSize for quick hash: read first and last chunks
@@ -163,6 +174,7 @@ func CalculateQuickSHA256(filePath string) (string, error) {
 
 // calculateFullHash calculates the full hash of a file
 func calculateFullHash(reader io.Reader, algorithm HashAlgorithm) (string, error) {
+	computations.Add(1)
 	buffer := make([]byte, fullHashBufferSize)
 	switch algorithm {
 	case AlgorithmBLAKE3:
@@ -189,6 +201,7 @@ func calculateFullHash(reader io.Reader, algorithm HashAlgorithm) (string, error
 // This provides fast hashing for large video/audio files while maintaining
 // reasonable collision resistance for the same file types
 func calculateQuickHash(file io.ReaderAt, fileSize int64, algorithm HashAlgorithm) (string, error) {
+	computations.Add(1)
 	var hasher interface {
 		io.Writer
 		Sum([]byte) []byte

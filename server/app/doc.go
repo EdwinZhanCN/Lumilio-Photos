@@ -7,8 +7,8 @@
 // Desktop App, so it owns its full lifecycle — startup and graceful shutdown —
 // without calling os.Exit; fatal startup conditions are returned as errors.
 // Single-run host controls (pprof address, agent audit log, agent ref memory
-// budgets, break-glass recovery) arrive separately from configuration in
-// [OperatorControls].
+// budgets, break-glass recovery, an optional change-watch backend) arrive
+// separately from configuration in [OperatorControls].
 //
 // Startup order is: logging; libvips; the single-writer catalog and the
 // independent QueueDB; catalog and River migrations in their own files; the
