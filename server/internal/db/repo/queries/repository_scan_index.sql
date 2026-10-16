@@ -123,6 +123,30 @@ SELECT EXISTS (
       AND state = 'present'
 ) AS present;
 
+-- name: HasTrashedRepositoryEntryAtPath :one
+-- A catalog restored from a backup taken before a Delete still lists the
+-- file at its path; the trashed row the Trash rebuild records for the same
+-- Asset and path supersedes it, so the vanished row is dropped instead of
+-- becoming missing.
+SELECT EXISTS (
+    SELECT 1 FROM repository_entries
+    WHERE asset_id = sqlc.arg(asset_id)
+      AND repository_id = sqlc.arg(repository_id)
+      AND path_key = sqlc.arg(path_key)
+      AND entry_id <> sqlc.arg(entry_id)
+      AND state = 'trashed'
+) AS trashed;
+
+-- name: DeleteMissingRepositoryEntriesAtTrashedPath :execrows
+-- The Trash rebuild recorded a trashed row for an Asset at a path a scan
+-- had already marked missing (the file left for the trash before the catalog
+-- knew); the missing row stands for the same file and is superseded.
+DELETE FROM repository_entries
+WHERE asset_id = sqlc.arg(asset_id)
+  AND repository_id = sqlc.arg(repository_id)
+  AND path_key = sqlc.arg(path_key)
+  AND state = 'missing';
+
 -- name: DeleteMissingRepositoryEntriesForAsset :execrows
 -- A present entry for the Asset now exists, so its missing entries were
 -- moves or deletions of copies, removed like Syncthing's findRename.

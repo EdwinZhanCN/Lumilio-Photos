@@ -168,8 +168,9 @@ type TrashRecord struct {
 // AdoptTrash records trashed files the catalog does not know, in one
 // transaction. Each binds to the owner's Asset for its content, or to a new
 // trashed Asset, so it is listed in the Trash and can be restored or expire.
-// Records whose trash ID is already known are skipped. It returns how many
-// records it adopted.
+// A missing row of that Asset at the same path is superseded by the trashed
+// row. Records whose trash ID is already known are skipped. It returns how
+// many records it adopted.
 func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner int32, records []TrashRecord) (int, error) {
 	adopted := 0
 	err := s.writer.WithTx(ctx, catalogtx.OperationAssetDelete, func(_ *sql.Tx, queries *repo.Queries) error {
@@ -231,6 +232,14 @@ func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner 
 				TrashID:   uuid.NullUUID{UUID: record.TrashID, Valid: true}, TrashedAt: stamp, UpdatedAt: stamp,
 			}); err != nil {
 				return fmt.Errorf("record trashed file %s: %w", record.OriginalPath, err)
+			}
+			// A scan that ran before this rebuild saw the file gone and
+			// marked its row missing (a catalog restored from a backup
+			// taken before the Delete); the trashed row supersedes it.
+			if _, err := queries.DeleteMissingRepositoryEntriesAtTrashedPath(ctx, repo.DeleteMissingRepositoryEntriesAtTrashedPathParams{
+				AssetID: uuid.NullUUID{UUID: assetID, Valid: true}, RepositoryID: repositoryID, PathKey: key,
+			}); err != nil {
+				return err
 			}
 			adopted++
 		}
