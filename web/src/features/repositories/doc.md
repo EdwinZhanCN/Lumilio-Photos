@@ -68,8 +68,18 @@ one Storage Location can hold Repositories on different mounts.
 Creation is a four-step [AddRepositoryModal](./flows/storage-panel/AddRepositoryModal.tsx) wizard that selects an
 authorized Storage Location, an explicit stable direct-child storage folder,
 and an immutable storage strategy through [useCreateRepository](./api/useCreateRepository.ts).
-Every Web creation entry uses [StorageStrategyPicker](./components/StorageStrategyPicker.tsx); later PATCH
-mutation remains unavailable.
+Its Review step asks the Server to assess that exact target through
+[useStorageAssessment](./api/useStorageAssessment.ts): the response names the risks to acknowledge
+(or a typed refusal such as network storage) and a consent token bound to
+the target's facts. [StorageRiskConfirmation](./components/StorageRiskConfirmation.tsx) renders the risks with
+[storageRiskLabel](./model/storageRiskCopy.ts) and the acknowledgement is sent with the token;
+a changed token, a `storage/confirmation-required`, or a
+`storage/assessment-stale` Problem resets it, so consent never outlives the
+facts it was given for. Server candidates only suggest folder names. A
+create that finds an existing Repository hands the user to Open Existing
+(native or [RepositoryCandidateModal](./flows/storage-panel/RepositoryCandidateModal.tsx)) with the Storage Location and
+folder retained. Every Web creation entry uses [StorageStrategyPicker](./components/StorageStrategyPicker.tsx);
+later PATCH mutation remains unavailable.
 
 [NativeHostActionModal](./flows/storage-panel/NativeHostActionModal.tsx) persists requests for a Desktop-native folder
 grant and polls their durable status. The shared HTTP contract never accepts

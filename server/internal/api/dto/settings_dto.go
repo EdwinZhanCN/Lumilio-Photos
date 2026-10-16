@@ -57,10 +57,13 @@ type MLSettingsDTO struct {
 }
 
 type RepositoryDefaultsDTO struct {
-	StorageLocation   string   `json:"storage_location" example:"/data/storage"`
-	Strategy          string   `json:"strategy" example:"date"`
-	DuplicateHandling string   `json:"duplicate_handling" example:"rename"`
-	RiskWarnings      []string `json:"risk_warnings,omitempty"`
+	StorageLocation   string `json:"storage_location" example:"/data/storage"`
+	Strategy          string `json:"strategy" example:"date"`
+	DuplicateHandling string `json:"duplicate_handling" example:"rename"`
+	// Assessment reviews the Primary Repository target below the Default
+	// Storage Location and carries the token the setup create binds to.
+	// It is absent while the target cannot be assessed.
+	Assessment *StorageAssessmentDTO `json:"assessment,omitempty"`
 }
 
 type UpdateSystemSettingsDTO struct {

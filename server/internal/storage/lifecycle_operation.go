@@ -84,7 +84,9 @@ type createRepositoryOperationPayload struct {
 	OwnerID           *int32           `json:"owner_id,omitempty"`
 	StorageStrategy   string           `json:"storage_strategy"`
 	DuplicateHandling string           `json:"duplicate_handling"`
-	RiskConfirmation  bool             `json:"risk_confirmation"`
+	// AcknowledgedRisks are the risk codes the actor acknowledged against
+	// the assessment token; they are part of payload equality.
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty"`
 }
 
 type createRepositoryRollbackData struct {
@@ -471,6 +473,8 @@ func (rm *DefaultRepositoryManager) recordJournalAudit(
 			confirmation = value
 		}
 	} else if confirmed, _ := payload["risk_confirmation"].(bool); confirmed {
+		confirmation = "storage_risk"
+	} else if acknowledged, _ := payload["acknowledged_risks"].([]any); len(acknowledged) > 0 {
 		confirmation = "storage_risk"
 	}
 	source := auditSourceForActor(operation.Actor)

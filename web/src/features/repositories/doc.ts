@@ -69,8 +69,18 @@
  * Creation is a four-step {@link AddRepositoryModal} wizard that selects an
  * authorized Storage Location, an explicit stable direct-child storage folder,
  * and an immutable storage strategy through {@link useCreateRepository}.
- * Every Web creation entry uses {@link StorageStrategyPicker}; later PATCH
- * mutation remains unavailable.
+ * Its Review step asks the Server to assess that exact target through
+ * {@link useStorageAssessment}: the response names the risks to acknowledge
+ * (or a typed refusal such as network storage) and a consent token bound to
+ * the target's facts. {@link StorageRiskConfirmation} renders the risks with
+ * {@link storageRiskLabel} and the acknowledgement is sent with the token;
+ * a changed token, a `storage/confirmation-required`, or a
+ * `storage/assessment-stale` Problem resets it, so consent never outlives the
+ * facts it was given for. Server candidates only suggest folder names. A
+ * create that finds an existing Repository hands the user to Open Existing
+ * (native or {@link RepositoryCandidateModal}) with the Storage Location and
+ * folder retained. Every Web creation entry uses {@link StorageStrategyPicker};
+ * later PATCH mutation remains unavailable.
  *
  * {@link NativeHostActionModal} persists requests for a Desktop-native folder
  * grant and polls their durable status. The shared HTTP contract never accepts
@@ -125,6 +135,9 @@
  * @module
  */
 import type { useCreateRepository } from "./api/useCreateRepository.ts";
+import type { useStorageAssessment } from "./api/useStorageAssessment.ts";
+import type { StorageRiskConfirmation } from "./components/StorageRiskConfirmation.tsx";
+import type { storageRiskLabel } from "./model/storageRiskCopy.ts";
 import type { useNativeHostAction, useNativeHostCapability } from "./api/useNativeHostActions.ts";
 import type { useRepositoryCandidates } from "./api/useRepositoryCandidates.ts";
 import type { useRepositoryOptions } from "./api/useRepositoryOptions.ts";

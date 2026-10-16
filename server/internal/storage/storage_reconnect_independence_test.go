@@ -72,7 +72,7 @@ func TestRelocateRepositorySucceedsWhenOriginalPathIsMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	created, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "reconnect-missing-old", Actor: "test", Name: "Reconnect",
 		DirectoryName: "reconnect", Role: dbtypes.RepoRoleRegular, StorageLocationID: firstRoot.StorageLocationID.String(),
 	})
@@ -158,7 +158,7 @@ func TestRelocateRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	created, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "reconnect-stale-activity", Actor: "test", Name: "Stale Activity",
 		DirectoryName: "stale-activity", Role: dbtypes.RepoRoleRegular, StorageLocationID: firstRoot.StorageLocationID.String(),
 	})
@@ -221,7 +221,7 @@ func TestRelocateRepositoryRescansAndForgetsVolumeFileIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	created, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "reconnect-fence", Actor: "test", Name: "Fence",
 		DirectoryName: "fence", Role: dbtypes.RepoRoleRegular, StorageLocationID: firstRoot.StorageLocationID.String(),
 	})

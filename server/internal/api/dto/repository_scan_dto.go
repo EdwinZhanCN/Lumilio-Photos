@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"server/internal/api/problem"
+	"server/internal/storage"
 )
 
 type CreateRepositoryRequestDTO struct {
@@ -20,7 +21,49 @@ type CreateRepositoryRequestDTO struct {
 	StorageLocationID string `json:"storage_location_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
 	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
-	RiskConfirmation  bool   `json:"risk_confirmation,omitempty"`
+	// AssessmentToken is the token returned by the create assessment (or by a
+	// storage/confirmation-required Problem) for this exact target. It is
+	// required whenever the target carries risks.
+	AssessmentToken string `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	// AcknowledgedRisks lists every risk code the administrator acknowledged
+	// against AssessmentToken. All risks the assessment reported must appear.
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"removable_storage,non_default_location"`
+}
+
+// StorageAssessmentRequestDTO selects a create target by registered Storage
+// Location and direct-child folder. Clients never submit a filesystem path.
+type StorageAssessmentRequestDTO struct {
+	Intent string `json:"intent" binding:"required,oneof=create_repository setup_primary" example:"create_repository"`
+	// StorageLocationID identifies a registered Storage Location. Empty selects
+	// the configured default; setup_primary always uses the default.
+	StorageLocationID string `json:"storage_location_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// DirectoryName is the direct-child folder for create_repository; ignored for setup_primary.
+	DirectoryName string `json:"directory_name,omitempty" example:"family-photos"`
+}
+
+// StorageAssessmentDTO is the Server's read-only review of one create
+// target. The token binds a later acknowledgement to exactly these facts;
+// capacity fluctuation does not change it, a changed mount, marker, or risk
+// vocabulary does.
+type StorageAssessmentDTO struct {
+	Token               string `json:"token" example:"v1.0123456789abcdef"`
+	Intent              string `json:"intent" enums:"create_repository,setup_primary" example:"create_repository"`
+	StorageLocationID   string `json:"storage_location_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	StorageLocationKind string `json:"storage_location_kind" enums:"default,external" example:"external"`
+	DirectoryName       string `json:"directory_name" example:"family-photos"`
+	// Support is supported, unsupported, or unknown; Problem names the typed
+	// refusal when Support is not supported or the target needs materialization.
+	Support string `json:"support" enums:"supported,unsupported,unknown" example:"supported"`
+	Problem string `json:"problem,omitempty" example:"storage/unsupported-filesystem"`
+	// Risks are the acknowledgements the create command will require.
+	Risks []string `json:"risks" example:"removable_storage,non_default_location"`
+	// CanCreate reports whether the target is reviewable for creation: an
+	// absent or empty target with no Repository marker on supported storage.
+	CanCreate bool `json:"can_create"`
+	// ExistingRepositoryID is the identity of a valid .lumiliorepo already at the target, if any.
+	ExistingRepositoryID string `json:"existing_repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// MarkerState is the typed reading of the target's Repository marker.
+	MarkerState string `json:"marker_state" enums:"valid,absent,permission_denied,unknown,corrupt,unsupported_version" example:"absent"`
 }
 
 type RepositoryDTO struct {
@@ -67,11 +110,35 @@ type ListRepositoriesResponseDTO struct {
 	Repositories []RepositoryDTO `json:"repositories"`
 }
 
+// ToStorageAssessmentDTO projects a Server assessment onto the wire. The
+// resolved path and raw observation stay on the Server.
+func ToStorageAssessmentDTO(assessment *storage.CreateTargetAssessment) StorageAssessmentDTO {
+	risks := storage.RiskCodes(assessment.Risks)
+	if risks == nil {
+		risks = []string{}
+	}
+	return StorageAssessmentDTO{
+		Token:                assessment.Token,
+		Intent:               string(assessment.Intent),
+		StorageLocationID:    assessment.StorageLocationID.String(),
+		StorageLocationKind:  string(assessment.StorageLocationKind),
+		DirectoryName:        assessment.DirectoryName,
+		Support:              string(assessment.Assessment.Classification.Support),
+		Problem:              string(assessment.Problem()),
+		Risks:                risks,
+		CanCreate:            assessment.Assessment.Capabilities.ReviewCreate,
+		ExistingRepositoryID: assessment.ExistingRepositoryID(),
+		MarkerState:          string(assessment.Assessment.Observation.RepositoryMarker.State),
+	}
+}
+
+// CreateRepositoryResponseDTO returns the created Repository and the risks
+// the administrator acknowledged to place it there.
 type CreateRepositoryResponseDTO struct {
 	Repository RepositoryDTO `json:"repository"`
-	// Warnings are non-fatal notes about the chosen location, such as it being
-	// inside a cloud-sync folder. The repository was created regardless.
-	Warnings []string `json:"warnings,omitempty"`
+	// AcknowledgedRisks are the risk codes the administrator acknowledged for
+	// this placement; empty when the target carried none.
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"removable_storage"`
 }
 
 type LifecycleAuditEventDTO struct {

@@ -69,19 +69,20 @@ the promotion commit, with bilingual release notes, smoked once.
   and portable app; the GitHub Release job was skipped as designed for a
   dispatch. Artifacts: `windows-amd64-setup`, `windows-amd64`, `dmg-arm64`.
 
-### Phase 0b — Sync `main` into `dev` (S1, do before anything else)
-- [ ] Merge `origin/main` into a branch off `dev` (brings #201's export
+### Phase 0b — Sync `main` into `dev` (S1, done 2026-10-14, PR #249)
+- [x] Merge `origin/main` into a branch off `dev` (brings #201's export
   dialog, `web/src/components/PhotoExportDialog` and
   `web/src/lib/photo-export`, and the Desktop retry-cleanup test). Resolve
   conflicts in favour of `dev` for anything the Atlas or storage work
   rewrote; keep `main`'s new modules.
-- [ ] `task atlas:generate`, then `task atlas:check`. If a view is reported
+- [x] `task atlas:generate`, then `task atlas:check`. If a view is reported
   stale, re-read it against the merged code before `task atlas:lock`
   (`lumilio-atlas`). `task verify:generated` and `task web:test` pass
   locally; push and confirm the `generated artifacts` job is green on the
-  PR and, after merge, on #210.
-- [ ] Close draft #229: its harness and five regression tests landed through
-  #232–#235, and it no longer merges cleanly.
+  PR and, after merge, on #210. (#249: four generated Atlas files, no stale
+  view; its CI was green.)
+- [x] Close draft #229: its harness and five regression tests landed through
+  #232–#235, and it no longer merges cleanly. (Closed 2026-10-13.)
 
 ### Phase 1 — Release notes (bilingual)
 - [ ] Collect user-facing changes since `v26.1.0-beta.1`:

@@ -9,13 +9,17 @@ import {
   useRepositoryCandidates,
   useResolveRepositoryCandidate,
 } from "../../api/useRepositoryCandidates";
+import { storageRiskLabel } from "../../model/storageRiskCopy";
 
 export default function RepositoryCandidateModal({
   isOpen,
   onClose,
+  focusDirectoryName,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  /** The folder a create handed over, highlighted so the journey continues where it stopped. */
+  focusDirectoryName?: string;
 }) {
   const { t } = useI18n();
   const showMessage = useMessage();
@@ -149,7 +153,12 @@ export default function RepositoryCandidateModal({
               return (
                 <div
                   key={candidate.directory_name}
-                  className="rounded-lg border border-base-300 px-4 py-3"
+                  className={`rounded-lg border px-4 py-3 ${focusDirectoryName && candidate.directory_name === focusDirectoryName ? "border-primary ring-1 ring-primary/40" : "border-base-300"}`}
+                  data-focused={
+                    focusDirectoryName && candidate.directory_name === focusDirectoryName
+                      ? "true"
+                      : undefined
+                  }
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
@@ -182,8 +191,12 @@ export default function RepositoryCandidateModal({
                             {t("manage.repositories.candidates.riskConfirmation", {
                               defaultValue:
                                 "I understand this location may be network-backed, removable, managed by cloud-sync software, mounted differently than when it was registered, or contain files that must be downloaded first.",
-                            })}{" "}
-                            ({candidate.risk_warnings?.join(", ")})
+                            })}
+                            <ul className="mt-1 list-disc pl-4">
+                              {(candidate.risk_warnings ?? []).map((risk) => (
+                                <li key={risk}>{storageRiskLabel(risk, t)}</li>
+                              ))}
+                            </ul>
                           </span>
                         </label>
                       ) : null}

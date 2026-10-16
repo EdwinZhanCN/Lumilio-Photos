@@ -119,3 +119,64 @@ describe("Problem Details", () => {
     );
   });
 });
+
+describe("storage consent Problems", () => {
+  it("keeps the bounded risk codes and assessment token of a confirmation-required Problem", async () => {
+    const value = normalizeProblem({
+      type: "https://lumilio.org/problems/storage/confirmation-required",
+      status: 409,
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      risks: ["removable_storage", "non_default_location"],
+      assessment_token: "v1.0123",
+      detail: "INJECTED",
+    });
+    expect(value).toMatchObject({
+      kind: "problem",
+      risks: ["removable_storage", "non_default_location"],
+      assessmentToken: "v1.0123",
+    });
+    expect(localizeProblem(value, await translator("en"), "Create failed.")).toBe(
+      "Review and acknowledge the storage risks before continuing.",
+    );
+    expect(localizeProblem(value, await translator("zh"), "创建失败。")).toBe(
+      "请先查看并确认存储风险，然后再继续。",
+    );
+  });
+
+  it("drops oversized or non-string risk lists instead of trusting them", () => {
+    const tooMany = normalizeProblem({
+      type: "https://lumilio.org/problems/storage/confirmation-required",
+      status: 409,
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      risks: Array.from({ length: 17 }, (_, index) => `risk-${index}`),
+      assessment_token: "x".repeat(300),
+    });
+    expect(tooMany).toMatchObject({ kind: "problem" });
+    expect(tooMany).not.toHaveProperty("risks", expect.anything());
+    expect(tooMany).not.toHaveProperty("assessmentToken", expect.anything());
+  });
+
+  it("localizes every typed storage refusal in both languages", async () => {
+    const en = await translator("en");
+    const zh = await translator("zh");
+    for (const type of [
+      "storage/assessment-stale",
+      "storage/unsupported-filesystem",
+      "storage/not-a-mounted-volume",
+      "storage/observation-unknown",
+      "storage/permission-denied",
+      "storage/materialization-required",
+    ]) {
+      const value = normalizeProblem({
+        type: `https://lumilio.org/problems/${type}`,
+        status: 409,
+        instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      });
+      const english = localizeProblem(value, en, "fallback");
+      const chinese = localizeProblem(value, zh, "fallback");
+      expect(english, type).not.toBe("fallback");
+      expect(chinese, type).not.toBe("fallback");
+      expect(chinese, type).not.toBe(english);
+    }
+  });
+});

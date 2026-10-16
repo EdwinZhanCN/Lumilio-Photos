@@ -90,8 +90,9 @@ const BootstrapFlow: React.FC = () => {
     storageStrategy,
     setStorageStrategy,
     placementRisks,
-    riskConfirmation,
-    setRiskConfirmation,
+    reviewProblem,
+    riskAcknowledged,
+    setRiskAcknowledged,
     canSubmitRepo,
     submitRepo,
     repoError,
@@ -543,10 +544,15 @@ const BootstrapFlow: React.FC = () => {
                     idPrefix="bootstrap-primary"
                   />
 
+                  {reviewProblem ? (
+                    <div role="alert" className="alert alert-warning text-sm">
+                      {reviewProblem}
+                    </div>
+                  ) : null}
                   <StorageRiskConfirmation
-                    warnings={placementRisks}
-                    checked={riskConfirmation}
-                    onChange={setRiskConfirmation}
+                    risks={placementRisks}
+                    checked={riskAcknowledged}
+                    onChange={setRiskAcknowledged}
                     disabled={isCreatingRepository}
                   />
 

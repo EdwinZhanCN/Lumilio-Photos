@@ -33,7 +33,10 @@ func ToSetupStatusDTO(status service.SetupStatus) SetupStatusDTO {
 			StorageLocation:   status.RepositoryDefaults.StorageLocation,
 			Strategy:          status.RepositoryDefaults.Strategy,
 			DuplicateHandling: status.RepositoryDefaults.DuplicateHandling,
-			RiskWarnings:      status.RepositoryDefaults.RiskWarnings,
+		}
+		if status.RepositoryDefaults.Assessment != nil {
+			assessment := ToStorageAssessmentDTO(status.RepositoryDefaults.Assessment)
+			result.RepositoryDefaults.Assessment = &assessment
 		}
 	}
 	return result

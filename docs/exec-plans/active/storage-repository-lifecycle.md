@@ -1,10 +1,12 @@
 # Storage Location and Repository lifecycle
 
 Status: active, created 2026-10-07; principal owner decisions frozen
-2026-10-07. P0 merged as PR #246. P1 lands in this PR: observation and
+2026-10-07. P0 merged as PR #246. P1 merged as PR #247: observation and
 assessment core, stat panic fix, guarded atomic marker primitive, and
-swappable lock/identity/watch adapters. P2–P8 remain outstanding. Each fixing
-PR lands its regression tests and updates this Status and the evidence tables.
+swappable lock/identity/watch adapters. P2 lands in this PR (session S2):
+the create contract and shared risk review, closing #242. P3–P8 remain
+outstanding. Each fixing PR lands its regression tests and updates this
+Status and the evidence tables.
 Child of [release-hardening.md](release-hardening.md); its session order
 (S2–S8, one phase per session, P3 and P6 may split) is the schedule.
 2026-10-13: no physical machine is available for the foreseeable future, so
@@ -296,6 +298,80 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   generated contracts/freshness and localized warning coverage green.
 - Edwin: PR review; revisit selection ownership only if needed. #242 closes
   on CI flow + injected-target Server evidence; hardware is not a phase gate.
+
+### P2 delivered (2026-10-14)
+
+- **Consent is bound to an assessment token.** `AssessCreateTarget` resolves
+  the create target from a registered Storage Location and folder, samples it
+  through the installed `StorageObserver`, and mints an HMAC token over the
+  facts that decide the review: intent, Location identity and kind, folder,
+  resolved path, support and problem, the sorted risk vocabulary, access and
+  emptiness, filesystem, mount identity (`MountID`, `MountSource`,
+  `MountPath`, `Device`, removable, remote, cloud provider), and both marker
+  readings. Capacity figures, inode, and capacity-group key are excluded, so
+  free-space drift keeps a review valid while a replaced disk, a new marker,
+  or a different risk set invalidates it. The key is per process; a restarted
+  Server asks for a fresh review. `CreateRepository` re-samples the same
+  target and admits only `AssessmentToken` equal to the current token plus an
+  `AcknowledgedRisks` set covering every reported risk; it refuses with
+  `StorageRiskConfirmationError{Risks, Token}` (no review or incomplete
+  acknowledgement), `ErrStorageAssessmentStale` (facts changed), or a typed
+  support refusal (`ErrStorageUnsupportedFilesystem`, not-a-mounted-volume,
+  `ErrStoragePermissionDenied`, `ErrStorageObservationUnknown`,
+  `ErrStorageMaterializationRequired`) before any journal or disk change, and
+  audits each refusal (`risk_confirmation`, `assessment_stale`,
+  `storage_support`). The legacy `risk_confirmation` boolean and
+  `StoragePlacementWarnings` are gone from the create and setup commands;
+  candidates, host actions, and open/relocate keep theirs until P3 and P6.
+- **Transport.** `POST /api/v1/storage/assessments` (admin) returns
+  `StorageAssessmentDTO` (token, intent, Location id and kind, folder,
+  support, problem, risks, can_create, existing marker identity, marker
+  state; never a path). `CreateRepositoryRequestDTO` and
+  `SetupPrimaryRepositoryRequestDTO` carry `assessment_token` and
+  `acknowledged_risks`; the create response returns `acknowledged_risks`
+  instead of English warning sentences. Setup status carries the
+  `setup_primary` assessment under `repository_defaults.assessment` until the
+  primary exists. `storage/confirmation-required` is now a typed Problem with
+  `risks` and `assessment_token`; `storage/assessment-stale`,
+  `storage/unsupported-filesystem`, `storage/not-a-mounted-volume`,
+  `storage/observation-unknown`, `storage/permission-denied`, and
+  `storage/materialization-required` are registered, documented, and
+  localized. The two create commands' 409 is the exact
+  `api.RepositoryCreateProblemResponse` union.
+- **Web.** The Add Repository Review step runs the assessment for the
+  selected Storage Location and folder (`useStorageAssessment`), renders the
+  risks through `storageRiskLabel` in `StorageRiskConfirmation`, resets the
+  acknowledgement whenever the token changes, submits token plus every risk
+  code, re-reviews on `confirmation-required` or `assessment-stale` with an
+  inline notice, shows typed refusals inline, and hands `existing_repository_found`
+  / `repository_identity` to Open Existing (native task in Desktop, candidate
+  modal with the folder highlighted elsewhere) with the Location and folder
+  retained. Server candidates only suggest folder names. Setup (gate and
+  bootstrap) acknowledges against the setup status assessment. All risk codes
+  have en/zh labels; zh coverage 100%.
+- **Evidence (R1, R7 transport, R9 create handoff).**
+  `TestCreateTargetFingerprintIgnoresCapacityButBindsEveryDecidingFact`,
+  `TestConsentTokenIsOpaqueAndStableWithinOneManager`,
+  `TestAssessCreateTargetReviewsTheActualTargetWithInjectedFacts`,
+  `TestCreateRepositoryBindsAcknowledgementToTheAssessedTarget` (red when
+  the token comparison is disabled: a foreign token was accepted),
+  `TestCreateRepositoryRefusesUnsupportedStorageBeforeAnyConsent`,
+  `TestSetupPrimaryIntentReviewsTheDefaultPrimaryTarget` (Server, injected
+  removable/network/denied facts on a real catalog with an external
+  Location); handler tests for the consent Problem body, every typed
+  refusal on both create commands, and the assessment endpoint; setup
+  service tests; Web `AddRepositoryModal.test.tsx` (Desktop shape with no
+  candidates, acknowledgement reset on changed facts, unsupported target
+  refused inline, conflict handoff payload), `StoragePanel.spec.tsx` (R1
+  through the real panel with native host available; create handoff into
+  Open Existing with the folder highlighted), `PrimaryRepositoryGate.test.tsx`,
+  `useBootstrapFlow.test.ts`, and `problem.test.ts` (bounded extensions,
+  en/zh for every new type). #242 closes with this PR.
+- **Deviations recorded.** Risk acknowledgement is one checkbox that
+  acknowledges every listed risk code at once; the wire contract stays
+  per-code so a later UI can split it. The `non_default_location` risk now
+  applies to every external Location create, as P1 classified it; before P2
+  an external Location without other facts needed no confirmation.
 
 ### P3 — Safe command boundary
 

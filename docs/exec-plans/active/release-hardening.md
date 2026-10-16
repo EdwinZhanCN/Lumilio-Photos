@@ -118,8 +118,8 @@ follow-up in the tech-debt tracker.
 
 | # | Session | Closes / unblocks | Plan |
 | --- | --- | --- | --- |
-| S1 | Sync `main` into `dev`: merge `origin/main` (five commits, export dialog), run `task atlas:generate` and `task verify:generated`, re-read any Atlas view the new modules make stale before `task atlas:lock`. #210 turns green again. Close the stale draft #229 (its tests landed through #232–#235). | #210 CI | [rc-release.md](rc-release.md) Phase 0b |
-| S2 | Storage P2 — assessment DTOs/endpoints, consent token, capability-backed Create, shared en/zh risk review. | #242 | [storage-repository-lifecycle.md](storage-repository-lifecycle.md) |
+| S1 | **Done 2026-10-14 (#249).** Sync `main` into `dev`: merge `origin/main` (five commits, export dialog), run `task atlas:generate` and `task verify:generated`, re-read any Atlas view the new modules make stale before `task atlas:lock`. #210 turns green again. Close the stale draft #229 (its tests landed through #232–#235). | #210 CI | [rc-release.md](rc-release.md) Phase 0b |
+| S2 | **In PR.** Storage P2 — assessment DTOs/endpoints, consent token, capability-backed Create, shared en/zh risk review. | #242 | [storage-repository-lifecycle.md](storage-repository-lifecycle.md) |
 | S3 | Storage P3 — safe command boundary (reassess under barriers, rename refresh, role-aware actions, idempotent receipts). May split into two PRs: commands, then native selection/review. | — | same |
 | S4 | Storage P4 — private preservation and recovery (held inherited Trash, Studio reassociation, journaled staging). Highest data risk; fault injection at every boundary. | — | same |
 | S5 | Storage P5 — setup and startup recovery (Adopt Primary / fresh elsewhere, authenticated setup recovery, startup facade). | leftover-primary dead end | same |

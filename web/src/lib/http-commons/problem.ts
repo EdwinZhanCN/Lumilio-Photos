@@ -32,9 +32,15 @@ const KNOWN_TYPES = {
   "https://lumilio.org/problems/repository/scan-incomplete": true,
   "https://lumilio.org/problems/repository/unavailable": true,
   "https://lumilio.org/problems/service/unavailable": true,
+  "https://lumilio.org/problems/storage/assessment-stale": true,
   "https://lumilio.org/problems/storage/confirmation-required": true,
   "https://lumilio.org/problems/storage/host-action-expired": true,
   "https://lumilio.org/problems/storage/host-action-failed": true,
+  "https://lumilio.org/problems/storage/materialization-required": true,
+  "https://lumilio.org/problems/storage/not-a-mounted-volume": true,
+  "https://lumilio.org/problems/storage/observation-unknown": true,
+  "https://lumilio.org/problems/storage/permission-denied": true,
+  "https://lumilio.org/problems/storage/unsupported-filesystem": true,
   "https://lumilio.org/problems/upload/processing-failed": true,
 } as const satisfies Record<KnownProblemType, true>;
 
@@ -48,6 +54,8 @@ export type NormalizedProblem =
       conflictType?: string;
       repositoryID?: string;
       actions?: readonly string[];
+      risks?: readonly string[];
+      assessmentToken?: string;
     }
   | { kind: "abort" }
   | { kind: "network" }
@@ -61,6 +69,8 @@ export type NormalizedProblemReference = {
   conflictType?: string;
   repositoryID?: string;
   actions?: readonly string[];
+  risks?: readonly string[];
+  assessmentToken?: string;
 };
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -81,13 +91,24 @@ function safeExtensions(source: Record<string, unknown>) {
     typeof source.repository_id === "string" && source.repository_id.length <= 128
       ? source.repository_id
       : undefined;
-  const actions =
-    Array.isArray(source.actions) &&
-    source.actions.length <= 16 &&
-    source.actions.every((action) => typeof action === "string" && action.length <= 64)
-      ? (source.actions as string[]).slice()
+  const actions = boundedCodes(source.actions);
+  const risks = boundedCodes(source.risks);
+  const assessmentToken =
+    typeof source.assessment_token === "string" &&
+    source.assessment_token.length > 0 &&
+    source.assessment_token.length <= 256
+      ? source.assessment_token
       : undefined;
-  return { retryAfterSeconds, conflictType, repositoryID, actions };
+  return { retryAfterSeconds, conflictType, repositoryID, actions, risks, assessmentToken };
+}
+
+/** A short list of stable codes; anything longer or non-string is dropped whole. */
+function boundedCodes(value: unknown): string[] | undefined {
+  return Array.isArray(value) &&
+    value.length <= 16 &&
+    value.every((code) => typeof code === "string" && code.length <= 64)
+    ? (value as string[]).slice()
+    : undefined;
 }
 
 export function normalizeProblem(value: unknown): NormalizedProblem {
@@ -180,6 +201,19 @@ export function localizeAPIProblem(
   return localizeProblemReference(value, t, operationFallback);
 }
 
+/**
+ * Localize a Problem type the Server reported outside a response, such as the
+ * `problem` code of a storage assessment. Unknown types use the fallback.
+ */
+export function localizeProblemType(
+  problemType: string,
+  t: TFunction,
+  operationFallback: string,
+): string {
+  if (!isKnownType(problemType)) return operationFallback;
+  return localizeKnownProblem(problemType, {}, t, operationFallback);
+}
+
 function localizeKnownProblem(
   problemType: KnownProblemType,
   facts: {
@@ -243,7 +277,37 @@ function localizeKnownProblem(
     case "https://lumilio.org/problems/storage/confirmation-required":
       return t(
         "apiErrors.storage.confirmationRequired",
-        "Review and confirm the Storage Location risks before continuing.",
+        "Review and acknowledge the storage risks before continuing.",
+      );
+    case "https://lumilio.org/problems/storage/assessment-stale":
+      return t(
+        "apiErrors.storage.assessmentStale",
+        "The storage target changed since it was reviewed. Review it again before continuing.",
+      );
+    case "https://lumilio.org/problems/storage/unsupported-filesystem":
+      return t(
+        "apiErrors.storage.unsupportedFilesystem",
+        "Network storage (NFS, SMB, AFP, SSHFS, WebDAV, or a network drive) is not supported for Storage Locations and Repositories in this release. Choose a local disk.",
+      );
+    case "https://lumilio.org/problems/storage/not-a-mounted-volume":
+      return t(
+        "apiErrors.storage.notMountedVolume",
+        "This folder is not a mounted volume; data stored here would be lost when the container is recreated. Mount a host directory in your compose file.",
+      );
+    case "https://lumilio.org/problems/storage/observation-unknown":
+      return t(
+        "apiErrors.storage.observationUnknown",
+        "The storage target could not be inspected. Check the mount and access, then try again.",
+      );
+    case "https://lumilio.org/problems/storage/permission-denied":
+      return t(
+        "apiErrors.storage.permissionDenied",
+        "Lumilio was denied access to the storage target. Grant access or choose another folder.",
+      );
+    case "https://lumilio.org/problems/storage/materialization-required":
+      return t(
+        "apiErrors.storage.materializationRequired",
+        "Files in this folder must be downloaded locally before it can be used. Make the folder available offline and try again.",
       );
     case "https://lumilio.org/problems/storage/host-action-expired":
       return t(

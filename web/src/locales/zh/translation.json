@@ -54,9 +54,15 @@
       "unavailable": "所需服务不可用。"
     },
     "storage": {
-      "confirmationRequired": "请检查并确认存储位置风险后再继续。",
+      "assessmentStale": "存储目标在审查后发生了变化。请重新审查后再继续。",
+      "confirmationRequired": "请先查看并确认存储风险，然后再继续。",
       "hostActionExpired": "桌面端审批已过期，请重新发起此操作。",
-      "hostActionFailed": "桌面端未能完成此存储操作。"
+      "hostActionFailed": "桌面端未能完成此存储操作。",
+      "materializationRequired": "此文件夹中的文件需要先下载到本地才能使用。请将文件夹设为离线可用后重试。",
+      "notMountedVolume": "此文件夹不是挂载的卷；存放在这里的数据会在容器重建时丢失。请在 compose 文件中挂载主机目录。",
+      "observationUnknown": "无法检查存储目标。请检查挂载和访问权限后重试。",
+      "permissionDenied": "Lumilio 无权访问该存储目标。请授予访问权限或选择其他文件夹。",
+      "unsupportedFilesystem": "本版本的存储位置和资源库不支持网络存储（NFS、SMB、AFP、SSHFS、WebDAV 或网络驱动器）。请选择本地磁盘。"
     },
     "upload": {
       "processingFailed": "无法处理此上传。"
@@ -716,6 +722,7 @@
       "storageLocation": "默认存储位置",
       "storageLocationHint": "由服务器配置决定。流明集会在这个默认存储位置的 primary/ 文件夹中创建主资源库。",
       "submit": "创建主资源库",
+      "targetUnavailable": "默认存储位置目前无法容纳主资源库。",
       "title": "创建主资源库"
     },
     "register": {
@@ -1445,8 +1452,8 @@
       "createNameRequired": "请输入资源库名称。",
       "createNameTooManyBytes": "名称的 UTF-8 编码不能超过 240 字节。",
       "createNameTooManyCharacters": "名称不能超过 80 个字符。",
-      "createRiskConfirmationDescription": "此目标可能是可移动存储、网络存储，或由云同步软件管理。请确认原件已有备份并且可离线读取。",
-      "createRiskConfirmationTitle": "确认存储位置风险",
+      "createRiskConfirmationDescription": "Lumilio 已审查此确切目标。请仅为本次操作确认下列风险；磁盘或文件夹发生变化时会再次询问。",
+      "createRiskConfirmationTitle": "确认存储风险",
       "createSubmit": "创建资源库",
       "createSuccess": "已添加 {{name}}。",
       "createTitle": "添加资源库",
@@ -1530,6 +1537,21 @@
       "renameSubmit": "保存名称",
       "renameSuccess": "已将资源库重命名为“{{name}}”。",
       "renameTitle": "重命名资源库",
+      "review": {
+        "assessing": "正在审查存储目标…",
+        "failed": "无法审查存储目标。",
+        "markerInvalid": "该文件夹中的资源库标记需要处理。请查看存储页面的诊断信息，或选择其他文件夹。",
+        "retry": "重新审查",
+        "unavailable": "该目标目前无法用于资源库。"
+      },
+      "risks": {
+        "cloudPlaceholder": "部分文件是云端占位文件，需要先下载。",
+        "cloudSyncDirectory": "由云同步软件管理：同步客户端可能会清除原件或产生重复文件。",
+        "mountChanged": "挂载的文件系统自该位置注册以来已发生变化。",
+        "networkFilesystem": "网络文件系统：不受支持。",
+        "nonDefaultLocation": "位于默认存储位置之外：此存储位置必须保持已授权且处于连接状态。",
+        "removableStorage": "可移动或外置磁盘：拔出期间原件将不可用。"
+      },
       "scanCoalesced": "{{name}} 已有扫描任务在运行；此次请求已并入现有操作。",
       "scanFailed": "加入扫描队列失败。",
       "scanQueued": "已为 {{name}} 加入扫描队列。扫描运行时，你仍可继续使用流明集。",

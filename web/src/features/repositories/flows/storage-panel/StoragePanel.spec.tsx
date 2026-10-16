@@ -463,3 +463,171 @@ test("verifying from a row menu queues a scan for that Repository", async () => 
 
   await expect.poll(() => scannedRepository).toBe("repo-family");
 });
+
+// R1 of docs/exec-plans/active/storage-repository-lifecycle.md: in Desktop
+// (native host available, no server candidates) a create on a removable
+// non-default Storage Location reaches the risk review, is refused until the
+// risks are acknowledged against the review's token, and then registers the
+// selected child. Rendered through the real StoragePanel composition.
+test("Desktop create on a removable external Storage Location reviews, acknowledges, and creates", async () => {
+  mockStoragePanelApis();
+  const assessments: unknown[] = [];
+  let created: unknown;
+  worker.use(
+    http.get("*/api/v1/storage/native-capability", () => HttpResponse.json({ available: true })),
+    http.post("*/api/v1/storage/assessments", async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      assessments.push(body);
+      return HttpResponse.json({
+        token: "v1.archive-disk",
+        intent: "create_repository",
+        storage_location_id: body.storage_location_id,
+        storage_location_kind: "external",
+        directory_name: body.directory_name,
+        support: "supported",
+        risks: ["removable_storage", "non_default_location"],
+        can_create: true,
+        marker_state: "absent",
+      });
+    }),
+    http.post("*/api/v1/storage/repositories", async ({ request }) => {
+      created = await request.json();
+      return HttpResponse.json({
+        repository: {
+          id: "repo-travel",
+          name: "Travel 2026",
+          path: "/Volumes/Archive/Travel 2026",
+          role: "regular",
+          is_primary: false,
+          storage_strategy: "date",
+          local_settings: { handle_duplicate_filenames: "rename" },
+        },
+        acknowledged_risks: ["removable_storage", "non_default_location"],
+      });
+    }),
+  );
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+
+  await screen
+    .getByRole("button", { name: t("storagePanel.action.addRepository"), exact: true })
+    .click();
+  await screen
+    .getByLabelText(t("manage.repositories.createNameLabel"), { exact: true })
+    .fill("Travel 2026");
+  await screen.getByRole("button", { name: t("common.next"), exact: true }).click();
+  // Choose the removable external Location instead of the preselected default.
+  await screen
+    .getByLabelText(t("manage.repositories.storageLocationLabel"), { exact: true })
+    .selectOptions("loc-archive");
+  await screen.getByRole("button", { name: t("common.next"), exact: true }).click();
+  await screen.getByRole("button", { name: t("common.next"), exact: true }).click();
+
+  await expect
+    .poll(() => assessments)
+    .toEqual([
+      {
+        intent: "create_repository",
+        storage_location_id: "loc-archive",
+        directory_name: "Travel 2026",
+      },
+    ]);
+  await expect
+    .element(screen.getByText(t("manage.repositories.risks.removableStorage"), { exact: true }))
+    .toBeVisible();
+  const submit = screen.getByRole("button", {
+    name: t("manage.repositories.createSubmit"),
+    exact: true,
+  });
+  await expect.element(submit).toBeDisabled();
+  await screen
+    .getByText(t("manage.repositories.createRiskConfirmationTitle"), { exact: true })
+    .click();
+  await expect.element(submit).toBeEnabled();
+  await submit.click();
+
+  await expect
+    .poll(() => created)
+    .toEqual({
+      name: "Travel 2026",
+      directory_name: "Travel 2026",
+      storage_location_id: "loc-archive",
+      storage_strategy: "date",
+      assessment_token: "v1.archive-disk",
+      acknowledged_risks: ["removable_storage", "non_default_location"],
+    });
+});
+
+// The create handoff of R9: a create that finds an existing Repository hands
+// the user to Open Existing with the folder retained, instead of a toast.
+test("a create conflict continues in Open Existing with the folder highlighted", async () => {
+  mockStoragePanelApis();
+  worker.use(
+    http.post("*/api/v1/storage/assessments", async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json({
+        token: "v1.default",
+        intent: "create_repository",
+        storage_location_id: body.storage_location_id,
+        storage_location_kind: "default",
+        directory_name: body.directory_name,
+        support: "supported",
+        risks: [],
+        can_create: true,
+        marker_state: "absent",
+      });
+    }),
+    http.post("*/api/v1/storage/repositories", () =>
+      HttpResponse.json(
+        {
+          type: "https://lumilio.org/problems/repository/conflict",
+          status: 409,
+          instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+          conflict_type: "existing_repository_found",
+          repository_id: "2f77ed88-8049-4b85-b060-65efb89565de",
+          actions: ["open"],
+        },
+        { status: 409, headers: { "Content-Type": "application/problem+json" } },
+      ),
+    ),
+    http.get("*/api/v1/storage/candidates", () =>
+      HttpResponse.json({
+        candidates: [
+          {
+            directory_name: "Old Archive",
+            name: "Old Archive",
+            classification: "existing_repository",
+            can_open: true,
+            can_create: false,
+            risk_warnings: [],
+          },
+        ],
+      }),
+    ),
+  );
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+
+  await screen
+    .getByRole("button", { name: t("storagePanel.action.addRepository"), exact: true })
+    .click();
+  await screen
+    .getByLabelText(t("manage.repositories.createNameLabel"), { exact: true })
+    .fill("Old Archive");
+  for (let step = 0; step < 3; step += 1) {
+    await screen.getByRole("button", { name: t("common.next"), exact: true }).click();
+  }
+  const submit = screen.getByRole("button", {
+    name: t("manage.repositories.createSubmit"),
+    exact: true,
+  });
+  await expect.element(submit).toBeEnabled();
+  await submit.click();
+
+  await expect
+    .element(screen.getByRole("heading", { name: t("manage.repositories.candidates.title") }))
+    .toBeVisible();
+  await expect
+    .poll(() => document.querySelector("[data-focused='true']")?.textContent)
+    .toContain("Old Archive");
+});
