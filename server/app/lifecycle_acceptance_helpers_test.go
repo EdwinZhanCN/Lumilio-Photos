@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"server/internal/api/dto"
 )
@@ -175,4 +176,89 @@ func trashedFilesOf(repository blackboxRepository) []string {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// listTrashedAssets lists the Trash for one Repository the way the Web Trash
+// view does and returns the Assets it shows.
+func (s *blackboxServer) listTrashedAssets(repositoryID string) []blackboxAsset {
+	s.t.Helper()
+	var response struct {
+		Items []blackboxBrowseItem `json:"items"`
+	}
+	s.mustJSON(http.MethodPost, "/api/v1/assets/list", map[string]any{
+		"filter":     map[string]any{"lifecycle_state": "trashed", "repository_id": repositoryID},
+		"pagination": map[string]any{"limit": 50, "offset": 0},
+	}, &response)
+	var assets []blackboxAsset
+	for _, item := range response.Items {
+		switch {
+		case item.MediaItem != nil:
+			assets = append(assets, item.MediaItem.PrimaryAsset)
+		case item.Stack != nil && item.Stack.Cover != nil:
+			assets = append(assets, item.Stack.Cover.PrimaryAsset)
+		}
+	}
+	return assets
+}
+
+// requestBackup asks for a backup now and returns the name of the snapshot
+// that request produced, ignoring the routine backups already listed.
+func (s *blackboxServer) requestBackup() string {
+	s.t.Helper()
+	listBackups := func() map[string]bool {
+		var backups dto.BackupListDTO
+		s.mustJSON(http.MethodGet, "/api/v1/settings/backups", nil, &backups)
+		names := map[string]bool{}
+		for _, backup := range backups.Backups {
+			if !backup.RestorePoint {
+				names[backup.Name] = true
+			}
+		}
+		return names
+	}
+	earlier := listBackups()
+	if status, payload := s.do(http.MethodPost, "/api/v1/settings/backups", nil, ""); status != http.StatusAccepted {
+		s.t.Fatalf("create backup: %d %s", status, payload)
+	}
+	name := ""
+	if !waitFor(2*time.Minute, func() bool {
+		for candidate := range listBackups() {
+			if !earlier[candidate] {
+				name = candidate
+			}
+		}
+		return name != ""
+	}) {
+		s.t.Fatal("the requested backup never appeared in the list")
+	}
+	return name
+}
+
+// restoreBackup restores a snapshot through the in-process runtime restart
+// and waits for the operation to complete and the Repository to be idle.
+func (s *blackboxServer) restoreBackup(name string) {
+	s.t.Helper()
+	var operation dto.RestoreOperationDTO
+	if _, err := s.try(http.MethodPost, "/api/v1/settings/backups/"+name+"/restore", nil, &operation); err != nil {
+		s.t.Fatal(err)
+	}
+	if operation.ID == "" {
+		s.t.Fatalf("restore accepted without an operation: %+v", operation)
+	}
+	if !waitFor(3*time.Minute, func() bool {
+		var latest dto.RestoreOperationDTO
+		if _, err := s.try(http.MethodGet, "/api/v1/settings/backup-restores/latest", nil, &latest); err != nil {
+			return false
+		}
+		switch latest.Status {
+		case "completed":
+			return latest.ID == operation.ID
+		case "failed", "rolled_back":
+			s.t.Fatalf("restore operation ended %s: %+v", latest.Status, latest)
+		}
+		return false
+	}) {
+		s.t.Fatal("restore operation did not complete")
+	}
+	s.waitIdle(s.primary)
 }

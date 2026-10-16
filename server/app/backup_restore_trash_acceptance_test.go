@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	"server/internal/api/dto"
 )
 
 // #223: "A backup taken before a Delete is restored; the Trash view is
@@ -25,34 +23,7 @@ func TestLifecycleBackupTakenBeforeADeleteRestoresIntoTheTrash(t *testing.T) {
 	server.waitProcessingSettled()
 	server.setRatingAndLike(assetID, 3, true)
 
-	// A backup now. The routine backup the Server took at startup predates
-	// the upload, so the test waits for the one it requested.
-	listBackups := func() map[string]bool {
-		var backups dto.BackupListDTO
-		server.mustJSON(http.MethodGet, "/api/v1/settings/backups", nil, &backups)
-		names := map[string]bool{}
-		for _, backup := range backups.Backups {
-			if !backup.RestorePoint {
-				names[backup.Name] = true
-			}
-		}
-		return names
-	}
-	earlier := listBackups()
-	if status, payload := server.do(http.MethodPost, "/api/v1/settings/backups", nil, ""); status != http.StatusAccepted {
-		t.Fatalf("create backup: %d %s", status, payload)
-	}
-	backupName := ""
-	if !waitFor(2*time.Minute, func() bool {
-		for name := range listBackups() {
-			if !earlier[name] {
-				backupName = name
-			}
-		}
-		return backupName != ""
-	}) {
-		t.Fatal("the requested backup never appeared in the list")
-	}
+	backupName := server.requestBackup()
 
 	// Then the Delete.
 	server.mustJSON(http.MethodDelete, "/api/v1/assets/"+assetID, nil, nil)
@@ -63,30 +34,8 @@ func TestLifecycleBackupTakenBeforeADeleteRestoresIntoTheTrash(t *testing.T) {
 		t.Fatalf("repository trash holds %v, want one file", trashed)
 	}
 
-	// Restore the backup: accepted, then the runtime restarts in-process.
-	var operation dto.RestoreOperationDTO
-	if _, err := server.try(http.MethodPost, "/api/v1/settings/backups/"+backupName+"/restore", nil, &operation); err != nil {
-		t.Fatal(err)
-	}
-	if operation.ID == "" {
-		t.Fatalf("restore accepted without an operation: %+v", operation)
-	}
-	if !waitFor(3*time.Minute, func() bool {
-		var latest dto.RestoreOperationDTO
-		if _, err := server.try(http.MethodGet, "/api/v1/settings/backup-restores/latest", nil, &latest); err != nil {
-			return false
-		}
-		switch latest.Status {
-		case "completed":
-			return latest.ID == operation.ID
-		case "failed", "rolled_back":
-			t.Fatalf("restore operation ended %s: %+v", latest.Status, latest)
-		}
-		return false
-	}) {
-		t.Fatal("restore operation did not complete")
-	}
-	server.waitIdle(server.primary)
+	// Restore the backup through the in-process runtime restart.
+	server.restoreBackup(backupName)
 
 	// The restored catalog knew the file as present; the Trash rebuild and
 	// the scan agree it is in the Trash, with the metadata the backup held.
@@ -121,5 +70,59 @@ func TestLifecycleBackupTakenBeforeADeleteRestoresIntoTheTrash(t *testing.T) {
 	}
 	if trashed := trashedFilesOf(server.primary); len(trashed) != 0 {
 		t.Fatalf("repository trash still holds %v", trashed)
+	}
+}
+
+// #223 / Phase 4b: "The Trash view can be rebuilt from the sidecars." Here the
+// restored backup predates the upload, so the catalog never knew the file:
+// the rebuild adopts the sidecar into a new trashed Asset, which the Trash
+// view lists and Restore returns to the library.
+func TestLifecycleTrashIsRebuiltIntoACatalogThatNeverKnewTheFile(t *testing.T) {
+	server := startBlackboxServer(t)
+	backupName := server.requestBackup()
+	const filename = "unknown-to-the-backup.jpg"
+	server.upload(server.primary, filename, blackboxJPEG(t, 170, "unknown-to-the-backup"))
+	var listed []blackboxAsset
+	if !waitFor(time.Minute, func() bool { listed = server.listByFilename(filename); return len(listed) == 1 }) {
+		t.Fatalf("uploaded file never appeared in browse: %+v", listed)
+	}
+	server.waitProcessingSettled()
+	server.mustJSON(http.MethodDelete, "/api/v1/assets/"+listed[0].AssetID, nil, nil)
+	if trashed := trashedFilesOf(server.primary); len(trashed) != 1 {
+		t.Fatalf("repository trash holds %v, want one file", trashed)
+	}
+
+	server.restoreBackup(backupName)
+
+	var adopted []blackboxAsset
+	if !waitFor(2*time.Minute, func() bool {
+		adopted = server.listTrashedAssets(server.primary.ID)
+		return len(adopted) == 1 && adopted[0].OriginalFilename == filename
+	}) {
+		t.Fatalf("Trash view after the rebuild lists %+v, want %s", adopted, filename)
+	}
+	if status := server.assetStatus(listed[0].AssetID); status != http.StatusNotFound {
+		t.Fatalf("the Asset the backup never knew answers %d, want 404 (the rebuild made a new one)", status)
+	}
+	if got := server.listByFilename(filename); len(got) != 0 {
+		t.Fatalf("browse lists the trashed file: %+v", got)
+	}
+
+	server.mustJSON(http.MethodPost, "/api/v1/assets/"+adopted[0].AssetID+"/restore", nil, nil)
+	if path := originalPath(t, server.primary, filename); path == "" {
+		t.Fatal("restored file is not back in the repository")
+	}
+	if !waitFor(time.Minute, func() bool {
+		got := server.listByFilename(filename)
+		return len(got) == 1 && got[0].AssetID == adopted[0].AssetID
+	}) {
+		t.Fatalf("browse after Restore lists %+v, want the adopted Asset", server.listByFilename(filename))
+	}
+	if names := server.listTrashed("", server.primary.ID); len(names) != 0 {
+		t.Fatalf("Trash after Restore lists %v", names)
+	}
+	// The restored file is processed like any other: it gets a thumbnail.
+	if !waitFor(2*time.Minute, func() bool { return server.thumbnail(adopted[0].AssetID, "small") != nil }) {
+		t.Fatal("the restored Asset never got a thumbnail")
 	}
 }

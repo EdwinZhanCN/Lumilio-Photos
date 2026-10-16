@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -213,6 +214,24 @@ func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner 
 					return fmt.Errorf("record trashed Asset: %w", err)
 				}
 				assetID = created.AssetID
+				// The library and the Trash view list logical media items,
+				// which activation creates for an Asset bound to a present
+				// file. A trashed Asset the catalog never saw present needs
+				// its media item here, or the Trash view would not show it.
+				mediaItemID := uuid.New()
+				if err := queries.CreateMediaItemForAsset(ctx, repo.CreateMediaItemForAssetParams{
+					MediaItemID: mediaItemID, OwnerID: &owner,
+					RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true},
+					MediaKind:    strings.ToLower(created.Type),
+					AssetID:      uuid.NullUUID{UUID: assetID, Valid: true}, CreatedAt: stamp,
+				}); err != nil {
+					return fmt.Errorf("record trashed media item: %w", err)
+				}
+				if err := queries.AttachAssetToMediaItem(ctx, repo.AttachAssetToMediaItemParams{
+					AssetID: assetID, MediaItemID: mediaItemID, Relation: "original", CreatedAt: stamp,
+				}); err != nil {
+					return fmt.Errorf("attach trashed Asset to its media item: %w", err)
+				}
 			default:
 				return err
 			}
