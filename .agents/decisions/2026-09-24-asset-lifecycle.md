@@ -1,9 +1,11 @@
 # Decision: One Asset lifecycle — present, missing, trashed — with a single purge path
 
-Status: accepted, 2026-09-24 (owner, issue #223). Implementation is in
-progress under
-[the scan index and Asset lifecycle plan](../../docs/exec-plans/active/repository-index-and-asset-lifecycle.md);
-this line becomes `implemented` when that plan completes. It replaces the
+Status: implemented, 2026-10-16 (accepted 2026-09-24, owner, issue #223).
+The scan index and Asset lifecycle plan that implemented it (#230–#237,
+#251, and the S10 PR) is complete and deleted; its durable follow-ups and the
+acceptance evidence are in
+[the lifecycle acceptance decision](2026-10-16-asset-lifecycle-acceptance.md).
+It replaces the
 implicit "no hard delete" rule that the
 [Repository Observation Engine decision](2026-08-22-repository-observation-engine.md)
 stated for inferred signals. Its scan half is

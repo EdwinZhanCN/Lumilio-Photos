@@ -10,7 +10,7 @@ As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
 `f598310a` is fully green in CI on draft promotion PR #210 (every job and all
 eight E2E slices, including the new `@people`). Remaining work is split into
 the following child plans, each written to be picked up by a fresh session:
-[repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) (blockers #222 and #223: scan index, trash, missing, purge),
+the scan index and Asset lifecycle (blockers #222 and #223: scan index, trash, missing, purge; completed 2026-10-16, [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md)),
 [storage-repository-lifecycle.md](storage-repository-lifecycle.md) (P0–P8: storage assessment, creation, private recovery, setup adoption, and reconnect),
 the compatibility baseline (done 2026-09-24, PR #225; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)),
 [rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
@@ -61,8 +61,8 @@ follow-up in the tech-debt tracker.
   lifecycle (#223) replace the Repository Observation Engine tables and
   `assets.is_deleted` before rc.1. A quadratic scan cost holds the single
   writer, and ghost, swallowed, and orphaned Assets are data-integrity
-  defects. The work is owned by
-  [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md).
+  defects. The work landed through the scan index and Asset lifecycle plan
+  (completed 2026-10-16; [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md)).
 
 ## Fixed contracts
 
@@ -126,8 +126,8 @@ follow-up in the tech-debt tracker.
 | S6 | Storage P6 — reconnect journeys and volume semantics. Volume evidence comes from CI filesystem images (Linux loop-mounted vfat/exFAT/casefold-ext4, macOS `hdiutil` APFS/ExFAT); native picker paths from the embedded harness. May split: regular/Location reconnect, then default Apply. | silent Reconnect no-op | same |
 | S7 | Storage P7 — remove competing classifiers and Desktop marker parsing; architecture checks that catch a deliberate violation. | — | same |
 | S8 | Storage P8 — `web:test:storage-recovery` E2E slice wired into `ci.yml` path filters; evidence tables; extract decisions; delete the plan. The Mac pass is recorded as an rc.2 checkpoint, not run. | storage plan complete | same |
-| S9 | **In PR.** #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test and `architecturecheck`. | #222 | [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) |
-| S10 | #223 acceptance tests: two-copy delete/restore with albums and faces; external deletion hidden from search, albums, counts; duplicate resolution into Trash and back; in-place edit with a real XMP/EXIF write, tags, rating/like, regenerated artifacts; fork and bind-without-merge snapshots; backup-before-delete restore rebuilding Trash from sidecars. Then complete that plan (decisions already recorded) and close #223. | #223 | same |
+| S9 | **In PR.** #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test and `architecturecheck`. | #222 | [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md) |
+| S10 | **Done 2026-10-16.** #223 acceptance tests: two-copy delete/restore with albums and faces; external deletion hidden from search, albums, counts; duplicate resolution into Trash and back; in-place edit with a real XMP/EXIF write, tags, rating/like, regenerated artifacts; fork and bind-without-merge snapshots; backup-before-delete restore rebuilding Trash from sidecars. The tests found and fixed three defects (a restored backup put the photo in Missing, re-pointed Assets never got new thumbnails, an adopted Trash entry was invisible). The plan is complete and deleted; [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md). | #223 | — |
 | S11 | Smoke-to-CI: a `@smoke` language-switch spec; the removable-Location create journey as the P2 flow spec plus Server injected-fact test (name them in the checklist); `release-smoke.yml` (dispatch: image reference or digest → fresh Compose install from the release bundle → setup → upload → browse → backup/restore; uploads the catalog, config, backup, and markers as the compatibility-fixture artifact). Rewrite the checklist's Results from CI run links. | smoke checkpoint | [rc-smoke-checklist.md](rc-smoke-checklist.md) |
 | S12 | Release notes (en + zh-cn, registry terms), upgrade page, Known issues, the Desktop CI-only verification statement. | notes | [rc-release.md](rc-release.md) Phase 1 |
 | S12b | Desktop correctness review (owner request 2026-10-13, since no machine will launch it): read every `desktop/` path a first launch takes (bootstrap, runtime config and apply journal, onboarding, Storage panel host actions, tray, update controller in its unconfigured state) and every Desktop change from S1 and S2–S8 against the Atlas Desktop runtime lifecycle view; prove each finding with a failing-first Desktop or Server test; `task desktop:test` green on the macOS and Windows jobs. Findings that meet the blocker definition go to the milestone. | Desktop ships unlaunched | this plan, Phase 6 |
@@ -258,10 +258,10 @@ S13–S15 wait for everything before them and for an empty milestone.
 ### Phase 6 — Release candidate
 - [x] Sync `main` into `dev` so #210's merge ref passes `verify:generated`
   again (S1, #249; [rc-release.md](rc-release.md) Phase 0b).
-- [ ] RC blockers #222 (scan index) and #223 (Asset lifecycle): implemented;
-  of the deterministic acceptance tests from the 2026-10-07 audit, the #222
-  set is in PR (S9) and the #223 set remains (S10) —
-  [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md).
+- [x] RC blockers #222 (scan index) and #223 (Asset lifecycle): implemented,
+  and every deterministic acceptance test from the 2026-10-07 audit landed
+  (#222 in #251, S9; #223 in S10). The plan is complete and deleted —
+  [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md).
 - [ ] RC blocker #242 and the storage refactor P2–P8 (S2–S8) —
   [storage-repository-lifecycle.md](storage-repository-lifecycle.md).
 - [ ] Release notes (user-facing, bilingual per the terminology registry) —
