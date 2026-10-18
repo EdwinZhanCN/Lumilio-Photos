@@ -55,8 +55,13 @@ async function completeSetup(page: Page): Promise<void> {
   expect(setup.secret).toBeTruthy();
   await fillOTP(page, totpCode(setup.secret as string));
   await page.getByRole("button", { name: t("auth.register.verifyAndEnable") }).click();
-  await page.getByRole("button", { name: t("auth.bootstrap.passkey.skip") }).click();
-  await page.getByLabel(t("auth.bootstrap.recovery.savedConfirm"), { exact: true }).check();
+  // The passkey step is offered only where the browser can use WebAuthn; on
+  // a plain-HTTP install the wizard goes straight to the recovery codes.
+  const skipPasskey = page.getByRole("button", { name: t("auth.bootstrap.passkey.skip") });
+  const savedCodes = page.getByLabel(t("auth.bootstrap.recovery.savedConfirm"), { exact: true });
+  await expect(skipPasskey.or(savedCodes)).toBeVisible();
+  if (await skipPasskey.isVisible()) await skipPasskey.click();
+  await savedCodes.check();
   await page.getByRole("button", { name: t("auth.bootstrap.recovery.cta") }).click();
   await page.getByRole("button", { name: t("auth.bootstrap.repository.submit") }).click();
   await expect(page).toHaveURL(/\/$/);
@@ -102,6 +107,9 @@ async function restoreOperation(token: string, id: string): Promise<RestoreOpera
 }
 
 test.describe.configure({ retries: 0 });
+// A step that cannot proceed fails within half a minute with the locator it
+// waited for, instead of consuming the whole journey budget.
+test.use({ actionTimeout: 30_000 });
 
 test("@release-smoke a fresh install completes setup, uploads, browses, backs up, and restores", async ({
   page,

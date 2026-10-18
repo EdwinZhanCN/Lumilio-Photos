@@ -49,8 +49,9 @@ jobs:
         timeout-minutes: 45
         env:
             LUMILIO_IMAGE: ${{ inputs.image || 'ghcr.io/edwinzhancn/lumilio-server:edge' }}
-            # The release bundle's default deployment uses host networking.
-            LUMILIO_E2E_BASE_URL: http://127.0.0.1:6680
+            # The release bundle's default deployment uses host networking;
+            # localhost is what a first user on the host opens.
+            LUMILIO_E2E_BASE_URL: http://localhost:6680
         steps:
             - uses: actions/checkout@v7
 
