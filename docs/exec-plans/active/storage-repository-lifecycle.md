@@ -411,6 +411,10 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   state; readiness-independent recovery contract; offline default not
   recreated; corrupt/newer bytes untouched; public setup status stays safe.
 - Edwin: review; revisit fresh-default/permanently-lost-primary defaults.
+- Release notes: add the adopt-or-fresh line to
+  `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md` and simplify the
+  "Coming from a beta build" steps there and on the en/zh upgrade pages
+  (S12 wrote them for today's setup, which stops on a leftover primary).
 
 ### P6 — Complete reconnect journeys and volume semantics
 
@@ -425,6 +429,8 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   case-sensitive APFS/ExFAT images provide reproducible volume evidence.
 - Edwin: supply R2 inputs and review; revisit volume-semantics default.
   Real external disks and Windows NTFS are optional reference coverage.
+- Release notes: add the "Relocate is now Reconnect and never moves files"
+  line to `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`.
 
 ### P7 — Enforce and remove competing paths
 

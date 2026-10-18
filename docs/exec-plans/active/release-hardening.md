@@ -129,7 +129,7 @@ follow-up in the tech-debt tracker.
 | S9 | **In PR.** #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test and `architecturecheck`. | #222 | [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md) |
 | S10 | **Done 2026-10-16 (#253).** #223 acceptance tests: two-copy delete/restore with albums and faces; external deletion hidden from search, albums, counts; duplicate resolution into Trash and back; in-place edit with a real XMP/EXIF write, tags, rating/like, regenerated artifacts; fork and bind-without-merge snapshots; backup-before-delete restore rebuilding Trash from sidecars. The tests found and fixed three defects (a restored backup put the photo in Missing, re-pointed Assets never got new thumbnails, an adopted Trash entry was invisible). The plan is complete and deleted; [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md). | #223 | — |
 | S11 | Smoke-to-CI: a `@smoke` language-switch spec; the removable-Location create journey as the P2 flow spec plus Server injected-fact test (name them in the checklist); `release-smoke.yml` (dispatch: image reference or digest → fresh Compose install from the release bundle → setup → upload → browse → backup/restore; uploads the catalog, config, backup, and markers as the compatibility-fixture artifact). Rewrite the checklist's Results from CI run links. | smoke checkpoint | [rc-smoke-checklist.md](rc-smoke-checklist.md) |
-| S12 | Release notes (en + zh-cn, registry terms), upgrade page, Known issues, the Desktop CI-only verification statement. | notes | [rc-release.md](rc-release.md) Phase 1 |
+| S12 | **In PR.** Release notes (en + zh-cn, registry terms), upgrade page, Known issues, the Desktop CI-only verification statement. S5 and S6 append their user-visible lines to `docs/releases/v26.1.0-rc.1*.md`. | notes | [rc-release.md](rc-release.md) Phase 1 |
 | S12b | Desktop correctness review (owner request 2026-10-13, since no machine will launch it): read every `desktop/` path a first launch takes (bootstrap, runtime config and apply journal, onboarding, Storage panel host actions, tray, update controller in its unconfigured state) and every Desktop change from S1 and S2–S8 against the Atlas Desktop runtime lifecycle view; prove each finding with a failing-first Desktop or Server test; `task desktop:test` green on the macOS and Windows jobs. Findings that meet the blocker definition go to the milestone. | Desktop ships unlaunched | this plan, Phase 6 |
 | S13 | Promote: blocker gate (milestone empty), update #210's body, mark ready, CI green on the final head; **Edwin merges**. | #210 | [rc-release.md](rc-release.md) Phase 2 |
 | S14 | Tag: blocker gate again; **Edwin confirms the tag in writing**; the session pushes `v26.1.0-rc.1` on the merged `main` commit and watches the release workflow; verifies the GitHub pre-release, image tags and digest, DMG, Windows installer and portable app. | rc.1 published | [rc-release.md](rc-release.md) Phase 3 |
@@ -264,8 +264,9 @@ S13–S15 wait for everything before them and for an empty milestone.
   [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md).
 - [ ] RC blocker #242 and the storage refactor P2–P8 (S2–S8) —
   [storage-repository-lifecycle.md](storage-repository-lifecycle.md).
-- [ ] Release notes (user-facing, bilingual per the terminology registry) —
-  [rc-release.md](rc-release.md) Phase 1.
+- [x] Release notes (user-facing, bilingual per the terminology registry) —
+  S12, `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`; S5 and S6 add their
+  lines ([rc-release.md](rc-release.md) Phase 1).
 - [x] Compatibility baseline: every app-owned persisted format reset to
   version 1, pre-release data rejected clearly, forward upgrade paths tested
   and proven on an RC build — PR #225, [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md). The rc.1 fixture is

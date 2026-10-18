@@ -491,6 +491,12 @@ jobs:
 
                   Before upgrading real data, create a Lumilio database snapshot and retain the previous application version or image digest. A database migrated by this build may require its matching pre-upgrade snapshot when rolling back.
                   EOF
+                  for notes in "docs/releases/${GITHUB_REF_NAME}.md" "docs/releases/${GITHUB_REF_NAME}.zh-cn.md"; do
+                      if [[ -f "$notes" ]]; then
+                          printf '\n' >> dist/release-notes.md
+                          cat "$notes" >> dist/release-notes.md
+                      fi
+                  done
 
             - uses: softprops/action-gh-release@v3
               with:

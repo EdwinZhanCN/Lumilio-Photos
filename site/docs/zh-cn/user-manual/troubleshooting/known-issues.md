@@ -1,44 +1,47 @@
 ---
 title: "当前已知问题与行为差异"
-description: "列出本轮代码审查中会直接影响用户决策的已验证限制。"
+description: "列出 v26.1.0-rc.1 中会直接影响用户决策的已验证限制。"
 page_id: "troubleshooting/known-issues"
 audience: "所有用户"
 platform: "Desktop、Server"
-baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-06"
+baseline_commit: "9f10907a42cc5d98ba239aee2888ff38c58f3f83"
+last_verified: "2026-10-18"
 verification_status: "verified"
 ---
 
 <!--
 code-evidence:
+- desktop/main.go
+- desktop/internal/update/controller.go
+- server/internal/storage/storage_assessment.go
 - server/internal/api/router.go
-- server/internal/service/asset_service.go
-- server/internal/service/duplicate_service.go
-- server/internal/service/auth_passkeys.go
-- server/internal/api/dto/passkey_dto.go
-- server/internal/service/credential_policy.go
-- web/src/features/auth/model/credentialPolicy.ts
-- deploy/compose/compose.yml
-- server/internal/api/handler/backup_handler.go
-- server/internal/service/backup_service.go
 - server/internal/api/handler/share_link_handler.go
+- server/internal/api/handler/backup_handler.go
+- server/internal/cloud/provider_registry.go
+- server/internal/storage/pathsemantics
+- server/internal/storage/repo_manager.go
+- docs/exec-plans/tech-debt-tracker.md
 -->
 
 # 当前已知问题与行为差异
 
-以下内容来自当前 baseline，不是未来承诺：
+以下内容以 `v26.1.0-rc.1` 为准，不是未来承诺；每个版本的完整列表见[发布说明](../reference/release-notes.md)。
 
-- 初始化后公开注册仍可用；后续注册账户为普通用户，但没有邀请码或关闭开关。
-- 数据库备份下载只返回 SQLite；正式恢复要求配套 manifest，当前没有备份上传或导入入口。
-- 公开分享的原件策略执行不一致：ZIP 下载忽略“包含原件”，Web 视频/音频在派生缺失时会回退原件。
-- 普通“移入回收站”只软删除数据库记录，原件不移动；没有已验证的永久清空入口。
-- 重复项合并显示的可回收字节不会实际释放磁盘。
-- 扫描可能重新发现仍在原路径的软删除媒体。
-- 资源库公开 API 的重命名仍未提供；“从流明集中移除”只注销目录和私有状态，保留磁盘文件。
-- Web 可以向已连接的 Desktop 发起本机目录任务，也可以在 Docker 中打开默认存储位置下的已验证一级候选；它不能提交任意宿主机路径。
-- 当前云提供方只有 iCloud，且不应视作完整双向同步。
-- macOS Desktop 只发布 Apple Silicon；没有 Linux Desktop 发布产物。
-- 默认 Docker Compose 使用 HTTP、主机网络和可变 `latest` 镜像标签。
-- 注册 DTO/OpenAPI 仍发布旧的用户名、密码长度约束；Web 与 Server 各自维护策略，当前表单基本对齐但存在再次漂移的风险。
+## 行为差异
 
-每一项的证据、影响和建议在交付包 `review/product-issues.md` 中单独记录。
+- **Desktop 构建只在 CI 运行器上经过自动化验证。** rc.1 的 macOS 和 Windows 应用由发布工作流构建，并在 GitHub 托管的 macOS 和 Windows 运行器上通过了 Desktop 自动化测试；发布前没有人在实体机器上启动过它们。请保留独立的媒体备份。
+- **不支持网络存储。** NFS、SMB/CIFS、AFP、sshfs、WebDAV 和 Windows 网络驱动器上的存储位置和资源库会被拒绝，并且无法通过确认绕过。流明集运行在 NAS 上、媒体在本地磁盘上不受影响。
+- **移入回收站会移动文件。** 文件从你的目录移到资源库自己的回收站，默认 30 天后永久删除；缺失的文件会被隐藏并列在该资源库的“缺失”视图中。详见[重复项与回收站](../use/duplicates-trash.md)。
+
+## 已知问题
+
+- **Desktop 没有应用内更新。** 设置 → 更新 会提示“此构建未配置已签名的更新提供方”。请从 GitHub Releases 下载新版本；应用内更新计划在 rc.2 提供。
+- **音频文件内嵌的封面不会显示。** 曲目使用占位图，把音频文件设为相册封面会失败。
+- **在不同操作系统之间迁移数据库后，仅大小写不同的重命名可能被当作新文件。** 从 macOS 或 Windows 恢复到 Linux（或反过来）的数据库仍按原系统的规则比较文件名。
+- **移除非常大的资源库**会在移除完成前阻塞其他数据库写入。
+- **分享相关控件缺少无障碍名称。** 导出对话框中的分享、工作室、添加到相册按钮和公开分享页中的图块不会被屏幕阅读器朗读。
+- **分享的 ZIP 下载始终包含原件**：只要允许下载，即使关闭了“包含原件”选项也是如此。
+- **初始化之后注册仍然开放。** 任何能打开登录页的人都可以创建普通用户账户，没有邀请码，也没有关闭注册的开关。不要在没有前置访问限制的情况下把实例暴露到公网，见[注册入口暴露](../admin/registration-exposure.md)。
+- **备份只能从服务器的备份目录恢复。** 界面下载的 SQLite 快照只是一份副本，没有上传备份文件进行恢复的入口。
+- **云导入**只支持 iCloud，并且是单向导入，不是同步。
+- **平台。** Desktop 只发布 macOS Apple Silicon 和 Windows x64 版本；Linux 使用 Docker Server；没有移动端应用。

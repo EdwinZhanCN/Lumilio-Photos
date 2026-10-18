@@ -29,13 +29,44 @@
   `v26.1.0-beta.*`) is not migrated to `v26.1.0-rc.1` or later. The server
   names such a database as pre-release and does not open it; move it aside and
   start with a new one. Original media and Repositories are not touched.
+  Steps: [Coming from a beta build](#coming-from-a-beta-build).
+
+## Coming from a beta build
+
+`v26.1.0-rc.1` is the first supported release. It does not open a catalog,
+configuration, or backup written by a beta build, and the albums, People,
+ratings, Event names, and share links from the beta are not carried over.
+Your media files and the Repository folders are untouched, and rc.1 reads
+the `.lumilioroot` and `.lumiliorepo` markers the beta wrote.
+
+1. If you want the beta catalog for reference, create a database backup in
+   the beta build first; back up your media independently.
+2. Stop the beta build and move its application state aside. Docker: the
+   `LUMILIO_STATE` directory (the catalog, secrets, and backups). Desktop: the
+   `Lumilio Photos` folder under your user's application-data directory
+   (see [Installation](./installation)). Do not delete the media folder.
+3. Rename the beta's Primary Repository folder, `primary/` inside the Default
+   Storage Location, to another name inside the same Storage Location, for
+   example `beta-primary/`. rc.1 setup creates a new Primary Repository at
+   `primary/` and stops if that folder already holds a Repository.
+4. Install rc.1 and complete the first-run setup.
+5. On the **Storage** page, add the renamed folder as an existing Repository
+   and let the scan register its files. Repeat for every other Repository the
+   beta used. Trash contents the beta never moved to disk do not exist; a
+   file the beta showed in its Trash is a normal file again.
 
 ## Desktop (macOS / Windows)
 
-1. Click **Update available** in the menu bar or tray;
-2. Download the new installer and verify its SHA-256 (see [Installation](./installation));
+`v26.1.0-rc.1` has no in-app update: **Settings → Updates** reports that no
+signed update provider is configured in this build. Updates are installed
+from the GitHub Releases page; the in-app updater is planned for rc.2.
+
+1. Quit Lumilio Photos from the menu bar or tray;
+2. Download the new `.dmg` or installer from the
+   [GitHub Releases page](https://github.com/EdwinZhanCN/Lumilio-Photos/releases)
+   and verify its SHA-256 (see [Installation](./installation));
 3. Run the installer or replace the app in Applications;
-4. Restart.
+4. Start the app again.
 
 **Success**: the app opens normally and the version on the About page is updated.
 **Rollback**: remove the new version and reinstall the previous one. If the new version upgraded the database, the previous one refuses it; restore the `pre-upgrade-…` snapshot. Original media are unaffected.

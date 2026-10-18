@@ -37,6 +37,7 @@ export const enSidebar: DefaultTheme.Sidebar = {
         { text: "Repositories & original-file policy", link: "/user-manual/introduction/repositories" },
         { text: "Backup & Restore", link: "/user-manual/introduction/integrity" },
         { text: "Upgrade", link: "/user-manual/introduction/upgrade" },
+        { text: "Release notes", link: "/user-manual/introduction/release-notes" },
         { text: "Diagnostics & Logs", link: "/user-manual/features/monitor" },
       ],
     },
