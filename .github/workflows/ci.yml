@@ -95,6 +95,7 @@ jobs:
                           - 'web/e2e/pages/**'
                           - 'web/e2e/support/**'
                           - 'web/e2e/specs/capabilities.spec.ts'
+                          - 'web/e2e/specs/language-switch.spec.ts'
                           - 'web/e2e/specs/login.spec.ts'
                           - 'web/e2e/specs/scan.spec.ts'
                           - 'web/e2e/specs/share-links.spec.ts'
@@ -110,6 +111,10 @@ jobs:
                           - 'web/src/features/upload/**'
                           - 'web/src/lib/assets/**'
                           - 'web/src/lib/http-commons/**'
+                          - 'web/src/lib/i18n.tsx'
+                          - 'web/src/lib/preferences/**'
+                          - 'web/src/locales/**'
+                          - 'web/src/features/settings/flows/appearance/**'
                       auth_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
