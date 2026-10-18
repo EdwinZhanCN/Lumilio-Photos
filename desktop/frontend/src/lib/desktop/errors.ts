@@ -19,6 +19,7 @@ const messages: Record<ErrorCode, () => string> = {
   [ErrorCode.ErrorLumenNotInstalled]: () => i18n.t("errors.lumenNotInstalled", "Install Lumen Hub before starting it."),
   [ErrorCode.ErrorLumenOwnerBusy]: () => i18n.t("errors.lumenOwnerBusy", "Another Desktop instance owns Lumen Hub."),
   [ErrorCode.ErrorRecoveryRequired]: () => i18n.t("errors.recoveryRequired", "Desktop needs recovery before this operation can continue."),
+  [ErrorCode.ErrorSelectionCancelled]: () => i18n.t("errors.selectionCancelled", "The folder selection was cancelled. The request is still waiting."),
   [ErrorCode.$zero]: () => i18n.t("errors.unknown", "The Desktop control plane returned an unknown error."),
 };
 
@@ -28,4 +29,12 @@ export function errorMessage(reason: unknown): string {
     return (messages[code] ?? messages[ErrorCode.$zero])();
   }
   return reason instanceof Error ? reason.message : messages[ErrorCode.$zero]();
+}
+
+/** The stable control-plane code of a rejected Desktop call, if it carries one. */
+export function errorCodeOf(reason: unknown): ErrorCode | undefined {
+  if (typeof reason === "object" && reason !== null && "code" in reason) {
+    return (reason as { code?: ErrorCode }).code;
+  }
+  return undefined;
 }

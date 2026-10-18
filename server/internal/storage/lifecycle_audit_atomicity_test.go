@@ -100,7 +100,7 @@ func TestHostTerminalStateRollsBackWhenLifecycleAuditInsertFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-audit", filepath.Join(t.TempDir(), "missing"))
+	_, err = manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-audit", filepath.Join(t.TempDir(), "missing"), nil)
 	if err == nil {
 		t.Fatal("host failure became terminal despite rejected audit")
 	}

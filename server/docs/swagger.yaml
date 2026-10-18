@@ -2590,6 +2590,8 @@ components:
                     example: 550e8400-e29b-41d4-a716-446655440000
                     type: string
                 risk_warnings:
+                    example:
+                        - removable_storage
                     items:
                         type: string
                     type: array
@@ -2598,6 +2600,10 @@ components:
                     example: 550e8400-e29b-41d4-a716-446655440000
                     type: string
                 type:
+                    enum:
+                        - repository_identity
+                        - storage_location_identity
+                        - storage_risk
                     example: repository_identity
                     type: string
             type: object
@@ -2628,6 +2634,8 @@ components:
                 purpose:
                     example: Open an existing photo repository
                     type: string
+                refusal:
+                    $ref: '#/components/schemas/dto.HostActionRefusalDTO'
                 repository_id:
                     example: 550e8400-e29b-41d4-a716-446655440000
                     type: string
@@ -2637,6 +2645,14 @@ components:
                 result:
                     $ref: '#/components/schemas/dto.HostActionResultDTO'
                 status:
+                    enum:
+                        - pending
+                        - running
+                        - needs_decision
+                        - succeeded
+                        - failed
+                        - cancelled
+                        - expired
                     example: pending
                     type: string
                 storage_location_id:
@@ -2644,6 +2660,31 @@ components:
                     type: string
                 updated_at:
                     type: string
+            type: object
+        dto.HostActionRefusalDTO:
+            properties:
+                action:
+                    enum:
+                        - verify
+                        - rename
+                        - detach
+                        - reconnect
+                    example: reconnect
+                    type: string
+                alternatives:
+                    example:
+                        - default_configuration
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
+                blockers:
+                    example:
+                        - primary_protected
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
             type: object
         dto.HostActionResultDTO:
             properties:
@@ -4828,6 +4869,13 @@ components:
             type: object
         dto.ResolveHostActionRequestDTO:
             properties:
+                acknowledged_risks:
+                    example:
+                        - removable_storage
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
                 resolution:
                     enum:
                         - update_location
@@ -4835,8 +4883,6 @@ components:
                         - confirm_risk
                     example: add_separate
                     type: string
-                risk_confirmation:
-                    type: boolean
             required:
                 - resolution
             type: object
@@ -8091,7 +8137,7 @@ components:
                     pattern: ^urn:lumilio:problem:[0-9a-f]{32}$
                     type: string
                 status:
-                    const: 500
+                    const: 409
                     type: integer
                 type:
                     const: https://lumilio.org/problems/storage/host-action-expired

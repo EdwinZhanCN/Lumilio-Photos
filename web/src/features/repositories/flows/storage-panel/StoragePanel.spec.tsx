@@ -670,3 +670,217 @@ test("a create conflict continues in Open Existing with the folder highlighted",
     .poll(() => document.querySelector("[data-focused='true']")?.textContent)
     .toContain("Old Archive");
 });
+
+type HostActionTask = Record<string, unknown>;
+
+/**
+ * The native host-action harness: the Desktop and Server replaced by one
+ * mutable task whose status the GET poll reports, with every create and
+ * resolve request recorded. `kind` and `status` drive the modal exactly as
+ * the durable task does in production.
+ */
+function mockNativeTask(initial: HostActionTask) {
+  let task: HostActionTask = { ...initial };
+  const created: { idempotencyKey: string | null; body: HostActionTask }[] = [];
+  const resolved: HostActionTask[] = [];
+  const now = "2026-10-18T00:00:00Z";
+  const base = {
+    id: "task-1",
+    request_id: "request-1",
+    actor: "web:user:1",
+    expires_at: "2026-10-18T00:10:00Z",
+    created_at: now,
+    updated_at: now,
+  };
+  worker.use(
+    http.get("*/api/v1/storage/native-capability", () => HttpResponse.json({ available: true })),
+    http.post("*/api/v1/storage/native-tasks", async ({ request }) => {
+      const body = (await request.json()) as HostActionTask;
+      created.push({ idempotencyKey: request.headers.get("Idempotency-Key"), body });
+      return HttpResponse.json({ ...base, kind: body.kind, status: "pending" });
+    }),
+    http.get("*/api/v1/storage/native-tasks/:id", () => HttpResponse.json({ ...base, ...task })),
+    http.post("*/api/v1/storage/native-tasks/:id/resolve", async ({ request }) => {
+      resolved.push((await request.json()) as HostActionTask);
+      task = { ...task, status: "succeeded", result: { name: "Archive Disk" } };
+      return HttpResponse.json({ ...base, ...task });
+    }),
+  );
+  return {
+    created,
+    resolved,
+    set(next: HostActionTask) {
+      task = { ...task, ...next };
+    },
+  };
+}
+
+async function sendAuthorizeRequest(screen: Awaited<ReturnType<typeof renderPanel>>, name: string) {
+  await screen
+    .getByRole("button", {
+      name: t("storagePanel.moreActions", { defaultValue: "More storage actions" }),
+      exact: true,
+    })
+    .click();
+  await screen.getByRole("menuitem", { name: t("storagePanel.authorize"), exact: true }).click();
+  await screen
+    .getByLabelText(t("manage.repositories.hostAction.locationName"), { exact: true })
+    .fill(name);
+  await screen
+    .getByRole("button", { name: t("manage.repositories.hostAction.send"), exact: true })
+    .click();
+}
+
+// R9 task outcomes (P3b): a folder Desktop chose on a removable disk stops at
+// the shared risk review in the Web. The review renders the Server's risk
+// codes, the confirm is disabled until they are acknowledged, and the
+// acknowledgement is sent by code, like the create review.
+test("a native folder on a removable disk is reviewed and acknowledged by risk code", async () => {
+  mockStoragePanelApis();
+  const native = mockNativeTask({
+    kind: "authorize_storage_location",
+    status: "needs_decision",
+    result: {
+      conflict: {
+        type: "storage_risk",
+        allowed_resolutions: ["confirm_risk"],
+        risk_warnings: ["removable_storage", "non_default_location"],
+      },
+    },
+  });
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+  await expect.element(screen.getByText("Family Archive", { exact: true })).toBeVisible();
+
+  await sendAuthorizeRequest(screen, "Archive Disk");
+
+  await expect
+    .element(screen.getByText(t("manage.repositories.risks.removableStorage"), { exact: true }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByText(t("manage.repositories.risks.nonDefaultLocation"), { exact: true }))
+    .toBeVisible();
+  const confirm = screen.getByRole("button", {
+    name: t("manage.repositories.hostAction.confirmRisk"),
+    exact: true,
+  });
+  await expect.element(confirm).toBeDisabled();
+  await screen
+    .getByText(t("manage.repositories.createRiskConfirmationTitle"), { exact: true })
+    .click();
+  await expect.element(confirm).toBeEnabled();
+  await confirm.click();
+
+  await expect
+    .poll(() => native.resolved)
+    .toEqual([
+      {
+        resolution: "confirm_risk",
+        acknowledged_risks: ["removable_storage", "non_default_location"],
+      },
+    ]);
+  await expect
+    .element(screen.getByText(t("manage.repositories.hostAction.completed"), { exact: true }))
+    .toBeVisible();
+  expect(native.created[0]?.body).toMatchObject({
+    kind: "authorize_storage_location",
+    name: "Archive Disk",
+  });
+});
+
+// An expired request is a normal outcome: the modal says so, keeps the form,
+// and the restart sends a new request under a new idempotency key.
+test("an expired Desktop request keeps the form and can be sent again", async () => {
+  mockStoragePanelApis();
+  const native = mockNativeTask({
+    kind: "authorize_storage_location",
+    status: "expired",
+    problem: {
+      type: "https://lumilio.org/problems/storage/host-action-expired",
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      retryable: true,
+    },
+  });
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+  await expect.element(screen.getByText("Family Archive", { exact: true })).toBeVisible();
+
+  await sendAuthorizeRequest(screen, "Archive Disk");
+
+  await expect
+    .element(screen.getByText(t("manage.repositories.hostAction.expired"), { exact: true }))
+    .toBeVisible();
+  expect(document.querySelector('[role="alert"].alert-error')).toBeNull();
+  await screen
+    .getByRole("button", { name: t("manage.repositories.hostAction.sendAgain"), exact: true })
+    .click();
+
+  const nameField = screen.getByLabelText(t("manage.repositories.hostAction.locationName"), {
+    exact: true,
+  });
+  await expect.element(nameField).toHaveValue("Archive Disk");
+  native.set({ status: "pending", problem: undefined });
+  await screen
+    .getByRole("button", { name: t("manage.repositories.hostAction.send"), exact: true })
+    .click();
+
+  await expect.poll(() => native.created.length).toBe(2);
+  expect(native.created[1]?.idempotencyKey).toBeTruthy();
+  expect(native.created[1]?.idempotencyKey).not.toBe(native.created[0]?.idempotencyKey);
+  expect(native.created[1]?.body).toMatchObject({ name: "Archive Disk" });
+});
+
+// A reconnect the role-aware policy withholds reaches the Web with its
+// blockers, rendered by the same presenter as the HTTP command, not as a
+// generic Desktop failure.
+test("a withheld native reconnect shows the policy blocker, not a generic failure", async () => {
+  mockStoragePanelApis();
+  mockNativeTask({
+    kind: "locate_repository",
+    repository_id: "repo-offline",
+    status: "failed",
+    problem: {
+      type: "https://lumilio.org/problems/storage/action-unavailable",
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      retryable: false,
+    },
+    refusal: {
+      action: "reconnect",
+      blockers: ["repository_busy"],
+      alternatives: ["wait_for_idle"],
+    },
+  });
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+  await expect.element(screen.getByText("Client Projects", { exact: true })).toBeVisible();
+
+  await screen
+    .getByRole("button", {
+      name: t("storagePanel.actionsFor", {
+        defaultValue: "Actions for {{name}}",
+        name: "Client Projects",
+      }),
+      exact: true,
+    })
+    .click();
+  await screen
+    .getByRole("menuitem", { name: t("storagePanel.action.locate"), exact: true })
+    .click();
+  await screen
+    .getByRole("button", { name: t("manage.repositories.hostAction.send"), exact: true })
+    .click();
+
+  await expect
+    .element(
+      screen.getByText(t("apiErrors.storage.actionUnavailable.repositoryBusy"), { exact: true }),
+    )
+    .toBeVisible();
+  await expect
+    .element(
+      screen.getByRole("button", {
+        name: t("manage.repositories.hostAction.sendAgain"),
+        exact: true,
+      }),
+    )
+    .toBeVisible();
+});

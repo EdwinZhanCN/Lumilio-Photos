@@ -14,7 +14,7 @@ type StorageControl interface {
 	ListStorageLocations(context.Context) ([]StorageLocation, error)
 	ListPendingHostActions(context.Context) ([]HostAction, error)
 	SetHostActionExpectedVersion(context.Context, string, string, uint64) (HostAction, error)
-	ExecuteHostAction(context.Context, string, string, string, string, bool) (HostAction, error)
+	ExecuteHostAction(context.Context, string, string, string, string, []string) (HostAction, error)
 	CancelHostAction(context.Context, string) (HostAction, error)
 }
 
@@ -91,8 +91,8 @@ func (a repositoryControlAdapter) SetHostActionExpectedVersion(ctx context.Conte
 	return hostAction(item), nil
 }
 
-func (a repositoryControlAdapter) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, riskConfirmation bool) (HostAction, error) {
-	item, err := a.inner.ExecuteHostAction(ctx, actionID, nonce, hostInstanceID, selectedPath, riskConfirmation)
+func (a repositoryControlAdapter) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, acknowledgedRisks []string) (HostAction, error) {
+	item, err := a.inner.ExecuteHostAction(ctx, actionID, nonce, hostInstanceID, selectedPath, acknowledgedRisks)
 	if err != nil {
 		return HostAction{}, err
 	}

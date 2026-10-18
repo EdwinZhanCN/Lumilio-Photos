@@ -16833,11 +16833,19 @@ export interface components {
             allowed_resolutions?: string[];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
+            /**
+             * @example [
+             *       "removable_storage"
+             *     ]
+             */
             risk_warnings?: string[];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             storage_location_id?: string;
-            /** @example repository_identity */
-            type?: string;
+            /**
+             * @example repository_identity
+             * @enum {string}
+             */
+            type?: "repository_identity" | "storage_location_identity" | "storage_risk";
         };
         "dto.HostActionDTO": {
             /** @example web:user:1 */
@@ -16855,16 +16863,39 @@ export interface components {
             problem?: components["schemas"]["api.ProblemReference"];
             /** @example Open an existing photo repository */
             purpose?: string;
+            refusal?: components["schemas"]["dto.HostActionRefusalDTO"];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example web-host-action-4d4d */
             request_id?: string;
             result?: components["schemas"]["dto.HostActionResultDTO"];
-            /** @example pending */
-            status?: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            status?: "pending" | "running" | "needs_decision" | "succeeded" | "failed" | "cancelled" | "expired";
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             storage_location_id?: string;
             updated_at?: string;
+        };
+        "dto.HostActionRefusalDTO": {
+            /**
+             * @example reconnect
+             * @enum {string}
+             */
+            action?: "verify" | "rename" | "detach" | "reconnect";
+            /**
+             * @example [
+             *       "default_configuration"
+             *     ]
+             */
+            alternatives?: string[];
+            /**
+             * @example [
+             *       "primary_protected"
+             *     ]
+             */
+            blockers?: string[];
         };
         "dto.HostActionResultDTO": {
             conflict?: components["schemas"]["dto.HostActionConflictDTO"];
@@ -18035,11 +18066,16 @@ export interface components {
         };
         "dto.ResolveHostActionRequestDTO": {
             /**
+             * @example [
+             *       "removable_storage"
+             *     ]
+             */
+            acknowledged_risks?: string[];
+            /**
              * @example add_separate
              * @enum {string}
              */
             resolution: "update_location" | "add_separate" | "confirm_risk";
-            risk_confirmation?: boolean;
         };
         "dto.ResolveRepositoryCandidateRequestDTO": {
             /** @example family-archive */
@@ -19860,7 +19896,7 @@ export interface components {
             /** Format: uri */
             instance: string;
             /** @constant */
-            status: 500;
+            status: 409;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}

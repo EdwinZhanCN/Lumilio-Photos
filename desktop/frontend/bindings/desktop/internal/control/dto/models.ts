@@ -111,6 +111,12 @@ export enum ErrorCode {
     ErrorLumenNotInstalled = "lumen_not_installed",
     ErrorLumenOwnerBusy = "lumen_owner_busy",
     ErrorRecoveryRequired = "recovery_required",
+
+    /**
+     * ErrorSelectionCancelled is the normal outcome of a native directory
+     * picker the person dismissed; the request it was answering stays pending.
+     */
+    ErrorSelectionCancelled = "selection_cancelled",
 };
 
 export interface HostActionTicket {

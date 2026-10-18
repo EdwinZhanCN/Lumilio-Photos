@@ -6,9 +6,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
+	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
@@ -74,11 +76,16 @@ func TestHostActionIsDurableIdempotentAndNativeApproved(t *testing.T) {
 	if bound.ExpectedVersion != 42 {
 		t.Fatalf("bound expected version = %d, want 42", bound.ExpectedVersion)
 	}
+	// Presenting the request again after the storage snapshot moved rebinds
+	// it; a binding never leaves a request permanently un-approvable.
 	boundAgain, err := manager.SetHostActionExpectedVersion(ctx, first.ActionID, first.NativeHostNonce(), 99)
-	if err != nil || boundAgain.ExpectedVersion != 42 {
-		t.Fatalf("expected version compare-and-set changed: action=%#v err=%v", boundAgain, err)
+	if err != nil || boundAgain.ExpectedVersion != 99 {
+		t.Fatalf("expected version rebind on presentation: action=%#v err=%v", boundAgain, err)
 	}
-	if _, err := manager.ExecuteHostAction(ctx, first.ActionID, "wrong-nonce", "desktop-1", filepath.Join(base, "external")); !errors.Is(err, ErrHostActionNonceInvalid) {
+	if _, err := manager.SetHostActionExpectedVersion(ctx, first.ActionID, "wrong-nonce", 7); !errors.Is(err, ErrHostActionNonceInvalid) {
+		t.Fatalf("rebind without the nonce error = %v", err)
+	}
+	if _, err := manager.ExecuteHostAction(ctx, first.ActionID, "wrong-nonce", "desktop-1", filepath.Join(base, "external"), nil); !errors.Is(err, ErrHostActionNonceInvalid) {
 		t.Fatalf("wrong nonce error = %v, want ErrHostActionNonceInvalid", err)
 	}
 
@@ -86,7 +93,18 @@ func TestHostActionIsDurableIdempotentAndNativeApproved(t *testing.T) {
 	if err := os.Mkdir(external, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	action, err := manager.ExecuteHostAction(ctx, first.ActionID, first.NativeHostNonce(), "desktop-1", external)
+	manager.SetObservationBackend(&injectedObserver{target: canonicalTestPath(t, external)})
+	// A plain internal disk outside the Default Storage Location is still a
+	// reviewed destination: the non-default risk is acknowledged by code.
+	review, err := manager.ExecuteHostAction(ctx, first.ActionID, first.NativeHostNonce(), "desktop-1", external, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStorageRiskDecision(t, review)
+	if got := review.Result.Conflict.RiskWarnings; !reflect.DeepEqual(got, []string{"non_default_location"}) {
+		t.Fatalf("authorize risk codes = %v", got)
+	}
+	action, err := manager.ResolveHostAction(ctx, first.ActionID, "confirm_risk", review.Result.Conflict.RiskWarnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +141,7 @@ func TestHostActionIsDurableIdempotentAndNativeApproved(t *testing.T) {
 	if hostAudit == nil {
 		t.Fatalf("host action audit not found: %#v", auditEvents)
 	}
-	if hostAudit.ActorUserID == nil || *hostAudit.ActorUserID != actor.UserID || hostAudit.HostInstanceID != "desktop-1" || hostAudit.RequestID != input.RequestID || hostAudit.Source != "desktop_host" || hostAudit.ConfirmationType != "native_directory_selection" || hostAudit.Result != AuditResultSucceeded {
+	if hostAudit.ActorUserID == nil || *hostAudit.ActorUserID != actor.UserID || hostAudit.HostInstanceID != "desktop-1" || hostAudit.RequestID != input.RequestID || hostAudit.Source != "desktop_host" || hostAudit.ConfirmationType != "storage_risk_confirmed" || hostAudit.Result != AuditResultSucceeded {
 		t.Fatalf("host action audit context = %#v", hostAudit)
 	}
 }
@@ -206,7 +224,7 @@ func TestHostActionFailurePersistsTerminalState(t *testing.T) {
 		t.Fatal(err)
 	}
 	missing := filepath.Join(t.TempDir(), "missing")
-	if _, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-1", missing); err == nil {
+	if _, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-1", missing, nil); err == nil {
 		t.Fatal("invalid selected path unexpectedly succeeded")
 	}
 	failed, err := manager.GetHostAction(ctx, action.ActionID)
@@ -218,29 +236,88 @@ func TestHostActionFailurePersistsTerminalState(t *testing.T) {
 	}
 }
 
-func TestHostActionRequiresExplicitStorageRiskConfirmationBeforeMutation(t *testing.T) {
-	catalog, manager := newCatalogRepositoryManager(t)
-	ctx := context.Background()
-	base := t.TempDir()
-	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	actor, err := catalog.Queries.CreateUser(ctx, repo.CreateUserParams{
-		Username: "risk-confirmation-admin", Password: "test", DisplayName: "Admin", Role: "admin",
-		WebauthnUserHandle: []byte("risk-confirmation-admin-handle"),
+// injectedObserver reproduces the facts of a native host's disk for one
+// directory without hardware: a macOS mount by default, optionally removable,
+// replaced, or on a network filesystem. Every other path keeps the real
+// filesystem. It is the in-package twin of testfixture.Observer, which cannot
+// be imported here without a cycle.
+type injectedObserver struct {
+	OSStorageObserver
+	target     string
+	removable  bool
+	remote     bool
+	filesystem string
+	device     string
+	platform   string
+}
+
+func (o *injectedObserver) matches(p string) bool {
+	clean := filepath.Clean(p)
+	return clean == o.target || filepath.Dir(clean) == o.target
+}
+
+func (o *injectedObserver) MountInfo(p string) (MountFacts, error) {
+	facts, err := o.OSStorageObserver.MountInfo(p)
+	if o.matches(p) {
+		facts.Removable = o.removable
+		facts.Remote = o.remote
+		facts.MountID, facts.MountSource, facts.MountPath = "injected-1", "/dev/injected1", o.target
+		facts.Device = o.device
+		if facts.Device == "" {
+			facts.Device = "injected1"
+		}
+		facts.Platform = o.platform
+		if facts.Platform == "" {
+			facts.Platform = "darwin"
+		}
+	}
+	return facts, err
+}
+
+func (o *injectedObserver) StatFS(p string) (VolumeFacts, error) {
+	facts, err := o.OSStorageObserver.StatFS(p)
+	if o.matches(p) && o.filesystem != "" {
+		facts.Filesystem = o.filesystem
+	}
+	return facts, err
+}
+
+func canonicalTestPath(t *testing.T, p string) string {
+	t.Helper()
+	canonical, err := CanonicalizeRepositoryPath(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return canonical
+}
+
+func createHostActionAdmin(t *testing.T, catalog *db.DB, username string) repo.User {
+	t.Helper()
+	actor, err := catalog.Queries.CreateUser(context.Background(), repo.CreateUserParams{
+		Username: username, Password: "test", DisplayName: "Admin", Role: "admin",
+		WebauthnUserHandle: []byte(username + "-handle"),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	return actor
+}
+
+// The native review is the shared assessment: a removable external disk is
+// a risk the administrator acknowledges by code, for this task only, and
+// nothing is registered until every reported code is acknowledged.
+func TestHostActionRequiresAcknowledgedRiskCodesBeforeMutation(t *testing.T) {
+	catalog, manager := newCatalogRepositoryManager(t)
+	ctx := context.Background()
+	base := t.TempDir()
+	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
+	actor := createHostActionAdmin(t, catalog, "risk-confirmation-admin")
 	selected := filepath.Join(base, "external")
 	if err := os.Mkdir(selected, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	previousInspector := inspectHostActionStoragePath
-	inspectHostActionStoragePath = func(path string) StoragePathInfo {
-		info := InspectStoragePath(path)
-		info.RiskWarnings = []string{"network_filesystem", "removable_storage", "cloud_sync_directory"}
-		return info
-	}
-	t.Cleanup(func() { inspectHostActionStoragePath = previousInspector })
+	manager.SetObservationBackend(&injectedObserver{target: canonicalTestPath(t, selected), removable: true})
+
 	action, err := manager.CreateHostAction(ctx, CreateHostActionInput{
 		RequestID: "host-risk-two-phase", Kind: HostActionAuthorizeStorageLocation,
 		Actor: "web:user:risk-confirmation-admin", ActorUserID: &actor.UserID,
@@ -249,21 +326,34 @@ func TestHostActionRequiresExplicitStorageRiskConfirmationBeforeMutation(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	decision, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-risk", selected)
+	decision, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-risk", selected, nil)
 	if err != nil {
 		t.Fatalf("stage risk decision: %v", err)
 	}
-	if decision.Status != HostActionNeedsDecision || decision.Result == nil || decision.Result.Conflict == nil ||
-		decision.Result.Conflict.Type != "storage_risk" || len(decision.Result.Conflict.RiskWarnings) != 3 {
-		t.Fatalf("risk decision = %#v", decision)
+	assertStorageRiskDecision(t, decision)
+	if got := decision.Result.Conflict.RiskWarnings; !reflect.DeepEqual(got, []string{"removable_storage", "non_default_location"}) {
+		t.Fatalf("risk codes = %v, want the shared removable and non-default codes", got)
 	}
-	if _, lookupErr := manager.queries.GetStorageLocationByPath(ctx, selected); !errors.Is(lookupErr, sql.ErrNoRows) {
+	if decision.Result.Conflict.Fingerprint == "" || decision.ErrorCode != "risk_confirmation" {
+		t.Fatalf("risk decision row = %#v", decision)
+	}
+	if _, lookupErr := manager.queries.GetStorageLocationByPath(ctx, canonicalTestPath(t, selected)); !errors.Is(lookupErr, sql.ErrNoRows) {
 		t.Fatalf("unconfirmed risk mutated Storage Locations: %v", lookupErr)
 	}
-	if _, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", false); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("false risk confirmation error = %v", err)
+	var consent *StorageRiskConfirmationError
+	if _, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", nil); !errors.As(err, &consent) || len(consent.Risks) != 2 {
+		t.Fatalf("empty acknowledgement error = %v", err)
 	}
-	completed, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", true)
+	if _, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", []string{"removable_storage"}); !errors.As(err, &consent) {
+		t.Fatalf("partial acknowledgement error = %v", err)
+	}
+	if _, err := manager.ResolveHostAction(ctx, action.ActionID, "update_location", []string{"removable_storage", "non_default_location"}); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
+		t.Fatalf("wrong resolution for a risk review error = %v", err)
+	}
+	if _, lookupErr := manager.queries.GetStorageLocationByPath(ctx, canonicalTestPath(t, selected)); !errors.Is(lookupErr, sql.ErrNoRows) {
+		t.Fatalf("refused acknowledgements mutated Storage Locations: %v", lookupErr)
+	}
+	completed, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", []string{"non_default_location", "removable_storage", "unknown_extra"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,33 +376,119 @@ func TestHostActionRequiresExplicitStorageRiskConfirmationBeforeMutation(t *test
 	}
 }
 
+// Network storage is refused by the shared classifier on the native path
+// exactly as on the HTTP path: the task fails with the typed Problem before
+// anything is written, and no decision can confirm past it.
+func TestHostActionRefusesNetworkStorageWithoutADecision(t *testing.T) {
+	catalog, manager := newCatalogRepositoryManager(t)
+	ctx := context.Background()
+	base := t.TempDir()
+	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
+	actor := createHostActionAdmin(t, catalog, "network-admin")
+	selected := filepath.Join(base, "nas-share")
+	if err := os.Mkdir(selected, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manager.SetObservationBackend(&injectedObserver{target: canonicalTestPath(t, selected), remote: true, filesystem: "cifs"})
+
+	action, err := manager.CreateHostAction(ctx, CreateHostActionInput{
+		RequestID: "host-network-refused", Kind: HostActionAuthorizeStorageLocation,
+		Actor: "web:user:network-admin", ActorUserID: &actor.UserID,
+		Summary: HostActionSummary{Name: "NAS"}, TTL: time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-network", selected, nil)
+	if !errors.Is(err, ErrStorageUnsupportedFilesystem) {
+		t.Fatalf("network target error = %v, want ErrStorageUnsupportedFilesystem", err)
+	}
+	if refused.Status != HostActionFailed || refused.ErrorCode != string(ProblemUnsupportedFilesystem) || refused.Result != nil {
+		t.Fatalf("refused task = %#v", refused)
+	}
+	if _, lookupErr := manager.queries.GetStorageLocationByPath(ctx, canonicalTestPath(t, selected)); !errors.Is(lookupErr, sql.ErrNoRows) {
+		t.Fatalf("refused network target mutated Storage Locations: %v", lookupErr)
+	}
+	if _, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", []string{"network_filesystem"}); !errors.Is(err, ErrHostActionDecisionNeeded) {
+		t.Fatalf("a refusal must not be confirmable, got %v", err)
+	}
+	if _, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-network", selected, []string{"network_filesystem"}); !errors.Is(err, ErrHostActionNotPending) {
+		t.Fatalf("a failed task must not run again, got %v", err)
+	}
+}
+
+// An acknowledgement belongs to the facts it was given for. When the disk
+// behind the selected folder is replaced between the review and the
+// decision, the decision is stale, the current review is presented, and the
+// catalog is unchanged until that review is acknowledged.
+func TestHostActionStaleAcknowledgementPresentsTheCurrentReview(t *testing.T) {
+	catalog, manager := newCatalogRepositoryManager(t)
+	ctx := context.Background()
+	base := t.TempDir()
+	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
+	actor := createHostActionAdmin(t, catalog, "stale-admin")
+	selected := filepath.Join(base, "external")
+	if err := os.Mkdir(selected, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	observer := &injectedObserver{target: canonicalTestPath(t, selected), removable: true, device: "disk-a"}
+	manager.SetObservationBackend(observer)
+
+	action, err := manager.CreateHostAction(ctx, CreateHostActionInput{
+		RequestID: "host-stale-review", Kind: HostActionAuthorizeStorageLocation,
+		Actor: "web:user:stale-admin", ActorUserID: &actor.UserID,
+		Summary: HostActionSummary{Name: "Archive"}, TTL: time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-stale", selected, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStorageRiskDecision(t, first)
+	acknowledged := first.Result.Conflict.RiskWarnings
+
+	observer.device = "disk-b"
+	stale, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", acknowledged)
+	if !errors.Is(err, ErrStorageAssessmentStale) {
+		t.Fatalf("replaced disk under an acknowledgement error = %v, want ErrStorageAssessmentStale", err)
+	}
+	assertStorageRiskDecision(t, stale)
+	if stale.Result.Conflict.Fingerprint == first.Result.Conflict.Fingerprint {
+		t.Fatal("a replaced disk kept the review fingerprint")
+	}
+	if _, lookupErr := manager.queries.GetStorageLocationByPath(ctx, canonicalTestPath(t, selected)); !errors.Is(lookupErr, sql.ErrNoRows) {
+		t.Fatalf("stale acknowledgement mutated Storage Locations: %v", lookupErr)
+	}
+	completed, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", stale.Result.Conflict.RiskWarnings)
+	if err != nil || completed.Status != HostActionSucceeded {
+		t.Fatalf("acknowledging the current review = %#v, err=%v", completed, err)
+	}
+}
+
+// Open and both reconnect kinds stop at the same shared review before any
+// catalog mutation; a reconnect whose selected tree sits on a different mount
+// than the registration recorded adds the continuity risk.
 func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
-	if _, err := catalog.Queries.CreateUser(ctx, repo.CreateUserParams{
-		Username: "host-risk-owner", Password: "test", DisplayName: "Owner", Role: "admin",
-		WebauthnUserHandle: []byte("host-risk-owner-handle"),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	createHostActionAdmin(t, catalog, "host-risk-owner")
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
 	defaultStorageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	previousInspector := inspectHostActionStoragePath
-	inspectHostActionStoragePath = func(path string) StoragePathInfo {
-		info := InspectStoragePath(path)
-		info.RiskWarnings = []string{"network_filesystem"}
-		info.MountFingerprint = "confirmed-test-mount"
-		return info
-	}
-	t.Cleanup(func() { inspectHostActionStoragePath = previousInspector })
-
 	openSource, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "host-risk-open-source", Actor: "test", Name: "Open Source", DirectoryName: "open-source",
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: defaultStorageLocation.StorageLocationID.String(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	relocateSource, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+		RequestID: "host-risk-relocate-source", Actor: "test", Name: "Relocate Source", DirectoryName: "relocate-source",
 		Role: dbtypes.RepoRoleRegular, StorageLocationID: defaultStorageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
@@ -324,32 +500,31 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// From here on the default disk reads as removable: every native task on
+	// it stops at the shared review before the catalog changes.
+	manager.SetObservationBackend(&injectedObserver{target: canonicalTestPath(t, defaultStorageLocation.Path), removable: true})
 	openAction, err := manager.CreateHostAction(ctx, CreateHostActionInput{
 		RequestID: "host-risk-open", Kind: HostActionOpenRepository, TTL: time.Minute,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	openDecision, err := manager.ExecuteHostAction(ctx, openAction.ActionID, openAction.NativeHostNonce(), "desktop-risk", openPath)
+	openDecision, err := manager.ExecuteHostAction(ctx, openAction.ActionID, openAction.NativeHostNonce(), "desktop-risk", openPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertStorageRiskDecision(t, openDecision)
+	if got := openDecision.Result.Conflict.RiskWarnings; !reflect.DeepEqual(got, []string{"removable_storage"}) {
+		t.Fatalf("open under the default Location risk codes = %v, want only removable_storage", got)
+	}
 	if _, lookupErr := manager.queries.GetRepositoryByPath(ctx, openPath); !errors.Is(lookupErr, sql.ErrNoRows) {
 		t.Fatalf("unconfirmed open mutated catalog: %v", lookupErr)
 	}
-	openCompleted, err := manager.ResolveHostAction(ctx, openAction.ActionID, "confirm_risk", true)
+	openCompleted, err := manager.ResolveHostAction(ctx, openAction.ActionID, "confirm_risk", openDecision.Result.Conflict.RiskWarnings)
 	if err != nil || openCompleted.Status != HostActionSucceeded {
 		t.Fatalf("confirmed open = %#v, err=%v", openCompleted, err)
 	}
 
-	relocateSource, err := manager.CreateRepository(ctx, CreateRepositorySpec{
-		RequestID: "host-risk-relocate-source", Actor: "test", Name: "Relocate Source", DirectoryName: "relocate-source",
-		Role: dbtypes.RepoRoleRegular, StorageLocationID: defaultStorageLocation.StorageLocationID.String(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	oldRepositoryPath := relocateSource.Repository.Path
 	newRepositoryPath := filepath.Join(defaultStorageLocation.Path, "relocate-target")
 	if err := os.Rename(oldRepositoryPath, newRepositoryPath); err != nil {
@@ -362,7 +537,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	repositoryDecision, err := manager.ExecuteHostAction(ctx, locateRepositoryAction.ActionID, locateRepositoryAction.NativeHostNonce(), "desktop-risk", newRepositoryPath)
+	repositoryDecision, err := manager.ExecuteHostAction(ctx, locateRepositoryAction.ActionID, locateRepositoryAction.NativeHostNonce(), "desktop-risk", newRepositoryPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +546,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	if err != nil || stillOld.Path != oldRepositoryPath {
 		t.Fatalf("unconfirmed Repository locate changed path: %#v, err=%v", stillOld, err)
 	}
-	repositoryCompleted, err := manager.ResolveHostAction(ctx, locateRepositoryAction.ActionID, "confirm_risk", true)
+	repositoryCompleted, err := manager.ResolveHostAction(ctx, locateRepositoryAction.ActionID, "confirm_risk", repositoryDecision.Result.Conflict.RiskWarnings)
 	if err != nil || repositoryCompleted.Status != HostActionSucceeded {
 		t.Fatalf("confirmed Repository locate = %#v, err=%v", repositoryCompleted, err)
 	}
@@ -388,6 +563,14 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	if err := os.Rename(oldRootPath, newRootPath); err != nil {
 		t.Fatal(err)
 	}
+	// The registration remembers another mount than the one the moved tree
+	// now sits on: the continuity risk joins the review.
+	if _, err := manager.queries.UpdateStorageLocationMountFingerprint(ctx, repo.UpdateStorageLocationMountFingerprintParams{
+		StorageLocationID: externalRoot.StorageLocationID, MountFingerprint: "registered-on-another-disk",
+		UpdatedAt:         dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		t.Fatal(err)
+	}
 	locateRootAction, err := manager.CreateHostAction(ctx, CreateHostActionInput{
 		RequestID: "host-risk-locate-storageLocation", Kind: HostActionLocateStorageLocation,
 		Summary: HostActionSummary{StorageLocationID: externalRoot.StorageLocationID.String()}, TTL: time.Minute,
@@ -395,21 +578,60 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	rootDecision, err := manager.ExecuteHostAction(ctx, locateRootAction.ActionID, locateRootAction.NativeHostNonce(), "desktop-risk", newRootPath)
+	rootDecision, err := manager.ExecuteHostAction(ctx, locateRootAction.ActionID, locateRootAction.NativeHostNonce(), "desktop-risk", newRootPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertStorageRiskDecision(t, rootDecision)
-	if !containsString(rootDecision.Result.Conflict.RiskWarnings, "mount_fingerprint_changed") {
-		t.Fatalf("mount fingerprint warning missing: %#v", rootDecision.Result.Conflict.RiskWarnings)
+	if !containsString(rootDecision.Result.Conflict.RiskWarnings, string(RiskMountChanged)) {
+		t.Fatalf("mount continuity risk missing: %#v", rootDecision.Result.Conflict.RiskWarnings)
 	}
 	stillOldRoot, err := manager.GetStorageLocation(ctx, externalRoot.StorageLocationID.String())
 	if err != nil || stillOldRoot.Path != externalRoot.Path {
 		t.Fatalf("unconfirmed Storage Location locate changed path: %#v, err=%v", stillOldRoot, err)
 	}
-	rootCompleted, err := manager.ResolveHostAction(ctx, locateRootAction.ActionID, "confirm_risk", true)
+	rootCompleted, err := manager.ResolveHostAction(ctx, locateRootAction.ActionID, "confirm_risk", rootDecision.Result.Conflict.RiskWarnings)
 	if err != nil || rootCompleted.Status != HostActionSucceeded {
 		t.Fatalf("confirmed Storage Location locate = %#v, err=%v", rootCompleted, err)
+	}
+}
+
+// The native host goes through the same role-aware policy as HTTP: a
+// reconnect the policy withholds fails the task under the action-unavailable
+// Problem with the verdict's blockers, instead of a generic host failure.
+func TestHostActionLocateRefusalCarriesThePolicyBlockers(t *testing.T) {
+	_, manager := newCatalogRepositoryManager(t)
+	ctx := context.Background()
+	base := t.TempDir()
+	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
+	primary, err := manager.queries.GetPrimaryRepository(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := filepath.Join(base, "elsewhere")
+	if err := os.Mkdir(elsewhere, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	action, err := manager.CreateHostAction(ctx, CreateHostActionInput{
+		RequestID: "host-locate-primary", Kind: HostActionLocateRepository,
+		Summary: HostActionSummary{RepositoryID: primary.RepoID.String()}, TTL: time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-policy", elsewhere, nil)
+	var unavailable *RepositoryActionUnavailableError
+	if !errors.As(err, &unavailable) {
+		t.Fatalf("primary reconnect through the native host error = %v, want the policy refusal", err)
+	}
+	if refused.Status != HostActionFailed || refused.ErrorCode != hostActionCodeActionUnavailable ||
+		refused.Result == nil || refused.Result.Refusal == nil || refused.Result.Refusal.Action != string(ActionReconnect) ||
+		!containsString(refused.Result.Refusal.Blockers, string(BlockerPrimaryProtected)) {
+		t.Fatalf("refused task = %#v result=%#v", refused, refused.Result)
+	}
+	still, err := manager.GetRepository(primary.RepoID.String())
+	if err != nil || still.Path != primary.Path {
+		t.Fatalf("refused reconnect moved the primary: %#v err=%v", still, err)
 	}
 }
 
@@ -473,14 +695,24 @@ func TestHostActionAddSeparateCarriesActorHostAndIndependentIdentityAudit(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	decision, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-copy", copyPath)
+	// Opening under an external Storage Location is reviewed first; the
+	// identity conflict follows once that review is acknowledged.
+	review, err := manager.ExecuteHostAction(ctx, action.ActionID, action.NativeHostNonce(), "desktop-copy", copyPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decision.Status != HostActionNeedsDecision || decision.Result == nil || decision.Result.Conflict == nil {
+	assertStorageRiskDecision(t, review)
+	if got := review.Result.Conflict.RiskWarnings; !reflect.DeepEqual(got, []string{"non_default_location"}) {
+		t.Fatalf("open under an external Location risk codes = %v", got)
+	}
+	decision, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", review.Result.Conflict.RiskWarnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decision.Status != HostActionNeedsDecision || decision.Result == nil || decision.Result.Conflict == nil || decision.Result.Conflict.Type != "repository_identity" {
 		t.Fatalf("copy decision = %#v", decision)
 	}
-	completed, err := manager.ResolveHostAction(ctx, action.ActionID, "add_separate")
+	completed, err := manager.ResolveHostAction(ctx, action.ActionID, "add_separate", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

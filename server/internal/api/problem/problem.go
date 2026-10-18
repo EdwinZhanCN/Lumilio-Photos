@@ -128,8 +128,11 @@ var (
 		"Backup restore failed", "An accepted database restore could not be completed.")
 	HostActionFailed = descriptor("storage/host-action-failed", http.StatusInternalServerError,
 		"Native host action failed", "An accepted native host action could not be completed.")
-	HostActionExpired = descriptor("storage/host-action-expired", http.StatusInternalServerError,
-		"Native host action expired", "A native host action expired before it was approved.")
+	HostActionExpired = Descriptor{
+		Type: Namespace + "storage/host-action-expired", Status: http.StatusConflict,
+		Title: "Native host action expired", Definition: "A native host action expired before Desktop approved it; nothing was changed.",
+		Recovery: "Send the request again from the Storage page when Desktop is ready to approve it; the request form is kept.",
+	}
 	CloudImportFailed = descriptor("cloud/import-failed", http.StatusInternalServerError,
 		"Cloud import failed", "An accepted cloud import could not be completed.")
 )

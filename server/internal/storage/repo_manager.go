@@ -148,8 +148,8 @@ type RepositoryManager interface {
 	ListHostActionsForActor(ctx context.Context, actorUserID int32) ([]HostAction, error)
 	RecoverHostActions(ctx context.Context) error
 	AcquireRuntimeStorageOwnership(ctx context.Context) (func(), error)
-	ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, riskConfirmation ...bool) (HostAction, error)
-	ResolveHostAction(ctx context.Context, actionID, resolution string, riskConfirmation ...bool) (HostAction, error)
+	ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, acknowledgedRisks []string) (HostAction, error)
+	ResolveHostAction(ctx context.Context, actionID, resolution string, acknowledgedRisks []string) (HostAction, error)
 	CancelHostAction(ctx context.Context, actionID string) (HostAction, error)
 
 	// GetRepository returns the repository with the given UUID, or an error if
