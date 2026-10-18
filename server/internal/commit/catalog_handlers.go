@@ -337,14 +337,16 @@ func applyAssetDerivatives(ctx context.Context, tx *sql.Tx, payload AssetDerivat
 		if artifact.RepositoryID == uuid.Nil || artifact.Size == "" || artifact.StoragePath == "" || artifact.MimeType == "" {
 			return 0, errors.New("invalid thumbnail artifact")
 		}
+		// The artifact identity is immutable per source content; the row per
+		// (asset, size) follows the Asset's current content. The fence check
+		// above proved these artifacts belong to that content, so a row that
+		// still points at an earlier content's artifact (the Asset was
+		// re-pointed by an in-place edit) is replaced, never left stale.
 		existing, lookupErr := queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{AssetID: payload.AssetID, Size: artifact.Size})
-		if lookupErr == nil {
-			if existing.RepositoryID != artifact.RepositoryID || existing.StoragePath != artifact.StoragePath || existing.MimeType != artifact.MimeType {
-				return 0, fmt.Errorf("thumbnail artifact %s does not match the immutable catalog path", artifact.Size)
-			}
+		if lookupErr == nil && existing.RepositoryID == artifact.RepositoryID && existing.StoragePath == artifact.StoragePath && existing.MimeType == artifact.MimeType {
 			continue
 		}
-		if !errors.Is(lookupErr, sql.ErrNoRows) {
+		if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
 			return 0, lookupErr
 		}
 		if _, err := queries.CreateThumbnail(ctx, repo.CreateThumbnailParams{AssetID: payload.AssetID, Size: artifact.Size, StoragePath: artifact.StoragePath, MimeType: artifact.MimeType, RepositoryID: artifact.RepositoryID}); err != nil {

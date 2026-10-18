@@ -197,6 +197,16 @@ func TestTrashIsRebuiltFromSidecarsAndCanBeRestored(t *testing.T) {
 	if state != "trashed" {
 		t.Fatalf("rebuilt Asset is %s, want trashed", state)
 	}
+	// The Trash view lists media items, so the rebuilt Asset needs one.
+	var mediaItems int
+	if err := f.database.ReaderSQL.QueryRowContext(f.ctx, `
+		SELECT count(*) FROM media_items item JOIN media_item_assets link ON link.media_item_id = item.media_item_id
+		WHERE item.primary_asset_id = ? AND link.asset_id = ? AND item.media_kind = 'photo'`, rebuilt, rebuilt).Scan(&mediaItems); err != nil {
+		t.Fatal(err)
+	}
+	if mediaItems != 1 {
+		t.Fatalf("rebuilt Asset has %d media items, want 1", mediaItems)
+	}
 	if _, err := os.Stat(newer); err != nil {
 		t.Fatalf("the newer-format sidecar was touched: %v", err)
 	}
