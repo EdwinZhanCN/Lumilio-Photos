@@ -1,6 +1,5 @@
 import type { Page } from "playwright/test";
 import { expect, test } from "playwright/test";
-import { GalleryPage } from "../pages/gallery.page";
 import { api } from "../support/api";
 import { t } from "../support/i18n";
 import { sampleJPEG } from "../support/sample-image";
@@ -124,9 +123,10 @@ test("@release-smoke a fresh install completes setup, uploads, browses, backs up
 
   // Upload through the page, as a user would.
   await page.goto("/upload");
+  // Option values are repository ids; the visible label decorates the name.
   await page
     .getByLabel(t("upload.UnifiedUploadSection.upload_target_label"))
-    .selectOption({ label: primary.name });
+    .selectOption(primary.id);
   await page.locator('input[type="file"]').setInputFiles({
     name: filename,
     mimeType: "image/jpeg",
@@ -147,9 +147,15 @@ test("@release-smoke a fresh install completes setup, uploads, browses, backs up
   await accepted;
 
   // Browse until ingestion lands it, then open the detail view.
-  const gallery = new GalleryPage(page);
+  const scopeToPrimary = async () => {
+    await page.goto("/assets");
+    await page
+      .getByLabel(t("assets.assetsPageHeader.scope.title"))
+      .filter({ visible: true })
+      .selectOption(primary.id as string);
+  };
   await expect(async () => {
-    await gallery.scopeTo(primary.name as string);
+    await scopeToPrimary();
     await expect(page.getByLabel(new RegExp(filename, "i"))).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 120_000 });
   const asset = await findAsset(token, filename);
@@ -241,7 +247,7 @@ test("@release-smoke a fresh install completes setup, uploads, browses, backs up
 
   // Everything the user made is still there after the round trip.
   await expect(async () => {
-    await gallery.scopeTo(primary.name as string);
+    await scopeToPrimary();
     await expect(page.getByLabel(new RegExp(filename, "i"))).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 120_000 });
   const restoredAlbum = await api<Album>(`/api/v1/albums/${album.album_id}`, { token });
