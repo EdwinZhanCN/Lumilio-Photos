@@ -1,9 +1,10 @@
 # Decision: Index repositories with a Syncthing-style scan, not an observation engine
 
-Status: accepted, 2026-09-24 (owner, issue #222). Implementation is in
-progress under
-[the scan index and Asset lifecycle plan](../../docs/exec-plans/active/repository-index-and-asset-lifecycle.md);
-this line becomes `implemented` when that plan completes. Supersedes
+Status: implemented, 2026-10-16 (accepted 2026-09-24, owner, issue #222;
+#222 closed 2026-10-14). The scan index and Asset lifecycle plan that
+implemented it is complete and deleted; the acceptance evidence is in
+[the lifecycle acceptance decision](2026-10-16-asset-lifecycle-acceptance.md).
+Supersedes
 [the Repository Observation Engine decision](2026-08-22-repository-observation-engine.md).
 Its lifecycle half is
 [the Asset lifecycle decision](2026-09-24-asset-lifecycle.md).

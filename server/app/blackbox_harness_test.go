@@ -28,11 +28,11 @@ import (
 
 // blackboxServer is one complete in-process Server generation driven only
 // through its public HTTP API and the repository directory on disk, the way
-// the Desktop host embeds it. The *_regression_test.go files in this package
-// are the Phase 0 tests of
-// docs/exec-plans/active/repository-index-and-asset-lifecycle.md (#222,
-// #223); going through this seam keeps their assertions valid across
-// rewrites of the scan and catalog internals.
+// the Desktop host embeds it. The *_regression_test.go and
+// *_acceptance_test.go files in this package are the #222 and #223 tests
+// (.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md); going
+// through this seam keeps their assertions valid across rewrites of the
+// scan and catalog internals.
 type blackboxServer struct {
 	t       testing.TB
 	baseURL string

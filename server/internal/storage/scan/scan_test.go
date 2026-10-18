@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"testing"
@@ -375,6 +376,101 @@ func TestInPlaceRewriteRepointsTheAsset(t *testing.T) {
 	f.requireAlbumMember(album, asset)
 }
 
+// userMetadata is the user-owned metadata of an Asset the in-place
+// carry-over branches must copy (fork) or leave alone (bind without merge):
+// rating and like, album membership, user tags, and the user-edited
+// description with its edited flag. An AI tag is listed separately because
+// a fork copies only the user's tags.
+type userMetadata struct {
+	Rating      int
+	Liked       bool
+	Albums      []int64
+	UserTags    []string
+	AITags      []string
+	Description string
+	Edited      bool
+	Lifecycle   string
+}
+
+func (f *fixture) userMetadata(asset uuid.UUID) userMetadata {
+	f.t.Helper()
+	var m userMetadata
+	var description, edited *string
+	if err := f.database.ReaderSQL.QueryRowContext(f.ctx, `
+		SELECT rating, liked, lifecycle_state,
+		       json_extract(specific_metadata, '$.description'),
+		       json_extract(specific_metadata, '$.description_edited')
+		FROM assets WHERE asset_id = ?`, asset).Scan(&m.Rating, &m.Liked, &m.Lifecycle, &description, &edited); err != nil {
+		f.t.Fatal(err)
+	}
+	if description != nil {
+		m.Description = *description
+	}
+	m.Edited = edited != nil && (*edited == "1" || *edited == "true")
+	collect := func(query string, out *[]int64) {
+		rows, err := f.database.ReaderSQL.QueryContext(f.ctx, query, asset)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var value int64
+			if err := rows.Scan(&value); err != nil {
+				f.t.Fatal(err)
+			}
+			*out = append(*out, value)
+		}
+	}
+	collect(`SELECT album_id FROM album_assets WHERE asset_id = ? ORDER BY album_id`, &m.Albums)
+	rows, err := f.database.ReaderSQL.QueryContext(f.ctx, `
+		SELECT tag.tag_name, link.source FROM asset_tags link JOIN tags tag ON tag.tag_id = link.tag_id
+		WHERE link.asset_id = ? ORDER BY tag.tag_name`, asset)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, source string
+		if err := rows.Scan(&name, &source); err != nil {
+			f.t.Fatal(err)
+		}
+		if source == "user" {
+			m.UserTags = append(m.UserTags, name)
+		} else {
+			m.AITags = append(m.AITags, name)
+		}
+	}
+	return m
+}
+
+// attachUserMetadata gives an Asset a rating and like, membership in a new
+// album, one user tag and one AI tag, and a user-edited description.
+func (f *fixture) attachUserMetadata(asset uuid.UUID, rating int, tag, description string) int64 {
+	f.t.Helper()
+	album := f.addToNewAlbum(asset)
+	if _, err := f.database.SQL.ExecContext(f.ctx, `
+		UPDATE assets SET rating = ?, liked = 1,
+		    specific_metadata = json_set(COALESCE(specific_metadata, '{}'), '$.description', ?, '$.description_edited', json('true'))
+		WHERE asset_id = ?`, rating, description, asset); err != nil {
+		f.t.Fatal(err)
+	}
+	for _, link := range []struct{ name, source string }{{tag, "user"}, {tag + "-ai", "ai"}} {
+		if _, err := f.database.SQL.ExecContext(f.ctx, `INSERT OR IGNORE INTO tags (tag_name, is_ai_generated) VALUES (?, ?)`, link.name, link.source != "user"); err != nil {
+			f.t.Fatal(err)
+		}
+		if _, err := f.database.SQL.ExecContext(f.ctx, `
+			INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
+			VALUES (?, (SELECT tag_id FROM tags WHERE tag_name = ?), 1, ?)`, asset, link.name, link.source); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+	return album
+}
+
+// In-place carry-over branch 2 (#223): editing one of two copies forks a new
+// Asset for the edited file. The fork inherits the user's metadata in full
+// (rating, like, albums, user tags, the edited description), not the AI
+// tags; the untouched copy keeps the original Asset with everything it had.
 func TestInPlaceRewriteOfOneCopyForksTheAssetWithItsMetadata(t *testing.T) {
 	f := newFixture(t, 0)
 	f.write(f.primary, "a.jpg", "shared")
@@ -382,10 +478,14 @@ func TestInPlaceRewriteOfOneCopyForksTheAssetWithItsMetadata(t *testing.T) {
 	f.scan(f.primary)
 	f.hash(f.primary)
 	original := f.mustEntry(f.primary, "a.jpg", StatePresent).AssetID.UUID
-	album := f.addToNewAlbum(original)
-	if _, err := f.database.SQL.ExecContext(f.ctx, `UPDATE assets SET rating = 4, liked = 1 WHERE asset_id = ?`, original); err != nil {
-		t.Fatal(err)
+	album := f.attachUserMetadata(original, 4, "family", "edited by the user")
+	before := f.userMetadata(original)
+	want := userMetadata{Rating: 4, Liked: true, Albums: []int64{album}, UserTags: []string{"family"}, AITags: []string{"family-ai"},
+		Description: "edited by the user", Edited: true, Lifecycle: "active"}
+	if !reflect.DeepEqual(before, want) {
+		t.Fatalf("fixture metadata = %+v, want %+v", before, want)
 	}
+
 	f.write(f.primary, "copy/a.jpg", "edited copy")
 	f.scan(f.primary)
 	f.hash(f.primary)
@@ -393,17 +493,23 @@ func TestInPlaceRewriteOfOneCopyForksTheAssetWithItsMetadata(t *testing.T) {
 	if forked == original || f.mustEntry(f.primary, "a.jpg", StatePresent).AssetID.UUID != original {
 		t.Fatalf("edited copy bound to %v, untouched copy must keep %v", forked, original)
 	}
-	var rating, liked int
-	if err := f.database.ReaderSQL.QueryRowContext(f.ctx, `SELECT rating, liked FROM assets WHERE asset_id = ?`, forked).Scan(&rating, &liked); err != nil {
-		t.Fatal(err)
+	if after := f.userMetadata(original); !reflect.DeepEqual(after, before) {
+		t.Fatalf("original Asset metadata after the fork = %+v, want unchanged %+v", after, before)
 	}
-	if rating != 4 || liked != 1 {
-		t.Fatalf("forked Asset rating=%d liked=%d, want the copied 4 and 1", rating, liked)
+	wantFork := want
+	wantFork.AITags = nil
+	if got := f.userMetadata(forked); !reflect.DeepEqual(got, wantFork) {
+		t.Fatalf("forked Asset metadata = %+v, want the user's metadata copied %+v", got, wantFork)
 	}
-	f.requireAlbumMember(album, forked)
-	f.requireAlbumMember(album, original)
+	if got, want := f.assetContentHash(forked), fileHash(t, f.path(f.primary, "copy/a.jpg")); got != want {
+		t.Fatalf("forked Asset content %s, want the edited content %s", got, want)
+	}
 }
 
+// In-place carry-over branch 3 (#223): a rewrite whose new content already
+// belongs to another Asset binds the file to that Asset without merging. The
+// bound Asset's metadata is untouched; the old Asset keeps all of its own as
+// a missing entry, so nothing the user attached to either is lost or mixed.
 func TestInPlaceRewriteMatchingAnotherAssetBindsWithoutMerge(t *testing.T) {
 	f := newFixture(t, 0)
 	f.write(f.primary, "a.jpg", "first")
@@ -412,6 +518,10 @@ func TestInPlaceRewriteMatchingAnotherAssetBindsWithoutMerge(t *testing.T) {
 	f.hash(f.primary)
 	first := f.mustEntry(f.primary, "a.jpg", StatePresent).AssetID.UUID
 	second := f.mustEntry(f.primary, "b.jpg", StatePresent).AssetID.UUID
+	f.attachUserMetadata(first, 2, "old", "the first caption")
+	f.attachUserMetadata(second, 5, "new", "the second caption")
+	firstBefore, secondBefore := f.userMetadata(first), f.userMetadata(second)
+
 	f.write(f.primary, "a.jpg", "second")
 	f.scan(f.primary)
 	f.hash(f.primary)
@@ -426,6 +536,14 @@ func TestInPlaceRewriteMatchingAnotherAssetBindsWithoutMerge(t *testing.T) {
 	}
 	if !kept || f.assetCount() != 2 {
 		t.Fatalf("the old Asset %v must stay as a missing entry: %+v", first, f.entries(f.primary))
+	}
+	if got := f.userMetadata(second); !reflect.DeepEqual(got, secondBefore) {
+		t.Fatalf("bound Asset metadata = %+v, want unchanged %+v (no merge)", got, secondBefore)
+	}
+	firstWant := firstBefore
+	firstWant.Lifecycle = "missing"
+	if got := f.userMetadata(first); !reflect.DeepEqual(got, firstWant) {
+		t.Fatalf("old Asset metadata = %+v, want kept %+v", got, firstWant)
 	}
 }
 
