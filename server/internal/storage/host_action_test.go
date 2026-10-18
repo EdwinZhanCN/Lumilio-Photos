@@ -319,7 +319,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 		t.Fatal(err)
 	}
 	openPath := openSource.Repository.Path
-	if err := manager.RemoveRepository(ctx, openSource.Repository.RepoID.String(), LifecycleRequest{
+	if _, err := manager.RemoveRepository(ctx, openSource.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "host-risk-open-detach", Actor: "test",
 	}); err != nil {
 		t.Fatal(err)

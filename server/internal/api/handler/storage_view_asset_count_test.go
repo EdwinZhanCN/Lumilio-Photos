@@ -36,6 +36,12 @@ func (stub storageViewCountRepositoryManager) ListRepositories() ([]*repo.Reposi
 	return stub.repositories, nil
 }
 
+func (stub storageViewCountRepositoryManager) RepositoryActionPolicyFor(_ context.Context, repository repo.Repository) (storage.RepositoryActionPolicy, error) {
+	return storage.DeriveRepositoryActions(storage.RepositoryActionFacts{
+		Role: repository.Role, Reachability: repository.Reachability, Activity: repository.Activity,
+	}), nil
+}
+
 // The storage view counts every non-deleted Asset with an active occurrence in
 // a Repository, whatever its processing state, against the real catalog schema.
 // Deleted Assets and other Repositories' Assets are excluded.
@@ -107,6 +113,11 @@ INSERT INTO repositories (
 	var response dto.StorageViewResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Len(t, response.Repositories, 1)
+	// The row carries the role-aware actions the menu renders from.
+	require.Equal(t, []string{"verify", "rename", "detach"}, response.Repositories[0].Actions)
+	require.Len(t, response.Repositories[0].UnavailableActions, 1)
+	require.Equal(t, "reconnect", response.Repositories[0].UnavailableActions[0].Action)
+	require.Equal(t, []string{"original_available"}, response.Repositories[0].UnavailableActions[0].Blockers)
 	require.Equal(t, int64(1), response.Repositories[0].TrashCount)
 	require.Equal(t, int64(1), response.Repositories[0].TrashBytes)
 	require.Zero(t, response.Repositories[0].MissingCount)

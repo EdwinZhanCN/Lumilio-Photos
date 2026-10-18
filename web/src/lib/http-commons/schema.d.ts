@@ -13981,7 +13981,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                        "application/problem+json": components["schemas"]["api.RepositoryCommandProblemResponse"];
                     };
                 };
             };
@@ -14513,7 +14513,34 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.DetachRepositoryResponseDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Action withheld by the role-aware policy (the Primary is protected), Repository busy, or a reused Idempotency-Key with another payload */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.RepositoryCommandProblemResponse"];
                     };
                 };
             };
@@ -14599,7 +14626,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                        "application/json": components["schemas"]["dto.RenameRepositoryResponseDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -14618,6 +14645,15 @@ export interface paths {
                     };
                     content: {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Action withheld by the role-aware policy, Repository busy, ownership held elsewhere, identity mismatch, or a reused Idempotency-Key with another payload */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.RepositoryCommandProblemResponse"];
                     };
                 };
             };
@@ -15443,7 +15479,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.RepositoryCommandProblemResponse": components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"];
         "api.RepositoryConflictProblemResponse": {
             actions?: string[];
             conflict_type: string;
@@ -16479,6 +16516,11 @@ export interface components {
             from?: string;
             to?: string;
         };
+        "dto.DetachRepositoryResponseDTO": {
+            /** @example true */
+            files_preserved?: boolean;
+            operation?: components["schemas"]["dto.LifecycleReceiptDTO"];
+        };
         "dto.DetectDuplicatesRequestDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id: string;
@@ -16881,6 +16923,24 @@ export interface components {
             source?: string;
             target_id?: string;
             target_type?: string;
+        };
+        "dto.LifecycleReceiptDTO": {
+            /**
+             * @example rename_repository
+             * @enum {string}
+             */
+            kind?: "rename_repository" | "detach_repository";
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
+            /** @example false */
+            replayed?: boolean;
+            /** @example 3f0c2d2e-8d6d-4e4e-9b3a-8d2c7b1d9f10 */
+            request_id?: string;
+            /**
+             * @example completed
+             * @enum {string}
+             */
+            status?: "completed";
         };
         "dto.ListAlbumsResponseDTO": {
             albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
@@ -17746,6 +17806,29 @@ export interface components {
             /** @example Family Archive */
             name: string;
         };
+        "dto.RenameRepositoryResponseDTO": {
+            operation?: components["schemas"]["dto.LifecycleReceiptDTO"];
+            repository?: components["schemas"]["dto.RepositoryDTO"];
+        };
+        "dto.RepositoryActionBlockDTO": {
+            /**
+             * @example rename
+             * @enum {string}
+             */
+            action?: "verify" | "rename" | "detach" | "reconnect";
+            /**
+             * @example [
+             *       "default_configuration"
+             *     ]
+             */
+            alternatives?: string[];
+            /**
+             * @example [
+             *       "primary_protected"
+             *     ]
+             */
+            blockers?: string[];
+        };
         "dto.RepositoryCandidateDTO": {
             /**
              * @example [
@@ -18439,6 +18522,17 @@ export interface components {
             status?: string;
         };
         "dto.StorageRepositoryViewDTO": {
+            /**
+             * @description Actions are the row commands the role-aware policy admits on the
+             *     current facts; UnavailableActions explain the withheld ones. Menus
+             *     render from these and never invent a protected action.
+             * @example [
+             *       "verify",
+             *       "rename",
+             *       "detach"
+             *     ]
+             */
+            actions?: ("verify" | "rename" | "detach" | "reconnect")[];
             /** @example idle */
             activity?: string;
             /** @example 1240 */
@@ -18472,6 +18566,7 @@ export interface components {
             storage_location_id?: string;
             trash_bytes?: number;
             trash_count?: number;
+            unavailable_actions?: components["schemas"]["dto.RepositoryActionBlockDTO"][];
             verification?: components["schemas"]["dto.StorageRepositoryVerificationSummaryDTO"];
             write_policy?: components["schemas"]["dto.StorageRepositoryWritePolicyDTO"];
         };
@@ -19667,6 +19762,33 @@ export interface components {
              */
             type: "https://lumilio.org/problems/service/unavailable";
         };
+        "api.StorageActionUnavailableProblem": {
+            action: string;
+            alternatives?: string[];
+            blockers: string[];
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/action-unavailable";
+        };
+        "api.StorageActionUnavailableProblemReference": {
+            action: string;
+            alternatives?: string[];
+            blockers: string[];
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/action-unavailable";
+        };
         "api.StorageAssessmentStaleProblem": {
             /** Format: uri */
             instance: string;
@@ -19687,6 +19809,27 @@ export interface components {
              * @enum {string}
              */
             type: "https://lumilio.org/problems/storage/assessment-stale";
+        };
+        "api.StorageBusyProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/busy";
+        };
+        "api.StorageBusyProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/busy";
         };
         "api.StorageConfirmationRequiredProblem": {
             assessment_token: string;
@@ -19755,6 +19898,27 @@ export interface components {
              */
             type: "https://lumilio.org/problems/storage/host-action-failed";
         };
+        "api.StorageIdentityMismatchProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/identity-mismatch";
+        };
+        "api.StorageIdentityMismatchProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/identity-mismatch";
+        };
         "api.StorageMaterializationRequiredProblem": {
             /** Format: uri */
             instance: string;
@@ -19817,6 +19981,48 @@ export interface components {
              * @enum {string}
              */
             type: "https://lumilio.org/problems/storage/observation-unknown";
+        };
+        "api.StorageOriginalOnlineProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/original-online";
+        };
+        "api.StorageOriginalOnlineProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/original-online";
+        };
+        "api.StorageOwnershipUnavailableProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/ownership-unavailable";
+        };
+        "api.StorageOwnershipUnavailableProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/ownership-unavailable";
         };
         "api.StoragePermissionDeniedProblem": {
             /** Format: uri */
@@ -19881,7 +20087,7 @@ export interface components {
              */
             type: "https://lumilio.org/problems/upload/processing-failed";
         };
-        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
+        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageActionUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageBusyProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageIdentityMismatchProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StorageOriginalOnlineProblemReference"] | components["schemas"]["api.StorageOwnershipUnavailableProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
         "api.RateLimitedProblemResponse": {
             /** Format: uri */
             instance: string;

@@ -688,6 +688,7 @@ CREATE TABLE lifecycle_operations (
         'switch_default_storage_location',
         'relocate_storage_location',
         'rename_repository',
+        'detach_repository',
         'trash_assets',
         'restore_assets'
     )),

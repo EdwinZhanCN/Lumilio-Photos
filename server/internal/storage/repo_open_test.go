@@ -30,7 +30,7 @@ func TestOpenRepositoryRejectsUnavailableCloudPlaceholderBeforeCatalogMutation(t
 		t.Fatal(err)
 	}
 	repositoryPath := created.Repository.Path
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(repositoryPath, ".family.jpg.icloud"), nil, 0o644); err != nil {
@@ -68,7 +68,7 @@ func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T)
 	if err := os.WriteFile(oldState, []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,9 +151,13 @@ func TestRenameRepositoryChangesOnlyDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	renamed, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
+	renamedResult, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
 		RequestID: "rename-before-after", Actor: "test",
 	})
+	var renamed *repo.Repository
+	if renamedResult != nil {
+		renamed = &renamedResult.Repository
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,9 +171,13 @@ func TestRenameRepositoryChangesOnlyDisplayName(t *testing.T) {
 	if disk.Name != "After" || disk.StorageStrategy != "cas" || disk.ID != renamed.RepoID.String() {
 		t.Fatalf("renamed marker = %#v", disk)
 	}
-	replayed, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
+	replayedResult, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
 		RequestID: "rename-before-after", Actor: "test",
 	})
+	var replayed *repo.Repository
+	if replayedResult != nil {
+		replayed = &replayedResult.Repository
+	}
 	if err != nil || replayed.Name != "After" {
 		t.Fatalf("idempotent rename replay = %+v, error = %v", replayed, err)
 	}

@@ -73,6 +73,11 @@ type StorageRepositoryViewDTO struct {
 	TrashBytes   int64                                    `json:"trash_bytes"`
 	AssetCount   *int64                                   `json:"asset_count,omitempty" example:"1240"`
 	Verification *StorageRepositoryVerificationSummaryDTO `json:"verification,omitempty"`
+	// Actions are the row commands the role-aware policy admits on the
+	// current facts; UnavailableActions explain the withheld ones. Menus
+	// render from these and never invent a protected action.
+	Actions            []string                   `json:"actions" example:"verify,rename,detach" enums:"verify,rename,detach,reconnect"`
+	UnavailableActions []RepositoryActionBlockDTO `json:"unavailable_actions"`
 }
 
 // StorageCapacityGroupDTO is one shared backing capacity pool for admin display.

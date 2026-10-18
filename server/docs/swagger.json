@@ -927,13 +927,18 @@
                         "https://lumilio.org/problems/repository/scan-incomplete": "#/components/schemas/api.RepositoryScanIncompleteProblemReference",
                         "https://lumilio.org/problems/repository/unavailable": "#/components/schemas/api.RepositoryUnavailableProblemReference",
                         "https://lumilio.org/problems/service/unavailable": "#/components/schemas/api.ServiceUnavailableProblemReference",
+                        "https://lumilio.org/problems/storage/action-unavailable": "#/components/schemas/api.StorageActionUnavailableProblemReference",
                         "https://lumilio.org/problems/storage/assessment-stale": "#/components/schemas/api.StorageAssessmentStaleProblemReference",
+                        "https://lumilio.org/problems/storage/busy": "#/components/schemas/api.StorageBusyProblemReference",
                         "https://lumilio.org/problems/storage/confirmation-required": "#/components/schemas/api.StorageConfirmationRequiredProblemReference",
                         "https://lumilio.org/problems/storage/host-action-expired": "#/components/schemas/api.StorageHostActionExpiredProblemReference",
                         "https://lumilio.org/problems/storage/host-action-failed": "#/components/schemas/api.StorageHostActionFailedProblemReference",
+                        "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblemReference",
                         "https://lumilio.org/problems/storage/materialization-required": "#/components/schemas/api.StorageMaterializationRequiredProblemReference",
                         "https://lumilio.org/problems/storage/not-a-mounted-volume": "#/components/schemas/api.StorageNotAMountedVolumeProblemReference",
                         "https://lumilio.org/problems/storage/observation-unknown": "#/components/schemas/api.StorageObservationUnknownProblemReference",
+                        "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblemReference",
+                        "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblemReference",
                         "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblemReference",
                         "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblemReference",
                         "https://lumilio.org/problems/upload/processing-failed": "#/components/schemas/api.UploadProcessingFailedProblemReference"
@@ -1011,7 +1016,13 @@
                         "$ref": "#/components/schemas/api.ServiceUnavailableProblemReference"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageActionUnavailableProblemReference"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageAssessmentStaleProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageBusyProblemReference"
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageConfirmationRequiredProblemReference"
@@ -1023,6 +1034,9 @@
                         "$ref": "#/components/schemas/api.StorageHostActionFailedProblemReference"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageIdentityMismatchProblemReference"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageMaterializationRequiredProblemReference"
                     },
                     {
@@ -1030,6 +1044,12 @@
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageObservationUnknownProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOriginalOnlineProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOwnershipUnavailableProblemReference"
                     },
                     {
                         "$ref": "#/components/schemas/api.StoragePermissionDeniedProblemReference"
@@ -1069,13 +1089,18 @@
                         "https://lumilio.org/problems/repository/scan-incomplete": "#/components/schemas/api.RepositoryScanIncompleteProblem",
                         "https://lumilio.org/problems/repository/unavailable": "#/components/schemas/api.RepositoryUnavailableProblem",
                         "https://lumilio.org/problems/service/unavailable": "#/components/schemas/api.ServiceUnavailableProblem",
+                        "https://lumilio.org/problems/storage/action-unavailable": "#/components/schemas/api.StorageActionUnavailableProblem",
                         "https://lumilio.org/problems/storage/assessment-stale": "#/components/schemas/api.StorageAssessmentStaleProblem",
+                        "https://lumilio.org/problems/storage/busy": "#/components/schemas/api.StorageBusyProblem",
                         "https://lumilio.org/problems/storage/confirmation-required": "#/components/schemas/api.StorageConfirmationRequiredProblem",
                         "https://lumilio.org/problems/storage/host-action-expired": "#/components/schemas/api.StorageHostActionExpiredProblem",
                         "https://lumilio.org/problems/storage/host-action-failed": "#/components/schemas/api.StorageHostActionFailedProblem",
+                        "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblem",
                         "https://lumilio.org/problems/storage/materialization-required": "#/components/schemas/api.StorageMaterializationRequiredProblem",
                         "https://lumilio.org/problems/storage/not-a-mounted-volume": "#/components/schemas/api.StorageNotAMountedVolumeProblem",
                         "https://lumilio.org/problems/storage/observation-unknown": "#/components/schemas/api.StorageObservationUnknownProblem",
+                        "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblem",
+                        "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblem",
                         "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblem",
                         "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblem",
                         "https://lumilio.org/problems/upload/processing-failed": "#/components/schemas/api.UploadProcessingFailedProblem"
@@ -1156,7 +1181,13 @@
                         "$ref": "#/components/schemas/api.ServiceUnavailableProblem"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageActionUnavailableProblem"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageAssessmentStaleProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageBusyProblem"
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageConfirmationRequiredProblem"
@@ -1168,6 +1199,9 @@
                         "$ref": "#/components/schemas/api.StorageHostActionFailedProblem"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageIdentityMismatchProblem"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageMaterializationRequiredProblem"
                     },
                     {
@@ -1175,6 +1209,12 @@
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageObservationUnknownProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOriginalOnlineProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOwnershipUnavailableProblem"
                     },
                     {
                         "$ref": "#/components/schemas/api.StoragePermissionDeniedProblem"
@@ -1216,6 +1256,35 @@
                     "type"
                 ],
                 "type": "object"
+            },
+            "api.RepositoryCommandProblemResponse": {
+                "discriminator": {
+                    "mapping": {
+                        "https://lumilio.org/problems/storage/action-unavailable": "#/components/schemas/api.StorageActionUnavailableProblem",
+                        "https://lumilio.org/problems/storage/busy": "#/components/schemas/api.StorageBusyProblem",
+                        "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblem",
+                        "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblem",
+                        "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblem"
+                    },
+                    "propertyName": "type"
+                },
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/api.StorageActionUnavailableProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageBusyProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOwnershipUnavailableProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageIdentityMismatchProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOriginalOnlineProblem"
+                    }
+                ]
             },
             "api.RepositoryConflictProblem": {
                 "additionalProperties": false,
@@ -1562,6 +1631,88 @@
                 ],
                 "type": "object"
             },
+            "api.StorageActionUnavailableProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "action": {
+                        "type": "string"
+                    },
+                    "alternatives": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "blockers": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/action-unavailable",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "action",
+                    "blockers",
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageActionUnavailableProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "action": {
+                        "type": "string"
+                    },
+                    "alternatives": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "blockers": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/action-unavailable",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "action",
+                    "blockers",
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
             "api.StorageAssessmentStaleProblem": {
                 "additionalProperties": false,
                 "properties": {
@@ -1600,6 +1751,54 @@
                     },
                     "type": {
                         "const": "https://lumilio.org/problems/storage/assessment-stale",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageBusyProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/busy",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageBusyProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/busy",
                         "format": "uri",
                         "type": "string"
                     }
@@ -1812,6 +2011,54 @@
                 ],
                 "type": "object"
             },
+            "api.StorageIdentityMismatchProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/identity-mismatch",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageIdentityMismatchProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/identity-mismatch",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
             "api.StorageMaterializationRequiredProblem": {
                 "additionalProperties": false,
                 "properties": {
@@ -1946,6 +2193,102 @@
                     },
                     "type": {
                         "const": "https://lumilio.org/problems/storage/observation-unknown",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageOriginalOnlineProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/original-online",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageOriginalOnlineProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/original-online",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageOwnershipUnavailableProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/ownership-unavailable",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageOwnershipUnavailableProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/ownership-unavailable",
                         "format": "uri",
                         "type": "string"
                     }
@@ -4776,6 +5119,18 @@
                 },
                 "type": "object"
             },
+            "dto.DetachRepositoryResponseDTO": {
+                "properties": {
+                    "files_preserved": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "operation": {
+                        "$ref": "#/components/schemas/dto.LifecycleReceiptDTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.DetectDuplicatesRequestDTO": {
                 "properties": {
                     "repository_id": {
@@ -5810,6 +6165,38 @@
                         "type": "string"
                     },
                     "target_type": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LifecycleReceiptDTO": {
+                "properties": {
+                    "kind": {
+                        "enum": [
+                            "rename_repository",
+                            "detach_repository"
+                        ],
+                        "example": "rename_repository",
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "replayed": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "request_id": {
+                        "example": "3f0c2d2e-8d6d-4e4e-9b3a-8d2c7b1d9f10",
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "completed"
+                        ],
+                        "example": "completed",
                         "type": "string"
                     }
                 },
@@ -8273,6 +8660,52 @@
                 ],
                 "type": "object"
             },
+            "dto.RenameRepositoryResponseDTO": {
+                "properties": {
+                    "operation": {
+                        "$ref": "#/components/schemas/dto.LifecycleReceiptDTO"
+                    },
+                    "repository": {
+                        "$ref": "#/components/schemas/dto.RepositoryDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryActionBlockDTO": {
+                "properties": {
+                    "action": {
+                        "enum": [
+                            "verify",
+                            "rename",
+                            "detach",
+                            "reconnect"
+                        ],
+                        "example": "rename",
+                        "type": "string"
+                    },
+                    "alternatives": {
+                        "example": [
+                            "default_configuration"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "blockers": {
+                        "example": [
+                            "primary_protected"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.RepositoryCandidateDTO": {
                 "properties": {
                     "allowed_resolutions": {
@@ -9833,6 +10266,25 @@
             },
             "dto.StorageRepositoryViewDTO": {
                 "properties": {
+                    "actions": {
+                        "description": "Actions are the row commands the role-aware policy admits on the\ncurrent facts; UnavailableActions explain the withheld ones. Menus\nrender from these and never invent a protected action.",
+                        "example": [
+                            "verify",
+                            "rename",
+                            "detach"
+                        ],
+                        "items": {
+                            "enum": [
+                                "verify",
+                                "rename",
+                                "detach",
+                                "reconnect"
+                            ],
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "activity": {
                         "example": "idle",
                         "type": "string"
@@ -9886,6 +10338,13 @@
                     },
                     "trash_count": {
                         "type": "integer"
+                    },
+                    "unavailable_actions": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryActionBlockDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     },
                     "verification": {
                         "$ref": "#/components/schemas/dto.StorageRepositoryVerificationSummaryDTO"
@@ -26589,7 +27048,7 @@
                         "content": {
                             "application/problem+json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                    "$ref": "#/components/schemas/api.RepositoryCommandProblemResponse"
                                 }
                             }
                         },
@@ -27135,11 +27594,41 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                    "$ref": "#/components/schemas/dto.DetachRepositoryResponseDTO"
                                 }
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.RepositoryCommandProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Action withheld by the role-aware policy (the Primary is protected), Repository busy, or a reused Idempotency-Key with another payload"
                     }
                 },
                 "security": [
@@ -27228,7 +27717,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                    "$ref": "#/components/schemas/dto.RenameRepositoryResponseDTO"
                                 }
                             }
                         },
@@ -27253,6 +27742,16 @@
                             }
                         },
                         "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.RepositoryCommandProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Action withheld by the role-aware policy, Repository busy, ownership held elsewhere, identity mismatch, or a reused Idempotency-Key with another payload"
                     }
                 },
                 "security": [

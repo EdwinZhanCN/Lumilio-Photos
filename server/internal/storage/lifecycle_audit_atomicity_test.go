@@ -33,7 +33,8 @@ func TestRemovalMutationsRollbackWhenLifecycleAuditInsertFails(t *testing.T) {
 				if err != nil {
 					return "", err
 				}
-				return created.Repository.RepoID.String(), manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{RequestID: "audit-remove", Actor: "web:admin"})
+				_, removeErr := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{RequestID: "audit-remove", Actor: "web:admin"})
+				return created.Repository.RepoID.String(), removeErr
 			},
 			check: func(ctx context.Context, manager *DefaultRepositoryManager, id string) error {
 				_, err := manager.GetRepository(id)

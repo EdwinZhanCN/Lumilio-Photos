@@ -64,7 +64,7 @@ func TestRepositoryWorkGateSerializesReprocessAndRemoval(t *testing.T) {
 	if err != nil || visible.Activity != dbtypes.RepositoryActivityProcessing {
 		t.Fatalf("persistent work gate = %+v, error = %v", visible, err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("removal during repository work = %v, want ErrRepositoryBusy", err)
 	}
 	blockedCtx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
@@ -116,7 +116,7 @@ func TestRepositoryEnqueueGateDoesNotWaitForOpenMediaLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enqueue gate waited for an open media lease: %v", err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
 		_ = release()
 		t.Fatalf("removal crossed durable enqueue gate: %v", err)
 	}

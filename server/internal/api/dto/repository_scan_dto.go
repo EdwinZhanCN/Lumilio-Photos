@@ -88,6 +88,37 @@ type RenameRepositoryRequestDTO struct {
 	Name string `json:"name" binding:"required" example:"Family Archive"`
 }
 
+// LifecycleReceiptDTO is the durable operation a journaled storage command
+// became. A retry that sends the same Idempotency-Key receives the same
+// receipt with replayed set, never a second mutation.
+type LifecycleReceiptDTO struct {
+	OperationID string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RequestID   string `json:"request_id" example:"3f0c2d2e-8d6d-4e4e-9b3a-8d2c7b1d9f10"`
+	Kind        string `json:"kind" example:"rename_repository" enums:"rename_repository,detach_repository"`
+	Status      string `json:"status" example:"completed" enums:"completed"`
+	Replayed    bool   `json:"replayed" example:"false"`
+}
+
+// RenameRepositoryResponseDTO is the renamed Repository with its receipt.
+type RenameRepositoryResponseDTO struct {
+	Repository RepositoryDTO       `json:"repository"`
+	Operation  LifecycleReceiptDTO `json:"operation"`
+}
+
+// DetachRepositoryResponseDTO confirms a detach: the registration is gone,
+// every file stays, and the receipt answers a retry.
+type DetachRepositoryResponseDTO struct {
+	Operation      LifecycleReceiptDTO `json:"operation"`
+	FilesPreserved bool                `json:"files_preserved" example:"true"`
+}
+
+// RepositoryActionBlockDTO explains one withheld row action with stable codes.
+type RepositoryActionBlockDTO struct {
+	Action       string   `json:"action" example:"rename" enums:"verify,rename,detach,reconnect"`
+	Blockers     []string `json:"blockers" example:"primary_protected"`
+	Alternatives []string `json:"alternatives,omitempty" example:"default_configuration"`
+}
+
 type RepositoryRemovalImpactDTO struct {
 	RepositoryID      string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	RepositoryName    string `json:"repository_name" example:"Family Photos"`

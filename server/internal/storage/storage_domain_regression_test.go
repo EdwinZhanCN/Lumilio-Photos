@@ -467,8 +467,12 @@ func TestRenameRepositoryDoesNotRequireStorageLocationReadLease(t *testing.T) {
 	}
 	defer releaseStorageLocation()
 
-	renamed, err := manager.RenameRepository(ctx, sibling.Repository.RepoID.String(), "Renamed Sibling",
+	renamedResult, err := manager.RenameRepository(ctx, sibling.Repository.RepoID.String(), "Renamed Sibling",
 		LifecycleRequest{RequestID: "rename-without-storageLocation-read", Actor: "test"})
+	var renamed *repo.Repository
+	if renamedResult != nil {
+		renamed = &renamedResult.Repository
+	}
 	if err != nil {
 		t.Fatalf("rename blocked behind Storage Location mutation lease: %v", err)
 	}
