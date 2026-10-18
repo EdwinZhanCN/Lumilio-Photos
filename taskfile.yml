@@ -144,6 +144,56 @@ tasks:
       - task: web:atlas:facts
       - go -C server run ./tools/atlas lock
 
+  # Published-artifact smoke (release-smoke.yml): install one Server image the
+  # way the release bundle does, from its Compose file and .env into host
+  # directories, run the browser journey against it, and keep what it made as
+  # the compatibility fixture. SUDO=sudo on runners where the container's app
+  # user owns the bind mounts.
+  release:smoke:up:
+    desc: Install LUMILIO_IMAGE from the release bundle's Compose files into .local/release-smoke and wait for it
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+    cmds:
+      - test -n "$LUMILIO_IMAGE" || { echo "LUMILIO_IMAGE is required (tag or @sha256 digest reference)" >&2; exit 1; }
+      - mkdir -p {{.SMOKE_DIR}}/bundle {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/app-state
+      - cp deploy/compose/compose.yml {{.SMOKE_DIR}}/bundle/compose.yml
+      - printf 'LUMILIO_IMAGE=%s\nLUMILIO_STORAGE=%s\nLUMILIO_STATE=%s\n' "$LUMILIO_IMAGE" "{{.SMOKE_DIR}}/media" "{{.SMOKE_DIR}}/app-state" > {{.SMOKE_DIR}}/bundle/.env
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke pull --quiet
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke up -d --wait --wait-timeout 180
+
+  release:smoke:fixture:
+    desc: Stop the smoke install and collect its catalog, config, backups, originals, and markers into .local/release-smoke/fixture (SUDO=sudo when the app user owns the mounts)
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+      SUDO: '{{default "" .SUDO}}'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke stop
+      - '{{.SUDO}} rm -rf {{.SMOKE_DIR}}/fixture'
+      - mkdir -p {{.SMOKE_DIR}}/fixture/app-state
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke cp lumilio:/app/config/docker-http.toml {{.SMOKE_DIR}}/fixture/config.toml
+      - '{{.SUDO}} cp -a {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/fixture/media'
+      - '{{.SUDO}} cp -a {{.SMOKE_DIR}}/app-state/library.sqlite3 {{.SMOKE_DIR}}/app-state/river.sqlite3 {{.SMOKE_DIR}}/app-state/backups {{.SMOKE_DIR}}/fixture/app-state/'
+      - '{{.SUDO}} chown -R "$(id -u):$(id -g)" {{.SMOKE_DIR}}/fixture'
+      - >-
+        docker image inspect "$LUMILIO_IMAGE" --format '{"image":"{{"{{"}}.Id{{"}}"}}","repo_digests":{{"{{"}}json .RepoDigests{{"}}"}},"revision":{{"{{"}}json (index .Config.Labels "org.opencontainers.image.revision"){{"}}"}},"version":{{"{{"}}json (index .Config.Labels "org.opencontainers.image.version"){{"}}"}}}'
+        > {{.SMOKE_DIR}}/fixture/image.json
+
+  release:smoke:logs:
+    desc: Print the smoke install's Server logs
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke logs --no-color
+
+  release:smoke:down:
+    desc: Remove the smoke install and its host directories (SUDO=sudo when the app user owns the mounts)
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+      SUDO: '{{default "" .SUDO}}'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke down --remove-orphans || true
+      - '{{.SUDO}} rm -rf {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/app-state {{.SMOKE_DIR}}/bundle'
+
   compose:test:
     desc: Validate every Docker Compose configuration
     cmds:

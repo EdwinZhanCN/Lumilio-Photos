@@ -239,6 +239,46 @@ async function waitForRestoreTerminal(
   return terminal;
 }
 
+const DOCUMENT_MARKER = "__lumilioE2EDocumentBeforeRestore";
+
+type MarkedWindow = Window & { [DOCUMENT_MARKER]?: true };
+
+/**
+ * The backup section reloads the page on its own 750 ms after it observes a
+ * completed restore. A navigation issued while that reload is in flight is
+ * aborted by the browser, so the spec marks the current document before the
+ * restore and waits until a fresh document (without the marker) has loaded.
+ */
+async function markDocument(page: Page): Promise<void> {
+  await page.evaluate((marker) => {
+    (window as MarkedWindow)[marker as typeof DOCUMENT_MARKER] = true;
+  }, DOCUMENT_MARKER);
+}
+
+async function waitForAutomaticReload(page: Page): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(
+            (marker) => (window as MarkedWindow)[marker as typeof DOCUMENT_MARKER] !== true,
+            DOCUMENT_MARKER,
+          );
+        } catch {
+          // The execution context is torn down while the reload is in flight.
+          return false;
+        }
+      },
+      {
+        message: "the settings page should reload itself after the completed restore",
+        timeout: 30_000,
+        intervals: [250, 500, 1_000],
+      },
+    )
+    .toBe(true);
+  await page.waitForLoadState("load");
+}
+
 test("@backup-recovery admin UI proves backup, download, restore, and rollback", async ({
   page,
   workspace,
@@ -306,9 +346,11 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
   );
   expect(await repositoryExists(workspace.token, afterBackup.id)).toBe(true);
 
+  await markDocument(page);
   const successfulOperationID = await restoreFromRow(page, routineRow);
   const successfulOperation = await waitForRestoreTerminal(workspace.token, successfulOperationID);
   expect(successfulOperation.status).toBe("completed");
+  await waitForAutomaticReload(page);
   await expect
     .poll(() => repositoryPresence(workspace.token, afterBackup.id), {
       message: "successful restore should remove data created after the dump",
