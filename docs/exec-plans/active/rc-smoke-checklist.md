@@ -109,8 +109,15 @@ core row: verdict, spec or test, notes, PR or tracker link. Part C: digest,
 run link.)
 
 - 2026-10-18, S11: `release-smoke.yml` proof run against
-  `ghcr.io/edwinzhancn/lumilio-server:edge` on the S11 pull request — run
-  link: RELEASE_SMOKE_RUN_LINK.
+  `ghcr.io/edwinzhancn/lumilio-server:edge` (the dev build of 2026-09-27,
+  `c397cf3`) on the S11 pull request (#254):
+  https://github.com/EdwinZhanCN/Lumilio-Photos/actions/runs/39086527258 —
+  fresh install healthy in 23 s, the browser journey (wizard, upload,
+  browse and detail, album with cover, share link, backup, restore) green,
+  the `compatibility-fixture-39086527258` artifact uploaded. The first two
+  attempts found journey assumptions, not install faults: the wizard has no
+  passkey step on plain HTTP, and the upload and scope selects decorate
+  repository names in their option labels; both fixed in the spec.
 
 ## Validation boundaries
 
