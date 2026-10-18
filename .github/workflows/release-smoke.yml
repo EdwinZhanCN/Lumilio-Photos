@@ -10,6 +10,10 @@
 # (web:test:release-smoke).
 name: Release smoke
 
+# A dispatch proves a published image (post-tag, by digest). A pull request
+# that changes the workflow, its Task targets, its spec, or the bundle's
+# Compose file proves the workflow itself against the current `edge` image,
+# so a broken smoke never waits for a release to be noticed.
 on:
     workflow_dispatch:
         inputs:
@@ -17,6 +21,18 @@ on:
                 description: Server image to prove, as a tag or a digest reference (ghcr.io/edwinzhancn/lumilio-server@sha256:…)
                 required: true
                 default: ghcr.io/edwinzhancn/lumilio-server:edge
+    pull_request:
+        paths:
+            - '.github/workflows/release-smoke.yml'
+            - 'deploy/compose/compose.yml'
+            - 'taskfile.yml'
+            - 'web/taskfile.yml'
+            - 'web/e2e/specs/release-smoke.spec.ts'
+            - 'web/e2e/support/sample-image.ts'
+            - 'web/e2e/support/i18n.ts'
+            - 'web/e2e/support/api.ts'
+            - 'web/e2e/support/totp.ts'
+            - 'web/e2e/pages/gallery.page.ts'
 
 permissions:
     contents: read
@@ -32,7 +48,7 @@ jobs:
         runs-on: ubuntu-24.04
         timeout-minutes: 45
         env:
-            LUMILIO_IMAGE: ${{ inputs.image }}
+            LUMILIO_IMAGE: ${{ inputs.image || 'ghcr.io/edwinzhancn/lumilio-server:edge' }}
             # The release bundle's default deployment uses host networking.
             LUMILIO_E2E_BASE_URL: http://127.0.0.1:6680
         steps:
