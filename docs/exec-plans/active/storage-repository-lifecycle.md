@@ -3,7 +3,9 @@
 Status: active, created 2026-10-07; principal owner decisions frozen
 2026-10-07. P0 merged as PR #246. P1 merged as PR #247: observation and
 assessment core, stat panic fix, guarded atomic marker primitive, and
-swappable lock/identity/watch adapters. P2 lands in this PR (session S2):
+swappable lock/identity/watch adapters. P2 merged as PR #250 (session S2,
+2026-10-16). P3a (commands) lands in this PR (session S3); P3b (native
+selection and review) follows. P2 delivered (session S2):
 the create contract and shared risk review, closing #242. P3–P8 remain
 outstanding. Each fixing PR lands its regression tests and updates this
 Status and the evidence tables.
@@ -382,6 +384,80 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   replay tests, concurrency gate, adversarial primary capability tests, no
   stale marker rollback. Native/HTTP paths give equivalent policy decisions.
 - Edwin: concurrency review; revisit primary-rename default if needed.
+- Split 2026-10-16 into P3a (commands, this PR) and P3b (native selection
+  and review: host-action task outcomes R9, `storage/host-action-expired`
+  as a normal outcome with the form retained, and the native host going
+  through the same policy as HTTP).
+
+### P3a delivered (2026-10-16)
+
+- **Role-aware action policy.** `storage.DeriveRepositoryActions` is a
+  pure function over catalog facts (role, reachability, activity, a running
+  journal entry) returning a verdict per action in the closed vocabulary
+  `verify`, `rename`, `detach`, `reconnect`, each withheld verdict carrying
+  stable blocker codes (`primary_protected`, `repository_offline`,
+  `identity_problem`, `recovery_required`, `maintenance`,
+  `repository_busy`, `pending_operation`, `original_available`) and
+  alternatives (`default_configuration`, `recover_operation`,
+  `wait_for_idle`). The Primary never gets rename, detach, or reconnect
+  (smaller decision "Primary rename: prohibited", applied as the default).
+  The storage view publishes `actions` and `unavailable_actions` per row and
+  the Web menu renders Rename, Remove, and the native reconnect entry only
+  from them; the Primary row therefore offers neither Rename nor Remove.
+- **Commands admit through the same policy, re-derived under the lease.**
+  Rename, detach, and reconnect check the projected row for a typed
+  refusal, then re-read the row after acquiring the mutation barrier and
+  decide on those facts. Reconnect lets the marker probe, not the stale
+  projection, decide whether the original is online. The refusal is
+  `RepositoryActionUnavailableError` (Problem `storage/action-unavailable`
+  with `action`, `blockers`, `alternatives`); it still matches the legacy
+  sentinels (`ErrPrimaryRepositoryNotRemovable`, `ErrPathNotAllowed`,
+  `ErrRepositoryBusy`) for existing callers.
+- **Rename refresh (R5, R12 command guard).** Under the lease the command
+  loads the complete marker at the current path, requires its identity,
+  changes only the raw name, and writes it with `SaveGuarded` (expected
+  identity), as does the rollback and the startup recovery; a marker another
+  writer replaced is refused as `ErrRepositoryIDMismatch` and never
+  overwritten, and a rollback that finds a replaced identity leaves it alone
+  and marks the operation `rollback_required`.
+- **Journaled detach and receipts.** Detach is lifecycle kind
+  `detach_repository` (baseline CHECK amended in place, pre-rc.1 rule); its
+  journal completes in the removal transaction, so no crash leaves a
+  detached Repository with a running operation, and an interrupted detach
+  is rolled back at startup with the row intact. Rename and detach return
+  `LifecycleReceipt` (`operation_id`, `request_id`, `kind`, `status`,
+  `replayed`); a retry with the same Idempotency-Key gets the same receipt
+  even after the detached row is gone; a different payload conflicts.
+- **Typed failures.** New Problems `storage/action-unavailable`,
+  `storage/busy`, `storage/ownership-unavailable`,
+  `storage/identity-mismatch`, `storage/original-online` (registry 38),
+  the exact `api.RepositoryCommandProblemResponse` 409 union on rename,
+  detach, and candidate resolve, en/zh presenters keyed by the first
+  blocker, pages and Redoc regenerated. `ErrRepositoryOwnershipUnavailable`
+  wraps a failed runtime ownership claim in open and reconnect.
+- **Evidence.** `TestDeriveRepositoryActionsIsRoleAware` (adversarial
+  primary and every withheld state), `TestCommandsAgreeWithTheActionPolicy`
+  (role × reachability × activity × pending journal, real catalog rows:
+  each command refuses exactly when the policy withholds, with the same
+  blockers, and never on policy grounds when it allows),
+  `TestRenameRefreshesTheLeasedRowAfterAReconnect` (rename parked before
+  its lease by a test seam while a reconnect moves the tree: the new path
+  is renamed, only the raw name changes, the old path stays absent, same
+  payload replays the same receipt, changed payload conflicts),
+  `TestRenameRefusesAReplacedIdentityWithoutOverwriting`,
+  `TestRenameRollbackNeverOverwritesAReplacedIdentity` (both rollback
+  branches), `TestDetachIsJournaledAndReplaysItsReceipt`, handler tests for
+  every new Problem and the detach receipt replay, the storage view action
+  test, Web `RepositoryRowActions.test.tsx`, `problem.test.ts`, and the
+  StoragePanel flow spec. Concurrency gate: the storage package under
+  `-race -shuffle=on -count=3` passes. The agreement test found two real
+  disagreements while it was written (reconnect validated the destination
+  before the policy; the Primary's verdict lost its other blockers), both
+  fixed before this PR.
+- **Deviations.** The Web keeps the "Locate on disk" label for the native
+  reconnect entry until P6 renames it with its prerequisites; the entry is
+  now shown only for a positively unavailable regular Repository. Blocked
+  actions are not yet explained in the Inspector (P7 presenters).
 
 ### P4 — Private preservation and recovery
 

@@ -2,14 +2,17 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"server/internal/api/dto"
 	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -541,5 +544,149 @@ func TestAssessStorageTargetReturnsTheReviewWithoutAHostPath(t *testing.T) {
 	var conflictBody problem.RepositoryConflictDetails
 	if err := json.Unmarshal(conflict.Body.Bytes(), &conflictBody); err != nil || conflict.Code != http.StatusConflict || conflictBody.ConflictType != "repository_directory_conflict" {
 		t.Fatalf("directory conflict review = %d %s", conflict.Code, conflict.Body.String())
+	}
+}
+
+// repositoryCommandManagerStub answers the rename and detach commands with
+// the typed refusals the storage policy produces.
+type repositoryCommandManagerStub struct {
+	storage.RepositoryManager
+	repository *repo.Repository
+	renameErr  error
+	removeErr  error
+	receipt    storage.LifecycleReceipt
+	removed    []string
+}
+
+func (s *repositoryCommandManagerStub) GetRepository(string) (*repo.Repository, error) {
+	if s.repository == nil {
+		return nil, sql.ErrNoRows
+	}
+	return s.repository, nil
+}
+
+func (s *repositoryCommandManagerStub) RenameRepository(_ context.Context, _, name string, _ ...storage.LifecycleRequest) (*storage.RepositoryRenameResult, error) {
+	if s.renameErr != nil {
+		return nil, s.renameErr
+	}
+	renamed := *s.repository
+	renamed.Name = name
+	return &storage.RepositoryRenameResult{Repository: renamed, Receipt: s.receipt}, nil
+}
+
+func (s *repositoryCommandManagerStub) RemoveRepository(_ context.Context, id string, _ ...storage.LifecycleRequest) (storage.LifecycleReceipt, error) {
+	s.removed = append(s.removed, id)
+	if s.removeErr != nil {
+		return storage.LifecycleReceipt{}, s.removeErr
+	}
+	return s.receipt, nil
+}
+
+func TestRenameRepositoryReturnsTheActionUnavailableProblemWithBlockers(t *testing.T) {
+	manager := &repositoryCommandManagerStub{
+		repository: &repo.Repository{RepoID: uuid.New(), Name: "Primary", Role: dbtypes.RepoRolePrimary},
+		renameErr: &storage.RepositoryActionUnavailableError{
+			Action: storage.ActionRename, Blockers: []storage.RepositoryActionBlocker{storage.BlockerPrimaryProtected},
+			Alternatives: []storage.RepositoryActionAlternative{storage.AlternativeDefaultConfiguration},
+		},
+	}
+	handler := NewRepositoryScanHandler(nil, manager)
+	recorder := postStorageJSON(t, handler.RenameRepository, "/api/v1/storage/repositories/x/rename", `{"name":"Renamed"}`)
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d body %s", recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Type         string   `json:"type"`
+		Action       string   `json:"action"`
+		Blockers     []string `json:"blockers"`
+		Alternatives []string `json:"alternatives"`
+		Detail       string   `json:"detail"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Type != problem.StorageActionUnavailable.Type || body.Action != "rename" ||
+		strings.Join(body.Blockers, ",") != "primary_protected" || strings.Join(body.Alternatives, ",") != "default_configuration" {
+		t.Fatalf("problem body = %s", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "/") && strings.Contains(recorder.Body.String(), "path") {
+		t.Fatalf("problem body leaks a host path: %s", recorder.Body.String())
+	}
+}
+
+func TestRepositoryCommandsReturnTypedBarrierIdentityAndOnlineProblems(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want problem.Descriptor
+	}{
+		{"busy", storage.ErrRepositoryBusy, problem.StorageBusy},
+		{"running operation", storage.ErrLifecycleOperationRunning, problem.StorageBusy},
+		{"ownership", storage.ErrRepositoryOwnershipUnavailable, problem.StorageOwnershipUnavailable},
+		{"identity", storage.ErrRepositoryIDMismatch, problem.StorageIdentityMismatch},
+		{"original online", storage.ErrRepositoryOriginalOnline, problem.StorageOriginalOnline},
+		{"offline", storage.ErrRepositoryOffline, problem.RepositoryUnavailable},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := &repositoryCommandManagerStub{
+				repository: &repo.Repository{RepoID: uuid.New(), Name: "Archive", Role: dbtypes.RepoRoleRegular},
+				renameErr:  fmt.Errorf("wrapped: %w", tc.err), removeErr: fmt.Errorf("wrapped: %w", tc.err),
+			}
+			handler := NewRepositoryScanHandler(nil, manager)
+			for _, run := range []struct {
+				name string
+				rec  *httptest.ResponseRecorder
+			}{
+				{"rename", postStorageJSON(t, handler.RenameRepository, "/api/v1/storage/repositories/x/rename", `{"name":"Renamed"}`)},
+				{"detach", postStorageJSON(t, handler.DetachRepository, "/api/v1/storage/repositories/x/detach", `{"confirmation_name":"Archive"}`)},
+			} {
+				var body struct {
+					Type string `json:"type"`
+				}
+				if err := json.Unmarshal(run.rec.Body.Bytes(), &body); err != nil {
+					t.Fatal(err)
+				}
+				if run.rec.Code != tc.want.Status || body.Type != tc.want.Type {
+					t.Fatalf("%s: status %d type %s, want %d %s", run.name, run.rec.Code, body.Type, tc.want.Status, tc.want.Type)
+				}
+			}
+		})
+	}
+}
+
+func TestDetachRepositoryReturnsItsReceiptAndReplaysAfterTheRowIsGone(t *testing.T) {
+	receipt := storage.LifecycleReceipt{OperationID: "op-1", RequestID: "req-1", Kind: "detach_repository", Status: "completed"}
+	manager := &repositoryCommandManagerStub{
+		repository: &repo.Repository{RepoID: uuid.New(), Name: "Archive", Role: dbtypes.RepoRoleRegular},
+		receipt:    receipt,
+	}
+	handler := NewRepositoryScanHandler(nil, manager)
+	recorder := postStorageJSON(t, handler.DetachRepository, "/api/v1/storage/repositories/x/detach", `{"confirmation_name":"Archive"}`)
+	var response dto.DetachRepositoryResponseDTO
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || recorder.Code != http.StatusOK {
+		t.Fatalf("detach = %d %s (%v)", recorder.Code, recorder.Body.String(), err)
+	}
+	if response.Operation.OperationID != "op-1" || response.Operation.Kind != "detach_repository" || !response.FilesPreserved || response.Operation.Replayed {
+		t.Fatalf("detach response = %+v", response)
+	}
+
+	// The row is gone and the journal answers the retry with the same receipt.
+	manager.repository = nil
+	manager.receipt.Replayed = true
+	recorder = postStorageJSON(t, handler.DetachRepository, "/api/v1/storage/repositories/x/detach", `{"confirmation_name":"Archive"}`)
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || recorder.Code != http.StatusOK {
+		t.Fatalf("replayed detach = %d %s (%v)", recorder.Code, recorder.Body.String(), err)
+	}
+	if !response.Operation.Replayed || response.Operation.OperationID != "op-1" {
+		t.Fatalf("replayed detach response = %+v", response)
+	}
+
+	// A wrong confirmation never reaches the command.
+	manager.repository = &repo.Repository{RepoID: uuid.New(), Name: "Archive", Role: dbtypes.RepoRoleRegular}
+	before := len(manager.removed)
+	recorder = postStorageJSON(t, handler.DetachRepository, "/api/v1/storage/repositories/x/detach", `{"confirmation_name":"Other"}`)
+	if recorder.Code != http.StatusBadRequest || len(manager.removed) != before {
+		t.Fatalf("wrong confirmation = %d, removed %d -> %d", recorder.Code, before, len(manager.removed))
 	}
 }

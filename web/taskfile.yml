@@ -102,6 +102,13 @@ tasks:
       - task: e2e:seed
       - vp run e2e:test --grep @smoke --workers=1
 
+  test:release-smoke:
+    desc: Run the published-artifact smoke journey against LUMILIO_E2E_BASE_URL (a fresh release-bundle install, no seed)
+    env:
+      CI: "1"
+    cmds:
+      - vp run e2e:test --grep @release-smoke --workers=1
+
   test:auth-hardening:
     desc: Run the authentication hardening regression
     env:

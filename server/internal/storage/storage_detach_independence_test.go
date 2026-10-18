@@ -48,7 +48,7 @@ func TestRemoveOfflineRepositoryClearsCatalogWithoutDiskPrerequisite(t *testing.
 	if offline.Reachability != dbtypes.RepositoryReachabilityOffline {
 		t.Fatalf("reachability = %q, want offline", offline.Reachability)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "offline-detach", Actor: "test",
 	}); err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestRemoveOfflineRepositoryClearsStaleActivity(t *testing.T) {
 	`, now, created.Repository.RepoID); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := manager.queries.GetRepository(ctx, created.Repository.RepoID); !errors.Is(err, sql.ErrNoRows) {
@@ -127,7 +127,7 @@ func TestRemoveRepositoryIgnoresParentStorageLocationFailure(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
+			if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
 				RequestID: "detach-parent-fault-" + failure, Actor: "test",
 			}); err != nil {
 				t.Fatalf("detach denied by parent %s: %v", failure, err)

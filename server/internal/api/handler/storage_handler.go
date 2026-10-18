@@ -152,6 +152,12 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 			},
 			Activity: string(repository.Activity),
 		}
+		policy, policyErr := h.repoManager.RepositoryActionPolicyFor(ctx, *repository)
+		if policyErr != nil {
+			api.WriteProblem(c, api.Internal(fmt.Errorf("derive repository actions: %w", policyErr)))
+			return
+		}
+		view.Actions, view.UnavailableActions = repositoryActionDTOs(policy)
 		if groupID, ok := repoGroupIDs[index]; ok {
 			view.CapacityGroupID = &groupID
 		}
@@ -247,4 +253,23 @@ func buildStorageCapacityGroups(repositories []*repo.Repository) ([]dto.StorageC
 		}
 	}
 	return capacityGroups, repoGroupIDs, repoStorage
+}
+
+// repositoryActionDTOs splits the role-aware policy into the admitted action
+// codes and the explained withheld ones. Both lists are always present so the
+// Web never confuses "no actions" with "actions unknown".
+func repositoryActionDTOs(policy storage.RepositoryActionPolicy) ([]string, []dto.RepositoryActionBlockDTO) {
+	actions := make([]string, 0, len(policy.Verdicts))
+	blocked := make([]dto.RepositoryActionBlockDTO, 0)
+	for _, verdict := range policy.Verdicts {
+		if verdict.Allowed() {
+			actions = append(actions, string(verdict.Action))
+			continue
+		}
+		blocked = append(blocked, dto.RepositoryActionBlockDTO{
+			Action: string(verdict.Action), Blockers: storage.BlockerCodes(verdict.Blockers),
+			Alternatives: storage.AlternativeCodes(verdict.Alternatives),
+		})
+	}
+	return actions, blocked
 }

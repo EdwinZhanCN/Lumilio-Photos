@@ -179,4 +179,83 @@ describe("storage consent Problems", () => {
       expect(chinese, type).not.toBe(english);
     }
   });
+  it("localizes a withheld Repository action by its first blocker and keeps the codes bounded", async () => {
+    const value = normalizeProblem({
+      type: "https://lumilio.org/problems/storage/action-unavailable",
+      status: 409,
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      action: "rename",
+      blockers: ["primary_protected"],
+      alternatives: ["default_configuration"],
+      detail: "INJECTED /Volumes/secret/path",
+    });
+    expect(value).toMatchObject({
+      kind: "problem",
+      action: "rename",
+      blockers: ["primary_protected"],
+      alternatives: ["default_configuration"],
+    });
+    expect(localizeProblem(value, await translator("en"), "Rename failed.")).toBe(
+      "The Primary Repository follows the Default Storage Location. Change it through the storage configuration instead.",
+    );
+    expect(localizeProblem(value, await translator("zh"), "重命名失败。")).toBe(
+      "主资源库跟随默认存储位置。请改为通过存储配置进行更改。",
+    );
+
+    const unknownBlocker = normalizeProblem({
+      type: "https://lumilio.org/problems/storage/action-unavailable",
+      status: 409,
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      action: "detach",
+      blockers: ["<script>"],
+    });
+    expect(localizeProblem(unknownBlocker, await translator("en"), "Detach failed.")).toBe(
+      "This action is not available for the Repository right now.",
+    );
+
+    const oversized = normalizeProblem({
+      type: "https://lumilio.org/problems/storage/action-unavailable",
+      status: 409,
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      action: "x".repeat(65),
+      blockers: Array.from({ length: 17 }, () => "repository_busy"),
+    });
+    expect(oversized).toMatchObject({ kind: "problem" });
+    expect((oversized as { action?: string }).action).toBeUndefined();
+    expect((oversized as { blockers?: string[] }).blockers).toBeUndefined();
+  });
+
+  it("localizes the typed Repository command refusals in both languages", async () => {
+    const cases: Array<[string, string, string]> = [
+      [
+        "https://lumilio.org/problems/storage/busy",
+        "Another storage command is still working on this Repository. Wait for it to finish, then try again.",
+        "另一项存储命令仍在处理此资源库。请等待其完成后重试。",
+      ],
+      [
+        "https://lumilio.org/problems/storage/ownership-unavailable",
+        "Another Lumilio process owns this Repository folder. Stop it, then try again.",
+        "另一个 Lumilio 进程占用着此资源库文件夹。请先停止它，然后重试。",
+      ],
+      [
+        "https://lumilio.org/problems/storage/identity-mismatch",
+        "The folder holds a different Repository than the one you chose. Nothing was changed.",
+        "该文件夹中的资源库与你选择的不同。未做任何更改。",
+      ],
+      [
+        "https://lumilio.org/problems/storage/original-online",
+        "This Repository is still available at its registered location, so there is nothing to reconnect.",
+        "该资源库仍在其登记位置可用，无需重新连接。",
+      ],
+    ];
+    for (const [type, en, zh] of cases) {
+      const value = normalizeProblem({
+        type,
+        status: 409,
+        instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      });
+      expect(localizeProblem(value, await translator("en"), "fallback")).toBe(en);
+      expect(localizeProblem(value, await translator("zh"), "回退")).toBe(zh);
+    }
+  });
 });

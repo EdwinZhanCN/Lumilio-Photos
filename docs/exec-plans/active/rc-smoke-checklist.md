@@ -78,9 +78,9 @@ in [rc-release.md](rc-release.md) Phase 4.
 | Share links | spot | `@smoke` create, open logged out, revoke (`share-links.spec.ts`) | exists |
 | Studio | spot | Vitest browser project (`web/src/features/studio/**` worker and export tests); no E2E | gap, non-blocking |
 | Map | spot | none | gap, non-blocking |
-| Language switch | core | **new** `@smoke` spec (S11): switch to 中文, open Storage and Photos, assert registry terms and no raw keys; switch back | S11 |
+| Language switch | core | `@smoke` `language-switch.spec.ts` (S11): switches to 中文 from Settings, keeps it across a reload, opens Storage and Photos, asserts the registry terms 存储位置 and 资源库 from the `zh` bundle and no raw translation key on either page, switches back to English | exists (S11) |
 | Settings / Users | spot | `@auth-hardening` logout, lockout, session boundaries (`auth-session.spec.ts`) | exists |
-| Storage admin | core | `@smoke` add Repository, scan, Storage view counts (`storage-admin.spec.ts`); removable non-default Storage Location create = P2's R1 Web flow spec with `nativeHostAvailable=true` and the injected-target Server integration test (name both here when they land) | P2 + S11 |
+| Storage admin | core | `@smoke` add Repository, scan, Storage view counts (`storage-admin.spec.ts`); removable non-default Storage Location create (P2, #250) = the Web flow spec `StoragePanel.spec.tsx` "Desktop create on a removable external Storage Location reviews, acknowledges, and creates" (Vitest browser project, `task web:test`) and the Server tests `TestAssessCreateTargetReviewsTheActualTargetWithInjectedFacts`, `TestCreateRepositoryBindsAcknowledgementToTheAssessedTarget`, and `TestCreateRepositoryRefusesUnsupportedStorageBeforeAnyConsent` in `server/internal/storage/storage_consent_test.go` plus the handler test `TestCreateRepositoryReturnsTheConsentProblemWithRisksAndToken` (`task server:test`) | exists (P2 + S11) |
 | Scanning (#222) | spot | `scan.spec.ts`; watcher and settle follow-up Server tests in `storage/scan` | exists |
 | Trash / restore (#223) | core | `@smoke` Trash restore with album intact and permanent delete gone from disk (`trash.spec.ts`); offline-refusal and duplicate-resolution Server tests (S10) | exists + S10 |
 | Missing and edits (#223) | spot | `server/app` lifecycle regressions: missing file leaves browse, in-place overwrite keeps album; the S10 XMP/EXIF write test | exists + S10 |
@@ -91,10 +91,12 @@ in [rc-release.md](rc-release.md) Phase 4.
 
 ## Execution phases
 
-- [ ] S11: language-switch spec lands in the `@smoke` slice; P2's
-  removable-Location evidence is named in the table; `release-smoke.yml`
-  exists, is dispatchable with an image reference or digest, and was run
-  once against the `edge` image to prove the workflow itself.
+- [x] S11 (2026-10-18): `language-switch.spec.ts` landed in the `@smoke`
+  slice (and in the `browser_smoke` path filter); P2's removable-Location
+  evidence is named in the table; `release-smoke.yml` exists, takes an
+  image reference or digest on dispatch, and also runs on pull requests
+  that change it (default image `edge`), which is how it was first proven:
+  run link in Results.
 - [ ] Tag time (S13): the promotion head's CI run link and every core row's
   verdict are recorded below; zh coverage reported.
 - [ ] Post-tag (S15): Part C run link and digest recorded; Part B written up
@@ -102,8 +104,20 @@ in [rc-release.md](rc-release.md) Phase 4.
 
 ## Results
 
-(Fill in: promotion-head SHA, CI run link, date; one line per core row:
-verdict, spec or test, notes, PR or tracker link. Part C: digest, run link.)
+(Fill in at tag time: promotion-head SHA, CI run link, date; one line per
+core row: verdict, spec or test, notes, PR or tracker link. Part C: digest,
+run link.)
+
+- 2026-10-18, S11: `release-smoke.yml` proof run against
+  `ghcr.io/edwinzhancn/lumilio-server:edge` (the dev build of 2026-09-27,
+  `c397cf3`) on the S11 pull request (#254):
+  https://github.com/EdwinZhanCN/Lumilio-Photos/actions/runs/39086527258 —
+  fresh install healthy in 23 s, the browser journey (wizard, upload,
+  browse and detail, album with cover, share link, backup, restore) green,
+  the `compatibility-fixture-39086527258` artifact uploaded. The first two
+  attempts found journey assumptions, not install faults: the wizard has no
+  passkey step on plain HTTP, and the upload and scope selects decorate
+  repository names in their option labels; both fixed in the spec.
 
 ## Validation boundaries
 
