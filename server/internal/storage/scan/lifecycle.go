@@ -164,7 +164,14 @@ type TrashRecord struct {
 	Size          int64
 	MtimeNs       int64
 	DeletedAt     time.Time
+	// Held keeps the adopted file out of automatic expiry until the user
+	// decides: a sidecar this catalog never wrote is inherited Trash.
+	Held bool
 }
+
+// TrashHoldInherited marks a trashed entry the Trash rebuild adopted from a
+// sidecar this catalog did not write.
+const TrashHoldInherited = "inherited"
 
 // AdoptTrash records trashed files the catalog does not know, in one
 // transaction. Each binds to the owner's Asset for its content, or to a new
@@ -243,12 +250,17 @@ func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner 
 			if err != nil {
 				return err
 			}
+			var hold *string
+			if record.Held {
+				held := TrashHoldInherited
+				hold = &held
+			}
 			if err := queries.InsertTrashedRepositoryEntry(ctx, repo.InsertTrashedRepositoryEntryParams{
 				EntryID: uuid.New(), RepositoryID: repositoryID, Path: record.OriginalPath, PathKey: key,
 				ParentKey: parentKey, Size: record.Size, MtimeNs: record.MtimeNs,
 				ContentID: uuid.NullUUID{UUID: content.ContentID, Valid: true},
 				AssetID:   uuid.NullUUID{UUID: assetID, Valid: true},
-				TrashID:   uuid.NullUUID{UUID: record.TrashID, Valid: true}, TrashedAt: stamp, UpdatedAt: stamp,
+				TrashID:   uuid.NullUUID{UUID: record.TrashID, Valid: true}, TrashedAt: stamp, TrashHold: hold, UpdatedAt: stamp,
 			}); err != nil {
 				return fmt.Errorf("record trashed file %s: %w", record.OriginalPath, err)
 			}

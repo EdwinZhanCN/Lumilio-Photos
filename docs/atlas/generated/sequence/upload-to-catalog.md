@@ -75,7 +75,7 @@ sequenceDiagram
 | 10 | web → api | follow receipts (SSE, falls back to polling) | `ts:waitForUploadOperations` [`web/src/lib/upload/uploadLifecycle.ts:144`](../../../../web/src/lib/upload/uploadLifecycle.ts#L144) |
 | 11 | scheduler → catalog | read pending ingest receipts | `go:queue.Scheduler.ScheduleOnce` [`server/internal/queue/scheduler.go:70`](../../../../server/internal/queue/scheduler.go#L70) |
 | 12 | scheduler → river | insert IngestAssetArgs{CommitID, ReceiptID} | `go:jobs.IngestAssetArgs` [`server/internal/queue/jobs/macro.go:17`](../../../../server/internal/queue/jobs/macro.go#L17) |
-| 13 | river → materializer | run under the execution governor | `go:server/app.pipelineRuntime.ingest` [`server/app/pipeline_runtime.go:226`](../../../../server/app/pipeline_runtime.go#L226) |
+| 13 | river → materializer | run under the execution governor | `go:server/app.pipelineRuntime.ingest` [`server/app/pipeline_runtime.go:228`](../../../../server/app/pipeline_runtime.go#L228) |
 | 14 | materializer → staging | claim commit, verify bytes, move staging file into inbox/ | `go:sourcing.SourceMaterializer.MaterializeCommit` [`server/internal/sourcing/materializer.go:141`](../../../../server/internal/sourcing/materializer.go#L141) |
 | 15 | materializer → scanner | bind the on-disk file as known content | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:44`](../../../../server/internal/storage/scan/known.go#L44) |
 | 16 | scanner → catalog | repository entry + Asset, request analyze/derivatives/transcode/enrich | `go:service.ApplyAssetActivationTx` [`server/internal/service/asset_activation.go:22`](../../../../server/internal/service/asset_activation.go#L22) |

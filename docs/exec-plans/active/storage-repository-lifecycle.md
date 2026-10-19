@@ -5,10 +5,11 @@ Status: active, created 2026-10-07; principal owner decisions frozen
 assessment core, stat panic fix, guarded atomic marker primitive, and
 swappable lock/identity/watch adapters. P2 merged as PR #250 (session S2,
 2026-10-16). P3a (commands) merged as PR #252 (session S3a, 2026-10-18);
-P3b (native selection and review) lands in this PR (session S3b). P2 delivered (session S2):
-the create contract and shared risk review, closing #242. P3–P8 remain
-outstanding. Each fixing PR lands its regression tests and updates this
-Status and the evidence tables.
+P3b (native selection and review) merged as PR #256 (session S3b,
+2026-10-19). P4 (private preservation and recovery) lands in this PR
+(session S4). P2 delivered (session S2): the create contract and shared
+risk review, closing #242. P5–P8 remain outstanding. Each fixing PR lands
+its regression tests and updates this Status and the evidence tables.
 Child of [release-hardening.md](release-hardening.md); its session order
 (S2–S8, one phase per session, P3 and P6 may split) is the schedule.
 2026-10-13: no physical machine is available for the foreseeable future, so
@@ -128,8 +129,8 @@ designs below.
 | Owned elsewhere / busy                                                      | No conflicting mutation; unrelated healthy trees usable                                                            | Stop owner, wait/inspect operation, retry; cancel only if supported                | R10 designed; P3                                    |
 | Unsupported network/remote filesystem                                       | Refuse create/open/reconnect before acknowledgement                                                                | Choose supported destination, with reason; confirmation cannot enable it           | P1 shared injected network classifier pass; P2 refusal wiring; #245 deferred                   |
 | Cloud-backed resident tree / unavailable placeholder                        | Review risks; deep preflight checks residency                                                                      | Materialize locally and retry; denial has its own classification                   | P1 access distinction/read-only core pass; P2 transport pending                              |
-| Private Trash/Studio/staging/unknown retained                               | Preserve by class; hold inherited Trash; rebuild/reassociate proven matches                                        | Reachable recovery inventory, review/export unresolved records                     | P0 private fixtures; R4 designed; P4                |
-| Interrupted mutation (`recovery_required`)                                  | Recover journal before conflicting mutation                                                                        | Recovery receipt, diagnose/retry                                                   | R4, R5 designed; P3–P4                              |
+| Private Trash/Studio/staging/unknown retained                               | Preserve by class; hold inherited Trash; rebuild/reassociate proven matches                                        | Reachable recovery inventory, review/export unresolved records                     | P4 preservation, holds, reassociation, inventory pass |
+| Interrupted mutation (`recovery_required`)                                  | Recover journal before conflicting mutation                                                                        | Recovery receipt, diagnose/retry                                                   | P3 journals; P4 `storage/recovery-required` and preservation rollback pass |
 | Unregistered native Location selection                                      | Review authorization; create root marker only when genuinely absent or register compatible marker                  | Native task review; stale/expired selection restarts without losing form           | R9, R10 designed; P3, P6                            |
 | Registered external Location                                                | Create/open direct children; reconnect complete identity; detach only with zero children/no pending mutation       | Direct Location reconnect entry, all child markers revalidated atomically          | R2, R9 designed; P6                                 |
 | Default, setup incomplete                                                   | Create/adopt fixed primary; choose fresh default only with no primary, no child registrations, no pending mutation | Desktop config selection/Apply or standalone manifest/restart; preserve old tree   | R3 designed; P5                                     |
@@ -156,7 +157,7 @@ Endpoints named here are proposed unless already present; no P0 API change.
 | `storage/identity-mismatch`, `storage/original-online`         | Matching-tree selection or existing registration/regular copy review; no overwrite/primary copy                     | R2, R10; P3, P6   |
 | `storage/ownership-unavailable`, `storage/busy`                | Owner/operation diagnostics, wait/retry, supported cancellation                                                     | R10; P3           |
 | `storage/materialization-required`                             | Bounded offending-file facts; local residency then retry deep preflight                                             | R6, R7; P1–P2     |
-| `storage/recovery-required`                                    | Setup/storage private-recovery inventory and journal receipt; retry recovery                                        | R4; P4–P5         |
+| `storage/recovery-required`                                    | Setup/storage private-recovery inventory and journal receipt; retry recovery                                        | P4 Problem and Storage inventory; setup entry P5 |
 | `storage/host-action-expired` / native selection cancelled     | New phase-scoped task / return to selection with form retained; cancellation is a normal outcome                    | R9; P3, P6        |
 | Protected primary/default                                      | Default configuration handoff or standalone operator instructions                                                   | R2, R10; P3, P6   |
 | Generic failure                                                | Receipt/diagnostics, refresh, explicit safe retry; do not invent a specific remedy                                  | R10; P3, P7       |
@@ -557,6 +558,104 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   deletes retain ordinary policy; private-recovery Web flow green.
 - Edwin: careful preservation review; revisit metadata/Studio defaults. A
   reinstall of a copied real library is optional.
+
+### P4 delivered (2026-10-19)
+
+- **Preservation by class replaces blanket isolation.** `OpenRepository` and
+  `RegisterRepositoryCopy` no longer move `.lumilio/` into a recovery
+  folder. `planPrivatePreservation` inventories the private tree read-only
+  and classifies every file: the Trash (`trash/info`, `trash/files`), logs,
+  and derivatives (`assets`, `artifacts`) stay in place and are summarized;
+  Studio records (`sidecars/*.lumilio-sidecar`) stay in place and are listed
+  with the Asset they named (a version this build does not read is listed
+  `unreadable`); uncommitted staging is moved under
+  `.lumilio/recovery/<receipt_id>/staging/…` so ordinary staging cleanup can
+  never discard it; anything else, including an earlier build's isolation
+  folders, is listed `unknown` and left untouched. The plan is journaled in
+  the operation's rollback data, the format-1 receipt
+  (`.lumilio/recovery/<receipt_id>.json`, `storage.RecoveryReceipt`) is
+  written before any move, every move is no-replace and idempotent (a file
+  found under both names keeps the destination), and rollback or startup
+  journal recovery puts staging back and removes the receipt.
+  `CreateStructure` no longer truncates existing logs.
+- **Inherited Trash is held.** `repository_entries.trash_hold`
+  (`'inherited'`, baseline amended in place) is set by every file the Trash
+  rebuild adopts from a sidecar this catalog did not write; `Expire` skips
+  held rows, Restore and Delete permanently end the hold, and
+  `trash.Service.AcceptRetention` releases it explicitly for a selection or
+  one Repository in the caller's owner scope (audited
+  `trash_hold_released`). **Default applied:** acceptance restarts the
+  retention clock at the acceptance (`trashed_at` is set to it), because the
+  catalog never saw the original deletion and an inherited file deleted
+  years ago would otherwise expire on the next pass. A rebuild after a
+  second catalog loss re-adopts under a hold, so the hold survives without
+  catalog state.
+- **Studio reassociation on proven content.**
+  `recovery.Service.Reconcile` (new `server/internal/storage/recovery`
+  package) runs after a scan drains and on every Trash maintenance pass. A
+  preserved record waits until a scan finished after the receipt and
+  nothing is left to hash; it is attached only when exactly one Asset in the
+  Repository is bound to a present file with the record's hash and size and
+  no live file at the record's source path carries different content. The
+  record is rewritten under the Asset's name with its `asset_id` and
+  `storage_path` corrected (every other field kept), the receipt records the
+  reassociation, and only then the old name is removed, so a crash at any
+  point is finished by the next pass without a second write. No match,
+  several Assets, a replaced source, or an existing different record is
+  `ambiguous`; the record stays for review or export. Audited
+  `studio_reassociated`.
+- **Reachable inventory.** `GET /storage/repositories/{id}/recovery`
+  (receipts, items with class, disposition, presence, and the actions
+  `export`/`delete`, held Trash counts), `GET …/items/{item}/content`
+  (attachment), `DELETE …/items/{item}` (explicit, audited
+  `recovery_item_deleted`; a reassociated record is live state and refuses),
+  `GET /assets/trash-holds` and `POST /assets/accept-retention` (owner
+  scoped like the other Trash commands; Repository-wide is administrator
+  only). The Storage view carries `trash_held_count` and
+  `recovery_item_count`. `storage/recovery-required` (409) is registered
+  and mapped from `ErrLifecycleRecoveryRequired` on the Repository
+  commands and candidate open. Web: the row's **Recovery inventory**
+  (`RecoveryInventoryModal`: classes, dispositions, export, confirmed
+  delete, held link to the Trash), Inspector and Trash-column counts, and
+  in the Trash view `TrashHoldNotice` with **Keep with normal retention**
+  for the Repository plus the same action for a held selection.
+- **Evidence (R4).** `server/internal/storage`:
+  `TestPlanPrivatePreservationClassifiesByClass`,
+  `TestOpenRepositoryPreservesPrivateStateByClass` (hash inventory of every
+  file before and after the open, staging under the receipt, logs not
+  truncated, replay repeats nothing),
+  `TestPrivatePreservationRollsBackACrashBetweenMoves`,
+  `TestPrivatePreservationRetryFinishesAnInterruptedPlanWithoutRepeatingMoves`
+  (both-names and conflicting-destination cases),
+  `TestLifecycleRecoveryRollsBackAnOpenInterruptedAfterItsFilesystemPhase`
+  (journal recovery restores the tree), `TestCreateStructureKeepsExistingLogs`;
+  the copy registration test asserts the `register_copy` receipt.
+  `server/internal/storage/trash`:
+  `TestInheritedTrashIsHeldPastRetentionUntilTheUserDecides` (held past
+  retention, this catalog's own Delete expires, hold survives rebuild and a
+  second catalog loss, Restore ends it),
+  `TestAcceptRetentionReleasesTheHoldFromTheAcceptance` (injected clock).
+  `server/internal/storage/recovery`:
+  `TestReconcileRecoversInheritedTrashAndProvenStudioRecords` (waits for
+  proven content, reassociates the proven record, leaves orphan, replaced,
+  and newer records for review, inventory actions, export, explicit and
+  idempotent delete), `TestReconcileFinishesAnInterruptedReassociation`
+  (crash between the receipt and the removal),
+  `TestRecoveryRefusesAnUnreachableRepository`. Handler tests for the
+  projection (no internal paths on the wire), refusal mapping, and the
+  owner-scope rules of the hold endpoints. `server/app`:
+  `TestPrivateStateOfAnOpenedRepositoryIsRecoverable` opens the P0
+  leftover-primary tree through `/storage/candidates/open` and proves, over
+  HTTP, the held Trash, the reassociated Studio record served by
+  `/assets/{id}/sidecar`, export, delete, acceptance, and Restore. Web:
+  `StoragePanel.spec.tsx` (recovery inventory exports and deletes
+  explicitly), `TrashHoldNotice.test.tsx`, `problem.test.ts`.
+- **Deviations.** The private-recovery Web flow is the Storage page's
+  inventory modal and the Trash notice; the setup-time inventory (catalog
+  absent, adopt) is P5. Studio reassociation rewrites `asset_id` and
+  `storage_path` in the record rather than keeping the old name; ambiguous
+  records are exported as files, not opened in Studio. Item records are
+  capped at 2000 per receipt (the rest is preserved and counted).
 
 ### P5 — Setup and startup recovery
 

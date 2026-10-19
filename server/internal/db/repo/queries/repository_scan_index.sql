@@ -329,12 +329,12 @@ WHERE entry_id = sqlc.arg(entry_id)
 INSERT INTO repository_entries (
     entry_id, repository_id, path, path_key, parent_key, kind,
     size, mtime_ns, stat_checked_ns, state, content_id, asset_id,
-    trash_id, trashed_at, revision, updated_at
+    trash_id, trashed_at, trash_hold, revision, updated_at
 ) VALUES (
     sqlc.arg(entry_id), sqlc.arg(repository_id), sqlc.arg(path), sqlc.arg(path_key),
     sqlc.arg(parent_key), 'file', sqlc.arg(size), sqlc.arg(mtime_ns), sqlc.arg(mtime_ns),
     'trashed', sqlc.arg(content_id), sqlc.arg(asset_id),
-    sqlc.arg(trash_id), sqlc.arg(trashed_at), 1, sqlc.arg(updated_at)
+    sqlc.arg(trash_id), sqlc.arg(trashed_at), sqlc.narg(trash_hold), 1, sqlc.arg(updated_at)
 );
 
 -- name: RestoreRepositoryEntry :execrows
@@ -352,6 +352,7 @@ SET state = 'present',
     stat_checked_ns = sqlc.arg(stat_checked_ns),
     trash_id = NULL,
     trashed_at = NULL,
+    trash_hold = NULL,
     revision = revision + 1,
     updated_at = sqlc.arg(updated_at)
 WHERE entry_id = sqlc.arg(entry_id)
@@ -378,13 +379,72 @@ WHERE asset_id IN (sqlc.slice('asset_ids'))
 ORDER BY asset_id, repository_id, path;
 
 -- name: ListExpiredTrashedRepositoryEntries :many
--- Trashed files of one repository past their retention, oldest first.
+-- Trashed files of one repository past their retention, oldest first. A
+-- held file (inherited Trash) is never expired automatically.
 SELECT * FROM repository_entries
 WHERE repository_id = sqlc.arg(repository_id)
   AND state = 'trashed'
+  AND trash_hold IS NULL
   AND trashed_at < sqlc.arg(cutoff)
 ORDER BY trashed_at, entry_id
 LIMIT sqlc.arg(row_limit);
+
+-- name: ListHeldTrashedAssetIDs :many
+-- Assets with at least one held trashed file, optionally in one repository
+-- and one owner scope, for the Trash view's held notice.
+SELECT DISTINCT e.asset_id FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.state = 'trashed'
+  AND e.trash_hold IS NOT NULL
+  AND (sqlc.narg(repository_id) IS NULL OR e.repository_id = sqlc.narg(repository_id))
+  AND (sqlc.narg(owner_id) IS NULL OR a.owner_id = sqlc.narg(owner_id))
+ORDER BY e.asset_id;
+
+-- name: ListHeldTrashedRepositoryEntriesForAssets :many
+-- The held trashed files of the selected Assets, for retention acceptance.
+SELECT * FROM repository_entries
+WHERE asset_id IN (sqlc.slice('asset_ids'))
+  AND state = 'trashed'
+  AND trash_hold IS NOT NULL
+ORDER BY asset_id, repository_id, path;
+
+-- name: ReleaseTrashHoldForEntry :execrows
+-- The user accepted ordinary retention for a held file: the hold is lifted
+-- and the retention clock starts at the acceptance, not at the original
+-- deletion the catalog never saw.
+UPDATE repository_entries
+SET trash_hold = NULL,
+    trashed_at = sqlc.arg(trashed_at),
+    revision = revision + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE entry_id = sqlc.arg(entry_id)
+  AND state = 'trashed'
+  AND trash_hold IS NOT NULL;
+
+-- name: ReleaseTrashHoldForRepository :execrows
+UPDATE repository_entries
+SET trash_hold = NULL,
+    trashed_at = sqlc.arg(trashed_at),
+    revision = revision + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE repository_id = sqlc.arg(repository_id)
+  AND state = 'trashed'
+  AND trash_hold IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM assets a
+    WHERE a.asset_id = repository_entries.asset_id
+      AND (sqlc.narg(owner_id) IS NULL OR a.owner_id = sqlc.narg(owner_id))
+  );
+
+-- name: ListPresentRepositoryEntriesByContent :many
+-- Present files of one repository whose bound content has exactly this
+-- hash and size: the proof a Studio sidecar needs before it is reassociated.
+SELECT e.* FROM repository_entries e JOIN content_objects c ON c.content_id = e.content_id
+WHERE e.repository_id = sqlc.arg(repository_id)
+  AND e.state = 'present'
+  AND c.hash_algorithm = sqlc.arg(hash_algorithm)
+  AND c.full_hash = sqlc.arg(full_hash)
+  AND c.file_size = sqlc.arg(file_size)
+ORDER BY e.path;
 
 -- name: ListMissingRepositoryEntriesForAssets :many
 SELECT * FROM repository_entries
@@ -408,7 +468,9 @@ WHERE trash_id = sqlc.arg(trash_id);
 -- name: CountRepositoryLifecycle :one
 SELECT COUNT(DISTINCT CASE WHEN a.lifecycle_state = 'missing' AND e.state = 'missing' THEN e.asset_id END) AS missing_count,
        COUNT(CASE WHEN e.state = 'trashed' THEN 1 END) AS trash_count,
-       CAST(COALESCE(SUM(CASE WHEN e.state = 'trashed' THEN e.size ELSE 0 END), 0) AS INTEGER) AS trash_bytes
+       CAST(COALESCE(SUM(CASE WHEN e.state = 'trashed' THEN e.size ELSE 0 END), 0) AS INTEGER) AS trash_bytes,
+       COUNT(CASE WHEN e.state = 'trashed' AND e.trash_hold IS NOT NULL THEN 1 END) AS trash_held_count,
+       CAST(COALESCE(SUM(CASE WHEN e.state = 'trashed' AND e.trash_hold IS NOT NULL THEN e.size ELSE 0 END), 0) AS INTEGER) AS trash_held_bytes
 FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
 WHERE e.repository_id = sqlc.arg(repository_id);
 

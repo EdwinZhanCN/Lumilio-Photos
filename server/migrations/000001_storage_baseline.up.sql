@@ -1105,6 +1105,12 @@ CREATE TABLE repository_entries (
     -- original location that Restore returns it to.
     trash_id TEXT CHECK (trash_id IS NULL OR (trash_id = lower(trash_id) AND length(trash_id) = 36)),
     trashed_at INTEGER,
+    -- A held trashed file never enters automatic expiry. 'inherited' marks a
+    -- file the Trash rebuild adopted from a sidecar this catalog did not
+    -- write (a Repository opened, copied, or adopted into a new catalog, or a
+    -- catalog restored from before the Delete); it is cleared by Restore,
+    -- Delete permanently, or the user's explicit acceptance of retention.
+    trash_hold TEXT CHECK (trash_hold IS NULL OR trash_hold = 'inherited'),
     updated_at INTEGER NOT NULL,
     CHECK (kind = 'file' OR (content_id IS NULL AND asset_id IS NULL)),
     CHECK (kind = 'file' OR state IN ('present', 'missing')),
@@ -1112,7 +1118,8 @@ CREATE TABLE repository_entries (
     CHECK (kind = 'directory' OR state NOT IN ('present', 'trashed') OR asset_id IS NOT NULL),
     CHECK ((state = 'missing') = (missing_since IS NOT NULL)),
     CHECK ((state = 'trashed') = (trash_id IS NOT NULL)),
-    CHECK ((trash_id IS NULL) = (trashed_at IS NULL))
+    CHECK ((trash_id IS NULL) = (trashed_at IS NULL)),
+    CHECK (trash_hold IS NULL OR state = 'trashed')
 ) STRICT;
 
 CREATE TABLE repository_scans (

@@ -946,6 +946,7 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblemReference",
                         "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblemReference",
                         "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblemReference",
+                        "https://lumilio.org/problems/storage/recovery-required": "#/components/schemas/api.StorageRecoveryRequiredProblemReference",
                         "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblemReference",
                         "https://lumilio.org/problems/upload/processing-failed": "#/components/schemas/api.UploadProcessingFailedProblemReference"
                     },
@@ -1061,6 +1062,9 @@ const docTemplate = `{
                         "$ref": "#/components/schemas/api.StoragePermissionDeniedProblemReference"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageRecoveryRequiredProblemReference"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageUnsupportedFilesystemProblemReference"
                     },
                     {
@@ -1108,6 +1112,7 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblem",
                         "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblem",
                         "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblem",
+                        "https://lumilio.org/problems/storage/recovery-required": "#/components/schemas/api.StorageRecoveryRequiredProblem",
                         "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblem",
                         "https://lumilio.org/problems/upload/processing-failed": "#/components/schemas/api.UploadProcessingFailedProblem"
                     },
@@ -1224,6 +1229,9 @@ const docTemplate = `{
                     },
                     {
                         "$ref": "#/components/schemas/api.StoragePermissionDeniedProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageRecoveryRequiredProblem"
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageUnsupportedFilesystemProblem"
@@ -2343,6 +2351,54 @@ const docTemplate = `{
                     },
                     "type": {
                         "const": "https://lumilio.org/problems/storage/permission-denied",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageRecoveryRequiredProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/recovery-required",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageRecoveryRequiredProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/recovery-required",
                         "format": "uri",
                         "type": "string"
                     }
@@ -4030,6 +4086,15 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetRetentionAcceptedDTO": {
+                "properties": {
+                    "entries": {
+                        "example": 3,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetSelectionDTO": {
                 "properties": {
                     "asset_ids": {
@@ -4106,6 +4171,22 @@ const docTemplate = `{
                     },
                     "thumbnail_id": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetTrashHoldsDTO": {
+                "properties": {
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "count": {
+                        "example": 3,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -8968,6 +9049,178 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.RepositoryRecoveryDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryRecoveryItemDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "receipts": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryRecoveryReceiptDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "trash": {
+                        "$ref": "#/components/schemas/dto.RepositoryRecoveryTrashDTO"
+                    },
+                    "unreadable_receipts": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryRecoveryItemDTO": {
+                "properties": {
+                    "actions": {
+                        "description": "Actions are the explicit decisions available for this item.",
+                        "items": {
+                            "enum": [
+                                "export",
+                                "delete"
+                            ],
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "class": {
+                        "enum": [
+                            "trash",
+                            "studio",
+                            "staging",
+                            "logs",
+                            "derived",
+                            "unknown"
+                        ],
+                        "example": "staging",
+                        "type": "string"
+                    },
+                    "detail": {
+                        "example": "no present file in the Repository has the record's content",
+                        "type": "string"
+                    },
+                    "disposition": {
+                        "description": "Disposition is what became of the item: preserved or moved bytes await\na decision; reassociated is a Studio record attached to its proven\nAsset; ambiguous and unreadable records stay for review or export;\ndeleted was removed explicitly.",
+                        "enum": [
+                            "preserved",
+                            "moved",
+                            "reassociated",
+                            "ambiguous",
+                            "unreadable",
+                            "deleted"
+                        ],
+                        "example": "moved",
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "path": {
+                        "example": ".lumilio/staging/incoming/upload.part",
+                        "type": "string"
+                    },
+                    "present": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "receipt_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "resolved_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "resolved_at": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "example": 1048576,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryRecoveryReceiptDTO": {
+                "properties": {
+                    "actor": {
+                        "example": "web:user:1",
+                        "type": "string"
+                    },
+                    "derived_files": {
+                        "example": 12,
+                        "type": "integer"
+                    },
+                    "event": {
+                        "enum": [
+                            "open",
+                            "register_copy",
+                            "adopt"
+                        ],
+                        "example": "open",
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "items_truncated": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "log_files": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "recorded_at": {
+                        "type": "string"
+                    },
+                    "source_repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "trash_bytes": {
+                        "example": 4096,
+                        "type": "integer"
+                    },
+                    "trash_files": {
+                        "example": 2,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryRecoveryTrashDTO": {
+                "properties": {
+                    "held_bytes": {
+                        "example": 6291456,
+                        "type": "integer"
+                    },
+                    "held_count": {
+                        "example": 3,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RepositoryRemovalImpactDTO": {
                 "properties": {
                     "active_task_count": {
@@ -10389,6 +10642,9 @@ const docTemplate = `{
                         "example": "active",
                         "type": "string"
                     },
+                    "recovery_item_count": {
+                        "type": "integer"
+                    },
                     "role": {
                         "enum": [
                             "primary",
@@ -10405,6 +10661,10 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "trash_count": {
+                        "type": "integer"
+                    },
+                    "trash_held_count": {
+                        "description": "TrashHeldCount is how many trashed files are inherited and held out of\nautomatic expiry; RecoveryItemCount is how many preserved private files\nstill await a decision in the Repository's recovery inventory.",
                         "type": "integer"
                     },
                     "unavailable_actions": {
@@ -14639,6 +14899,97 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/accept-retention": {
+            "post": {
+                "description": "Lift the hold on the selected Assets' trashed files, or on every held file of one Repository in the caller's scope. The files then follow the configured retention counted from this acceptance; nothing is deleted now. Requires explicit confirmation.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AssetPurgeRequestDTO",
+                                        "description": "Selection or Repository, confirmed",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Selection or Repository, confirmed",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetRetentionAcceptedDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Accept retention for held trashed Assets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/batch": {
             "post": {
                 "description": "Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.",
@@ -16748,6 +17099,67 @@ const docTemplate = `{
                     }
                 },
                 "summary": "TrashAssets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/trash-holds": {
+            "get": {
+                "description": "List the Assets whose trashed files are held out of automatic expiry because the Trash inherited them from a Repository opened, copied, or restored into this catalog. Scoped to the caller's own Assets unless the caller is an administrator.",
+                "parameters": [
+                    {
+                        "description": "Limit to one Repository",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AssetTrashHoldsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "List held trashed Assets",
                 "tags": [
                     "assets"
                 ]
@@ -26984,7 +27396,7 @@ const docTemplate = `{
         },
         "/api/v1/storage/candidates/open": {
             "post": {
-                "description": "Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.",
+                "description": "Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is preserved by class under a recovery receipt (Trash held, Studio records reassociated on proven content, staging kept for export) before an authoritative initial scan.",
                 "parameters": [
                     {
                         "description": "Stable request identifier",
@@ -27741,6 +28153,295 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Preview repository detach impact",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/recovery": {
+            "get": {
+                "description": "Return the recovery receipts of a Repository, every preserved private file that awaits or had a decision, and the inherited Trash still held out of automatic expiry. Paths are relative to the Repository's private workspace.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryRecoveryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "503": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get repository recovery inventory",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/recovery/items/{item}": {
+            "delete": {
+                "description": "Remove one preserved private file from disk and record the decision in the Repository's recovery receipt. Reassociated Studio records are live state and cannot be deleted here.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Recovery item UUID",
+                        "in": "path",
+                        "name": "item",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryRecoveryItemDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "The item is not deletable from the inventory"
+                    },
+                    "503": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a recovery item",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/recovery/items/{item}/content": {
+            "get": {
+                "description": "Download the bytes of one preserved private file (uncommitted staging, an unknown file, or an unproven Studio record) as an attachment. The item is unchanged.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Recovery item UUID",
+                        "in": "path",
+                        "name": "item",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "503": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Export a recovery item",
                 "tags": [
                     "storage"
                 ]

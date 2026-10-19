@@ -44,6 +44,7 @@ import (
 	"server/internal/storage"
 	"server/internal/storage/locations"
 	"server/internal/storage/pathsemantics"
+	"server/internal/storage/recovery"
 	"server/internal/storage/scan"
 	"server/internal/storage/trash"
 	"server/internal/utils/imaging"
@@ -645,7 +646,14 @@ func run(
 	if err := assetTrash.Recover(ctx); err != nil {
 		appLogger.Warn("interrupted trash operations wait for their repositories", zap.Error(err))
 	}
-	go runTrashMaintenanceLoop(ctx, assetTrash,
+	// Private recovery adopts the inherited Trash (held) and reassociates
+	// proven Studio records after a Repository is opened, copied, or adopted;
+	// it runs with every Trash maintenance pass and after a scan completes.
+	privateRecovery, err := recovery.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, repositoryScanner, assetTrash, appLogger.Named("recovery"))
+	if err != nil {
+		return fmt.Errorf("initialize private recovery: %w", err)
+	}
+	go runTrashMaintenanceLoop(ctx, assetTrash, privateRecovery,
 		time.Duration(appConfig.RepositoryTrash.RetentionDays)*24*time.Hour, appLogger.Named("trash"))
 	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {
 		return err
@@ -692,6 +700,7 @@ func run(
 		pipelineReader: database.ReaderSQL,
 		engine:         executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
 		scanner:         repositoryScanner,
+		recovery:        privateRecovery,
 		eventProjection: eventService, locationProjection: locationService,
 		ocrProjection: ocrIndexWriter, reindexProjection: indexingService,
 		enrichmentReader: database.ReaderQueries, settings: settingsService,
@@ -827,6 +836,7 @@ func run(
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
 	repositoryScanController.SetBootstrapService(bootstrapService)
 	storageController := handler.NewStorageHandler(repoManager, database.ReaderQueries, repositoryScanner)
+	storageController.SetRecovery(privateRecovery)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)

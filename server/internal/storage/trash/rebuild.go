@@ -40,9 +40,10 @@ func (s *Service) RebuildAll(ctx context.Context) (int, error) {
 // Rebuild records every trashed file of a repository that the catalog does
 // not know, from the info sidecars in its trash. The trash is
 // self-describing, so a catalog rebuilt from disk, or a repository opened into
-// a new catalog, lists the same Trash. A sidecar in a format this build does
-// not read is reported and left alone; a sidecar whose file is gone is
-// ignored.
+// a new catalog, lists the same Trash. Every adopted file is held: it never
+// expires automatically until the user acts on it (AcceptRetention, Restore,
+// or DeletePermanently). A sidecar in a format this build does not read is
+// reported and left alone; a sidecar whose file is gone is ignored.
 func (s *Service) Rebuild(ctx context.Context, repositoryID uuid.UUID) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,9 +111,15 @@ func (s *Service) Rebuild(ctx context.Context, repositoryID uuid.UUID) (int, err
 		if exists, err := files.Exists(trashed); err != nil || !exists {
 			continue
 		}
+		// A sidecar the catalog does not know was written by a Delete this
+		// catalog never saw: a Repository opened or copied into a new catalog,
+		// or a catalog restored from before the Delete. The adopted file is
+		// held out of automatic expiry until the user restores it, deletes it
+		// permanently, or accepts ordinary retention.
 		records = append(records, scan.TrashRecord{
 			TrashID: trashID, OriginalPath: sidecar.OriginalPath, HashAlgorithm: sidecar.HashAlgorithm,
 			ContentHash: sidecar.ContentHash, Size: sidecar.Size, MtimeNs: sidecar.MtimeNs, DeletedAt: sidecar.DeletedAt,
+			Held: true,
 		})
 		if len(records) == purgeBatch {
 			if err := flush(); err != nil {

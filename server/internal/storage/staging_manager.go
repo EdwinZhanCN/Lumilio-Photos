@@ -404,6 +404,16 @@ func portableBase(filename string) (string, error) {
 	return base, nil
 }
 
+// MovePrivateFile moves one file inside the private tree without replacing
+// an existing destination. The recovery service uses it to give a Studio
+// record its reassociated Asset name.
+func (r *RepositoryFS) MovePrivateFile(source, destination RepositoryPath) error {
+	if !source.isPrivate() || !destination.isPrivate() {
+		return ErrRepositoryPathNamespace
+	}
+	return r.movePrivateNoReplace(source, destination)
+}
+
 func (r *RepositoryFS) movePrivateNoReplace(source, destination RepositoryPath) error {
 	if !source.isPrivate() || (!destination.isPrivate() && !destination.isUserMedia()) {
 		return ErrRepositoryPathNamespace

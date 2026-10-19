@@ -4,6 +4,7 @@ import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
 import { t } from "@test/i18n";
 import { formatBytes } from "@/lib/utils/formatters";
+import type { components } from "@/lib/http-commons/schema";
 import type { StorageViewResponse } from "../../api/useStorageView";
 import StoragePanel from "../../routes/StoragePanel";
 import "@/styles/App.css";
@@ -94,6 +95,8 @@ const storageViewFixture = {
       role: "regular",
       storage_location_id: "loc-primary",
       capacity_group_id: "cg-photos",
+      trash_held_count: 2,
+      recovery_item_count: 3,
       mount_path: "/Volumes/Photos",
       filesystem: "apfs",
       reachability: "active",
@@ -883,4 +886,189 @@ test("a withheld native reconnect shows the policy blocker, not a generic failur
       }),
     )
     .toBeVisible();
+});
+
+type RecoveryResponse = components["schemas"]["dto.RepositoryRecoveryDTO"];
+type RecoveryItem = components["schemas"]["dto.RepositoryRecoveryItemDTO"];
+
+const stagingItem = {
+  id: "11111111-1111-4111-8111-111111111111",
+  receipt_id: "22222222-2222-4222-8222-222222222222",
+  class: "staging",
+  path: ".lumilio/staging/incoming/abandoned.part",
+  size: 27,
+  disposition: "moved",
+  present: true,
+  actions: ["export", "delete"],
+} satisfies RecoveryItem;
+
+const studioItem = {
+  id: "33333333-3333-4333-8333-333333333333",
+  receipt_id: "22222222-2222-4222-8222-222222222222",
+  class: "studio",
+  path: ".lumilio/sidecars/old.lumilio-sidecar",
+  size: 310,
+  disposition: "reassociated",
+  present: true,
+  actions: [],
+  resolved_asset_id: "44444444-4444-4444-8444-444444444444",
+} satisfies RecoveryItem;
+
+function recoveryFixture(deleted: string[]): RecoveryResponse {
+  return {
+    repository_id: "repo-family",
+    receipts: [
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        event: "open",
+        recorded_at: "2026-10-18T10:00:00Z",
+        actor: "web:user:1",
+        trash_files: 2,
+        trash_bytes: 4096,
+        log_files: 2,
+        derived_files: 0,
+      },
+    ],
+    items: [
+      deleted.includes(stagingItem.id)
+        ? { ...stagingItem, disposition: "deleted", present: false, actions: [] }
+        : stagingItem,
+      studioItem,
+    ],
+    trash: { held_count: 2, held_bytes: 4096 },
+    unreadable_receipts: [],
+  };
+}
+
+// P4 / R4 Web flow: the recovery inventory is reachable from the row, names
+// each preserved file with its class and what became of it, exports one
+// without changing it, and deletes one only after an explicit confirmation
+// that the inventory then records. A reassociated Studio record offers no
+// destructive action.
+test("the recovery inventory exports and deletes preserved files explicitly", async () => {
+  const deleted: string[] = [];
+  const exported: string[] = [];
+  worker.use(
+    http.get("*/api/v1/storage/repositories/:id/recovery", () =>
+      HttpResponse.json(recoveryFixture(deleted)),
+    ),
+    http.get("*/api/v1/storage/repositories/:id/recovery/items/:item/content", ({ params }) => {
+      exported.push(String(params.item));
+      return new HttpResponse("uncommitted incoming bytes\n", {
+        headers: { "Content-Type": "application/octet-stream" },
+      });
+    }),
+    http.delete("*/api/v1/storage/repositories/:id/recovery/items/:item", ({ params }) => {
+      deleted.push(String(params.item));
+      return HttpResponse.json({
+        ...stagingItem,
+        disposition: "deleted",
+        present: false,
+        actions: [],
+      });
+    }),
+  );
+  const downloads: string[] = [];
+  const captureDownload = (event: MouseEvent) => {
+    if (!(event.target instanceof HTMLAnchorElement) || !event.target.download) return;
+    event.preventDefault();
+    downloads.push(event.target.download);
+  };
+  document.addEventListener("click", captureDownload);
+  try {
+    const screen = await renderPanel();
+    await expect.element(screen.getByText("Family Archive", { exact: true })).toBeVisible();
+    // The Trash column names the held files beside the ordinary count.
+    await expect
+      .element(screen.getByText(t("storagePanel.trashHeld", { count: 2 }), { exact: false }))
+      .toBeVisible();
+
+    await screen
+      .getByRole("button", {
+        name: t("storagePanel.actionsFor", {
+          defaultValue: "Actions for {{name}}",
+          name: "Family Archive",
+        }),
+        exact: true,
+      })
+      .click();
+    await screen
+      .getByRole("menuitem", { name: t("storagePanel.action.recovery"), exact: true })
+      .click();
+
+    await expect
+      .element(screen.getByRole("heading", { name: t("storagePanel.recovery.title"), exact: true }))
+      .toBeVisible();
+    await expect.element(screen.getByText("abandoned.part", { exact: true })).toBeVisible();
+    await expect
+      .element(screen.getByText(t("storagePanel.recovery.disposition.moved"), { exact: false }))
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByText(t("storagePanel.recovery.disposition.reassociated"), { exact: false }),
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("link", {
+          name: t("storagePanel.recovery.heldTrashValue", { count: 2 }),
+          exact: true,
+        }),
+      )
+      .toBeVisible();
+    // The reassociated Studio record is live state: no delete, no export.
+    await expect
+      .element(
+        screen.getByRole("button", {
+          name: t("storagePanel.recovery.deleteItem", { name: "old.lumilio-sidecar" }),
+          exact: true,
+        }),
+      )
+      .not.toBeInTheDocument();
+
+    await screen
+      .getByRole("button", {
+        name: t("storagePanel.recovery.exportItem", { name: "abandoned.part" }),
+        exact: true,
+      })
+      .click();
+    await expect.poll(() => exported).toEqual([stagingItem.id]);
+    await expect.poll(() => downloads).toEqual(["abandoned.part"]);
+    expect(deleted).toEqual([]);
+
+    await screen
+      .getByRole("button", {
+        name: t("storagePanel.recovery.deleteItem", { name: "abandoned.part" }),
+        exact: true,
+      })
+      .click();
+    await expect
+      .element(
+        screen.getByText(t("storagePanel.recovery.deleteWarning", { name: "abandoned.part" })),
+      )
+      .toBeVisible();
+    expect(deleted).toEqual([]);
+    await screen
+      .getByRole("button", { name: t("storagePanel.recovery.confirmDelete"), exact: true })
+      .click();
+    await expect.poll(() => deleted).toEqual([stagingItem.id]);
+    await expect
+      .element(
+        screen.getByText(
+          `${t("storagePanel.recovery.class.staging")} · ${t("storagePanel.recovery.disposition.deleted")}`,
+          { exact: false },
+        ),
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("button", {
+          name: t("storagePanel.recovery.exportItem", { name: "abandoned.part" }),
+          exact: true,
+        }),
+      )
+      .not.toBeInTheDocument();
+  } finally {
+    document.removeEventListener("click", captureDownload);
+  }
 });

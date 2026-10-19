@@ -39,6 +39,8 @@ type AssetControllerInterface interface {
 	DeleteAssetsPermanently(c *gin.Context)
 	RemoveMissingAssets(c *gin.Context)
 	EmptyAssetTrash(c *gin.Context)
+	GetTrashHolds(c *gin.Context)        // GET /assets/trash-holds - Held inherited Trash in the caller's scope
+	AcceptTrashRetention(c *gin.Context) // POST /assets/accept-retention - Release holds so ordinary retention applies
 	DeleteAsset(c *gin.Context)
 	RestoreAsset(c *gin.Context)
 	PrecheckUpload(c *gin.Context)
@@ -234,8 +236,11 @@ type UserControllerInterface interface {
 }
 
 type StorageControllerInterface interface {
-	GetStorageTargets(c *gin.Context) // GET /storage/targets - Authenticated storage selectors
-	GetStorageView(c *gin.Context)    // GET /storage/view - Admin storage read model
+	GetStorageTargets(c *gin.Context)     // GET /storage/targets - Authenticated storage selectors
+	GetStorageView(c *gin.Context)        // GET /storage/view - Admin storage read model
+	GetRepositoryRecovery(c *gin.Context) // GET /storage/repositories/:id/recovery - Private-recovery inventory
+	ExportRecoveryItem(c *gin.Context)    // GET /storage/repositories/:id/recovery/items/:item/content - Export preserved bytes
+	DeleteRecoveryItem(c *gin.Context)    // DELETE /storage/repositories/:id/recovery/items/:item - Explicit removal
 }
 
 type RepositoryScanControllerInterface interface {
@@ -523,6 +528,9 @@ func NewRouter(
 				storageAdmin.GET("/repositories/:id/verifications/:operation_id", appInitializedMiddleware, repositoryScanController.GetRepositoryScan)
 				storageAdmin.POST("/repositories/:id/verifications/:operation_id/cancel", appInitializedMiddleware, repositoryScanController.CancelRepositoryScan)
 				storageAdmin.GET("/repositories/:id/verifications", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
+				storageAdmin.GET("/repositories/:id/recovery", appInitializedMiddleware, storageController.GetRepositoryRecovery)
+				storageAdmin.GET("/repositories/:id/recovery/items/:item/content", appInitializedMiddleware, storageController.ExportRecoveryItem)
+				storageAdmin.DELETE("/repositories/:id/recovery/items/:item", appInitializedMiddleware, storageController.DeleteRecoveryItem)
 				storageAdmin.POST("/locations/:id/detach-impact", appInitializedMiddleware, repositoryScanController.PostLocationDetachImpact)
 				storageAdmin.POST("/locations/:id/detach", appInitializedMiddleware, repositoryScanController.DetachLocation)
 				storageAdmin.GET("/candidates", appInitializedMiddleware, repositoryScanController.ListRepositoryCandidates)
@@ -591,6 +599,8 @@ func NewRouter(
 			assets.POST("/delete-permanently", assetController.DeleteAssetsPermanently)
 			assets.POST("/remove-missing", assetController.RemoveMissingAssets)
 			assets.POST("/empty-trash", assetController.EmptyAssetTrash)
+			assets.GET("/trash-holds", assetController.GetTrashHolds)
+			assets.POST("/accept-retention", assetController.AcceptTrashRetention)
 			assets.GET("/:id/availability", assetController.GetAssetAvailability)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/exif", assetController.GetAssetExif)

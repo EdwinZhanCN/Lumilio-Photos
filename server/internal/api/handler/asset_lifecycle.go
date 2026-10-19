@@ -2,6 +2,8 @@ package handler
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"server/internal/api"
@@ -344,4 +346,64 @@ func restoreDTO(result trash.RestoreResult) dto.AssetLifecycleResultDTO {
 		renamed = append(renamed, dto.AssetRestoredPathDTO{AssetID: file.AssetID.String(), OriginalPath: file.OriginalPath, RestoredPath: file.RestoredPath})
 	}
 	return dto.AssetLifecycleResultDTO{Files: result.Files, Renamed: renamed}
+}
+
+// GetTrashHolds lists the held Assets in the caller's Trash scope.
+// @Summary List held trashed Assets
+// @Description List the Assets whose trashed files are held out of automatic expiry because the Trash inherited them from a Repository opened, copied, or restored into this catalog. Scoped to the caller's own Assets unless the caller is an administrator.
+// @Tags assets
+// @Produce json
+// @Param repository_id query string false "Limit to one Repository"
+// @Success 200 {object} dto.AssetTrashHoldsDTO
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 401 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
+// @Router /api/v1/assets/trash-holds [get]
+func (h *AssetHandler) GetTrashHolds(c *gin.Context) {
+	var repositoryID uuid.NullUUID
+	if raw := strings.TrimSpace(c.Query("repository_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			api.WriteProblem(c, api.BadRequest(err))
+			return
+		}
+		repositoryID = uuid.NullUUID{UUID: id, Valid: true}
+	}
+	held, err := h.assetService.HeldTrashAssetIDs(c.Request.Context(), repositoryID, ownerScopeID(c))
+	if err != nil {
+		writeTrashProblem(c, err)
+		return
+	}
+	ids := make([]string, 0, len(held))
+	for _, id := range held {
+		ids = append(ids, id.String())
+	}
+	api.JSONOK(c, dto.AssetTrashHoldsDTO{AssetIDs: ids, Count: len(ids)})
+}
+
+// AcceptTrashRetention releases the hold on inherited trashed files.
+// @Summary Accept retention for held trashed Assets
+// @Description Lift the hold on the selected Assets' trashed files, or on every held file of one Repository in the caller's scope. The files then follow the configured retention counted from this acceptance; nothing is deleted now. Requires explicit confirmation.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body dto.AssetPurgeRequestDTO true "Selection or Repository, confirmed"
+// @Success 200 {object} dto.AssetRetentionAcceptedDTO
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 401 {object} api.ProblemResponse
+// @Failure 403 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
+// @Router /api/v1/assets/accept-retention [post]
+func (h *AssetHandler) AcceptTrashRetention(c *gin.Context) {
+	request, repositoryID, ok := h.bindPurge(c, false)
+	if !ok {
+		return
+	}
+	result, err := h.assetService.AcceptTrashRetention(c.Request.Context(), request, repositoryID, ownerScopeID(c))
+	if err != nil {
+		writeTrashProblem(c, err)
+		return
+	}
+	api.JSONOK(c, dto.AssetRetentionAcceptedDTO{Entries: result.Entries})
 }

@@ -63,6 +63,10 @@ type AssetService interface {
 	DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
 	RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
 	EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
+	// HeldTrashAssetIDs lists Assets whose trashed files are inherited and
+	// held; AcceptTrashRetention lifts that hold so ordinary retention applies.
+	HeldTrashAssetIDs(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) ([]uuid.UUID, error)
+	AcceptTrashRetention(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.AcceptRetentionResult, error)
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
 	UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error
@@ -773,6 +777,8 @@ type AssetTrash interface {
 	DeletePermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
 	RemoveMissing(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
 	Empty(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
+	HeldAssetIDs(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) ([]uuid.UUID, error)
+	AcceptRetention(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.AcceptRetentionResult, error)
 }
 
 // ErrAssetTrashUnavailable reports a Server built without the repository
@@ -1919,4 +1925,16 @@ func (s *assetService) EmptyAssetTrash(ctx context.Context, request trash.Reques
 		return trash.PurgeResult{}, ErrAssetTrashUnavailable
 	}
 	return s.trash.Empty(ctx, request, repositoryID, ownerID)
+}
+func (s *assetService) HeldTrashAssetIDs(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) ([]uuid.UUID, error) {
+	if s.trash == nil {
+		return nil, ErrAssetTrashUnavailable
+	}
+	return s.trash.HeldAssetIDs(ctx, repositoryID, ownerID)
+}
+func (s *assetService) AcceptTrashRetention(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.AcceptRetentionResult, error) {
+	if s.trash == nil {
+		return trash.AcceptRetentionResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.AcceptRetention(ctx, request, repositoryID, ownerID)
 }

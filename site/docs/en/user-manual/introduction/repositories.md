@@ -62,12 +62,12 @@ The primary repository is the exception: first-run setup creates it in the non-r
 
 ## Opening is only for an existing repository
 
-**Open Existing Repository** registers a Lumilio Repository that already exists on disk. The selected directory must contain a valid `.lumiliorepo`; an empty directory or an ordinary folder of photos is not initialized automatically. Before registration, Lumilio moves old `.lumilio/` private state under `.lumilio/recovery/reopened-…`, creates a fresh private workspace, and queues an authoritative initial observation. Original media and `.lumiliorepo` stay in place.
+**Open Existing Repository** registers a Lumilio Repository that already exists on disk. The selected directory must contain a valid `.lumiliorepo`; an empty directory or an ordinary folder of photos is not initialized automatically. Before registration, Lumilio records what the Repository's `.lumilio/` private workspace already holds in a recovery receipt and preserves it by class: the Trash stays and is listed as held (it never expires on its own until you decide), Studio edits are attached to their photos again once a scan has proven the content, unfinished uploads and unknown files are kept for export or explicit deletion in the Repository's **Recovery inventory** on the Storage page. It then queues an authoritative initial observation. Original media and `.lumiliorepo` stay in place.
 
 If that repository identity is already registered at another path, Desktop asks you to decide explicitly:
 
 - **Use as moved original** when the repository moved to another disk, mount point, or Windows drive letter. Relocation is refused while the registered original is still online.
-- **Add as separate repository** when this directory is an independent copy that needs a new identity. Lumilio isolates copied private state, mints a fresh repository UUID, and requires explicit confirmation.
+- **Add as separate repository** when this directory is an independent copy that needs a new identity. Lumilio preserves the copied private state the same way, mints a fresh repository UUID, and requires explicit confirmation.
 
 Lumilio does not guess whether a directory moved or was copied based on whether its old path is currently online.
 

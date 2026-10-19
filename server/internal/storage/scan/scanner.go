@@ -147,6 +147,12 @@ func New(reader *repo.Queries, writer Writer, files *storage.RepositoryFSFactory
 	return &Scanner{reader: reader, writer: writer, files: files, config: config}, nil
 }
 
+// PathKey maps a repository-relative path to the comparison key the index
+// stores for it, under this scanner's volume semantics. Lookups by path
+// outside the scanner (the recovery service proving a Studio record's
+// source) must key the same way.
+func (s *Scanner) PathKey(relative string) (string, error) { return s.pathKey(relative) }
+
 // pathKey maps a relative path to its comparison key, component by component.
 func (s *Scanner) pathKey(relative string) (string, error) {
 	if relative == "" {

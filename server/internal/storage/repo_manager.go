@@ -96,9 +96,10 @@ type RepositoryManager interface {
 	// resolves with RelocateRepository or RegisterRepositoryCopy.
 	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, storageLocationID ...uuid.UUID) (*repo.Repository, error)
 
-	// OpenRepository is the durable user-facing attach workflow. It isolates
-	// repository-private state left by a previous registration before inserting
-	// the catalog row and scheduling an authoritative initial scan.
+	// OpenRepository is the durable user-facing attach workflow. It preserves
+	// the repository-private state of a previous registration by class under a
+	// recovery receipt before inserting the catalog row and scheduling an
+	// authoritative initial scan.
 	OpenRepository(ctx context.Context, path string, defaultOwnerID *int32, role dbtypes.RepoRole, request LifecycleRequest) (*repo.Repository, error)
 	ListDefaultRepositoryCandidates(ctx context.Context) ([]RepositoryCandidate, error)
 	OpenDefaultRepositoryCandidate(ctx context.Context, directoryName string, defaultOwnerID *int32, request LifecycleRequest) (*repo.Repository, error)

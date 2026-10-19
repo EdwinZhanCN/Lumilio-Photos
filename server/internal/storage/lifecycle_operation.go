@@ -122,11 +122,13 @@ type registerRepositoryCopyOperationPayload struct {
 	RiskConfirmation  bool             `json:"risk_confirmation"`
 }
 
+// registerRepositoryCopyRollbackData is the journaled rollback plan of an
+// open or copy registration: the previous marker identity (copy only) and
+// the private-state preservation the operation applies before its catalog
+// commit, so a crash or failure undoes exactly the moves it made.
 type registerRepositoryCopyRollbackData struct {
-	PreviousRepositoryID string   `json:"previous_repository_id"`
-	RecoveryPath         string   `json:"recovery_path,omitempty"`
-	MovedEntries         []string `json:"moved_entries,omitempty"`
-	PrivateRootExisted   bool     `json:"private_root_existed,omitempty"`
+	PreviousRepositoryID string                  `json:"previous_repository_id,omitempty"`
+	Preservation         privatePreservationPlan `json:"preservation"`
 }
 
 type registerRepositoryCopyOperationResult struct {
@@ -693,7 +695,7 @@ func (rm *DefaultRepositoryManager) recoverOpenRepositoryOperation(ctx context.C
 	if diskConfig.ID != repositoryID.String() {
 		return fmt.Errorf("%w: opened repository path now carries a different identity", ErrLifecycleRecoveryRequired)
 	}
-	if err := rollbackRepositoryPrivateStateIsolation(payload.Path, rollback); err != nil {
+	if err := rollbackPrivateState(payload.Path, rollback.Preservation); err != nil {
 		_ = rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, false, err, rollback)
 		return fmt.Errorf("%w: restore reopened repository private state: %v", ErrLifecycleRecoveryRequired, err)
 	}
@@ -790,7 +792,7 @@ func (rm *DefaultRepositoryManager) recoverRegisterRepositoryCopyOperation(ctx c
 			}
 		}
 	}
-	if err := rollbackRepositoryPrivateStateIsolation(payload.Path, rollback); err != nil {
+	if err := rollbackPrivateState(payload.Path, rollback.Preservation); err != nil {
 		_ = rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, false, err, rollback)
 		return fmt.Errorf("%w: restore copied repository private state: %v", ErrLifecycleRecoveryRequired, err)
 	}

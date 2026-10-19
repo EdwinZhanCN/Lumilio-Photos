@@ -1,6 +1,7 @@
 import { removeMissingLabel, emptyTrashLabel } from "@/lib/assets/lifecycleCopy";
 import type { ReactNode } from "react";
 import {
+  Archive,
   Cloud,
   Copy,
   FolderSearch,
@@ -28,7 +29,8 @@ export type RepositoryCommand =
   | "rename"
   | "remove"
   | "cloudSources"
-  | "locate";
+  | "locate"
+  | "recovery";
 
 type Props = {
   row: RepositoryRow;
@@ -60,7 +62,7 @@ export default function RepositoryRowActions({
     <AnchoredMenu
       label={t("storagePanel.actionsFor", "Actions for {{name}}", { name: row.name })}
       menuWidth={240}
-      menuHeight={380}
+      menuHeight={420}
     >
       {({ close }) => {
         const item = (command: RepositoryCommand, icon: ReactNode, label: string) => (
@@ -120,6 +122,11 @@ export default function RepositoryRowActions({
               "rebuildLocations",
               <MapPin className="size-4" aria-hidden />,
               t("storagePanel.action.rebuild", "Rebuild location"),
+            )}
+            {item(
+              "recovery",
+              <Archive className="size-4" aria-hidden />,
+              t("storagePanel.action.recovery", "Recovery inventory"),
             )}
             {nativeHostAvailable && allows("reconnect")
               ? item(

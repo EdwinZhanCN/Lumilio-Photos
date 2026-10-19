@@ -624,7 +624,7 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 
 // OpenRepositoryCandidate opens one validated direct child of the configured default Storage Location.
 // @Summary Open repository candidate
-// @Description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.
+// @Description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is preserved by class under a recovery receipt (Trash held, Studio records reassociated on proven content, staging kept for export) before an authoritative initial scan.
 // @Tags repositories
 // @Accept json
 // @Produce json
@@ -673,6 +673,9 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
 			return
 		}
+		if writeRepositoryCommandFailure(c, err) {
+			return
+		}
 		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
@@ -698,6 +701,8 @@ func writeRepositoryCommandFailure(c *gin.Context, err error) bool {
 		api.WriteProblem(c, api.KnownProblem(problem.StorageOwnershipUnavailable, err))
 	case errors.Is(err, storage.ErrRepositoryIDMismatch):
 		api.WriteProblem(c, api.KnownProblem(problem.StorageIdentityMismatch, err))
+	case errors.Is(err, storage.ErrLifecycleRecoveryRequired):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageRecoveryRequired, err))
 	case errors.Is(err, storage.ErrRepositoryOriginalOnline):
 		api.WriteProblem(c, api.KnownProblem(problem.StorageOriginalOnline, err))
 	case errors.Is(err, storage.ErrRepositoryOffline):

@@ -43,6 +43,7 @@ const KNOWN_TYPES = {
   "https://lumilio.org/problems/storage/not-a-mounted-volume": true,
   "https://lumilio.org/problems/storage/observation-unknown": true,
   "https://lumilio.org/problems/storage/original-online": true,
+  "https://lumilio.org/problems/storage/recovery-required": true,
   "https://lumilio.org/problems/storage/ownership-unavailable": true,
   "https://lumilio.org/problems/storage/permission-denied": true,
   "https://lumilio.org/problems/storage/unsupported-filesystem": true,
@@ -356,6 +357,11 @@ function localizeKnownProblem(
       return t(
         "apiErrors.storage.materializationRequired",
         "Files in this folder must be downloaded locally before it can be used. Make the folder available offline and try again.",
+      );
+    case "https://lumilio.org/problems/storage/recovery-required":
+      return t(
+        "apiErrors.storage.recoveryRequired",
+        "An interrupted storage operation on this Repository must be recovered first. Check its recovery inventory on the Storage page, then try again.",
       );
     case "https://lumilio.org/problems/storage/host-action-expired":
       return t(

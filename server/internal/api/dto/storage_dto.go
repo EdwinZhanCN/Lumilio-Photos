@@ -63,16 +63,21 @@ type StorageRepositoryViewDTO struct {
 	// Windows drive root such as "C:". It names the storage an operator
 	// recognizes. It is raw host data and is never localized by the Server.
 	// Empty when the mount could not be resolved.
-	MountPath    string                                   `json:"mount_path,omitempty" example:"/data/storage"`
-	Filesystem   string                                   `json:"filesystem,omitempty" example:"ext4"`
-	Reachability string                                   `json:"reachability" example:"active"`
-	WritePolicy  StorageRepositoryWritePolicyDTO          `json:"write_policy"`
-	Activity     string                                   `json:"activity" example:"idle"`
-	MissingCount int64                                    `json:"missing_count"`
-	TrashCount   int64                                    `json:"trash_count"`
-	TrashBytes   int64                                    `json:"trash_bytes"`
-	AssetCount   *int64                                   `json:"asset_count,omitempty" example:"1240"`
-	Verification *StorageRepositoryVerificationSummaryDTO `json:"verification,omitempty"`
+	MountPath    string                          `json:"mount_path,omitempty" example:"/data/storage"`
+	Filesystem   string                          `json:"filesystem,omitempty" example:"ext4"`
+	Reachability string                          `json:"reachability" example:"active"`
+	WritePolicy  StorageRepositoryWritePolicyDTO `json:"write_policy"`
+	Activity     string                          `json:"activity" example:"idle"`
+	MissingCount int64                           `json:"missing_count"`
+	TrashCount   int64                           `json:"trash_count"`
+	TrashBytes   int64                           `json:"trash_bytes"`
+	// TrashHeldCount is how many trashed files are inherited and held out of
+	// automatic expiry; RecoveryItemCount is how many preserved private files
+	// still await a decision in the Repository's recovery inventory.
+	TrashHeldCount    int64                                    `json:"trash_held_count"`
+	RecoveryItemCount int64                                    `json:"recovery_item_count"`
+	AssetCount        *int64                                   `json:"asset_count,omitempty" example:"1240"`
+	Verification      *StorageRepositoryVerificationSummaryDTO `json:"verification,omitempty"`
 	// Actions are the row commands the role-aware policy admits on the
 	// current facts; UnavailableActions explain the withheld ones. Menus
 	// render from these and never invent a protected action.
@@ -122,4 +127,60 @@ type SetupPrimaryRepositoryRequestDTO struct {
 	// storage/confirmation-required Problem.
 	AssessmentToken   string   `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
 	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"removable_storage"`
+}
+
+// RepositoryRecoveryReceiptDTO is one registration's private-recovery
+// receipt: what an open, copy, or adoption found under the Repository's
+// private workspace. Counts are by class; files that need a decision are the
+// inventory items.
+type RepositoryRecoveryReceiptDTO struct {
+	ID                 string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Event              string    `json:"event" example:"open" enums:"open,register_copy,adopt"`
+	RecordedAt         time.Time `json:"recorded_at"`
+	Actor              string    `json:"actor,omitempty" example:"web:user:1"`
+	SourceRepositoryID string    `json:"source_repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	TrashFiles         int       `json:"trash_files" example:"2"`
+	TrashBytes         int64     `json:"trash_bytes" example:"4096"`
+	LogFiles           int       `json:"log_files" example:"2"`
+	DerivedFiles       int       `json:"derived_files" example:"12"`
+	ItemsTruncated     int       `json:"items_truncated,omitempty" example:"0"`
+}
+
+// RepositoryRecoveryItemDTO is one preserved file awaiting or past a
+// decision. Path is relative to the Repository's private workspace and
+// never a host path.
+type RepositoryRecoveryItemDTO struct {
+	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ReceiptID string `json:"receipt_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Class     string `json:"class" example:"staging" enums:"trash,studio,staging,logs,derived,unknown"`
+	Path      string `json:"path" example:".lumilio/staging/incoming/upload.part"`
+	Size      int64  `json:"size" example:"1048576"`
+	// Disposition is what became of the item: preserved or moved bytes await
+	// a decision; reassociated is a Studio record attached to its proven
+	// Asset; ambiguous and unreadable records stay for review or export;
+	// deleted was removed explicitly.
+	Disposition string `json:"disposition" example:"moved" enums:"preserved,moved,reassociated,ambiguous,unreadable,deleted"`
+	Present     bool   `json:"present" example:"true"`
+	// Actions are the explicit decisions available for this item.
+	Actions         []string   `json:"actions" enums:"export,delete"`
+	AssetID         string     `json:"asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ResolvedAssetID string     `json:"resolved_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ResolvedAt      *time.Time `json:"resolved_at,omitempty"`
+	Detail          string     `json:"detail,omitempty" example:"no present file in the Repository has the record's content"`
+}
+
+// RepositoryRecoveryTrashDTO counts the inherited trashed files held out of
+// automatic expiry until the user decides.
+type RepositoryRecoveryTrashDTO struct {
+	HeldCount int64 `json:"held_count" example:"3"`
+	HeldBytes int64 `json:"held_bytes" example:"6291456"`
+}
+
+// RepositoryRecoveryDTO is the private-recovery inventory of one Repository.
+type RepositoryRecoveryDTO struct {
+	RepositoryID       string                         `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Receipts           []RepositoryRecoveryReceiptDTO `json:"receipts"`
+	Items              []RepositoryRecoveryItemDTO    `json:"items"`
+	Trash              RepositoryRecoveryTrashDTO     `json:"trash"`
+	UnreadableReceipts []string                       `json:"unreadable_receipts"`
 }
