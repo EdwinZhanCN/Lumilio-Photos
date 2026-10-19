@@ -94,6 +94,15 @@ func findManifestStep(steps []manifestStep, from int) (manifestStep, bool) {
 // so a manifest from an older, newer, or pre-release build is reported as such
 // instead of as a list of unknown or missing fields. A missing or malformed
 // version is left to the strict decode and presence checks.
+// ErrManifestUpgradeRequired marks a manifest an older build wrote; the
+// operator runs the upgrade command. ErrManifestIncompatible marks a manifest
+// this build cannot read at all: written by a newer build or by a pre-release
+// one whose configuration is not migrated.
+var (
+	ErrManifestUpgradeRequired = errors.New("runtime manifest needs an upgrade")
+	ErrManifestIncompatible    = errors.New("runtime manifest is incompatible with this build")
+)
+
 func checkManifestVersion(data []byte, current int) error {
 	var probe struct {
 		SchemaVersion *int `toml:"schema_version"`
@@ -103,7 +112,8 @@ func checkManifestVersion(data []byte, current int) error {
 	}
 	if *probe.SchemaVersion < current && *probe.SchemaVersion >= 1 {
 		return fmt.Errorf(
-			"schema_version = %d is older than this build (%d): run `server config upgrade --config <this file>` to upgrade it; the current file is kept as a .bak copy",
+			"%w: schema_version = %d is older than this build (%d): run `server config upgrade --config <this file>` to upgrade it; the current file is kept as a .bak copy",
+			ErrManifestUpgradeRequired,
 			*probe.SchemaVersion,
 			current,
 		)
@@ -117,7 +127,8 @@ func checkManifestVersion(data []byte, current int) error {
 func checkVersion(version, current int) error {
 	if version > current {
 		return fmt.Errorf(
-			"schema_version = %d is newer than this build supports (%d): the file was written for a newer Lumilio Photos, or by a pre-release build whose configuration is not migrated (create a new one from the current examples)",
+			"%w: schema_version = %d is newer than this build supports (%d): the file was written for a newer Lumilio Photos, or by a pre-release build whose configuration is not migrated (create a new one from the current examples)",
+			ErrManifestIncompatible,
 			version,
 			current,
 		)

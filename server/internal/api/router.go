@@ -245,6 +245,7 @@ type StorageControllerInterface interface {
 
 type RepositoryScanControllerInterface interface {
 	CreatePrimaryRepository(c *gin.Context) // POST /setup/primary-repository - Initial primary during setup
+	AdoptPrimaryRepository(c *gin.Context)  // POST /setup/primary-repository/adopt - Adopt the leftover primary during setup
 	CreateRepository(c *gin.Context)
 	AssessStorageTarget(c *gin.Context) // POST /storage/assessments - Read-only create target review
 	ListRepositoryCandidates(c *gin.Context)
@@ -322,7 +323,8 @@ type CloudControllerInterface interface {
 
 // SetupControllerInterface defines the zero-config first-run status endpoint.
 type SetupControllerInterface interface {
-	GetSetupStatus(c *gin.Context) // GET  /setup/status
+	GetSetupStatus(c *gin.Context)        // GET  /setup/status (public, phase-only)
+	GetSetupPrimaryTarget(c *gin.Context) // GET  /setup/primary-target (administrator)
 }
 
 // ShareLinkControllerInterface defines the share link endpoints: owner-scoped
@@ -442,11 +444,16 @@ func NewRouter(
 		})
 		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
 
-		// Zero-config first-run setup. Public: the system has no users/secrets yet.
+		// Zero-config first-run setup. The status is public and phase-only:
+		// the system has no users/secrets yet. The target review and both
+		// primary commands are reachable to the authenticated administrator
+		// before readiness, which is exactly when they are needed.
 		setup := v1.Group("/setup")
 		{
 			setup.GET("/status", setupController.GetSetupStatus)
+			setup.GET("/primary-target", authController.AuthMiddleware(), authController.RequireAdmin(), setupController.GetSetupPrimaryTarget)
 			setup.POST("/primary-repository", authController.AuthMiddleware(), repositoryScanController.CreatePrimaryRepository)
+			setup.POST("/primary-repository/adopt", authController.AuthMiddleware(), authController.RequireAdmin(), repositoryScanController.AdoptPrimaryRepository)
 		}
 
 		settings := v1.Group("/settings")

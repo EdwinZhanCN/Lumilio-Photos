@@ -20,6 +20,10 @@ const messages: Record<ErrorCode, () => string> = {
   [ErrorCode.ErrorLumenOwnerBusy]: () => i18n.t("errors.lumenOwnerBusy", "Another Desktop instance owns Lumen Hub."),
   [ErrorCode.ErrorRecoveryRequired]: () => i18n.t("errors.recoveryRequired", "Desktop needs recovery before this operation can continue."),
   [ErrorCode.ErrorSelectionCancelled]: () => i18n.t("errors.selectionCancelled", "The folder selection was cancelled. The request is still waiting."),
+  [ErrorCode.ErrorCatalogIncompatible]: () => i18n.t("errors.catalogIncompatible", "The catalog was written by a pre-release or a newer Lumilio Photos and is not opened by this build. Move the application state aside to start a new catalog; your media folders are untouched and setup offers to adopt the Primary Repository they hold."),
+  [ErrorCode.ErrorConfigurationIncompatible]: () => i18n.t("errors.configurationIncompatible", "The runtime configuration was written by another build. Review it in Settings and apply it again."),
+  [ErrorCode.ErrorStorageMigrationRejected]: () => i18n.t("errors.storageMigrationRejected", "The selected Default Storage Location does not carry the registered identity and its Primary Repository, so the change was rolled back. A fresh Default Storage Location is possible only before the Primary Repository exists."),
+  [ErrorCode.ErrorStorageUnavailable]: () => i18n.t("errors.storageUnavailable", "The Default Storage Location could not be created or claimed. Check that the folder is writable and not held by another running instance."),
   [ErrorCode.$zero]: () => i18n.t("errors.unknown", "The Desktop control plane returned an unknown error."),
 };
 

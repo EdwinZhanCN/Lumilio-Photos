@@ -25,6 +25,15 @@ const (
 	// ErrorSelectionCancelled is the normal outcome of a native directory
 	// picker the person dismissed; the request it was answering stays pending.
 	ErrorSelectionCancelled ErrorCode = "selection_cancelled"
+	// Startup failures the Server classifies (server/app.ClassifyStartupFailure);
+	// Desktop presents them and never works around them. The catalog or the
+	// manifest came from a pre-release or a newer build, the configured
+	// storage folder does not prove the registered default's identity, or a
+	// first run could not create its default storage at all.
+	ErrorCatalogIncompatible       ErrorCode = "catalog_incompatible"
+	ErrorConfigurationIncompatible ErrorCode = "configuration_incompatible"
+	ErrorStorageMigrationRejected  ErrorCode = "storage_migration_rejected"
+	ErrorStorageUnavailable        ErrorCode = "storage_unavailable"
 )
 
 // Error is the only error shape exposed through Wails bindings and events.

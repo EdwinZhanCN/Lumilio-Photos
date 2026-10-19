@@ -24,9 +24,29 @@ export function buildSetupPrimaryRepositoryRequestBody({
   };
 }
 
+export type AdoptPrimaryRepositoryInput = {
+  expectedRepositoryId: string;
+  assessmentToken: string;
+  acknowledgedRisks?: readonly string[];
+};
+
+/** The adoption binds to the review: identity, token, and every risk shown. */
+export function buildAdoptPrimaryRepositoryRequestBody({
+  expectedRepositoryId,
+  assessmentToken,
+  acknowledgedRisks,
+}: AdoptPrimaryRepositoryInput) {
+  return {
+    expected_repository_id: expectedRepositoryId,
+    assessment_token: assessmentToken,
+    acknowledged_risks: acknowledgedRisks ? [...acknowledgedRisks] : undefined,
+  };
+}
+
 export function useSetupPrimaryRepository() {
   const queryClient = useQueryClient();
   const mutation = $api.useMutation("post", "/api/v1/setup/primary-repository");
+  const adoptMutation = $api.useMutation("post", "/api/v1/setup/primary-repository/adopt");
 
   const createPrimaryRepository = useCallback(
     async ({
@@ -59,9 +79,25 @@ export function useSetupPrimaryRepository() {
     [mutation, queryClient],
   );
 
+  const adoptPrimaryRepository = useCallback(
+    async (input: AdoptPrimaryRepositoryInput) => {
+      const response = await adoptMutation.mutateAsync({
+        body: buildAdoptPrimaryRepositoryRequestBody(input),
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/targets"] }),
+        queryClient.invalidateQueries({ queryKey: ["post", "/api/v1/assets/list"] }),
+        queryClient.invalidateQueries({ queryKey: ["post", "/api/v1/assets/search"] }),
+      ]);
+      return response;
+    },
+    [adoptMutation, queryClient],
+  );
+
   return {
     createPrimaryRepository,
-    isPending: mutation.isPending,
-    error: mutation.error,
+    adoptPrimaryRepository,
+    isPending: mutation.isPending || adoptMutation.isPending,
+    error: mutation.error ?? adoptMutation.error,
   };
 }

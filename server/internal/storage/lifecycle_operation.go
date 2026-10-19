@@ -31,6 +31,7 @@ const (
 	lifecycleKindRelocateStorage        = "relocate_storage_location"
 	lifecycleKindRenameRepository       = "rename_repository"
 	lifecycleKindDetachRepository       = "detach_repository"
+	lifecycleKindAdoptPrimaryRepository = "adopt_primary_repository"
 	// Trash and restore journals are recovered by storage/trash.
 	LifecycleKindTrashAssets   = "trash_assets"
 	LifecycleKindRestoreAssets = "restore_assets"
@@ -241,6 +242,10 @@ type switchDefaultStorageOperationPayload struct {
 	NewPath           string `json:"new_path"`
 	ConfirmationType  string `json:"confirmation_type"`
 	RepositoryCount   int64  `json:"repository_count"`
+	// NewStorageLocationID is set by a fresh-default switch during setup:
+	// the unused default registration is replaced by the identity at the new
+	// path rather than moved. It is empty for an identity-preserving move.
+	NewStorageLocationID string `json:"new_storage_location_id,omitempty"`
 }
 
 type switchDefaultStorageOperationResult struct {
@@ -556,6 +561,10 @@ func (rm *DefaultRepositoryManager) RecoverLifecycleOperations(ctx context.Conte
 			if err := rm.recoverDetachRepositoryOperation(ctx, operation); err != nil {
 				return err
 			}
+		case lifecycleKindAdoptPrimaryRepository:
+			if err := rm.recoverAdoptPrimaryOperation(ctx, operation); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("%w: unsupported operation kind %q", ErrLifecycleRecoveryRequired, operation.Kind)
 		}
@@ -584,7 +593,8 @@ func (rm *DefaultRepositoryManager) claimLifecycleRecoveryTargets(ctx context.Co
 		kind = "storage_location"
 		path = strings.TrimSpace(target.NewPath)
 	case lifecycleKindCreateRepository, lifecycleKindOpenRepository,
-		lifecycleKindRegisterRepositoryCopy, lifecycleKindRenameRepository:
+		lifecycleKindRegisterRepositoryCopy, lifecycleKindRenameRepository,
+		lifecycleKindAdoptPrimaryRepository:
 		// The common payload path is the repository mutation target.
 	case lifecycleKindDetachRepository:
 		// Detach changes no file; its tree may already be gone or belong to
@@ -706,6 +716,9 @@ func (rm *DefaultRepositoryManager) recoverSwitchDefaultStorageOperation(ctx con
 	var payload switchDefaultStorageOperationPayload
 	if err := json.Unmarshal(operation.Payload, &payload); err != nil {
 		return fmt.Errorf("%w: decode default Storage Location switch payload: %v", ErrLifecycleRecoveryRequired, err)
+	}
+	if payload.NewStorageLocationID != "" && payload.NewStorageLocationID != payload.StorageLocationID {
+		return rm.recoverFreshDefaultStorageOperation(ctx, operation, payload)
 	}
 	storageLocationID, err := uuid.Parse(payload.StorageLocationID)
 	if err != nil {

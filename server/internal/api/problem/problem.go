@@ -108,6 +108,11 @@ var (
 		"Repository identity mismatch", "The marker at the path carries a different Repository identity than the registration the command targets.")
 	StorageOriginalOnline = descriptor("storage/original-online", http.StatusConflict,
 		"Original Repository still online", "The registered Repository is still present at its original path, so there is nothing to reconnect.")
+	StorageLayoutObstructed = Descriptor{
+		Type: Namespace + "storage/layout-obstructed", Status: http.StatusConflict,
+		Title: "Repository layout repair obstructed", Definition: "The Repository at the target is missing part of its layout, and a file or a denied directory sits where the missing directory belongs, so the bounded repair was not run.",
+		Recovery: "Move the obstructing file out of the Repository folder or fix its permissions, then review the setup target again; nothing in the folder was changed. Choosing a fresh Default Storage Location is the other way out.",
+	}
 	StorageRecoveryRequired = Descriptor{
 		Type: Namespace + "storage/recovery-required", Status: http.StatusConflict,
 		Title: "Repository recovery required", Definition: "An interrupted storage operation left the journal of this Repository open; conflicting commands are refused until journal recovery completes.",
@@ -167,6 +172,7 @@ var registry = mustRegistry(
 	StorageOwnershipUnavailable,
 	StorageIdentityMismatch,
 	StorageOriginalOnline,
+	StorageLayoutObstructed,
 	StorageRecoveryRequired,
 	ServiceUnavailable,
 	InvalidMediaRequest,

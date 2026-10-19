@@ -34,6 +34,7 @@ components:
                     https://lumilio.org/problems/storage/host-action-expired: '#/components/schemas/api.StorageHostActionExpiredProblem'
                     https://lumilio.org/problems/storage/host-action-failed: '#/components/schemas/api.StorageHostActionFailedProblem'
                     https://lumilio.org/problems/storage/identity-mismatch: '#/components/schemas/api.StorageIdentityMismatchProblem'
+                    https://lumilio.org/problems/storage/layout-obstructed: '#/components/schemas/api.StorageLayoutObstructedProblem'
                     https://lumilio.org/problems/storage/materialization-required: '#/components/schemas/api.StorageMaterializationRequiredProblem'
                     https://lumilio.org/problems/storage/not-a-mounted-volume: '#/components/schemas/api.StorageNotAMountedVolumeProblem'
                     https://lumilio.org/problems/storage/observation-unknown: '#/components/schemas/api.StorageObservationUnknownProblem'
@@ -76,6 +77,7 @@ components:
                 - $ref: '#/components/schemas/api.StorageHostActionExpiredProblem'
                 - $ref: '#/components/schemas/api.StorageHostActionFailedProblem'
                 - $ref: '#/components/schemas/api.StorageIdentityMismatchProblem'
+                - $ref: '#/components/schemas/api.StorageLayoutObstructedProblem'
                 - $ref: '#/components/schemas/api.StorageMaterializationRequiredProblem'
                 - $ref: '#/components/schemas/api.StorageNotAMountedVolumeProblem'
                 - $ref: '#/components/schemas/api.StorageObservationUnknownProblem'
@@ -365,6 +367,52 @@ components:
                         type: string
                     type: array
                     uniqueItems: false
+            type: object
+        dto.AdoptPrimaryRepositoryRequestDTO:
+            properties:
+                acknowledged_risks:
+                    example:
+                        - removable_storage
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
+                assessment_token:
+                    example: v1.0123456789abcdef
+                    type: string
+                expected_repository_id:
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                    type: string
+            required:
+                - assessment_token
+                - expected_repository_id
+            type: object
+        dto.AdoptPrimaryRepositoryResponseDTO:
+            properties:
+                acknowledged_risks:
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
+                layout_repaired:
+                    example:
+                        - .lumilio
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
+                recovery:
+                    $ref: '#/components/schemas/dto.SetupPrimaryRecoveryDTO'
+                recovery_receipt_id:
+                    description: |-
+                        RecoveryReceiptID names the adopt receipt; empty when the tree carried
+                        no private state.
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                    type: string
+                replayed:
+                    type: boolean
+                repository:
+                    $ref: '#/components/schemas/dto.RepositoryDTO'
             type: object
         dto.AgentDateRangeDTO:
             properties:
@@ -4682,8 +4730,6 @@ components:
             type: object
         dto.RepositoryDefaultsDTO:
             properties:
-                assessment:
-                    $ref: '#/components/schemas/dto.StorageAssessmentDTO'
                 duplicate_handling:
                     example: rename
                     type: string
@@ -5321,6 +5367,92 @@ components:
                 hidden:
                     type: boolean
             type: object
+        dto.SetupDefaultStorageDTO:
+            properties:
+                detail:
+                    example: 'parse storage location marker: yaml: line 1'
+                    type: string
+                marker_state:
+                    enum:
+                        - valid
+                        - absent
+                        - permission_denied
+                        - unknown
+                        - corrupt
+                        - unsupported_version
+                    example: valid
+                    type: string
+                path:
+                    example: /data/storage
+                    type: string
+                registered:
+                    type: boolean
+                state:
+                    description: State names the one condition that decides what setup can do here.
+                    enum:
+                        - ready
+                        - offline
+                        - path_changed
+                        - marker_missing
+                        - marker_invalid
+                        - marker_unsupported
+                        - identity_mismatch
+                        - repository_marker
+                        - unregistered
+                        - unavailable
+                    example: ready
+                    type: string
+            type: object
+        dto.SetupPrimaryExistingDTO:
+            properties:
+                created_at:
+                    type: string
+                marker_version:
+                    example: "1.0"
+                    type: string
+                name:
+                    example: Primary Storage
+                    type: string
+                registered_role:
+                    description: |-
+                        RegisteredRole is set when the identity is already registered in this
+                        catalog; setup cannot adopt it then.
+                    enum:
+                        - primary
+                        - regular
+                    example: regular
+                    type: string
+                repository_id:
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                    type: string
+            type: object
+        dto.SetupPrimaryRecoveryDTO:
+            properties:
+                derived_files:
+                    example: 12
+                    type: integer
+                log_files:
+                    example: 2
+                    type: integer
+                receipts:
+                    example: 0
+                    type: integer
+                staging_files:
+                    example: 2
+                    type: integer
+                studio_records:
+                    example: 1
+                    type: integer
+                trash_bytes:
+                    example: 4096
+                    type: integer
+                trash_files:
+                    example: 2
+                    type: integer
+                unknown_files:
+                    example: 1
+                    type: integer
+            type: object
         dto.SetupPrimaryRepositoryRequestDTO:
             properties:
                 acknowledged_risks:
@@ -5350,6 +5482,64 @@ components:
             required:
                 - name
             type: object
+        dto.SetupPrimaryReviewDTO:
+            properties:
+                actions:
+                    description: |-
+                        Actions are the legal transitions; fresh_elsewhere is always listed
+                        before the Primary Repository exists.
+                    items:
+                        enum:
+                            - create
+                            - adopt
+                            - fresh_elsewhere
+                        type: string
+                    type: array
+                    uniqueItems: false
+                assessment:
+                    $ref: '#/components/schemas/dto.StorageAssessmentDTO'
+                existing:
+                    $ref: '#/components/schemas/dto.SetupPrimaryExistingDTO'
+                layout_missing:
+                    description: LayoutMissing lists the layout directories an adoption would add.
+                    example:
+                        - .lumilio
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
+                recovery:
+                    $ref: '#/components/schemas/dto.SetupPrimaryRecoveryDTO'
+                state:
+                    enum:
+                        - creatable
+                        - adoptable
+                        - layout_repairable
+                        - registered
+                        - nonempty_unmarked
+                        - marker_invalid
+                        - marker_unsupported
+                        - unavailable
+                    example: adoptable
+                    type: string
+            type: object
+        dto.SetupPrimaryTargetDTO:
+            properties:
+                default_storage:
+                    $ref: '#/components/schemas/dto.SetupDefaultStorageDTO'
+                native_host:
+                    description: |-
+                        NativeHost reports a Desktop host: a fresh Default Storage Location is
+                        chosen in Desktop Settings and applied; without it the operator edits
+                        storage.path in the manifest and restarts.
+                    type: boolean
+                repository_defaults:
+                    $ref: '#/components/schemas/dto.RepositoryDefaultsDTO'
+                setup_complete:
+                    type: boolean
+                target:
+                    $ref: '#/components/schemas/dto.SetupPrimaryReviewDTO'
+            type: object
         dto.SetupStatusDTO:
             properties:
                 admin_initialized:
@@ -5364,8 +5554,6 @@ components:
                     type: string
                 primary_repository_initialized:
                     type: boolean
-                repository_defaults:
-                    $ref: '#/components/schemas/dto.RepositoryDefaultsDTO'
                 runtime_reason:
                     example: storage_recovery_required
                     type: string
@@ -5553,10 +5741,6 @@ components:
                     type: string
             type: object
         dto.StorageAssessmentDTO:
-            description: |-
-                Assessment reviews the Primary Repository target below the Default
-                Storage Location and carries the token the setup create binds to.
-                It is absent while the target cannot be assessed.
             properties:
                 can_create:
                     description: |-
@@ -8395,6 +8579,42 @@ components:
                 - instance
                 - type
             type: object
+        api.StorageLayoutObstructedProblem:
+            additionalProperties: false
+            properties:
+                instance:
+                    format: uri
+                    pattern: ^urn:lumilio:problem:[0-9a-f]{32}$
+                    type: string
+                status:
+                    const: 409
+                    type: integer
+                type:
+                    const: https://lumilio.org/problems/storage/layout-obstructed
+                    format: uri
+                    type: string
+            required:
+                - instance
+                - status
+                - type
+            type: object
+        api.StorageLayoutObstructedProblemReference:
+            additionalProperties: false
+            properties:
+                instance:
+                    format: uri
+                    pattern: ^urn:lumilio:problem:[0-9a-f]{32}$
+                    type: string
+                retryable:
+                    type: boolean
+                type:
+                    const: https://lumilio.org/problems/storage/layout-obstructed
+                    format: uri
+                    type: string
+            required:
+                - instance
+                - type
+            type: object
         api.StorageMaterializationRequiredProblem:
             additionalProperties: false
             properties:
@@ -8752,6 +8972,7 @@ components:
                     https://lumilio.org/problems/storage/host-action-expired: '#/components/schemas/api.StorageHostActionExpiredProblemReference'
                     https://lumilio.org/problems/storage/host-action-failed: '#/components/schemas/api.StorageHostActionFailedProblemReference'
                     https://lumilio.org/problems/storage/identity-mismatch: '#/components/schemas/api.StorageIdentityMismatchProblemReference'
+                    https://lumilio.org/problems/storage/layout-obstructed: '#/components/schemas/api.StorageLayoutObstructedProblemReference'
                     https://lumilio.org/problems/storage/materialization-required: '#/components/schemas/api.StorageMaterializationRequiredProblemReference'
                     https://lumilio.org/problems/storage/not-a-mounted-volume: '#/components/schemas/api.StorageNotAMountedVolumeProblemReference'
                     https://lumilio.org/problems/storage/observation-unknown: '#/components/schemas/api.StorageObservationUnknownProblemReference'
@@ -8793,6 +9014,7 @@ components:
                 - $ref: '#/components/schemas/api.StorageHostActionExpiredProblemReference'
                 - $ref: '#/components/schemas/api.StorageHostActionFailedProblemReference'
                 - $ref: '#/components/schemas/api.StorageIdentityMismatchProblemReference'
+                - $ref: '#/components/schemas/api.StorageLayoutObstructedProblemReference'
                 - $ref: '#/components/schemas/api.StorageMaterializationRequiredProblemReference'
                 - $ref: '#/components/schemas/api.StorageNotAMountedVolumeProblemReference'
                 - $ref: '#/components/schemas/api.StorageObservationUnknownProblemReference'
@@ -17159,9 +17381,92 @@ paths:
             summary: Create primary repository during setup
             tags:
                 - setup
+    /api/v1/setup/primary-repository/adopt:
+        post:
+            description: 'Explicitly register the compatible, unregistered Repository found at the Default Storage Location''s primary/ folder as this catalog''s Primary Repository, keeping its identity and originals. The command binds to the setup primary target review: the expected Repository identity, the assessment token, and every reported risk acknowledged. Private state (Trash, Studio records, unfinished uploads, unknown files) is preserved by class under a recovery receipt; a missing layout is completed with empty directories only. Returns 409 once setup is complete, when the target is not adoptable, or with a typed storage refusal.'
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            oneOf:
+                                - type: object
+                                - $ref: '#/components/schemas/dto.AdoptPrimaryRepositoryRequestDTO'
+                                  description: Adoption bound to the setup review
+                                  summary: request
+                description: Adoption bound to the setup review
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/dto.AdoptPrimaryRepositoryResponseDTO'
+                    description: OK
+                "400":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Invalid request
+                "401":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Forbidden
+                "409":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Setup already completed, target not adoptable, layout obstructed, Repository conflict, or typed storage refusal
+            security:
+                - BearerAuth: []
+            summary: Adopt the existing Primary Repository during setup
+            tags:
+                - setup
+    /api/v1/setup/primary-target:
+        get:
+            description: 'Read-only review for the authenticated administrator while first-run setup has not completed: the configured Default Storage Location and its root marker, and the state of its primary/ folder with the actions setup may take (create, adopt the compatible Repository already there, or start fresh elsewhere), the risks to acknowledge, the token those acknowledgements bind to, and the private state an adoption would preserve. Nothing is written. Once setup is complete only setup_complete is reported.'
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/dto.SetupPrimaryTargetDTO'
+                    description: OK
+                "401":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Forbidden
+                "500":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Internal server error
+            security:
+                - BearerAuth: []
+            summary: Review the Primary Repository setup target
+            tags:
+                - setup
     /api/v1/setup/status:
         get:
-            description: Report whether the first owner and primary repository have been created.
+            description: 'Report whether the first owner and primary repository have been created. Public and phase-only: it never carries a host path, a marker reading, or a review token; those are the authenticated setup primary target.'
             responses:
                 "200":
                     content:

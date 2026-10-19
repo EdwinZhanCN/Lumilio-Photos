@@ -14,6 +14,7 @@ import (
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage/marker"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 
@@ -59,6 +60,13 @@ func (rm *DefaultRepositoryManager) EnsureDefaultStorageLocation(ctx context.Con
 		if len(requests) > 0 {
 			request = requests[0]
 		}
+		fresh, err := rm.freshDefaultSwitchEligible(ctx, existingDefault, cleanPath)
+		if err != nil {
+			return nil, err
+		}
+		if fresh {
+			return rm.replaceUnusedDefaultStorageLocation(ctx, existingDefault, cleanPath, request)
+		}
 		return rm.switchDefaultStorageLocation(ctx, existingDefault, cleanPath, request)
 	}
 	if defaultErr == nil {
@@ -74,6 +82,8 @@ func (rm *DefaultRepositoryManager) EnsureDefaultStorageLocation(ctx context.Con
 		}
 	} else if err := os.MkdirAll(cleanPath, 0o755); err != nil {
 		return nil, fmt.Errorf("create default storage location: %w", err)
+	} else if err := applyDirectoryMode(cleanPath, 0o755); err != nil {
+		return nil, fmt.Errorf("protect default storage location: %w", err)
 	}
 	if err := rm.claimRuntimeStoragePath(ctx, "storage_location", cleanPath); err != nil {
 		return nil, err
@@ -87,7 +97,9 @@ func (rm *DefaultRepositoryManager) EnsureDefaultStorageLocation(ctx context.Con
 	if createdMarker {
 		config = rootcfg.New("Default storage")
 	} else if config, err = rm.identities().LoadLocation(cleanPath); err != nil {
-		return nil, err
+		// A corrupt or newer root marker is preserved as it is: never replaced
+		// at startup, reported so setup can diagnose it or choose elsewhere.
+		return nil, fmt.Errorf("%w: %v", ErrStorageLocationInvalid, err)
 	}
 	if defaultErr == nil && config.ID != existingDefault.StorageLocationID.String() {
 		return nil, fmt.Errorf("%w: configured default path contains a different .lumilioroot identity", ErrStorageLocationInvalid)
@@ -224,6 +236,209 @@ func (rm *DefaultRepositoryManager) switchDefaultStorageLocation(
 		return nil, err
 	}
 	return storageLocation, nil
+}
+
+// freshDefaultSwitchEligible decides whether a configured default path that
+// differs from the registration is a fresh default rather than a move. It is
+// legal only before setup completes: no Primary Repository, no Repository
+// registered under the default, and no running operation on it (smaller
+// decision "Fresh default during setup"). A path carrying the registered
+// identity is always an identity-preserving move.
+func (rm *DefaultRepositoryManager) freshDefaultSwitchEligible(ctx context.Context, existing repo.StorageLocation, newPath string) (bool, error) {
+	if reading := rootcfg.ReadMarker(rm.observerOrDefault(), newPath); reading.State == marker.Valid && reading.UUID == existing.StorageLocationID.String() {
+		return false, nil
+	}
+	primaries, err := rm.queries.CountPrimaryRepositories(ctx)
+	if err != nil {
+		return false, fmt.Errorf("count primary repositories: %w", err)
+	}
+	if primaries > 0 {
+		return false, nil
+	}
+	repositories, err := rm.queries.ListRepositories(ctx)
+	if err != nil {
+		return false, fmt.Errorf("inspect default Storage Location children: %w", err)
+	}
+	for _, repository := range repositories {
+		if repository.StorageLocationID == existing.StorageLocationID {
+			return false, nil
+		}
+	}
+	operations, err := rm.queries.ListIncompleteLifecycleOperations(ctx)
+	if err != nil {
+		return false, fmt.Errorf("inspect pending default Storage Location operations: %w", err)
+	}
+	for _, operation := range operations {
+		if operation.TargetType == "storage_location" && operation.TargetID != nil && *operation.TargetID == existing.StorageLocationID.String() {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// replaceUnusedDefaultStorageLocation registers a fresh Default Storage
+// Location at newPath and drops the unused registration at the old path.
+// The old tree is not touched: its marker and whatever it holds stay for an
+// explicit open, adopt, or import later. A folder that already carries a
+// compatible, unregistered root marker keeps that identity; a Repository,
+// a corrupt or newer marker, or an identity registered elsewhere is refused.
+func (rm *DefaultRepositoryManager) replaceUnusedDefaultStorageLocation(ctx context.Context, existing repo.StorageLocation, newPath string, request LifecycleRequest) (*repo.StorageLocation, error) {
+	if err := os.MkdirAll(newPath, 0o755); err != nil {
+		return nil, fmt.Errorf("create default storage location: %w", err)
+	}
+	if err := rm.claimRuntimeStoragePath(ctx, "storage_location", newPath); err != nil {
+		return nil, err
+	}
+	if repocfg.IsStorageLocation(newPath) {
+		return nil, fmt.Errorf("%w: a repository cannot also be a storage location", ErrStorageLocationInvalid)
+	}
+	var config *rootcfg.RootConfig
+	createdMarker := false
+	switch reading := rootcfg.ReadMarker(rm.observerOrDefault(), newPath); reading.State {
+	case marker.Absent:
+		config = rootcfg.New("Default storage")
+		createdMarker = true
+	case marker.Valid:
+		loaded, err := rm.identities().LoadLocation(newPath)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrStorageLocationInvalid, err)
+		}
+		if _, err := rm.queries.GetStorageLocation(ctx, uuid.MustParse(loaded.ID)); err == nil {
+			return nil, fmt.Errorf("%w: the selected folder carries a Storage Location identity that is already registered", ErrStorageLocationInvalid)
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("find storage location by id: %w", err)
+		}
+		config = loaded
+	default:
+		return nil, fmt.Errorf("%w: the selected folder carries a .lumilioroot marker this build cannot adopt (%s)", ErrStorageLocationInvalid, reading.State)
+	}
+	actor := strings.TrimSpace(request.Actor)
+	if actor == "" {
+		actor = "server:config"
+	}
+	requestID := strings.TrimSpace(request.RequestID)
+	if requestID == "" {
+		requestID = "fresh-default:" + existing.StorageLocationID.String() + ":" + uuid.NewSHA1(uuid.NameSpaceURL, []byte(newPath)).String()
+	}
+	targetID := existing.StorageLocationID.String()
+	rollback := createStorageLocationRollbackData{Path: newPath, MarkerCreated: createdMarker}
+	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
+		RequestID: requestID, Kind: lifecycleKindSwitchDefaultStorage,
+		Payload: switchDefaultStorageOperationPayload{
+			StorageLocationID: targetID, OldPath: existing.Path, NewPath: newPath,
+			ConfirmationType: "fresh_default", RepositoryCount: 0, NewStorageLocationID: config.ID,
+		},
+		Actor: actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
+		TargetType: "storage_location", TargetID: &targetID, RollbackData: rollback,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if replay {
+		if err := lifecycleReplayError(operation); err != nil {
+			return nil, err
+		}
+		registered, err := rm.queries.GetStorageLocation(ctx, uuid.MustParse(config.ID))
+		if err != nil {
+			return nil, fmt.Errorf("%w: fresh default Storage Location is not registered", ErrStorageLocationInvalid)
+		}
+		return &registered, nil
+	}
+	fail := func(cause error) (*repo.StorageLocation, error) {
+		if createdMarker {
+			_ = os.Remove(filepath.Join(newPath, rootcfg.FileName))
+		}
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, cause, rollback)
+		return nil, cause
+	}
+	if createdMarker {
+		if err := config.Save(newPath); err != nil {
+			return fail(err)
+		}
+	}
+	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseFilesystemApplied, rollback); err != nil {
+		return fail(err)
+	}
+	removed, err := rm.queries.DeleteUnusedDefaultStorageLocation(ctx, existing.StorageLocationID)
+	if err != nil {
+		return fail(fmt.Errorf("release unused default Storage Location: %w", err))
+	}
+	if removed == 0 {
+		return fail(fmt.Errorf("%w: the registered default Storage Location is in use", ErrStorageLocationInvalid))
+	}
+	registered, err := rm.registerStorageLocation(ctx, newPath, config, dbtypes.StorageLocationKindDefault, false)
+	if err != nil {
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, false, err, rollback)
+		return nil, err
+	}
+	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseCatalogCommitted, rollback); err != nil {
+		return nil, fmt.Errorf("fresh default Storage Location registered but journal commit phase failed: %w", err)
+	}
+	if err := rm.completeLifecycleOperation(ctx, operation.OperationID,
+		switchDefaultStorageOperationResult{StorageLocationID: registered.StorageLocationID.String(), RepositoryCount: 0, FilesPreserved: true}); err != nil {
+		return nil, fmt.Errorf("fresh default Storage Location registered but journal completion failed: %w", err)
+	}
+	rm.logger.Info("default Storage Location started fresh elsewhere; the previous tree is untouched",
+		zap.String("operation", "storage_location.fresh_default"),
+		zap.String("previous_path", existing.Path), zap.String("path", newPath),
+		zap.String("previous_storage_location_id", existing.StorageLocationID.String()),
+		zap.String("storage_location_id", registered.StorageLocationID.String()))
+	return registered, nil
+}
+
+// recoverFreshDefaultStorageOperation finishes a fresh-default switch a
+// crash interrupted. A new registration that exists is completed (the old,
+// unused row is released if it is still there); a new marker on disk with
+// the old row already gone is rolled forward; otherwise the created marker
+// is removed and the operation records its rollback.
+func (rm *DefaultRepositoryManager) recoverFreshDefaultStorageOperation(ctx context.Context, operation repo.LifecycleOperation, payload switchDefaultStorageOperationPayload) error {
+	oldID, err := uuid.Parse(payload.StorageLocationID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid default Storage Location identity", ErrLifecycleRecoveryRequired)
+	}
+	newID, err := uuid.Parse(payload.NewStorageLocationID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid fresh default Storage Location identity", ErrLifecycleRecoveryRequired)
+	}
+	rollback := createStorageLocationRollbackData{}
+	if operation.RollbackData != nil {
+		if err := json.Unmarshal(*operation.RollbackData, &rollback); err != nil {
+			return fmt.Errorf("%w: decode fresh default rollback data: %v", ErrLifecycleRecoveryRequired, err)
+		}
+	}
+	complete := func() error {
+		return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID,
+			switchDefaultStorageOperationResult{StorageLocationID: newID.String(), FilesPreserved: true})
+	}
+	if _, err := rm.queries.GetStorageLocation(ctx, newID); err == nil {
+		if _, err := rm.queries.DeleteUnusedDefaultStorageLocation(ctx, oldID); err != nil {
+			return fmt.Errorf("release unused default Storage Location: %w", err)
+		}
+		return complete()
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("recover fresh default Storage Location: %w", err)
+	}
+	_, oldErr := rm.queries.GetStorageLocation(ctx, oldID)
+	diskConfig, diskErr := rm.identities().LoadLocation(payload.NewPath)
+	if errors.Is(oldErr, sql.ErrNoRows) {
+		if diskErr != nil || diskConfig.ID != newID.String() {
+			return fmt.Errorf("%w: fresh default Storage Location marker is missing at %s", ErrLifecycleRecoveryRequired, payload.NewPath)
+		}
+		if _, err := rm.registerStorageLocation(ctx, payload.NewPath, diskConfig, dbtypes.StorageLocationKindDefault, false); err != nil {
+			return fmt.Errorf("%w: roll forward fresh default Storage Location: %v", ErrLifecycleRecoveryRequired, err)
+		}
+		return complete()
+	}
+	if oldErr != nil {
+		return fmt.Errorf("recover fresh default Storage Location: %w", oldErr)
+	}
+	if rollback.MarkerCreated && diskErr == nil && diskConfig.ID == newID.String() {
+		if err := os.Remove(filepath.Join(payload.NewPath, rootcfg.FileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			_ = rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, false, err, rollback)
+			return fmt.Errorf("%w: remove fresh default marker: %v", ErrLifecycleRecoveryRequired, err)
+		}
+	}
+	return rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, true, errors.New("rolled back incomplete fresh default Storage Location switch"), rollback)
 }
 
 // AddStorageLocation registers a native-host-authorized directory as an

@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,6 +40,21 @@ type blackboxServer struct {
 	token   string
 	client  *http.Client
 	primary blackboxRepository
+	// root holds the state and storage folders; storageDir is the configured
+	// Default Storage Location. A test restarts the same catalog by passing
+	// them back through blackboxOptions.
+	root       string
+	storageDir string
+	// extraHeaders are added to every request while set (Idempotency-Key).
+	extraHeaders map[string]string
+	stopOnce     sync.Once
+	stopFunc     func()
+}
+
+// stop ends this generation and waits for the Server to exit, the way a
+// restart does; Cleanup is a no-op afterwards.
+func (s *blackboxServer) stop() {
+	s.stopOnce.Do(s.stopFunc)
 }
 
 type blackboxRepository struct {
@@ -68,7 +84,23 @@ const blackboxPollInterval = 100 * time.Millisecond
 type blackboxOptions struct {
 	scanIntervalSeconds int
 	changeWatch         scan.ChangeWatchBackend
+	// seedStorage populates the Default Storage Location folder before the
+	// Server starts, the way a reinstall finds what an earlier catalog left.
+	seedStorage func(tb testing.TB, storageDir string)
+	// skipPrimary leaves first-run setup at the Primary Repository step.
+	skipPrimary bool
+	// root reuses an earlier generation's folders so the restart runs
+	// against the same catalog; storageDir overrides <root>/storage.
+	root       string
+	storageDir string
+	// login signs the administrator an earlier generation registered in.
+	login bool
 }
+
+const (
+	blackboxAdminUsername = "blackbox-admin"
+	blackboxAdminPassword = "Lumilio-Blackbox-2026!"
+)
 
 func startBlackboxServer(tb testing.TB) *blackboxServer {
 	tb.Helper()
@@ -77,13 +109,23 @@ func startBlackboxServer(tb testing.TB) *blackboxServer {
 
 func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxServer {
 	tb.Helper()
-	root := tb.TempDir()
-	if err := os.Chmod(root, 0o700); err != nil {
-		tb.Fatal(err)
+	root := options.root
+	if root == "" {
+		root = tb.TempDir()
+		if err := os.Chmod(root, 0o700); err != nil {
+			tb.Fatal(err)
+		}
+		// SQLite refuses a catalog directory readable by group or others.
+		if err := os.Mkdir(filepath.Join(root, "state"), 0o700); err != nil {
+			tb.Fatal(err)
+		}
 	}
-	// SQLite refuses a catalog directory readable by group or others.
-	if err := os.Mkdir(filepath.Join(root, "state"), 0o700); err != nil {
-		tb.Fatal(err)
+	storageDir := options.storageDir
+	if storageDir == "" {
+		storageDir = filepath.Join(root, "storage")
+	}
+	if options.seedStorage != nil {
+		options.seedStorage(tb, storageDir)
 	}
 	listen := blackboxFreeListen(tb)
 	profile, ok := config.ProfileByName(config.ProfileDevVite)
@@ -92,7 +134,7 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 	}
 	manifest, err := config.EncodeProfile(profile, config.ProfileInputs{
 		StateDir:   filepath.ToSlash(filepath.Join(root, "state")),
-		StorageDir: filepath.ToSlash(filepath.Join(root, "storage")),
+		StorageDir: filepath.ToSlash(storageDir),
 	}, "")
 	if err != nil {
 		tb.Fatal(err)
@@ -123,7 +165,7 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 			ChangeWatchBackend: options.changeWatch,
 		})
 	}()
-	tb.Cleanup(func() {
+	stop := func() {
 		cancel()
 		select {
 		case err := <-done:
@@ -133,7 +175,7 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 		case <-time.After(90 * time.Second):
 			tb.Error("server did not shut down within 90s")
 		}
-	})
+	}
 	select {
 	case <-ready:
 	case err := <-done:
@@ -145,18 +187,34 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 
 	server := &blackboxServer{
 		t: tb, baseURL: "http://" + listen,
-		client: &http.Client{Timeout: 60 * time.Second},
+		client:   &http.Client{Timeout: 60 * time.Second},
+		root:     root,
+		stopFunc: stop,
 	}
+	server.storageDir = storageDir
+	tb.Cleanup(server.stop)
 	var registered struct {
 		Token string `json:"token"`
 	}
-	server.mustJSON(http.MethodPost, "/api/v1/auth/register/start", map[string]any{
-		"username": "blackbox-admin", "password": "Lumilio-Blackbox-2026!",
-	}, &registered)
-	if registered.Token == "" {
-		tb.Fatal("first-admin registration returned no session token")
+	if options.login {
+		server.mustJSON(http.MethodPost, "/api/v1/auth/login", map[string]any{
+			"username": blackboxAdminUsername, "password": blackboxAdminPassword,
+		}, &registered)
+		if registered.Token == "" {
+			tb.Fatal("administrator login returned no session token")
+		}
+	} else {
+		server.mustJSON(http.MethodPost, "/api/v1/auth/register/start", map[string]any{
+			"username": blackboxAdminUsername, "password": blackboxAdminPassword,
+		}, &registered)
+		if registered.Token == "" {
+			tb.Fatal("first-admin registration returned no session token")
+		}
 	}
 	server.token = registered.Token
+	if options.skipPrimary {
+		return server
+	}
 	var created struct {
 		Repository blackboxRepository `json:"repository"`
 	}
@@ -297,6 +355,9 @@ func (s *blackboxServer) do(method, pathname string, body io.Reader, contentType
 	}
 	if s.token != "" {
 		request.Header.Set("Authorization", "Bearer "+s.token)
+	}
+	for name, value := range s.extraHeaders {
+		request.Header.Set(name, value)
 	}
 	response, err := s.client.Do(request)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"server/internal/db/dbtypes"
 )
 
 const (
@@ -26,17 +27,27 @@ type StorageRuntimeStatus struct {
 // health projections do not degrade the whole instance; those facts stay local
 // to each Repository and Location summary.
 func (rm *DefaultRepositoryManager) StorageRuntimeStatus(ctx context.Context) (StorageRuntimeStatus, error) {
-	if _, err := rm.readerQueries.GetDefaultStorageLocation(ctx); err != nil {
+	defaultLocation, err := rm.readerQueries.GetDefaultStorageLocation(ctx)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return degradedStorageRuntimeStatus(), nil
 		}
 		return StorageRuntimeStatus{}, fmt.Errorf("load default storage location: %w", err)
 	}
-	if _, err := rm.readerQueries.GetPrimaryRepositoryRecord(ctx); err != nil {
+	primary, err := rm.readerQueries.GetPrimaryRepositoryRecord(ctx)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return degradedStorageRuntimeStatus(), nil
 		}
 		return StorageRuntimeStatus{}, fmt.Errorf("load primary repository: %w", err)
+	}
+	// Both anchors are registered. An anchor that reconciliation found
+	// offline or in error keeps the instance ready (setup is durable) but
+	// the runtime is degraded until the default tree is back or recovered;
+	// a maintenance barrier is a transient command state, not a fault.
+	if defaultLocation.Status == dbtypes.StorageLocationStatusOffline || defaultLocation.Status == dbtypes.StorageLocationStatusError ||
+		primary.Reachability == dbtypes.RepositoryReachabilityOffline {
+		return degradedStorageRuntimeStatus(), nil
 	}
 	return StorageRuntimeStatus{State: StorageRuntimeStateActive}, nil
 }

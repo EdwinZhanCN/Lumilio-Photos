@@ -45,7 +45,7 @@ func main() {
 
 	appConfig, err := config.LoadAppConfig(options.configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "load server configuration: %v\n", err)
+		fmt.Fprint(os.Stderr, app.DescribeStartupFailure(fmt.Errorf("load server configuration: %w", err)))
 		os.Exit(1)
 	}
 
@@ -60,7 +60,9 @@ func main() {
 		BreakGlassUsername:           strings.TrimSpace(os.Getenv("LUMILIO_BREAK_GLASS_USERNAME")),
 	}
 	if err := app.Run(ctx, appConfig, controls); err != nil {
-		fmt.Fprintf(os.Stderr, "server exited with error: %v\n", err)
+		// The Server owns the classification and the operator guidance; the
+		// CLI host only prints it.
+		fmt.Fprint(os.Stderr, app.DescribeStartupFailure(err))
 		os.Exit(1)
 	}
 }

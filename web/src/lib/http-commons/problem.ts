@@ -39,6 +39,7 @@ const KNOWN_TYPES = {
   "https://lumilio.org/problems/storage/host-action-expired": true,
   "https://lumilio.org/problems/storage/host-action-failed": true,
   "https://lumilio.org/problems/storage/identity-mismatch": true,
+  "https://lumilio.org/problems/storage/layout-obstructed": true,
   "https://lumilio.org/problems/storage/materialization-required": true,
   "https://lumilio.org/problems/storage/not-a-mounted-volume": true,
   "https://lumilio.org/problems/storage/observation-unknown": true,
@@ -357,6 +358,11 @@ function localizeKnownProblem(
       return t(
         "apiErrors.storage.materializationRequired",
         "Files in this folder must be downloaded locally before it can be used. Make the folder available offline and try again.",
+      );
+    case "https://lumilio.org/problems/storage/layout-obstructed":
+      return t(
+        "apiErrors.storage.layoutObstructed",
+        "A file or a denied folder sits where a Repository folder belongs, so the layout was not repaired. Move it out of the way and review again; nothing was changed.",
       );
     case "https://lumilio.org/problems/storage/recovery-required":
       return t(

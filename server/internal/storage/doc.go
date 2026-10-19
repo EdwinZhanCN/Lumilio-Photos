@@ -61,6 +61,18 @@
 // [LifecycleReceipt] a retry with the same request receives again; a withheld
 // action is a [RepositoryActionUnavailableError] with stable blocker codes.
 //
+// Setup recovery (storage plan P5): [DefaultRepositoryManager.AssessSetupPrimaryTarget] reviews the
+// fixed <default>/primary target into a closed [SetupPrimaryState] with the
+// one legal transition per state, and [DefaultRepositoryManager.AdoptPrimaryRepository] registers a
+// compatible, unregistered Repository found there as the Primary Repository,
+// bound to that review (identity, token, risks), journaled as
+// adopt_primary_repository with the P4 private preservation under an adopt
+// receipt, and completing only a missing layout. Before the Primary
+// Repository exists, a different configured storage.path replaces an unused
+// default registration (fresh default) and leaves the previous tree untouched;
+// afterwards it must prove the moved identity. [DefaultRepositoryManager.AssessDefaultStorageLocation]
+// names the state of storage.path read-only for setup and startup.
+//
 // [StorageObserver] supplies only read/stat/mount facts to
 // [ObserveStorageTarget] and [AssessStorageTarget]. [ClassifyStorage] and
 // [DeriveStorageCapabilities] are pure; mutation capabilities remain conditional

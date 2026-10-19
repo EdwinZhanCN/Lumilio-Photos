@@ -8,7 +8,9 @@ import (
 	"server/internal/storage"
 )
 
-// SetupStatus reports the durable first-run gates.
+// SetupStatus reports the durable first-run gates. It is public (the
+// instance has no users yet when setup starts), so it carries phase facts
+// only: no host path, no marker reading, no review token.
 type SetupStatus struct {
 	Initialized                  bool
 	AdminInitialized             bool
@@ -16,7 +18,6 @@ type SetupStatus struct {
 	RuntimeState                 string
 	RuntimeReason                string
 	NextRegistrationRole         string
-	RepositoryDefaults           *RepositoryDefaults
 }
 
 const SetupRuntimeStateInitializing = "initializing"
@@ -27,18 +28,27 @@ type RepositoryDefaults struct {
 	StorageLocation   string
 	Strategy          string
 	DuplicateHandling string
-	// Assessment is the Server's review of the Primary Repository target. It
-	// is nil when the Default Storage Location is not registered yet or the
-	// target cannot be resolved; the setup create then reports the exact cause.
-	Assessment *storage.CreateTargetAssessment
+}
+
+// SetupPrimaryTarget is the authenticated administrator's view of the
+// Primary Repository setup: the defaults, what the configured Default
+// Storage Location looks like, and the Server's review of <default>/primary
+// with its legal actions. Target is nil while the Default Storage Location
+// is not usable; DefaultStorage then names why.
+type SetupPrimaryTarget struct {
+	SetupComplete      bool
+	RepositoryDefaults RepositoryDefaults
+	DefaultStorage     storage.DefaultStorageAssessment
+	Target             *storage.SetupPrimaryAssessment
 }
 
 type repositoryDefaultsReader interface {
 	GetRepositoryDefaults(ctx context.Context) (storage.RepoDefaults, error)
 }
 
-type createTargetAssessor interface {
-	AssessCreateTarget(ctx context.Context, request storage.AssessCreateTargetRequest) (*storage.CreateTargetAssessment, error)
+type setupTargetAssessor interface {
+	AssessSetupPrimaryTarget(ctx context.Context) (*storage.SetupPrimaryAssessment, error)
+	AssessDefaultStorageLocation(ctx context.Context, configuredPath string) (storage.DefaultStorageAssessment, error)
 }
 
 type storageRuntimeReader interface {
@@ -48,7 +58,7 @@ type storageRuntimeReader interface {
 type setupRepositoryReader interface {
 	repositoryDefaultsReader
 	storageRuntimeReader
-	createTargetAssessor
+	setupTargetAssessor
 }
 
 // SetupService exposes first-run state after the catalog has opened and
@@ -57,7 +67,7 @@ type SetupService struct {
 	bootstrap       BootstrapService
 	repoDefaults    repositoryDefaultsReader
 	storage         storageRuntimeReader
-	assessor        createTargetAssessor
+	assessor        setupTargetAssessor
 	storageLocation string
 }
 
@@ -75,6 +85,7 @@ func NewSetupService(
 	}
 }
 
+// Status is the public, phase-only setup status.
 func (s *SetupService) Status(ctx context.Context) (SetupStatus, error) {
 	status := SetupStatus{RuntimeState: SetupRuntimeStateInitializing}
 
@@ -101,25 +112,45 @@ func (s *SetupService) Status(ctx context.Context) (SetupStatus, error) {
 	} else {
 		status.NextRegistrationRole = string(UserRoleAdmin)
 	}
+	return status, nil
+}
 
+// PrimaryTarget is the authenticated administrator's setup review. It reads
+// the Default Storage Location and the primary target without changing
+// either; once the primary exists it reports only that setup is complete.
+func (s *SetupService) PrimaryTarget(ctx context.Context) (SetupPrimaryTarget, error) {
+	result := SetupPrimaryTarget{RepositoryDefaults: RepositoryDefaults{StorageLocation: s.storageLocation}}
+	if s.bootstrap != nil {
+		ready, err := s.bootstrap.IsReady(ctx)
+		if err != nil {
+			return SetupPrimaryTarget{}, fmt.Errorf("load bootstrap phase: %w", err)
+		}
+		result.SetupComplete = ready
+	}
 	if s.repoDefaults != nil {
 		defaults, err := s.repoDefaults.GetRepositoryDefaults(ctx)
 		if err != nil {
-			return SetupStatus{}, fmt.Errorf("load repository defaults: %w", err)
+			return SetupPrimaryTarget{}, fmt.Errorf("load repository defaults: %w", err)
 		}
-		status.RepositoryDefaults = &RepositoryDefaults{
-			StorageLocation:   s.storageLocation,
-			Strategy:          defaults.Strategy,
-			DuplicateHandling: defaults.DuplicateHandling,
-		}
-		if s.assessor != nil && !status.PrimaryRepositoryInitialized {
-			// Read-only review of <default>/primary. A failure here is not a
-			// status failure: the setup create reports the exact typed cause.
-			if assessment, err := s.assessor.AssessCreateTarget(ctx, storage.AssessCreateTargetRequest{Intent: storage.IntentSetupPrimary}); err == nil {
-				status.RepositoryDefaults.Assessment = assessment
-			}
-		}
+		result.RepositoryDefaults.Strategy = defaults.Strategy
+		result.RepositoryDefaults.DuplicateHandling = defaults.DuplicateHandling
 	}
-
-	return status, nil
+	if s.assessor == nil {
+		return result, nil
+	}
+	defaultStorage, err := s.assessor.AssessDefaultStorageLocation(ctx, s.storageLocation)
+	if err != nil {
+		return SetupPrimaryTarget{}, fmt.Errorf("assess default Storage Location: %w", err)
+	}
+	result.DefaultStorage = defaultStorage
+	if result.SetupComplete || !defaultStorage.Usable() {
+		return result, nil
+	}
+	// A failed review is not a status failure: the Default Storage Location
+	// facts above already say what is wrong, and the commands report the
+	// exact typed cause.
+	if target, err := s.assessor.AssessSetupPrimaryTarget(ctx); err == nil {
+		result.Target = target
+	}
+	return result, nil
 }

@@ -35,6 +35,18 @@ You can skip, but the admin controls the whole Server — skipping means passwor
 
 **Success**: the main interface opens.
 
+**If a Primary Repository is already there.** When the Default Storage
+Location's `primary/` folder already holds a Repository from an earlier
+installation, setup shows it instead of the create form and offers **Adopt
+Primary Repository**: the identity, the originals, the Trash and the Studio
+edits are kept, and the scan registers the files again. Albums, People,
+ratings and share links live in the catalog, so a compatible database backup
+is the way to bring those back. To start over instead, change the Default
+Storage Location first (Desktop: **Settings → Storage**; Docker:
+`storage.path`); the old folder is left untouched. Files without a marker, a
+marker that cannot be read, or one written by a newer version are never
+initialized over; setup says which and leaves them alone.
+
 ## Verify
 
 1. Open **Manage** and confirm the primary repository is available;

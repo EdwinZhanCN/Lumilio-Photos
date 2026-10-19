@@ -32,6 +32,10 @@ const baselineMigrationFile = "000001_storage_baseline.up.sql"
 // catalogs are rejected, never migrated.
 var ErrPreReleaseCatalog = errors.New("catalog was created by a pre-release build of Lumilio Photos, whose data is not migrated")
 
+// ErrCatalogNewer marks a catalog written by a newer Lumilio Photos than this
+// build. It is never read or downgraded; the newer build opens it.
+var ErrCatalogNewer = errors.New("catalog was written by a newer Lumilio Photos")
+
 func preReleaseCatalogError() error {
 	return fmt.Errorf(
 		"%w: move the SQLite catalog aside and restart Lumilio Photos to create a new one (media repositories and original files are not touched)",
@@ -136,7 +140,8 @@ func assertSchemaVersion(ctx context.Context, database *sql.DB, current int) err
 	}
 	if version > current {
 		return fmt.Errorf(
-			"catalog schema version = %d is newer than this build supports (%d): it was written by a newer Lumilio Photos; upgrade Lumilio Photos to open it",
+			"%w: catalog schema version = %d is newer than this build supports (%d); upgrade Lumilio Photos to open it",
+			ErrCatalogNewer,
 			version,
 			current,
 		)

@@ -71,6 +71,7 @@
       "hostActionExpired": "桌面端审批已过期，请重新发起此操作。",
       "hostActionFailed": "桌面端未能完成此存储操作。",
       "identityMismatch": "该文件夹中的资源库与你选择的不同。未做任何更改。",
+      "layoutObstructed": "本应是资源库文件夹的位置被一个文件或无法访问的文件夹占据，因此未修复布局。请把它移开后重新检查；未做任何更改。",
       "materializationRequired": "此文件夹中的文件需要先下载到本地才能使用。请将文件夹设为离线可用后重试。",
       "notMountedVolume": "此文件夹不是挂载的卷；存放在这里的数据会在容器重建时丢失。请在 compose 文件中挂载主机目录。",
       "observationUnknown": "无法检查存储目标。请检查挂载和访问权限后重试。",
@@ -747,8 +748,50 @@
       "storageLocation": "默认存储位置",
       "storageLocationHint": "由服务器配置决定。流明集会在这个默认存储位置的 primary/ 文件夹中创建主资源库。",
       "submit": "创建主资源库",
-      "targetUnavailable": "默认存储位置目前无法容纳主资源库。",
-      "title": "创建主资源库"
+      "targetUnavailable": "默认存储位置目前无法容纳主资源库。"
+    },
+    "primarySetup": {
+      "adopt": {
+        "body": "在默认存储位置的 primary/ 文件夹中找到了 {{name}}。接管它可以保留其身份和全部文件，也可以在其他位置重新开始。在你做出选择之前，不会有任何更改。",
+        "disclosure": "相册、人物、评分、事件名称和分享链接保存在目录中，而不在文件夹里。要找回它们，请改为恢复早期安装的兼容数据库备份，而不是接管。接管只会重建文件夹中已有的内容：回收站里的文件会一直保留到你做出决定，Studio 编辑在其照片得到验证后重新关联。",
+        "heldTrash": "回收站中保留",
+        "heldTrashValue_other": "{{count}} 个文件（{{size}}）",
+        "identity": "身份",
+        "layoutRepair": "它缺少 {{folders}} 文件夹，接管时会补建为空文件夹；文件夹中的其他内容不变。",
+        "staging": "未完成的上传",
+        "studio": "Studio 编辑",
+        "submit": "接管主资源库",
+        "title": "这里已经有一个主资源库",
+        "unknown": "其他私有文件",
+        "unnamed": "早期的主资源库"
+      },
+      "blocked": {
+        "markerInvalid": "primary/ 中的资源库标记无法读取。它会原样保留。请从已知备份恢复 .lumiliorepo，或在其他位置重新开始。",
+        "markerUnsupported": "primary/ 中的资源库由更新版本的流明集写入。请安装该版本，或在其他位置重新开始。",
+        "nonemptyUnmarked": "primary/ 中有文件，但没有资源库标记。流明集绝不会在这些文件之上初始化。把它们移出 primary/ 后可在此新建主资源库，或在其他位置重新开始。",
+        "registered": "primary/ 中的资源库已在此目录中登记，因此不能成为主资源库。",
+        "title": "primary/ 文件夹无法成为主资源库",
+        "unavailable": "目前无法检查 primary/。请检查其访问权限和挂载状态，然后重新检查。"
+      },
+      "defaultStorage": {
+        "identityMismatch": "该文件夹的存储位置身份与此处登记的不同。",
+        "markerInvalid": "该文件夹的 .lumilioroot 标记无法读取。它会原样保留；请从已知备份恢复它，或在其他位置重新开始。",
+        "markerMissing": "该文件夹丢失了 .lumilioroot 标记。请从已知备份恢复；流明集绝不会在已登记的文件夹上写入新标记。",
+        "markerUnsupported": "该文件夹的 .lumilioroot 标记由更新版本的流明集写入。请安装该版本，或在其他位置重新开始。",
+        "offline": "目前无法访问所配置的文件夹。请重新连接磁盘或挂载，然后重新检查。",
+        "pathChanged": "所配置的路径与已登记的默认存储位置不同，且未被接受为移动。",
+        "repositoryMarker": "所配置的文件夹本身就是一个资源库。请把默认存储位置指向它的上级文件夹或其他文件夹。",
+        "title": "默认存储位置需要处理",
+        "unavailable": "目前无法检查该文件夹。请检查其访问权限和挂载状态，然后重新检查。",
+        "unregistered": "服务器启动时无法登记该文件夹。请查看服务器日志，修复文件夹后重启。"
+      },
+      "freshElsewhere": {
+        "desktop": "在流明集 Desktop 中打开“设置 → 存储”，选择另一个文件夹并应用。当前文件夹会原样保留，新的主资源库会在新文件夹中创建。",
+        "server": "把 server.toml 中的 storage.path（Docker：媒体卷）指向另一个文件夹，然后重启服务器。当前文件夹会原样保留，新的主资源库会在新文件夹中创建。",
+        "title": "在其他位置重新开始"
+      },
+      "loadFailed": "无法加载主资源库初始化检查结果。",
+      "title": "设置主资源库"
     },
     "register": {
       "confirmPassword": "确认密码",

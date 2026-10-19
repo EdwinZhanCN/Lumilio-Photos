@@ -445,6 +445,81 @@ func (h *RepositoryScanHandler) CreatePrimaryRepository(c *gin.Context) {
 	})
 }
 
+// AdoptPrimaryRepository registers the Repository already at the primary target as the Primary Repository.
+// @Summary Adopt the existing Primary Repository during setup
+// @Description Explicitly register the compatible, unregistered Repository found at the Default Storage Location's primary/ folder as this catalog's Primary Repository, keeping its identity and originals. The command binds to the setup primary target review: the expected Repository identity, the assessment token, and every reported risk acknowledged. Private state (Trash, Studio records, unfinished uploads, unknown files) is preserved by class under a recovery receipt; a missing layout is completed with empty directories only. Returns 409 once setup is complete, when the target is not adoptable, or with a typed storage refusal.
+// @Tags setup
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.AdoptPrimaryRepositoryRequestDTO true "Adoption bound to the setup review"
+// @Success 200 {object} dto.AdoptPrimaryRepositoryResponseDTO
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 409 {object} api.RepositoryCreateProblemResponse "Setup already completed, target not adoptable, layout obstructed, Repository conflict, or typed storage refusal"
+// @Router /api/v1/setup/primary-repository/adopt [post]
+func (h *RepositoryScanHandler) AdoptPrimaryRepository(c *gin.Context) {
+	if h == nil || h.repoManager == nil {
+		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
+		return
+	}
+	// No readiness short-circuit here: the journaled command answers a retry
+	// of a completed adoption with its result (Idempotency-Key), and refuses
+	// any new adoption once the primary exists.
+	var req dto.AdoptPrimaryRepositoryRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	actorOwnerID := adminIDFromContext(c)
+	if actorOwnerID == nil {
+		api.WriteProblem(c, api.KnownProblem(problem.PermissionDenied, errors.New("setup adoption requires an administrator")))
+		return
+	}
+	hostOwnerID, err := h.repoManager.HostOwnerID(c.Request.Context())
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if hostOwnerID == nil {
+		hostOwnerID = actorOwnerID
+	}
+	requestID := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	c.Header("Idempotency-Key", requestID)
+	result, err := h.repoManager.AdoptPrimaryRepository(c.Request.Context(), storage.AdoptPrimarySpec{
+		RequestID:            requestID,
+		Actor:                fmt.Sprintf("web:user:%d", *actorOwnerID),
+		ActorUserID:          actorOwnerID,
+		HostInstanceID:       lifecycleHostInstanceID(),
+		OwnerID:              hostOwnerID,
+		ExpectedRepositoryID: req.ExpectedRepositoryID,
+		AssessmentToken:      req.AssessmentToken,
+		AcknowledgedRisks:    req.AcknowledgedRisks,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrSetupPrimaryNotAdoptable):
+			api.WriteProblem(c, api.KnownProblem(problem.StorageAssessmentStale, err))
+		case errors.Is(err, storage.ErrRepositoryLayoutObstructed):
+			api.WriteProblem(c, api.KnownProblem(problem.StorageLayoutObstructed, err))
+		case errors.Is(err, storage.ErrRepositoryOwnershipUnavailable):
+			api.WriteProblem(c, api.KnownProblem(problem.StorageOwnershipUnavailable, err))
+		case errors.Is(err, storage.ErrLifecycleRecoveryRequired):
+			api.WriteProblem(c, api.KnownProblem(problem.StorageRecoveryRequired, err))
+		case errors.Is(err, storage.ErrPrimaryRepositoryExists):
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+		default:
+			writeRepositoryCreateFailure(c, err)
+		}
+		return
+	}
+	api.JSONOK(c, dto.ToAdoptPrimaryRepositoryResponseDTO(result, toRepositoryDTO(result.Repository)))
+}
+
 // writeRepositoryCreateFailure maps every provisioning and assessment error of
 // the create commands to its registered Problem. Typed storage refusals and
 // the consent gate come first; Repository conflicts keep their stable

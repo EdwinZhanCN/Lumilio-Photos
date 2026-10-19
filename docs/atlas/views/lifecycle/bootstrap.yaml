@@ -41,7 +41,19 @@ transitions:
     to: ready
     label: POST /setup/primary-repository creates the primary
     anchor: api:POST /api/v1/setup/primary-repository
+  - from: admin_created
+    to: ready
+    label: POST /setup/primary-repository/adopt adopts the primary found at <default>/primary
+    anchor: api:POST /api/v1/setup/primary-repository/adopt
 notes:
+  - title: Create or adopt, never implicit
+    body: >-
+      The authenticated administrator reviews the fixed primary target through
+      `GET /setup/primary-target` (admin only; the public status is phase-only)
+      and takes the one transition the review allows: create, adopt the
+      compatible Repository already there (identity, originals and private
+      state kept), or start fresh elsewhere through the host's configuration.
+      A leftover, unmarked, corrupt or newer primary is never initialized over.
   - title: Derived, never stored mid-setup
     body: >-
       While setting up, `BootstrapService.Phase` derives the phase from the

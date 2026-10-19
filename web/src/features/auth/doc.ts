@@ -38,8 +38,12 @@
  * {@link useRegistrationFlow} handles registration plus optional TOTP,
  * passkey, and recovery-code onboarding. {@link useMFAFlow} owns authenticated
  * MFA management, with its `mfa` and `action` URL parameters authoritative.
- * {@link useBootstrapFlow} composes first-admin registration with repository
- * creation without copying either domain's server state. {@link useSignOut}
+ * {@link useBootstrapFlow} composes first-admin registration with the Primary
+ * Repository setup step without copying either domain's server state;
+ * {@link usePrimarySetup} is that step, shared with the access gate: it reads
+ * the Server's review of the fixed primary target (create, adopt the
+ * Repository already there, or start fresh elsewhere through the host) and
+ * binds the administrator's acknowledgement to that review. {@link useSignOut}
  * is the only sign-out path: it awaits `logout` before opening `/login`, so the
  * login form never mounts while the session is still authenticated.
  *
@@ -71,6 +75,7 @@
 import type { useBrowserCapabilities } from "./api/useBrowserCapabilities.ts";
 import type { BrowserSecurityNotice } from "./components/BrowserSecurityNotice.tsx";
 import type { useBootstrapFlow } from "./flows/bootstrap/useBootstrapFlow.ts";
+import type { usePrimarySetup } from "./flows/primary-setup/usePrimarySetup.ts";
 import type { useMFAFlow } from "./flows/mfa/useMFAFlow.ts";
 import type { useRegistrationFlow } from "./flows/registration/useRegistrationFlow.ts";
 import type { useLoginFlow } from "./flows/sign-in/useLoginFlow.ts";
@@ -89,5 +94,3 @@ import type {
 } from "../../lib/http-commons/client.ts";
 import type { registerSessionExpiredHandler } from "../../lib/http-commons/sessionEvents.ts";
 import type { localizeAPIProblem } from "../../lib/http-commons/problem.ts";
-
-export {};

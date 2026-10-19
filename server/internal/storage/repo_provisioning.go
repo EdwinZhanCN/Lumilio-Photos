@@ -255,17 +255,43 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 	return &CreateRepositoryResult{Repository: dbRepo, AcknowledgedRisks: acknowledged}, nil
 }
 
+// consentAdmission is one command's consent input: who asks, what the
+// command is called in the audit, and the acknowledgement it carries.
+// TokenRequired makes the token mandatory even when the target reports no
+// risk, so a command that binds to an identity (adoption) cannot run on a
+// review it never saw.
+type consentAdmission struct {
+	Actor             string
+	ActorUserID       *int32
+	HostInstanceID    string
+	RequestID         string
+	Action            string
+	AssessmentToken   string
+	AcknowledgedRisks []string
+	TokenRequired     bool
+}
+
 // admitCreateTarget is the create command's consent gate. The target was
 // just re-sampled, so the decision rests on current facts: an unsupported or
 // unobservable target is refused outright; a risky target needs an
 // acknowledgement whose token still matches those facts. Every refusal is
 // audited before it is returned, and nothing on disk changes.
 func (rm *DefaultRepositoryManager) admitCreateTarget(ctx context.Context, spec CreateRepositorySpec, target *CreateTargetAssessment) ([]StorageRisk, error) {
+	return rm.admitAssessedTarget(ctx, consentAdmission{
+		Actor: spec.Actor, ActorUserID: spec.ActorUserID, HostInstanceID: spec.HostInstanceID,
+		RequestID: spec.RequestID, Action: lifecycleKindCreateRepository,
+		AssessmentToken: spec.AssessmentToken, AcknowledgedRisks: spec.AcknowledgedRisks,
+	}, target)
+}
+
+// admitAssessedTarget is the shared consent gate of every command that
+// binds to a create-target assessment.
+func (rm *DefaultRepositoryManager) admitAssessedTarget(ctx context.Context, admission consentAdmission, target *CreateTargetAssessment) ([]StorageRisk, error) {
 	audit := func(stage string, details map[string]any) error {
 		_, err := rm.RecordLifecycleAudit(ctx, LifecycleAuditInput{
-			Actor: spec.Actor, ActorUserID: spec.ActorUserID, HostInstanceID: spec.HostInstanceID,
-			RequestID: spec.RequestID, Action: lifecycleKindCreateRepository, TargetType: "repository",
-			Source: auditSourceForActor(spec.Actor), ConfirmationType: "none", NewPath: target.Path,
+			Actor: admission.Actor, ActorUserID: admission.ActorUserID, HostInstanceID: admission.HostInstanceID,
+			RequestID: admission.RequestID, Action: admission.Action, TargetType: "repository",
+			Source: auditSourceForActor(admission.Actor), ConfirmationType: "none", NewPath: target.Path,
 			Result: AuditResultRejected, FailureStage: stage, Details: details,
 		})
 		return err
@@ -276,25 +302,25 @@ func (rm *DefaultRepositoryManager) admitCreateTarget(ctx context.Context, spec 
 		}
 		return nil, refusal
 	}
-	if len(target.Risks) == 0 {
+	if len(target.Risks) == 0 && !admission.TokenRequired {
 		return nil, nil
 	}
 	details := map[string]any{
-		"risk_warnings": RiskCodes(target.Risks), "acknowledged_risks": spec.AcknowledgedRisks,
-		"assessment_token_present": strings.TrimSpace(spec.AssessmentToken) != "",
+		"risk_warnings": RiskCodes(target.Risks), "acknowledged_risks": admission.AcknowledgedRisks,
+		"assessment_token_present": strings.TrimSpace(admission.AssessmentToken) != "",
 	}
 	switch {
-	case strings.TrimSpace(spec.AssessmentToken) == "":
+	case strings.TrimSpace(admission.AssessmentToken) == "":
 		if err := audit("risk_confirmation", details); err != nil {
 			return nil, fmt.Errorf("%w: persist rejected storage risk decision: %v", ErrRepositoryRiskConfirmationRequired, err)
 		}
 		return nil, &StorageRiskConfirmationError{Risks: target.Risks, Token: target.Token}
-	case !hmac.Equal([]byte(strings.TrimSpace(spec.AssessmentToken)), []byte(target.Token)):
+	case !hmac.Equal([]byte(strings.TrimSpace(admission.AssessmentToken)), []byte(target.Token)):
 		if err := audit("assessment_stale", details); err != nil {
 			return nil, fmt.Errorf("%w: persist rejected stale assessment: %v", ErrStorageAssessmentStale, err)
 		}
 		return nil, fmt.Errorf("%w: %s", ErrStorageAssessmentStale, joinRisks(target.Risks))
-	case !acknowledgesRisks(spec.AcknowledgedRisks, target.Risks):
+	case !acknowledgesRisks(admission.AcknowledgedRisks, target.Risks):
 		if err := audit("risk_confirmation", details); err != nil {
 			return nil, fmt.Errorf("%w: persist rejected storage risk decision: %v", ErrRepositoryRiskConfirmationRequired, err)
 		}

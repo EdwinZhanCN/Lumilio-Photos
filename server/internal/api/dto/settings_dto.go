@@ -56,14 +56,13 @@ type MLSettingsDTO struct {
 	VideoSceneThreshold       float64 `json:"video_scene_threshold" example:"0.4"`
 }
 
+// RepositoryDefaultsDTO is the administrator's view of the storage-owned
+// repository defaults and the configured Default Storage Location path. It is
+// served only to an authenticated administrator (setup primary target).
 type RepositoryDefaultsDTO struct {
 	StorageLocation   string `json:"storage_location" example:"/data/storage"`
 	Strategy          string `json:"strategy" example:"date"`
 	DuplicateHandling string `json:"duplicate_handling" example:"rename"`
-	// Assessment reviews the Primary Repository target below the Default
-	// Storage Location and carries the token the setup create binds to.
-	// It is absent while the target cannot be assessed.
-	Assessment *StorageAssessmentDTO `json:"assessment,omitempty"`
 }
 
 type UpdateSystemSettingsDTO struct {

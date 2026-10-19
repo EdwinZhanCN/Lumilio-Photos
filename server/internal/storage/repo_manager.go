@@ -204,6 +204,15 @@ type RepositoryManager interface {
 	// AssessCreateTarget reviews a create target read-only and mints the
 	// consent token a later CreateRepository acknowledgement is bound to.
 	AssessCreateTarget(ctx context.Context, request AssessCreateTargetRequest) (*CreateTargetAssessment, error)
+	// AssessSetupPrimaryTarget reviews <default>/primary for first-run setup:
+	// creatable, adoptable, or a state that only a fresh destination resolves.
+	AssessSetupPrimaryTarget(ctx context.Context) (*SetupPrimaryAssessment, error)
+	// AdoptPrimaryRepository registers the compatible Repository already at
+	// <default>/primary as the Primary Repository, bound to that review.
+	AdoptPrimaryRepository(ctx context.Context, spec AdoptPrimarySpec) (*AdoptPrimaryResult, error)
+	// AssessDefaultStorageLocation compares storage.path with the registered
+	// default and the markers on disk, read-only.
+	AssessDefaultStorageLocation(ctx context.Context, configuredPath string) (DefaultStorageAssessment, error)
 }
 
 // DefaultRepositoryManager implements the RepositoryManager interface

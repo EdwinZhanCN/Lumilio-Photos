@@ -436,18 +436,23 @@ func run(
 	if err := repoManager.RecoverHostActions(ctx); err != nil {
 		return fmt.Errorf("recover native host actions: %w", err)
 	}
-	defaultStorageLocation, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
+	defaultStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
 	if err != nil {
 		return err
 	}
-	if degradedStorage {
+	if defaultStorage.Degraded {
+		// Restricted recovery runtime: the catalog is usable, HTTP starts, and
+		// the authenticated setup or Storage journey names the way out. No
+		// marker is provisioned or replaced here.
 		appLogger.Warn("default Storage Location requires recovery; continuing in degraded mode",
 			zap.String("operation", "storage_location.recovery_required"),
+			zap.String("reason", defaultStorage.Reason),
+			zap.Bool("registered", defaultStorage.Location != nil),
 			zap.String("path", appConfig.StorageConfig.Path))
 	} else {
 		appLogger.Info("default storage location initialized",
 			zap.String("operation", "storage_location.init"),
-			zap.String("path", defaultStorageLocation.Path),
+			zap.String("path", defaultStorage.Location.Path),
 		)
 	}
 	stagingManager := storage.NewStagingManager(repositoryFiles)
@@ -811,7 +816,7 @@ func run(
 	assetController.SetLocationResolver(assetLocationResolver)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
-	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
+	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path), controls.RepositoryManagerReady != nil)
 	albumController := handler.NewAlbumHandler(&albumService, queries, database.Writer, settingsService, lumenService)
 	musicController := handler.NewMusicHandler(musicService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager, repositoryFiles)
@@ -1002,40 +1007,71 @@ type defaultStorageRuntimeManager interface {
 	ListStorageLocations(context.Context) ([]repo.StorageLocation, error)
 }
 
-// ensureDefaultStorageForRuntime distinguishes a first-run initialization
-// failure from a previously registered portable identity that needs recovery.
-// The latter must not prevent the HTTP runtime and unrelated repositories from
-// starting in degraded mode.
-func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.StorageLocation, bool, error) {
+// defaultStorageStartup is what startup learned about the Default Storage
+// Location. Degraded means the runtime serves in restricted recovery mode:
+// Location is the registered default when one exists (offline or with an
+// invalid marker at its unchanged path) and nil when a fresh catalog found
+// an unusable marker at storage.path and registered nothing.
+type defaultStorageStartup struct {
+	Location *repo.StorageLocation
+	Degraded bool
+	Reason   string
+}
+
+const (
+	defaultStorageReasonOffline       = "default_storage_offline"
+	defaultStorageReasonMarkerInvalid = "default_storage_marker_invalid"
+)
+
+// ensureDefaultStorageForRuntime splits the catalog-first startup: a usable
+// catalog whose configured Default Storage Location cannot be used right now
+// still serves, so setup or the Storage page can diagnose it or choose
+// elsewhere; only a first run that cannot create its default at all, or a
+// configured path that claims to be a move of an established default
+// without proving its identity, stops the Server.
+func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (defaultStorageStartup, error) {
 	hostInstanceID, _ := os.Hostname()
 	storageLocation, err := manager.EnsureDefaultStorageLocation(ctx, path, storage.LifecycleRequest{
 		Actor: "server:config", HostInstanceID: hostInstanceID, ConfirmationType: "portable_identity_match",
 	})
 	if err == nil {
-		return storageLocation, false, nil
+		return defaultStorageStartup{Location: storageLocation}, nil
 	}
-	if !errors.Is(err, storage.ErrStorageLocationOffline) && !errors.Is(err, storage.ErrStorageLocationInvalid) {
-		return nil, false, fmt.Errorf("initialize default storage location: %w", err)
+	offline := errors.Is(err, storage.ErrStorageLocationOffline)
+	invalid := errors.Is(err, storage.ErrStorageLocationInvalid)
+	if !offline && !invalid {
+		return defaultStorageStartup{}, fmt.Errorf("%w: initialize default storage location: %v", ErrDefaultStorageUnavailable, err)
+	}
+	reason := defaultStorageReasonMarkerInvalid
+	if offline {
+		reason = defaultStorageReasonOffline
 	}
 	storageLocations, listErr := manager.ListStorageLocations(ctx)
 	if listErr != nil {
-		return nil, false, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
+		return defaultStorageStartup{}, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
 	}
 	for i := range storageLocations {
-		if storageLocations[i].Kind == dbtypes.StorageLocationKindDefault {
-			// A registered default failing at its unchanged configured path is a
-			// recoverable offline/missing-marker condition. A different configured
-			// path is a migration attempt; failure to prove its portable identity
-			// must fail startup so Desktop rolls the runtime intent back.
-			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(storageLocations[i].Path)
-			configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
-			if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
-				return nil, false, fmt.Errorf("validate default storage location migration: %w", err)
-			}
-			return &storageLocations[i], true, nil
+		if storageLocations[i].Kind != dbtypes.StorageLocationKindDefault {
+			continue
 		}
+		// A registered default failing at its unchanged configured path is a
+		// recoverable offline/invalid-marker condition. A different configured
+		// path is a migration attempt; failure to prove its portable identity
+		// must fail startup so Desktop rolls the runtime intent back.
+		registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(storageLocations[i].Path)
+		configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
+		if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
+			return defaultStorageStartup{}, fmt.Errorf("%w: validate default storage location migration: %v", ErrDefaultStorageMigrationRejected, err)
+		}
+		return defaultStorageStartup{Location: &storageLocations[i], Degraded: true, Reason: reason}, nil
 	}
-	return nil, false, fmt.Errorf("initialize default storage location: %w", err)
+	if invalid {
+		// First run against a folder that already carries a marker this
+		// build cannot adopt (corrupt, newer, or a Repository). Nothing is
+		// provisioned over it; the catalog serves so setup can say so.
+		return defaultStorageStartup{Degraded: true, Reason: reason}, nil
+	}
+	return defaultStorageStartup{}, fmt.Errorf("%w: initialize default storage location: %v", ErrDefaultStorageUnavailable, err)
 }
 
 func monitorRepositoryCapacity(ctx context.Context, manager *storage.DefaultRepositoryManager, logger *zap.Logger) {
