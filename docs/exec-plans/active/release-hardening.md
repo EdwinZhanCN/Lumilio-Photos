@@ -251,8 +251,10 @@ S13–S15 wait for everything before them and for an empty milestone.
   return an error so startup reports a diagnosable failure instead.
 
 ### Phase 5 — Low-risk cleanups (only if Phases 0–4 are done)
-- [ ] Pure-move splits verified line-for-line: `music_service.go`,
-  `asset_service.go`, `app/app.go`, `StudioEditor.tsx`, `AccountTab.tsx`.
+- [ ] Pure-move splits verified line-for-line: `app/app.go`,
+  `StudioEditor.tsx`, `AccountTab.tsx`. (`music_service.go` and
+  `asset_service.go` moved to [server-structure.md](server-structure.md),
+  sessions B3 and B8, on 2026-10-19.)
 - [ ] Agent: per-tool progress and duration in tool chips; copy-answer action.
 
 ### Phase 6 — Release candidate
