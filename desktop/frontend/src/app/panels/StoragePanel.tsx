@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StorageService } from "../../../bindings/desktop/internal/control/index.js";
 import {
+  ErrorCode,
   RuntimePhase,
   type DesktopSnapshot,
   type HostActionTicket,
@@ -12,7 +13,7 @@ import { type ToastInput } from "@/components/motion/animated-toast-stack";
 import { Button, StatefulButton } from "@/components/motion/button";
 import { PageHeading, SettingRow, SettingsSection } from "@/components/settings/setting-layout";
 import { type SettingsDraftController } from "@/features/settings/use-settings-draft";
-import { errorMessage } from "@/lib/desktop/errors";
+import { errorCodeOf, errorMessage } from "@/lib/desktop/errors";
 import { ActionNotice, RowActions, useTrackedOperation } from "../shared";
 
 export function StoragePanel({
@@ -79,6 +80,12 @@ export function StoragePanel({
       );
       hostOperation.track(receipt);
     } catch (reason: unknown) {
+      // Dismissing the picker is a normal outcome: the request stays
+      // pending for another approval or a decline, so nothing failed.
+      if (errorCodeOf(reason) === ErrorCode.ErrorSelectionCancelled) {
+        hostOperation.reset();
+        return;
+      }
       hostOperation.reject(reason);
     }
   };
@@ -306,6 +313,8 @@ function hostActionRiskLabel(
 ): string {
   if (warning === "network_filesystem") return t("storage.riskNetwork", "Network filesystem");
   if (warning === "removable_storage") return t("storage.riskRemovable", "Removable storage");
+  if (warning === "non_default_location")
+    return t("storage.riskNonDefault", "Outside the Default Storage Location");
   if (warning === "cloud_sync_directory")
     return t("storage.riskCloudSync", "Cloud-sync managed folder");
   if (warning === "mount_fingerprint_changed")

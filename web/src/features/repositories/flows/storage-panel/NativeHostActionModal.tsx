@@ -19,6 +19,7 @@ import {
   loadNativeHostActionID,
   saveNativeHostActionID,
 } from "../../state/nativeHostActionState";
+import { StorageRiskConfirmation } from "../../components/StorageRiskConfirmation";
 
 const terminalStatuses = new Set(["succeeded", "failed", "cancelled", "expired"]);
 
@@ -43,6 +44,7 @@ export default function NativeHostActionModal({
   const [action, setAction] = useState<HostAction | null>(null);
   const [name, setName] = useState("");
   const [confirmSeparate, setConfirmSeparate] = useState(false);
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestID = useRef(createUUID());
   const persistenceScope = storageLocationId || repositoryId || "new";
@@ -96,9 +98,25 @@ export default function NativeHostActionModal({
     setAction(null);
     setName("");
     setConfirmSeparate(false);
+    setRiskAcknowledged(false);
     setError(null);
     requestID.current = createUUID();
   }, [isOpen]);
+
+  // An acknowledgement belongs to one review. When the Server presents a
+  // different risk set, because the disk or folder changed under the
+  // decision, the acknowledgement is asked for again.
+  const reviewRisks = useMemo(
+    () =>
+      action?.result?.conflict?.type === "storage_risk"
+        ? (action.result.conflict.risk_warnings ?? [])
+        : [],
+    [action?.result?.conflict],
+  );
+  const reviewKey = reviewRisks.join(",");
+  useEffect(() => {
+    setRiskAcknowledged(false);
+  }, [reviewKey]);
 
   const title = hostActionTitle(kind, t);
   const purpose = hostActionPurpose(kind, t);
@@ -152,13 +170,13 @@ export default function NativeHostActionModal({
     }
   };
 
-  const resolve = async (resolution: HostActionResolution) => {
+  const resolve = async (resolution: HostActionResolution, acknowledgedRisks?: string[]) => {
     if (!action?.id) return;
     setError(null);
     try {
       const resolved = await resolveMutation.mutateAsync({
         params: { path: { id: action.id } },
-        body: { resolution },
+        body: { resolution, acknowledged_risks: acknowledgedRisks },
       });
       setAction(resolved);
     } catch (reason: unknown) {
@@ -173,6 +191,18 @@ export default function NativeHostActionModal({
         ),
       );
     }
+  };
+
+  // An expired, declined, or failed request is a finished outcome, not a lost
+  // form: the next request starts from the retained form under a new
+  // idempotency key.
+  const restart = () => {
+    clearNativeHostActionID(kind, persistenceScope);
+    requestID.current = createUUID();
+    setAction(null);
+    setConfirmSeparate(false);
+    setRiskAcknowledged(false);
+    setError(null);
   };
 
   const cancel = async () => {
@@ -311,6 +341,42 @@ export default function NativeHostActionModal({
               </button>
             </div>
           </div>
+        ) : action.status === "needs_decision" && conflict?.type === "storage_risk" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-base-content/70">
+              {t(
+                "manage.repositories.hostAction.riskHint",
+                "Desktop chose a folder that Lumilio reviewed. Acknowledge its risks here, or in Desktop, to continue; nothing is written until then.",
+              )}
+            </p>
+            <StorageRiskConfirmation
+              risks={reviewRisks}
+              checked={riskAcknowledged}
+              onChange={setRiskAcknowledged}
+              disabled={busy}
+            />
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => void cancel()}
+                disabled={busy}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void resolve("confirm_risk", [...reviewRisks])}
+                disabled={busy || !riskAcknowledged}
+              >
+                {resolveMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : null}
+                {t("manage.repositories.hostAction.confirmRisk", "Confirm and continue")}
+              </button>
+            </div>
+          </div>
         ) : action.status === "needs_decision" && conflict ? (
           <div className="space-y-4">
             <div role="alert" className="alert alert-warning alert-soft items-start text-sm">
@@ -392,13 +458,44 @@ export default function NativeHostActionModal({
               </button>
             </div>
           </div>
+        ) : action.status === "expired" || action.status === "cancelled" ? (
+          <div className="space-y-4">
+            <div role="status" className="alert alert-info alert-soft text-sm">
+              <span>
+                {action.status === "expired"
+                  ? t(
+                      "manage.repositories.hostAction.expired",
+                      "The Desktop request expired before it was approved. Nothing was changed.",
+                    )
+                  : t(
+                      "manage.repositories.hostAction.cancelled",
+                      "The request was declined in Desktop or cancelled. Nothing was changed.",
+                    )}
+              </span>
+            </div>
+            <div className="modal-action">
+              <button type="button" className="btn btn-ghost" onClick={onClose}>
+                {t("common.close", { defaultValue: "Close" })}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={restart}>
+                {t("manage.repositories.hostAction.sendAgain", "Send again")}
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
             <div role="alert" className="alert alert-error alert-soft text-sm">
               <AlertTriangle className="size-5 shrink-0" />
               <span>
                 {localizeProblemReference(
-                  action.problem,
+                  action.problem
+                    ? {
+                        ...action.problem,
+                        action: action.refusal?.action,
+                        blockers: action.refusal?.blockers,
+                        alternatives: action.refusal?.alternatives,
+                      }
+                    : undefined,
                   t,
                   t(
                     "manage.repositories.hostAction.ended",
@@ -408,8 +505,11 @@ export default function NativeHostActionModal({
               </span>
             </div>
             <div className="modal-action">
-              <button type="button" className="btn btn-primary" onClick={onClose}>
+              <button type="button" className="btn btn-ghost" onClick={onClose}>
                 {t("common.close", { defaultValue: "Close" })}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={restart}>
+                {t("manage.repositories.hostAction.sendAgain", "Send again")}
               </button>
             </div>
           </div>

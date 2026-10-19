@@ -164,16 +164,34 @@ func (h *HostActionHandler) ResolveHostAction(c *gin.Context) {
 		writeHostActionOwnershipError(c, err)
 		return
 	}
-	action, err := h.manager.ResolveHostAction(c.Request.Context(), c.Param("id"), req.Resolution, req.RiskConfirmation)
+	action, err := h.manager.ResolveHostAction(c.Request.Context(), c.Param("id"), req.Resolution, req.AcknowledgedRisks)
 	if err != nil {
-		if errors.Is(err, storage.ErrHostActionDecisionNeeded) || errors.Is(err, storage.ErrRepositoryOriginalOnline) {
-			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
-		} else {
-			api.WriteProblem(c, api.BadRequest(err))
-		}
+		writeHostActionResolveFailure(c, err)
 		return
 	}
 	api.JSONOK(c, toHostActionDTO(action))
+}
+
+// writeHostActionResolveFailure maps a refused decision to the same Problems
+// the HTTP storage commands use, so the Web renders one vocabulary for both
+// transports: the consent gate with its risk codes, a stale review, and the
+// typed reconnect refusals.
+func writeHostActionResolveFailure(c *gin.Context, err error) {
+	var consent *storage.StorageRiskConfirmationError
+	switch {
+	case errors.As(err, &consent):
+		api.WriteProblem(c, problem.NewStorageConfirmationRequired(err, storage.RiskCodes(consent.Risks), ""))
+	case errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired):
+		api.WriteProblem(c, problem.NewStorageConfirmationRequired(err, []string{}, ""))
+	case errors.Is(err, storage.ErrStorageAssessmentStale):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageAssessmentStale, err))
+	case errors.Is(err, storage.ErrRepositoryOriginalOnline):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageOriginalOnline, err))
+	case errors.Is(err, storage.ErrHostActionDecisionNeeded), errors.Is(err, storage.ErrHostActionNotPending):
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+	default:
+		api.WriteProblem(c, api.BadRequest(err))
+	}
 }
 
 // CancelHostAction cancels a pending native host request.
@@ -253,16 +271,39 @@ func toHostActionDTO(action storage.HostAction) dto.HostActionDTO {
 		value := problem.ReferenceFor(problem.HostActionExpired, action.ActionID, true)
 		operationProblem = &value
 	case storage.HostActionFailed:
-		value := problem.ReferenceFor(problem.HostActionFailed, action.ActionID, true)
+		value := problem.ReferenceFor(hostActionFailureDescriptor(action.ErrorCode), action.ActionID, true)
 		operationProblem = &value
+	}
+	var refusal *dto.HostActionRefusalDTO
+	if action.Result != nil && action.Result.Refusal != nil {
+		refusal = &dto.HostActionRefusalDTO{
+			Action:       action.Result.Refusal.Action,
+			Blockers:     append([]string(nil), action.Result.Refusal.Blockers...),
+			Alternatives: append([]string(nil), action.Result.Refusal.Alternatives...),
+		}
 	}
 	return dto.HostActionDTO{
 		ID: action.ActionID, RequestID: action.RequestID, Kind: string(action.Kind), Actor: action.Actor,
 		Purpose: action.Summary.Purpose, Name: action.Summary.Name, ExpectedVersion: action.ExpectedVersion,
 		StorageLocationID: action.Summary.StorageLocationID, RepositoryID: action.Summary.RepositoryID,
-		Status: string(action.Status), Result: result, Problem: operationProblem,
+		Status: string(action.Status), Result: result, Problem: operationProblem, Refusal: refusal,
 		ExpiresAt: action.ExpiresAt, CreatedAt: action.CreatedAt, UpdatedAt: action.UpdatedAt, CompletedAt: action.CompletedAt,
 	}
+}
+
+// hostActionFailureDescriptor projects a failed task's error code: a code
+// that names a registered Problem type (the typed storage refusals the
+// native path shares with the HTTP commands) is that Problem; any other
+// code is the generic host-action failure.
+func hostActionFailureDescriptor(code string) problem.Descriptor {
+	code = strings.TrimSpace(code)
+	if code == "" || strings.Contains(code, "host-action") {
+		return problem.HostActionFailed
+	}
+	if descriptor, ok := problem.Lookup(problem.Namespace + code); ok {
+		return descriptor
+	}
+	return problem.HostActionFailed
 }
 
 func hostActionResolutions(actions []string) []string {

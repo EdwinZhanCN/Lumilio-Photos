@@ -20,7 +20,7 @@ type ownedHostActionManagerStub struct {
 	action        storage.HostAction
 	resolveCalled bool
 	resolution    string
-	riskConfirmed bool
+	acknowledged  []string
 	cancelCalled  bool
 }
 
@@ -28,10 +28,10 @@ func (s *ownedHostActionManagerStub) GetHostAction(context.Context, string) (sto
 	return s.action, nil
 }
 
-func (s *ownedHostActionManagerStub) ResolveHostAction(_ context.Context, _ string, resolution string, riskConfirmation ...bool) (storage.HostAction, error) {
+func (s *ownedHostActionManagerStub) ResolveHostAction(_ context.Context, _ string, resolution string, acknowledgedRisks []string) (storage.HostAction, error) {
 	s.resolveCalled = true
 	s.resolution = resolution
-	s.riskConfirmed = len(riskConfirmation) > 0 && riskConfirmation[0]
+	s.acknowledged = acknowledgedRisks
 	return s.action, nil
 }
 
@@ -43,7 +43,8 @@ func TestHostActionRiskDecisionProjectionAndConfirmationRequest(t *testing.T) {
 		ActionID: "action-risk", ActorUserID: &ownerID, Status: storage.HostActionNeedsDecision,
 		Result: &storage.HostActionResult{Conflict: &storage.HostActionConflict{
 			Type: "storage_risk", Actions: []string{"confirm_risk"},
-			RiskWarnings: []string{"network_filesystem", "mount_fingerprint_changed"},
+			RiskWarnings: []string{"removable_storage", "mount_fingerprint_changed"},
+			Fingerprint:  "0123456789abcdef",
 		}},
 		ExpiresAt: now.Add(time.Minute), CreatedAt: now, UpdatedAt: now,
 	}}
@@ -54,18 +55,121 @@ func TestHostActionRiskDecisionProjectionAndConfirmationRequest(t *testing.T) {
 		projected.Result.Conflict.AllowedResolutions[0] != "confirm_risk" {
 		t.Fatalf("risk projection = %#v", projected)
 	}
+	if encoded, _ := json.Marshal(projected); strings.Contains(string(encoded), "0123456789abcdef") {
+		t.Fatalf("HTTP projection leaked the review fingerprint: %s", encoded)
+	}
 
 	handler := NewHostActionHandler(manager, true)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Params = gin.Params{{Key: "id", Value: "action-risk"}}
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/host-actions/action-risk/resolve",
-		strings.NewReader(`{"resolution":"confirm_risk","risk_confirmation":true}`))
+		strings.NewReader(`{"resolution":"confirm_risk","acknowledged_risks":["removable_storage","mount_fingerprint_changed"]}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: int(ownerID), Role: "admin"})
 	handler.ResolveHostAction(ctx)
-	if recorder.Code != http.StatusOK || !manager.resolveCalled || manager.resolution != "confirm_risk" || !manager.riskConfirmed {
-		t.Fatalf("risk resolve status=%d body=%s resolution=%q confirmed=%v", recorder.Code, recorder.Body.String(), manager.resolution, manager.riskConfirmed)
+	if recorder.Code != http.StatusOK || !manager.resolveCalled || manager.resolution != "confirm_risk" ||
+		len(manager.acknowledged) != 2 || manager.acknowledged[0] != "removable_storage" {
+		t.Fatalf("risk resolve status=%d body=%s resolution=%q acknowledged=%v", recorder.Code, recorder.Body.String(), manager.resolution, manager.acknowledged)
+	}
+}
+
+type refusingHostActionManagerStub struct {
+	ownedHostActionManagerStub
+	err error
+}
+
+func (s *refusingHostActionManagerStub) ResolveHostAction(context.Context, string, string, []string) (storage.HostAction, error) {
+	return storage.HostAction{}, s.err
+}
+
+// A refused decision answers with the same Problems as the HTTP storage
+// commands: the consent gate names the risk codes still to acknowledge, and a
+// review whose facts moved is a stale assessment.
+func TestHostActionResolveRefusalsUseTheSharedStorageProblems(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ownerID := int32(7)
+	for _, test := range []struct {
+		name     string
+		err      error
+		wantType string
+		wantBody string
+	}{
+		{
+			name:     "consent names the outstanding risks",
+			err:      &storage.StorageRiskConfirmationError{Risks: []storage.StorageRisk{storage.RiskRemovable, storage.RiskNonDefault}},
+			wantType: "https://lumilio.org/problems/storage/confirmation-required",
+			wantBody: `"risks":["removable_storage","non_default_location"]`,
+		},
+		{
+			name:     "moved facts are a stale assessment",
+			err:      storage.ErrStorageAssessmentStale,
+			wantType: "https://lumilio.org/problems/storage/assessment-stale",
+		},
+		{
+			name:     "an original that is online is typed",
+			err:      storage.ErrRepositoryOriginalOnline,
+			wantType: "https://lumilio.org/problems/storage/original-online",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			manager := &refusingHostActionManagerStub{err: test.err}
+			manager.action = storage.HostAction{ActionID: "action-risk", ActorUserID: &ownerID, Status: storage.HostActionNeedsDecision}
+			handler := NewHostActionHandler(manager, true)
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Params = gin.Params{{Key: "id", Value: "action-risk"}}
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/native-tasks/action-risk/resolve",
+				strings.NewReader(`{"resolution":"confirm_risk","acknowledged_risks":["removable_storage"]}`))
+			ctx.Request.Header.Set("Content-Type", "application/json")
+			ctx.Set("current_user", &service.UserResponse{UserID: int(ownerID), Role: "admin"})
+			handler.ResolveHostAction(ctx)
+			body := recorder.Body.String()
+			if recorder.Code != http.StatusConflict || !strings.Contains(body, test.wantType) || !strings.Contains(body, test.wantBody) {
+				t.Fatalf("status=%d body=%s", recorder.Code, body)
+			}
+		})
+	}
+}
+
+// A failed task whose cause is a typed storage refusal is projected as that
+// Problem with the policy verdict, so the Web renders the HTTP vocabulary;
+// an untyped failure stays the generic host-action failure, and an expired
+// task is its own normal outcome.
+func TestHostActionFailureProjectionKeepsTheTypedReason(t *testing.T) {
+	now := time.Now().UTC()
+	refused := toHostActionDTO(storage.HostAction{
+		ActionID: "action-refused", Kind: storage.HostActionLocateRepository, Status: storage.HostActionFailed,
+		ErrorCode: "storage/action-unavailable", ErrorMessage: "withheld",
+		Result: &storage.HostActionResult{Refusal: &storage.HostActionRefusal{
+			Action: "reconnect", Blockers: []string{"primary_protected", "original_available"}, Alternatives: []string{"default_configuration"},
+		}},
+		ExpiresAt: now.Add(time.Minute), CreatedAt: now, UpdatedAt: now,
+	})
+	if refused.Problem == nil || refused.Problem.Type != "https://lumilio.org/problems/storage/action-unavailable" ||
+		refused.Refusal == nil || refused.Refusal.Action != "reconnect" || len(refused.Refusal.Blockers) != 2 || refused.Refusal.Alternatives[0] != "default_configuration" {
+		t.Fatalf("refused projection = %#v refusal=%#v", refused.Problem, refused.Refusal)
+	}
+	network := toHostActionDTO(storage.HostAction{
+		ActionID: "action-network", Kind: storage.HostActionAuthorizeStorageLocation, Status: storage.HostActionFailed,
+		ErrorCode: "storage/unsupported-filesystem", ExpiresAt: now.Add(time.Minute), CreatedAt: now, UpdatedAt: now,
+	})
+	if network.Problem == nil || network.Problem.Type != "https://lumilio.org/problems/storage/unsupported-filesystem" || network.Refusal != nil {
+		t.Fatalf("network projection = %#v", network.Problem)
+	}
+	generic := toHostActionDTO(storage.HostAction{
+		ActionID: "action-generic", Kind: storage.HostActionOpenRepository, Status: storage.HostActionFailed,
+		ErrorCode: "open_repository_failed", ExpiresAt: now.Add(time.Minute), CreatedAt: now, UpdatedAt: now,
+	})
+	if generic.Problem == nil || generic.Problem.Type != "https://lumilio.org/problems/storage/host-action-failed" {
+		t.Fatalf("generic projection = %#v", generic.Problem)
+	}
+	expired := toHostActionDTO(storage.HostAction{
+		ActionID: "action-expired", Kind: storage.HostActionOpenRepository, Status: storage.HostActionExpired,
+		ErrorCode: "expired", ExpiresAt: now.Add(-time.Minute), CreatedAt: now, UpdatedAt: now,
+	})
+	if expired.Problem == nil || expired.Problem.Type != "https://lumilio.org/problems/storage/host-action-expired" {
+		t.Fatalf("expired projection = %#v", expired.Problem)
 	}
 }
 

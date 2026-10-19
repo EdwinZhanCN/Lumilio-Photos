@@ -27,7 +27,7 @@ type RepositoryControl interface {
 	ResolveRepositoryConflict(ctx context.Context, action, repositoryID, path string, requestID ...string) (RepositoryInfo, error)
 	ListPendingHostActions(ctx context.Context) ([]HostActionInfo, error)
 	SetHostActionExpectedVersion(ctx context.Context, actionID, nonce string, version uint64) (HostActionInfo, error)
-	ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, riskConfirmation bool) (HostActionInfo, error)
+	ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, acknowledgedRisks []string) (HostActionInfo, error)
 	CancelHostAction(ctx context.Context, actionID string) (HostActionInfo, error)
 }
 
@@ -239,10 +239,15 @@ func (c *repositoryControl) SetHostActionExpectedVersion(ctx context.Context, ac
 	return hostActionInfo(action), nil
 }
 
-func (c *repositoryControl) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, riskConfirmation bool) (HostActionInfo, error) {
-	action, err := c.manager.ExecuteHostAction(ctx, actionID, nonce, hostInstanceID, selectedPath, riskConfirmation)
+// ExecuteHostAction runs the task on the folder Desktop chose. A task that
+// stops at a storage-risk review, including one whose facts moved under an
+// acknowledgement, is a presented decision, not a failure: Desktop lists it
+// again with the current risk codes.
+func (c *repositoryControl) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, acknowledgedRisks []string) (HostActionInfo, error) {
+	action, err := c.manager.ExecuteHostAction(ctx, actionID, nonce, hostInstanceID, selectedPath, acknowledgedRisks)
 	if err != nil {
-		if errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired) && action.Status == storage.HostActionNeedsDecision {
+		if (errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired) || errors.Is(err, storage.ErrStorageAssessmentStale)) &&
+			action.Status == storage.HostActionNeedsDecision {
 			return hostActionInfo(action), nil
 		}
 		return HostActionInfo{}, err

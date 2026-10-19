@@ -4,8 +4,8 @@ Status: active, created 2026-10-07; principal owner decisions frozen
 2026-10-07. P0 merged as PR #246. P1 merged as PR #247: observation and
 assessment core, stat panic fix, guarded atomic marker primitive, and
 swappable lock/identity/watch adapters. P2 merged as PR #250 (session S2,
-2026-10-16). P3a (commands) lands in this PR (session S3); P3b (native
-selection and review) follows. P2 delivered (session S2):
+2026-10-16). P3a (commands) merged as PR #252 (session S3a, 2026-10-18);
+P3b (native selection and review) lands in this PR (session S3b). P2 delivered (session S2):
 the create contract and shared risk review, closing #242. P3–P8 remain
 outstanding. Each fixing PR lands its regression tests and updates this
 Status and the evidence tables.
@@ -458,6 +458,89 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   reconnect entry until P6 renames it with its prerequisites; the entry is
   now shown only for a positively unavailable regular Repository. Blocked
   actions are not yet explained in the Inspector (P7 presenters).
+
+### P3b delivered (2026-10-18)
+
+- **The native host goes through the shared assessment.** `ExecuteHostAction`
+  samples the folder Desktop chose with `AssessStorageTarget` through the
+  installed P1 observer (`reviewHostActionTarget`): authorizing or
+  reconnecting a Storage Location is a non-default destination, opening or
+  reconnecting a Repository takes the kind of the Storage Location that
+  contains the folder, and a reconnect adds the continuity risk
+  `mount_fingerprint_changed` when the selected tree sits on another mount
+  than the registration recorded. A classification problem fails the task
+  under that typed Problem (`storage/unsupported-filesystem`,
+  `storage/not-a-mounted-volume`, `storage/permission-denied`,
+  `storage/observation-unknown`, `storage/materialization-required`) before
+  anything is written, and no decision can confirm past it; a folder that is
+  gone by the time the task runs is unavailable, never created. The legacy
+  `inspectHostActionStoragePath` warnings are removed from the native path
+  (candidates keep theirs until P6/P7).
+- **Risks are acknowledged by code, bound to the facts.** A `storage_risk`
+  decision carries the P1 risk codes and a fingerprint digest of the facts
+  (task, path, risk set, classification, marker and mount facts; capacity
+  excluded). `confirm_risk` requires `acknowledged_risks` covering every
+  code, from the Web (`ResolveHostActionRequestDTO.acknowledged_risks`) or
+  from Desktop, which acknowledges the codes its ticket displayed. The
+  resume re-samples the folder; a different fingerprint stores the current
+  review and answers `storage/assessment-stale`, so consent never outlives
+  the facts it was given for. The `risk_confirmation` boolean leaves the
+  host-action contract (`app.RepositoryControl.ExecuteHostAction` takes the
+  acknowledged codes).
+- **Policy equivalence.** A `locate_repository` task runs `admitReconnect`
+  before the folder review, and every command failure with a typed cause is
+  recorded under that cause's Problem path (`storage/action-unavailable`
+  with the verdict's action, blockers and alternatives persisted as
+  `HostActionResult.Refusal`; `storage/original-online`,
+  `storage/identity-mismatch`, `storage/ownership-unavailable`,
+  `storage/busy`). `HostActionDTO.problem` names the typed Problem and
+  `refusal` carries the verdict, so the Web presents the same en/zh copy as
+  the HTTP command; an untyped failure stays `storage/host-action-failed`.
+- **Expired and dismissed are normal outcomes (R9).**
+  `storage/host-action-expired` is 409 with a recovery text, the Web modal
+  presents expired and cancelled as information with the form retained and a
+  **Send again** restart under a new idempotency key, and the dismissed
+  Desktop picker is `selection_cancelled` (no failure toast; the request
+  stays pending). Presenting a request in Desktop rebinds its expected
+  storage version (`SetHostActionExpectedVersion` rebinds through the nonce;
+  `ListHostActions` rebinds whenever the snapshot moved), so a changed
+  snapshot never leaves a request un-approvable.
+- **Web review.** `NativeHostActionModal` renders a `storage_risk` decision
+  with the shared `StorageRiskConfirmation` (the create review's component
+  and copy), resets the acknowledgement when the risk set changes, and
+  confirms by code; Desktop's ticket labels gain `non_default_location`.
+- **Evidence (R9 task outcomes, R10 domain reasons over native transport).**
+  Server: `TestHostActionRequiresAcknowledgedRiskCodesBeforeMutation`
+  (injected removable disk → codes `removable_storage`,
+  `non_default_location`; empty, partial, wrong-resolution acknowledgements
+  refused without mutation; full set succeeds; `storage_risk_confirmed`
+  audit), `TestHostActionRefusesNetworkStorageWithoutADecision` (injected
+  CIFS → failed under `storage/unsupported-filesystem`, not confirmable,
+  not re-runnable), `TestHostActionStaleAcknowledgementPresentsTheCurrentReview`
+  (device replaced under the acknowledgement → stale, new fingerprint, no
+  mutation, current review acknowledgeable),
+  `TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation`
+  (open, Repository reconnect, Location reconnect with the continuity risk),
+  `TestHostActionLocateRefusalCarriesThePolicyBlockers` (Primary reconnect
+  through the native host → `storage/action-unavailable` with
+  `primary_protected`, primary unmoved), the rebind contract in
+  `TestHostActionIsDurableIdempotentAndNativeApproved`; handler tests for the
+  consent/stale/original-online Problems on resolve and for the typed
+  failure projection without the fingerprint; the storage package under
+  `-race -shuffle=on -count=2` passes. Desktop: the embedded host-action
+  harness in `desktop/internal/storage/host_action_controller_test.go`
+  (stale rebind on listing, dismissed picker as `selection_cancelled` with
+  no execution or operation, canonical selection without acknowledgements,
+  acknowledged codes without reopening the picker, identity decisions not
+  approvable from Desktop). Web: the StoragePanel flow spec drives the real
+  panel through a removable-disk review confirmed by code, an expired
+  request restarted with the form retained under a new idempotency key, and
+  a withheld reconnect rendered with its blocker copy.
+- **Deviations.** Docker/standalone candidates (`/storage/candidates`) still
+  use the legacy warnings and `risk_confirmation`; they cut over with the
+  native/Location journeys (P6) and the classifier removal (P7). The Desktop
+  ticket still lists risks as a joined line rather than the shared review
+  component (P7 presenters).
 
 ### P4 — Private preservation and recovery
 

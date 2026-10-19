@@ -37,11 +37,15 @@ type Options struct {
 	Operations      *operation.Registry
 	PickDirectory   func(string) (string, error)
 	OpenFileManager func(string, bool) error
+	// Control replaces the running runtime's repository control. The
+	// embedded host-action harness injects it; production leaves it nil.
+	Control runtime.StorageControl
 }
 
 type Controller struct {
 	paths      platform.Paths
 	runtime    *runtime.Controller
+	control    runtime.StorageControl
 	store      *state.Store
 	operations *operation.Registry
 
@@ -57,7 +61,7 @@ func NewController(options Options) *Controller {
 	if options.Operations == nil {
 		options.Operations = operation.New()
 	}
-	return &Controller{paths: options.Paths, runtime: options.Runtime, store: options.Store, operations: options.Operations, pick: options.PickDirectory, open: options.OpenFileManager}
+	return &Controller{paths: options.Paths, runtime: options.Runtime, control: options.Control, store: options.Store, operations: options.Operations, pick: options.PickDirectory, open: options.OpenFileManager}
 }
 
 // SetPickDirectory installs the host-owned native directory picker. The
@@ -76,12 +80,10 @@ func (c *Controller) SetOpenFileManager(open func(string, bool) error) {
 }
 
 func (c *Controller) ListShortcuts(ctx context.Context) ([]dto.StorageShortcut, error) {
-	if c.runtime != nil {
-		if control := c.runtime.RepositoryControl(); control != nil {
-			locations, err := control.ListStorageLocations(ctx)
-			if err == nil {
-				return c.refresh(locations)
-			}
+	if control, err := c.repositoryControl(); err == nil && control != nil {
+		locations, err := control.ListStorageLocations(ctx)
+		if err == nil {
+			return c.refresh(locations)
 		}
 	}
 	cache, err := c.loadCache()
@@ -152,9 +154,12 @@ func (c *Controller) ListHostActions(ctx context.Context) ([]dto.HostActionTicke
 	if err != nil {
 		return nil, err
 	}
+	// Listing is presenting: each request is bound to the storage snapshot
+	// the person now sees, so a request bound to an older snapshot is rebound
+	// here instead of staying un-approvable after the snapshot moved.
 	currentVersion := c.store.Get().Storage.Version
 	for index := range actions {
-		if actions[index].ExpectedVersion == 0 && currentVersion != 0 {
+		if actions[index].ExpectedVersion != currentVersion && currentVersion != 0 {
 			bound, bindErr := control.SetHostActionExpectedVersion(ctx, actions[index].ID, actions[index].Nonce, currentVersion)
 			if bindErr != nil {
 				return nil, bindErr
@@ -205,7 +210,14 @@ func (c *Controller) ApproveHostAction(requestID string, expectedVersion uint64,
 	if selected.Status == "needs_decision" && len(selected.RiskWarnings) == 0 {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "host action awaits an administrator recovery decision in the Web app")
 	}
+	// Approving a presented risk review acknowledges exactly the risk codes
+	// the ticket showed; the Server re-samples the folder and refuses an
+	// acknowledgement whose facts have since moved.
+	var acknowledgedRisks []string
 	riskConfirmation := selected.Status == "needs_decision" && len(selected.RiskWarnings) > 0
+	if riskConfirmation {
+		acknowledgedRisks = append([]string(nil), selected.RiskWarnings...)
+	}
 	canonical := ""
 	if !riskConfirmation {
 		c.openMu.Lock()
@@ -216,7 +228,9 @@ func (c *Controller) ApproveHostAction(requestID string, expectedVersion uint64,
 		}
 		path, pickErr := pick(hostActionPickerTitle(*selected))
 		if pickErr != nil || strings.TrimSpace(path) == "" {
-			return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "directory selection was cancelled")
+			// Dismissing the picker is a normal outcome: the request stays
+			// pending and can be approved again or declined.
+			return dto.OperationReceipt{}, operation.NewError(dto.ErrorSelectionCancelled, "directory selection was cancelled")
 		}
 		canonical, err = canonicalShortcutPath(path)
 		if err != nil {
@@ -229,7 +243,7 @@ func (c *Controller) ApproveHostAction(requestID string, expectedVersion uint64,
 	}
 	instanceID := c.store.Get().InstanceID
 	go func() {
-		_, callErr := control.ExecuteHostAction(context.Background(), actionID, nonce, instanceID, canonical, riskConfirmation)
+		_, callErr := control.ExecuteHostAction(context.Background(), actionID, nonce, instanceID, canonical, acknowledgedRisks)
 		if callErr == nil {
 			if locations, listErr := control.ListStorageLocations(context.Background()); listErr == nil {
 				_, callErr = c.refresh(locations)
@@ -271,6 +285,9 @@ func hostActionPickerTitle(action runtime.HostAction) string {
 }
 
 func (c *Controller) repositoryControl() (runtime.StorageControl, error) {
+	if c.control != nil {
+		return c.control, nil
+	}
 	if c.runtime == nil {
 		return nil, operation.NewError(dto.ErrorRepositoryControlUnavailable, "repository control is unavailable")
 	}

@@ -22,6 +22,9 @@ const (
 	ErrorLumenNotInstalled            ErrorCode = "lumen_not_installed"
 	ErrorLumenOwnerBusy               ErrorCode = "lumen_owner_busy"
 	ErrorRecoveryRequired             ErrorCode = "recovery_required"
+	// ErrorSelectionCancelled is the normal outcome of a native directory
+	// picker the person dismissed; the request it was answering stays pending.
+	ErrorSelectionCancelled ErrorCode = "selection_cancelled"
 )
 
 // Error is the only error shape exposed through Wails bindings and events.

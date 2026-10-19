@@ -1930,7 +1930,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "status": {
-                        "const": 500,
+                        "const": 409,
                         "type": "integer"
                     },
                     "type": {
@@ -5948,6 +5948,9 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "risk_warnings": {
+                        "example": [
+                            "removable_storage"
+                        ],
                         "items": {
                             "type": "string"
                         },
@@ -5959,6 +5962,11 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "type": {
+                        "enum": [
+                            "repository_identity",
+                            "storage_location_identity",
+                            "storage_risk"
+                        ],
                         "example": "repository_identity",
                         "type": "string"
                     }
@@ -6002,6 +6010,9 @@ const docTemplate = `{
                         "example": "Open an existing photo repository",
                         "type": "string"
                     },
+                    "refusal": {
+                        "$ref": "#/components/schemas/dto.HostActionRefusalDTO"
+                    },
                     "repository_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
@@ -6014,6 +6025,15 @@ const docTemplate = `{
                         "$ref": "#/components/schemas/dto.HostActionResultDTO"
                     },
                     "status": {
+                        "enum": [
+                            "pending",
+                            "running",
+                            "needs_decision",
+                            "succeeded",
+                            "failed",
+                            "cancelled",
+                            "expired"
+                        ],
                         "example": "pending",
                         "type": "string"
                     },
@@ -6023,6 +6043,41 @@ const docTemplate = `{
                     },
                     "updated_at": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.HostActionRefusalDTO": {
+                "properties": {
+                    "action": {
+                        "enum": [
+                            "verify",
+                            "rename",
+                            "detach",
+                            "reconnect"
+                        ],
+                        "example": "reconnect",
+                        "type": "string"
+                    },
+                    "alternatives": {
+                        "example": [
+                            "default_configuration"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "blockers": {
+                        "example": [
+                            "primary_protected"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -9168,6 +9223,16 @@ const docTemplate = `{
             },
             "dto.ResolveHostActionRequestDTO": {
                 "properties": {
+                    "acknowledged_risks": {
+                        "example": [
+                            "removable_storage"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "resolution": {
                         "enum": [
                             "update_location",
@@ -9176,9 +9241,6 @@ const docTemplate = `{
                         ],
                         "example": "add_separate",
                         "type": "string"
-                    },
-                    "risk_confirmation": {
-                        "type": "boolean"
                     }
                 },
                 "required": [

@@ -45,7 +45,7 @@ func (fakeRepositoryControl) SetHostActionExpectedVersion(context.Context, strin
 	return app.HostActionInfo{}, nil
 }
 
-func (fakeRepositoryControl) ExecuteHostAction(context.Context, string, string, string, string, bool) (app.HostActionInfo, error) {
+func (fakeRepositoryControl) ExecuteHostAction(context.Context, string, string, string, string, []string) (app.HostActionInfo, error) {
 	return app.HostActionInfo{}, nil
 }
 

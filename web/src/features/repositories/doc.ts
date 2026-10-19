@@ -84,9 +84,15 @@
  *
  * {@link NativeHostActionModal} persists requests for a Desktop-native folder
  * grant and polls their durable status. The shared HTTP contract never accepts
- * a filesystem path or exposes the native approval nonce. Relocate-versus-copy
- * conflicts return user-facing resolutions and require an explicit copy
- * confirmation. Standalone and Docker deployments use
+ * a filesystem path or exposes the native approval nonce. A folder Desktop
+ * chose is reviewed by the Server's shared storage assessment: a
+ * `storage_risk` decision renders {@link StorageRiskConfirmation} with the
+ * same risk codes as the create review and is confirmed by those codes, and a
+ * changed risk set asks again. Relocate-versus-copy conflicts return
+ * user-facing resolutions and require an explicit copy confirmation. A task
+ * the role-aware policy withheld carries its typed Problem and blockers, and
+ * an expired or declined request is a normal outcome that keeps the form and
+ * offers to send it again. Standalone and Docker deployments use
  * {@link RepositoryCandidateModal} instead.
  *
  * Repository rows keep unavailable repositories visible for diagnosis.
