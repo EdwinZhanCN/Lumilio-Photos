@@ -42,6 +42,11 @@ func treeHashes(tb testing.TB, root string) map[string]string {
 		if entry.IsDir() {
 			return nil
 		}
+		// OS lock files are coordination state, not content: the running
+		// Server holds them, and Windows refuses to read a locked region.
+		if entry.Name() == ".lumilioroot.lock" || entry.Name() == ".lumiliorepo.lock" {
+			return nil
+		}
 		data, err := os.ReadFile(name)
 		if err != nil {
 			return err
