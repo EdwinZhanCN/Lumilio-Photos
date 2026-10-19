@@ -303,6 +303,7 @@ export const zhcnSidebar: DefaultTheme.Sidebar = {
                     text: '版本与限制',
                     collapsed: true,
                     items: [
+                        { text: '发布说明', link: '/zh-cn/user-manual/reference/release-notes' },
                         { text: '版本与发布产物', link: '/zh-cn/user-manual/reference/releases' },
                         { text: '升级与迁移索引', link: '/zh-cn/user-manual/reference/upgrade-index' },
                         { text: '当前限制', link: '/zh-cn/user-manual/reference/known-limitations' },

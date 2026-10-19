@@ -4,8 +4,8 @@ description: "在 Desktop 或 Docker 更新前建立恢复点、读取变更并�
 page_id: "admin/upgrade"
 audience: "管理员"
 platform: "Desktop、Server"
-baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-09-03"
+baseline_commit: "9f10907a42cc5d98ba239aee2888ff38c58f3f83"
+last_verified: "2026-10-18"
 verification_status: "verified"
 ---
 
@@ -35,6 +35,17 @@ code-evidence:
   原文件保存为 `server.toml.bak`，你手动添加的注释只保留在该文件中。默认 Docker 配置内置在镜像中，Desktop 会自动升级自身配置，二者都无需此步骤。
 - **降级**：任何版本都会拒绝由更新版本写入的数据库、备份或配置。回退时使用升级前快照。
 - **预发布数据**：预发布构建（`v1.0.0-beta.*`、`v26.1.0-beta.*`）的数据不会迁移到 `v26.1.0-rc.1` 及之后的版本。Server 会将这类数据库标明为预发布数据并拒绝打开；请把它移到别处，改用新数据库。原始媒体和资源库不受影响。
+  操作步骤见[从 beta 构建升级](#从-beta-构建升级)。
+
+## 从 beta 构建升级
+
+`v26.1.0-rc.1` 是第一个受支持的版本。它不会打开 beta 构建写入的数据库、配置或备份，beta 中的相册、人物、评分、事件名称和分享链接也不会带过来。媒体文件和资源库目录不受影响，rc.1 能读取 beta 写入的 `.lumilioroot` 和 `.lumiliorepo` 标记。
+
+1. 如需留作参考，先在 beta 构建中创建一份数据库备份，并独立备份媒体。
+2. 停止 beta 构建，把它的应用状态移到别处。Docker：`LUMILIO_STATE` 目录（数据库、密钥和备份）；Desktop：用户应用数据目录下的 `Lumilio Photos` 文件夹（见[应用私有状态路径](../reference/app-state-paths.md)）。不要删除媒体目录。
+3. 把 beta 的主资源库目录（默认存储位置内的 `primary/`）在同一个存储位置内改名，例如改为 `beta-primary/`。rc.1 的初始化会在 `primary/` 新建主资源库；如果该目录已经是一个资源库，初始化会停止。
+4. 安装 rc.1 并完成首次初始化。
+5. 在**存储**页把改名后的目录作为已有资源库添加回来，让扫描重新登记其中的文件。beta 使用过的其他资源库按同样方式处理。beta 从未真正移动到磁盘回收站的内容不存在；beta 回收站里显示过的文件现在只是普通文件。
 
 ## 升级前
 
@@ -46,7 +57,9 @@ code-evidence:
 
 ## Desktop
 
-使用与稳定或 beta 更新频道一致的构建。更新后先检查 Desktop 主机、Server 和存储位置状态，再打开全部自动任务。
+`v26.1.0-rc.1` 没有应用内更新：**设置 → 更新** 会提示“此构建未配置已签名的更新提供方”。更新需要从 [GitHub Releases](https://github.com/EdwinZhanCN/Lumilio-Photos/releases) 下载新的 `.dmg` 或安装包，校验 SHA-256 后退出应用并覆盖安装；资源库和数据库不受影响。应用内更新计划在 rc.2 提供。
+
+更新后先检查 Desktop 主机、Server 和存储位置状态，再打开全部自动任务。
 
 ## Docker
 

@@ -1,6 +1,6 @@
 # RC release: notes, pipeline, promotion, tag
 
-Status: active, created 2026-09-24. Phase 0 done (release workflow green on `dev` `c397cf38`). 2026-10-13: Phase 0b added because #210's CI has been red since #241 (`main` holds five commits `dev` lacks, so `verify:generated` reports Atlas drift on the merge ref); Phases 3–4 rewritten for a release driven entirely from Claude Code cloud with no physical machine ([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)). Phase 1 (release notes) is written once the storage refactor's user-visible behaviour is final (after P5). Child of
+Status: active, created 2026-09-24. Phase 0 done (release workflow green on `dev` `c397cf38`). 2026-10-13: Phase 0b added because #210's CI has been red since #241 (`main` holds five commits `dev` lacks, so `verify:generated` reports Atlas drift on the merge ref); Phases 3–4 rewritten for a release driven entirely from Claude Code cloud with no physical machine ([decision](../../../.agents/decisions/2026-10-13-rc1-evidence-without-hardware.md)). Phase 1 (release notes) was written in S12 from the behaviour on `dev` at that time (`docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`, rendered on the docs site and appended to the GitHub Release body by `release.yml`); S5 and S6 add their own user-visible lines (primary adoption, Reconnect) to the same files in their PRs, and S13 re-reads the notes against the promotion head. Child of
 [release-hardening.md](release-hardening.md) (Phase 6); the session order lives there. Target: `rc.1` tag on
 `main`, date **TBD** (owner decision 2026-09-24; originally 2026-09-29) until
 the RC blockers #222, #223, and #242 land.
@@ -85,44 +85,55 @@ the promotion commit, with bilingual release notes, smoked once.
   #232–#235, and it no longer merges cleanly. (Closed 2026-10-13.)
 
 ### Phase 1 — Release notes (bilingual)
-- [ ] Collect user-facing changes since `v26.1.0-beta.1`:
-  `git log --merges --oneline v26.1.0-beta.1..origin/dev` plus PR bodies
-  (`gh pr view <n>`). This week's user-visible fixes include: Storage page
-  asset counts (#209), search vectors after a full reindex (#212), Event
-  edits no longer reverted (#213), sign-out no longer resets the login form
-  (#214), playback no longer hangs when a transcode finishes (#216), share
-  link startup errors are diagnosable (#208), Processing stage grid.
-- [ ] Write notes for users, not developers: grouped (New, Fixed, Known
-  issues), no internal names. Known issues come from
-  `docs/exec-plans/tech-debt-tracker.md` items the user deferred (e.g. music
-  embedded covers placeholder). "Manual scan right after a file lands" is no
-  longer a Known issue once #222 lands, because it is folded into that
-  blocker.
-- [ ] Behaviour changes from #222 and #223 that users must read:
-  - Delete now moves files out of your folder into that Repository's trash,
-    and they can be restored for 30 days (configurable).
-  - Photos whose files disappeared are hidden from the library and listed
-    under Missing on the Storage page.
-  - Editing a file in another app keeps its albums, rating, and people.
-  Use the registry terms for Trash and Missing.
-- [ ] English and Simplified Chinese, using the canonical terms in the
-  `lumilio-frontend-i18n` skill's terminology registry. Put them where the
-  release workflow reads them (check `release.yml`; otherwise the GitHub
-  release body) and, if the docs site has a changelog/upgrade page, update
-  `site/docs/en` and `site/docs/zh-cn` together.
-- [ ] Upgrade guidance: rc.1 is the first supported release; data from
-  pre-release builds (`v1.0.0-beta.*`, `v26.1.0-beta.*`) is not migrated —
-  start fresh. From rc.1 on, updates upgrade in place and take an automatic
-  backup first ([decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
-- [ ] Behaviour changes from the storage refactor that users must read:
-  network storage (NFS, SMB, AFP, sshfs, WebDAV, Windows network drives) is
-  refused for Storage Locations and Repositories in rc.1; "Relocate" is now
-  "Reconnect" and never moves files; reinstalling over a kept primary
-  Repository asks whether to adopt it; risk confirmation is asked per
-  operation. Use the registry terms.
-- [ ] State plainly that the rc.1 Desktop builds for macOS and Windows were
-  verified by automated tests on CI runners, not on a physical machine,
-  and that in-app updates arrive in rc.2 (#240).
+Written in S12 (branch `docs/rc1-release-notes`). The notes are one file per
+language under `docs/releases/` (`v26.1.0-rc.1.md`, `v26.1.0-rc.1.zh-cn.md`,
+convention in `docs/releases/README.md`); `release.yml` appends the files
+matching the pushed tag to the GitHub Release body, and the docs site renders
+them through VitePress includes (`user-manual/introduction/release-notes`,
+`zh-cn/user-manual/reference/release-notes`).
+- [x] Collect user-facing changes since `v26.1.0-beta.1`: 40 merges and 102
+  commits on `dev` (`git log v26.1.0-beta.1..origin/dev`), the squash-merge
+  bodies of #237, #239, #244, #247, #250, #251, #253, and the decision
+  records dated after 2026-09-04. New since beta.1: Repository Trash /
+  Missing / permanent deletion (#223), the scan index (#222), the admin
+  Storage page, the Add Repository risk review (P2), Music, the Processing
+  stage grid, the shared Export photo dialog, the per-tab Agent transcript,
+  audio excluded from Events. Fixed: #209, #212, #213, #214, #216, #208.
+- [x] Notes written for users, grouped Before you install / New / Fixed /
+  Known issues / Upgrading / Downloads, no internal names. Known issues come
+  from the tracker items the user deferred (music embedded covers, case rule
+  across host kinds, large-Repository removal, share accessible names) plus
+  the verified limitations from the zh known-limitations page (open
+  registration, share ZIP originals, backup restore source, iCloud only,
+  platforms). "Manual scan right after a file lands" is gone with #222.
+- [x] Behaviour changes from #222 and #223 (Trash moves files, 30-day
+  retention and where to change it, Missing hidden and listed per
+  Repository, in-place edits keep metadata, backup-before-delete restores
+  into the Trash) with the registry terms Trash / 回收站 and Missing / 缺失.
+- [x] English and Simplified Chinese with the registry terms; both files
+  checked by `task architecture:check` through the site pages that include
+  them. The docs site gained the two release-notes pages and sidebar entries;
+  the zh `releases`, `known-issues`, `known-limitations`, `duplicates-trash`,
+  `external-storage` and `upgrade-index` pages and the en `utilities` page
+  were rewritten where they still described the beta behaviour.
+- [x] Upgrade guidance: rc.1 is the first supported release, pre-release data
+  is not migrated; a "Coming from a beta build" procedure (move the app state
+  aside, rename the beta `primary/`, set up, add the old folder back as an
+  existing Repository) on the en and zh upgrade pages and in the notes; the
+  in-place upgrade path with the automatic pre-upgrade snapshot and the
+  `config upgrade` command.
+- [ ] Behaviour changes from the storage refactor. Written: network storage
+  refused with the reason and not confirmable (P2); risk review per create
+  (P2). **S5 adds:** reinstalling over a kept Primary Repository offers to
+  adopt it (today setup stops; the beta procedure above renames the folder
+  and must then be simplified). **S6 adds:** "Relocate" is "Reconnect" and
+  never moves files. Each in its own PR, in both language files.
+- [x] The Desktop statement: rc.1 Desktop builds for macOS and Windows were
+  verified by the automated Desktop suites on GitHub-hosted runners, no rc.1
+  build was launched on a physical machine, and there is no in-app update in
+  rc.1 (Settings → Updates reports no signed provider; #240 is rc.2). The en
+  and zh upgrade pages and the en installation tip no longer describe the
+  "Update available" flow.
 
 ### Phase 2 — Promote
 - [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
