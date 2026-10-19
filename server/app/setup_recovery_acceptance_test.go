@@ -318,7 +318,12 @@ func TestFreshDefaultElsewhereBeforeThePrimaryExists(t *testing.T) {
 		"name": "Fresh Primary", "storage_strategy": "flat", "assessment_token": target.Target.Assessment.Token,
 		"acknowledged_risks": target.Target.Assessment.Risks,
 	}, &created)
-	if created.Repository.ID == "" || !strings.HasPrefix(created.Repository.Path, freshDir) {
+	// Repository paths are canonical; on macOS TempDir lives under /var -> /private/var.
+	canonicalFresh, err := filepath.EvalSymlinks(freshDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Repository.ID == "" || !strings.HasPrefix(created.Repository.Path, canonicalFresh) {
 		t.Fatalf("fresh primary = %+v", created.Repository)
 	}
 	if second.primaryCount() != 1 {

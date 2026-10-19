@@ -202,7 +202,7 @@ func TestSetupPrimaryReviewClassifiesEveryTargetState(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if after.State != storage.SetupPrimaryRegistered || after.Adoptable() || after.Existing.RegisteredRole != dbtypes.RepoRolePrimary || after.Existing.RegisteredPath != primary.Path {
+		if after.State != storage.SetupPrimaryRegistered || after.Adoptable() || after.Existing.RegisteredRole != dbtypes.RepoRolePrimary || after.Existing.RegisteredPath != canonicalPath(t, primary.Path) {
 			t.Fatalf("registered review = %+v existing=%+v", after.State, after.Existing)
 		}
 	})
