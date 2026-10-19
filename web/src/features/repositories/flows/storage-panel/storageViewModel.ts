@@ -64,6 +64,10 @@ export type RepositoryRow = {
   missingCount?: number;
   trashCount?: number;
   trashBytes?: number;
+  /** Inherited trashed files held out of automatic expiry until the user decides. */
+  trashHeldCount?: number;
+  /** Preserved private files awaiting a decision in the recovery inventory. */
+  recoveryItemCount?: number;
   verification: VerificationState;
   storageLocationId: string | null;
   storage: StorageLabel;
@@ -182,6 +186,8 @@ function mapRepositoryRow(
     missingCount: repository.missing_count ?? 0,
     trashCount: repository.trash_count ?? 0,
     trashBytes: repository.trash_bytes ?? 0,
+    trashHeldCount: repository.trash_held_count ?? 0,
+    recoveryItemCount: repository.recovery_item_count ?? 0,
     verification: mapVerification(repository.verification),
     storageLocationId: repository.storage_location_id ?? null,
     storage: deriveStorageLabel(repository.mount_path),

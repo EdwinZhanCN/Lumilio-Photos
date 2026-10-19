@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { RotateCcw, Trash2, ImageOff } from "lucide-react";
+import { RotateCcw, ShieldCheck, Trash2, ImageOff } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { AssetBrowserScope } from "../browse/selection/AssetBrowserScope";
 import { AssetBrowser } from "../browse/AssetBrowser";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/assets/lifecycleCopy";
 import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useI18n } from "@/lib/i18n";
+import TrashHoldNotice, { useTrashHolds } from "./TrashHoldNotice";
 
 const HIDDEN_ACTIONS = [
   "set-rating",
@@ -36,6 +37,11 @@ export default function LifecycleAssetsFlow({ state }: { state: "missing" | "tra
   const lifecycle = useAssetLifecycle();
   const [confirmAll, setConfirmAll] = useState(false);
   const isTrash = state === "trashed";
+  const holds = useTrashHolds(isTrash ? repositoryId : undefined);
+  const heldIds = useMemo(
+    () => new Set(isTrash ? (holds.data?.asset_ids ?? []) : []),
+    [holds.data?.asset_ids, isTrash],
+  );
   const title = isTrash ? trashLabel(t) : missingLabel(t);
   const [running, setRunning] = useState(false);
   const basePath = repositoryId
@@ -123,6 +129,42 @@ export default function LifecycleAssetsFlow({ state }: { state: "missing" | "tra
             }
           },
         });
+      if (isTrash && context.selectedAssetIds.some((id) => heldIds.has(id)))
+        actions.push({
+          id: "accept-retention",
+          label: t("assets.trash.holds.acceptSelected", "Keep with normal retention"),
+          icon: <ShieldCheck size={16} />,
+          requiresConfirmation: true,
+          confirmationTitle: t("assets.trash.holds.acceptSelected", "Keep with normal retention"),
+          confirmationMessage: t(
+            "assets.trash.holds.acceptSelectedWarning",
+            "The selected held files will be deleted permanently when the normal retention runs out, counted from now. You can still restore them until then.",
+          ),
+          onRun: async ({ selectedAssetIds, clearSelection }) => {
+            try {
+              const result = await lifecycle.acceptRetention.mutateAsync({
+                body: {
+                  asset_ids: selectedAssetIds.filter((id) => heldIds.has(id)),
+                  confirm: true,
+                },
+              });
+              clearSelection();
+              showMessage(
+                "success",
+                t(
+                  "assets.trash.holds.accepted",
+                  "{{count}} files now follow the normal retention.",
+                  {
+                    count: result.entries ?? 0,
+                  },
+                ),
+              );
+            } catch (error) {
+              showMessage("error", localizeAPIProblem(error, t, failedCopy));
+              throw error;
+            }
+          },
+        });
       actions.push({
         id: isTrash ? "delete-permanently" : "remove-missing",
         label: isTrash ? permanentDeleteLabel(t) : removeMissingLabel(t),
@@ -150,7 +192,7 @@ export default function LifecycleAssetsFlow({ state }: { state: "missing" | "tra
       });
       return actions;
     },
-    [failedCopy, irreversibleCopy, isTrash, lifecycle, showMessage, t],
+    [failedCopy, heldIds, irreversibleCopy, isTrash, lifecycle, showMessage, t],
   );
   return (
     <AssetBrowserScope
@@ -168,22 +210,25 @@ export default function LifecycleAssetsFlow({ state }: { state: "missing" | "tra
           hiddenBulkActions={HIDDEN_ACTIONS}
           searchEnabled={false}
           hero={
-            <div className="flex items-center justify-between gap-4 px-4 py-3">
-              <p className="text-sm text-base-content/70">
-                {isTrash
-                  ? t(
-                      "assets.lifecycle.trashHelp",
-                      "Restore files before their retention expires, or delete them permanently.",
-                    )
-                  : t(
-                      "assets.lifecycle.missingHelp",
-                      "Metadata is kept. Missing assets return automatically when their files are found by a scan.",
-                    )}
-              </p>
-              <button className="btn btn-error btn-sm" onClick={() => setConfirmAll(true)}>
-                {isTrash ? emptyTrashLabel(t) : removeMissingLabel(t)}
-              </button>
-            </div>
+            <>
+              {isTrash ? <TrashHoldNotice repositoryId={repositoryId} /> : null}
+              <div className="flex items-center justify-between gap-4 px-4 py-3">
+                <p className="text-sm text-base-content/70">
+                  {isTrash
+                    ? t(
+                        "assets.lifecycle.trashHelp",
+                        "Restore files before their retention expires, or delete them permanently.",
+                      )
+                    : t(
+                        "assets.lifecycle.missingHelp",
+                        "Metadata is kept. Missing assets return automatically when their files are found by a scan.",
+                      )}
+                </p>
+                <button className="btn btn-error btn-sm" onClick={() => setConfirmAll(true)}>
+                  {isTrash ? emptyTrashLabel(t) : removeMissingLabel(t)}
+                </button>
+              </div>
+            </>
           }
         />
         <Modal

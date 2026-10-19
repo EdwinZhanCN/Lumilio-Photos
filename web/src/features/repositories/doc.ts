@@ -100,6 +100,16 @@
  * credentials and import status come through the Cloud public entry rather
  * than being reimplemented here.
  *
+ * {@link RecoveryInventoryModal} is the private-recovery inventory of one
+ * Repository, read through {@link useRepositoryRecovery} from the receipts a
+ * registration wrote: the inherited Trash still held out of automatic expiry
+ * (decided in the Trash view), Studio records attached to their proven photo
+ * or kept for review, and unfinished uploads and unknown files kept for
+ * export. Export leaves an item in place; delete is an explicit, confirmed
+ * removal recorded in the receipt. The row and the Inspector carry the held
+ * and pending counts from the Storage view; nothing in the inventory changes
+ * without the user.
+ *
  * ## Data
  *
  * {@link useRepositoryOptions} adapts `GET /api/v1/storage/targets` through
@@ -148,6 +158,7 @@ import type { useNativeHostAction, useNativeHostCapability } from "./api/useNati
 import type { useRepositoryCandidates } from "./api/useRepositoryCandidates.ts";
 import type { useRepositoryOptions } from "./api/useRepositoryOptions.ts";
 import type { useRepositoryDuplicateDetect } from "./api/useRepositoryDuplicateDetect.ts";
+import type { useRepositoryRecovery } from "./api/useRepositoryRecovery.ts";
 import type { useRepositoryScan } from "./api/useRepositoryScan.ts";
 import type { useRepositoryVerificationCancel } from "./api/useRepositoryVerifications.ts";
 import type { useStorageDiagnostics } from "./api/useStorageDiagnostics.ts";
@@ -161,6 +172,7 @@ import type RepositoryInspector from "./flows/storage-panel/RepositoryInspector.
 import type RepositoryRowActions from "./flows/storage-panel/RepositoryRowActions.tsx";
 import type RepositoryTable from "./flows/storage-panel/RepositoryTable.tsx";
 import type NativeHostActionModal from "./flows/storage-panel/NativeHostActionModal.tsx";
+import type RecoveryInventoryModal from "./flows/storage-panel/RecoveryInventoryModal.tsx";
 import type RepositoryCandidateModal from "./flows/storage-panel/RepositoryCandidateModal.tsx";
 import type StoragePanelFlow from "./flows/storage-panel/StoragePanelFlow.tsx";
 import type VerificationHistoryModal from "./flows/storage-panel/VerificationHistoryModal.tsx";

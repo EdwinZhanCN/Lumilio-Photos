@@ -131,10 +131,16 @@ func (dm *defaultDirectoryManager) CreateStructure(repoPath string) error {
 		}
 	}
 
-	// Create empty log files so JSON loggers can append valid lines immediately.
+	// Create empty log files so JSON loggers can append valid lines
+	// immediately. An existing log is diagnostic history a reopened
+	// repository keeps; it is never truncated.
 	for _, logFile := range repoLogFiles {
 		logPath := filepath.Join(cleanPath, logFile)
-		if err := os.WriteFile(logPath, nil, 0644); err != nil {
+		file, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE, 0o644)
+		if err != nil {
+			return fmt.Errorf("failed to create log file %s: %w", logFile, err)
+		}
+		if err := file.Close(); err != nil {
 			return fmt.Errorf("failed to create log file %s: %w", logFile, err)
 		}
 	}

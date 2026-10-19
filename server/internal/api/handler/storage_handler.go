@@ -37,6 +37,7 @@ type StorageHandler struct {
 	repoManager  storage.RepositoryManager
 	assetCounter StorageViewAssetCounter
 	scanReader   StorageViewScanReader
+	recovery     StorageRecoveryService
 }
 
 func NewStorageHandler(
@@ -182,6 +183,18 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 				return
 			}
 			view.MissingCount, view.TrashCount, view.TrashBytes = counts.MissingCount, counts.TrashCount, counts.TrashBytes
+			view.TrashHeldCount = counts.TrashHeldCount
+		}
+		if h.recovery != nil && repository.Reachability == dbtypes.RepositoryReachabilityActive {
+			// The inventory lives in the Repository's receipts; a Repository
+			// that cannot be read right now simply shows no pending items.
+			if inventory, err := h.recovery.Inventory(ctx, repository.RepoID); err == nil {
+				for _, item := range inventory.Items {
+					if item.Present && len(item.Actions) > 0 {
+						view.RecoveryItemCount++
+					}
+				}
+			}
 		}
 		if h.scanReader != nil {
 			if scanRun, scanErr := h.scanReader.GetLatestScan(ctx, repository.RepoID.String()); scanErr == nil {

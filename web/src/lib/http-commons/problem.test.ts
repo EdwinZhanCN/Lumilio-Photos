@@ -247,6 +247,11 @@ describe("storage consent Problems", () => {
         "This Repository is still available at its registered location, so there is nothing to reconnect.",
         "该资源库仍在其登记位置可用，无需重新连接。",
       ],
+      [
+        "https://lumilio.org/problems/storage/recovery-required",
+        "An interrupted storage operation on this Repository must be recovered first. Check its recovery inventory on the Storage page, then try again.",
+        "此资源库上有一项被中断的存储操作需要先完成恢复。请在存储页面查看其恢复清单，然后重试。",
+      ],
     ];
     for (const [type, en, zh] of cases) {
       const value = normalizeProblem({

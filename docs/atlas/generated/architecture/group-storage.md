@@ -21,6 +21,7 @@ flowchart LR
         n_server_internal_storage_locations["storage/locations"]
         n_server_internal_storage_marker["storage/marker"]
         n_server_internal_storage_pathsemantics["storage/pathsemantics"]
+        n_server_internal_storage_recovery["storage/recovery"]
         n_server_internal_storage_repocfg["storage/repocfg"]
         n_server_internal_storage_rootcfg["storage/rootcfg"]
         n_server_internal_storage_scan["storage/scan"]
@@ -42,6 +43,7 @@ flowchart LR
     n_server_internal_storage --> n_server_internal_storage_repocfg
     n_server_internal_storage --> n_server_internal_storage_rootcfg
     n_server_internal_storage_locations --> n_server_internal_storage
+    n_server_internal_storage_recovery --> n_server_internal_storage_trash
     n_server_internal_storage_repocfg --> n_server_internal_storage_marker
     n_server_internal_storage_rootcfg --> n_server_internal_storage_marker
     n_server_internal_storage_scan --> n_server_internal_storage
@@ -70,6 +72,7 @@ flowchart LR
 | storage/locations | Package locations resolves logical Assets to a present physical file immediately before media I/O. It holds the RepositoryFS lifecycle lease for the lifetime of the returned capability and falls through unavailable copies without changing catalog state. | `mod:server/internal/storage/locations` [`server/internal/storage/locations/doc.go`](../../../../server/internal/storage/locations/doc.go) |
 | storage/marker | Package marker owns typed portable-marker readings and guarded atomic replacement. | `mod:server/internal/storage/marker` [`server/internal/storage/marker/doc.go`](../../../../server/internal/storage/marker/doc.go) |
 | storage/pathsemantics | Package pathsemantics turns filesystem-specific name comparison rules into durable repository name keys. | `mod:server/internal/storage/pathsemantics` [`server/internal/storage/pathsemantics/doc.go`](../../../../server/internal/storage/pathsemantics/doc.go) |
+| storage/recovery | Package recovery makes the private state a Repository carried into a new registration reachable again. | `mod:server/internal/storage/recovery` [`server/internal/storage/recovery/doc.go`](../../../../server/internal/storage/recovery/doc.go) |
 | storage/repocfg | Package repocfg defines a single repository's own configuration: the .lumiliorepo file and the catalog column that mirrors it. | `mod:server/internal/storage/repocfg` [`server/internal/storage/repocfg/doc.go`](../../../../server/internal/storage/repocfg/doc.go) |
 | storage/rootcfg | Package rootcfg owns the portable .lumilioroot marker used to identify an authorized repository container independently from its current mount path. | `mod:server/internal/storage/rootcfg` [`server/internal/storage/rootcfg/doc.go`](../../../../server/internal/storage/rootcfg/doc.go) |
 | storage/scan | Package scan is the repository scan index (#222). | `mod:server/internal/storage/scan` [`server/internal/storage/scan/doc.go`](../../../../server/internal/storage/scan/doc.go) |

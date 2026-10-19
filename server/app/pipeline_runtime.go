@@ -28,6 +28,7 @@ import (
 	"server/internal/search/bleveocr"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/recovery"
 	"server/internal/storage/scan"
 	"server/internal/workqos"
 )
@@ -175,6 +176,7 @@ type pipelineRuntime struct {
 	commits            *commit.Coordinator
 	processor          *processors.AssetProcessor
 	scanner            *scan.Scanner
+	recovery           *recovery.Service
 	eventProjection    eventProjectionPreparer
 	locationProjection locationProjectionPreparer
 	ocrProjection      ocrProjectionPreparer
@@ -435,7 +437,17 @@ func (runtime *pipelineRuntime) enrich(ctx context.Context, qos workqos.Class, a
 }
 
 func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos workqos.Class, args jobs.ScanRepositoryBatchArgs) (bool, error) {
-	return runRepositoryScanBatch(ctx, runtime.scanner, runtime.engine, runtime.demand, qos, args)
+	more, err := runRepositoryScanBatch(ctx, runtime.scanner, runtime.engine, runtime.demand, qos, args)
+	if err != nil || more || runtime.recovery == nil {
+		return more, err
+	}
+	// The walk is done and nothing is left to hash: content is proven, so
+	// the private recovery of this repository can decide its Studio records
+	// and adopt any inherited Trash now rather than on the hourly pass.
+	if _, reconcileErr := runtime.recovery.Reconcile(ctx, args.RepositoryID); reconcileErr != nil && ctx.Err() == nil {
+		runtime.logger.Warn("private recovery after scan", zap.String("repository_id", args.RepositoryID.String()), zap.Error(reconcileErr))
+	}
+	return false, nil
 }
 
 func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, qos workqos.Class, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {

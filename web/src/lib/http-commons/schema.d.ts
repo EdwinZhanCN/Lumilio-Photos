@@ -3865,6 +3865,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/accept-retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept retention for held trashed Assets
+         * @description Lift the hold on the selected Assets' trashed files, or on every held file of one Repository in the caller's scope. The files then follow the configured retention counted from this acceptance; nothing is deleted now. Requires explicit confirmation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Selection or Repository, confirmed */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AssetPurgeRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetRetentionAcceptedDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/batch": {
         parameters: {
             query?: never;
@@ -5938,6 +6027,75 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/trash-holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List held trashed Assets
+         * @description List the Assets whose trashed files are held out of automatic expiry because the Trash inherited them from a Repository opened, copied, or restored into this catalog. Scoped to the caller's own Assets unless the caller is an administrator.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Limit to one Repository */
+                    repository_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetTrashHoldsDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13873,7 +14031,7 @@ export interface paths {
         put?: never;
         /**
          * Open repository candidate
-         * @description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.
+         * @description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is preserved by class under a recovery receipt (Trash held, Studio records reassociated on proven content, staging kept for export) before an authoritative initial scan.
          */
         post: {
             parameters: {
@@ -14584,6 +14742,280 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get repository recovery inventory
+         * @description Return the recovery receipts of a Repository, every preserved private file that awaits or had a decision, and the inherited Trash still held out of automatic expiry. Paths are relative to the Repository's private workspace.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryRecoveryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Repository unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/recovery/items/{item}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a recovery item
+         * @description Remove one preserved private file from disk and record the decision in the Repository's recovery receipt. Reassociated Studio records are live state and cannot be deleted here.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Recovery item UUID */
+                    item: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryRecoveryItemDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description The item is not deletable from the inventory */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Repository unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/recovery/items/{item}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a recovery item
+         * @description Download the bytes of one preserved private file (uncommitted staging, an unknown file, or an unproven Studio record) as an attachment. The item is unchanged.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Recovery item UUID */
+                    item: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": Record<string, never>;
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Repository unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15479,7 +15911,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageRecoveryRequiredProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
         "api.RepositoryCommandProblemResponse": components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"];
         "api.RepositoryConflictProblemResponse": {
             actions?: string[];
@@ -16085,6 +16517,10 @@ export interface components {
             original_path?: string;
             restored_path?: string;
         };
+        "dto.AssetRetentionAcceptedDTO": {
+            /** @example 3 */
+            entries?: number;
+        };
         "dto.AssetSelectionDTO": {
             asset_ids: string[];
         };
@@ -16114,6 +16550,11 @@ export interface components {
             size?: string;
             storage_path?: string;
             thumbnail_id?: string;
+        };
+        "dto.AssetTrashHoldsDTO": {
+            asset_ids?: string[];
+            /** @example 3 */
+            count?: number;
         };
         "dto.AssetTypesResponseDTO": {
             types?: components["schemas"]["dbtypes.AssetType"][];
@@ -17944,6 +18385,79 @@ export interface components {
             /** @example uuid */
             handle_duplicate_filenames?: string;
         };
+        "dto.RepositoryRecoveryDTO": {
+            items?: components["schemas"]["dto.RepositoryRecoveryItemDTO"][];
+            receipts?: components["schemas"]["dto.RepositoryRecoveryReceiptDTO"][];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            trash?: components["schemas"]["dto.RepositoryRecoveryTrashDTO"];
+            unreadable_receipts?: string[];
+        };
+        "dto.RepositoryRecoveryItemDTO": {
+            /** @description Actions are the explicit decisions available for this item. */
+            actions?: ("export" | "delete")[];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id?: string;
+            /**
+             * @example staging
+             * @enum {string}
+             */
+            class?: "trash" | "studio" | "staging" | "logs" | "derived" | "unknown";
+            /** @example no present file in the Repository has the record's content */
+            detail?: string;
+            /**
+             * @description Disposition is what became of the item: preserved or moved bytes await
+             *     a decision; reassociated is a Studio record attached to its proven
+             *     Asset; ambiguous and unreadable records stay for review or export;
+             *     deleted was removed explicitly.
+             * @example moved
+             * @enum {string}
+             */
+            disposition?: "preserved" | "moved" | "reassociated" | "ambiguous" | "unreadable" | "deleted";
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example .lumilio/staging/incoming/upload.part */
+            path?: string;
+            /** @example true */
+            present?: boolean;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            receipt_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            resolved_asset_id?: string;
+            resolved_at?: string;
+            /** @example 1048576 */
+            size?: number;
+        };
+        "dto.RepositoryRecoveryReceiptDTO": {
+            /** @example web:user:1 */
+            actor?: string;
+            /** @example 12 */
+            derived_files?: number;
+            /**
+             * @example open
+             * @enum {string}
+             */
+            event?: "open" | "register_copy" | "adopt";
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example 0 */
+            items_truncated?: number;
+            /** @example 2 */
+            log_files?: number;
+            recorded_at?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            source_repository_id?: string;
+            /** @example 4096 */
+            trash_bytes?: number;
+            /** @example 2 */
+            trash_files?: number;
+        };
+        "dto.RepositoryRecoveryTrashDTO": {
+            /** @example 6291456 */
+            held_bytes?: number;
+            /** @example 3 */
+            held_count?: number;
+        };
         "dto.RepositoryRemovalImpactDTO": {
             /** @example 0 */
             active_task_count?: number;
@@ -18593,6 +19107,7 @@ export interface components {
             name?: string;
             /** @example active */
             reachability?: string;
+            recovery_item_count?: number;
             /**
              * @example regular
              * @enum {string}
@@ -18602,6 +19117,12 @@ export interface components {
             storage_location_id?: string;
             trash_bytes?: number;
             trash_count?: number;
+            /**
+             * @description TrashHeldCount is how many trashed files are inherited and held out of
+             *     automatic expiry; RecoveryItemCount is how many preserved private files
+             *     still await a decision in the Repository's recovery inventory.
+             */
+            trash_held_count?: number;
             unavailable_actions?: components["schemas"]["dto.RepositoryActionBlockDTO"][];
             verification?: components["schemas"]["dto.StorageRepositoryVerificationSummaryDTO"];
             write_policy?: components["schemas"]["dto.StorageRepositoryWritePolicyDTO"];
@@ -20081,6 +20602,27 @@ export interface components {
              */
             type: "https://lumilio.org/problems/storage/permission-denied";
         };
+        "api.StorageRecoveryRequiredProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/recovery-required";
+        };
+        "api.StorageRecoveryRequiredProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/recovery-required";
+        };
         "api.StorageUnsupportedFilesystemProblem": {
             /** Format: uri */
             instance: string;
@@ -20123,7 +20665,7 @@ export interface components {
              */
             type: "https://lumilio.org/problems/upload/processing-failed";
         };
-        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageActionUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageBusyProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageIdentityMismatchProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StorageOriginalOnlineProblemReference"] | components["schemas"]["api.StorageOwnershipUnavailableProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
+        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageActionUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageBusyProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageIdentityMismatchProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StorageOriginalOnlineProblemReference"] | components["schemas"]["api.StorageOwnershipUnavailableProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageRecoveryRequiredProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
         "api.RateLimitedProblemResponse": {
             /** Format: uri */
             instance: string;

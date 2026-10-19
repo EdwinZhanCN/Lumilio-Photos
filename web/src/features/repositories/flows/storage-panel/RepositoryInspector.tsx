@@ -65,6 +65,26 @@ export default function RepositoryInspector({ repository, displayName }: Props) 
     },
   ];
 
+  if ((repository.recoveryItemCount ?? 0) > 0 || (repository.trashHeldCount ?? 0) > 0) {
+    facts.push({
+      term: t("storagePanel.inspector.recovery", "Recovery"),
+      value: [
+        repository.recoveryItemCount
+          ? t("storagePanel.inspector.recoveryItems", "{{count}} files await a decision", {
+              count: repository.recoveryItemCount,
+            })
+          : null,
+        repository.trashHeldCount
+          ? t("storagePanel.inspector.recoveryHeld", "{{count}} held in Trash", {
+              count: repository.trashHeldCount,
+            })
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    });
+  }
+
   if (repository.storage.kind !== "unknown" && repository.storage.mountPath) {
     facts.push({
       term: t("storagePanel.inspector.mountPath", "Mount point"),

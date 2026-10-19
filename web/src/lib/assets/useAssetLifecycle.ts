@@ -24,5 +24,8 @@ export function useAssetLifecycle() {
   });
   const removeMissing = $api.useMutation("post", "/api/v1/assets/remove-missing", { onSettled });
   const emptyTrash = $api.useMutation("post", "/api/v1/assets/empty-trash", { onSettled });
-  return { trash, restore, permanentlyDelete, removeMissing, emptyTrash };
+  const acceptRetention = $api.useMutation("post", "/api/v1/assets/accept-retention", {
+    onSettled,
+  });
+  return { trash, restore, permanentlyDelete, removeMissing, emptyTrash, acceptRetention };
 }

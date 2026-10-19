@@ -600,8 +600,14 @@ type Querier interface {
 	ListEventMembership(ctx context.Context, arg ListEventMembershipParams) ([]EventMediaItem, error)
 	ListEventMembershipPage(ctx context.Context, arg ListEventMembershipPageParams) ([]EventMediaItem, error)
 	ListEventsPage(ctx context.Context, arg ListEventsPageParams) ([]Event, error)
-	// Trashed files of one repository past their retention, oldest first.
+	// Trashed files of one repository past their retention, oldest first. A
+	// held file (inherited Trash) is never expired automatically.
 	ListExpiredTrashedRepositoryEntries(ctx context.Context, arg ListExpiredTrashedRepositoryEntriesParams) ([]RepositoryEntry, error)
+	// Assets with at least one held trashed file, optionally in one repository
+	// and one owner scope, for the Trash view's held notice.
+	ListHeldTrashedAssetIDs(ctx context.Context, arg ListHeldTrashedAssetIDsParams) ([]uuid.NullUUID, error)
+	// The held trashed files of the selected Assets, for retention acceptance.
+	ListHeldTrashedRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error)
 	ListIncompleteLifecycleOperations(ctx context.Context) ([]LifecycleOperation, error)
 	ListLifecycleAuditEvents(ctx context.Context, arg ListLifecycleAuditEventsParams) ([]LifecycleAuditEvent, error)
 	ListLifecycleAuditEventsForTarget(ctx context.Context, arg ListLifecycleAuditEventsForTargetParams) ([]LifecycleAuditEvent, error)
@@ -644,6 +650,9 @@ type Querier interface {
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, arg ListPhotoAssetsMissingSemanticEmbeddingParams) ([]Asset, error)
+	// Present files of one repository whose bound content has exactly this
+	// hash and size: the proof a Studio sidecar needs before it is reassociated.
+	ListPresentRepositoryEntriesByContent(ctx context.Context, arg ListPresentRepositoryEntriesByContentParams) ([]RepositoryEntry, error)
 	// The occurrences media I/O may open, in a stable preference order.
 	ListPresentRepositoryEntriesForAsset(ctx context.Context, assetID uuid.NullUUID) ([]RepositoryEntry, error)
 	ListRecoverableRepositoryStagingCommits(ctx context.Context, limit int64) ([]RepositoryStagingCommit, error)
@@ -719,6 +728,11 @@ type Querier interface {
 	// idempotent.
 	ReconcileMediaItemComponentRelation(ctx context.Context, arg ReconcileMediaItemComponentRelationParams) error
 	ReleaseAgentThreadRefs(ctx context.Context, arg ReleaseAgentThreadRefsParams) error
+	// The user accepted ordinary retention for a held file: the hold is lifted
+	// and the retention clock starts at the acceptance, not at the original
+	// deletion the catalog never saw.
+	ReleaseTrashHoldForEntry(ctx context.Context, arg ReleaseTrashHoldForEntryParams) (int64, error)
+	ReleaseTrashHoldForRepository(ctx context.Context, arg ReleaseTrashHoldForRepositoryParams) (int64, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
 	RemoveStackMemberByAssetID(ctx context.Context, assetID uuid.UUID) error

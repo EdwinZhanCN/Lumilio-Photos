@@ -77,6 +77,7 @@
       "originalOnline": "该资源库仍在其登记位置可用，无需重新连接。",
       "ownershipUnavailable": "另一个 Lumilio 进程占用着此资源库文件夹。请先停止它，然后重试。",
       "permissionDenied": "Lumilio 无权访问该存储目标。请授予访问权限或选择其他文件夹。",
+      "recoveryRequired": "此资源库上有一项被中断的存储操作需要先完成恢复。请在存储页面查看其恢复清单，然后重试。",
       "unsupportedFilesystem": "本版本的存储位置和资源库不支持网络存储（NFS、SMB、AFP、SSHFS、WebDAV 或网络驱动器）。请选择本地磁盘。"
     },
     "upload": {
@@ -540,6 +541,15 @@
       },
       "emptyDescription": "移入回收站的项目会显示在这里。",
       "emptyTitle": "回收站为空",
+      "holds": {
+        "acceptAll": "按正常保留期保留",
+        "accepted_other": "{{count}} 个文件现已按正常保留期处理。",
+        "acceptSelected": "按正常保留期保留",
+        "acceptSelectedWarning": "所选的保留文件将在正常保留期（从现在起计算）结束后被永久删除。在此之前你仍可以恢复它们。",
+        "acceptWarning": "此资源库中被保留的文件将在正常保留期（从现在起计算）结束后被永久删除。在此之前你仍可以恢复它们。",
+        "help": "这些文件在此资源库于此处打开之前就已在回收站中，因此不会自行过期。你可以恢复它们、永久删除它们，或按正常保留期保留。",
+        "title_other": "{{count}} 个文件将一直保留，直到你做出决定"
+      },
       "messages": {
         "restoreSuccess_one": "已恢复 {{count}} 个资源。",
         "restoreSuccess_other": "已恢复 {{count}} 个资源。"
@@ -2704,6 +2714,7 @@
       "detectDuplicates": "检测重复项",
       "locate": "在磁盘中定位",
       "rebuild": "重建位置",
+      "recovery": "恢复清单",
       "remove": "从流明集中移除",
       "removeLocation": "移除存储位置",
       "rename": "重命名资源库",
@@ -2744,6 +2755,9 @@
       "assets": "资产",
       "available": "容量",
       "mountPath": "挂载点",
+      "recovery": "恢复",
+      "recoveryHeld_other": "{{count}} 个在回收站中保留",
+      "recoveryItems_other": "{{count}} 个文件等待决定",
       "repository": "资源库",
       "state": "状态",
       "storage": "存储",
@@ -2760,6 +2774,41 @@
     "menuVerification": "扫描",
     "moreActions": "更多存储操作",
     "pendingHostActions_other": "有 {{count}} 个存储请求正在等待桌面应用批准。",
+    "recovery": {
+      "actionFailed": "无法完成恢复操作。",
+      "class": {
+        "derived": "派生文件",
+        "logs": "日志",
+        "staging": "未完成的上传",
+        "studio": "Studio 编辑",
+        "trash": "回收站",
+        "unknown": "未知文件"
+      },
+      "confirmDelete": "删除文件",
+      "delete": "删除",
+      "deleted": "已删除 {{name}}。",
+      "deleteItem": "删除 {{name}}",
+      "deleteWarning": "要从磁盘中删除 {{name}} 吗？此操作无法撤销。如果你可能还需要它，请先导出。",
+      "disposition": {
+        "ambiguous": "需要审核",
+        "deleted": "已删除",
+        "moved": "已保留以供导出",
+        "preserved": "原地保留",
+        "reassociated": "已关联到其照片",
+        "unreadable": "更新的格式"
+      },
+      "empty": "没有需要决定的保留文件。",
+      "export": "导出",
+      "exportItem": "导出 {{name}}",
+      "heldTrash": "回收站中保留",
+      "heldTrashValue_other": "{{count}} 个文件 · 在回收站中决定",
+      "intro": "{{name}} 从先前的登记中带来的文件。在你做出决定之前，这里的内容不会被删除或过期。",
+      "loadFailed": "无法加载恢复清单。",
+      "none": "无",
+      "receiptLine": "{{event}} · {{at}}",
+      "receipts": "回执",
+      "title": "恢复清单"
+    },
     "removeBlocked": "请先移除其下的资源库。",
     "repositoryCount_one": "{{count}} 个资源库",
     "repositoryCount_other": "{{count}} 个资源库",
@@ -2793,6 +2842,7 @@
       "mount": "挂载"
     },
     "title": "存储",
+    "trashHeld_other": "{{count}} 个保留",
     "trashSummary": "文件数：{{files}} · {{bytes}}",
     "unlinked": {
       "description": "它们的存储位置未在此注册。文件未被改动；重新连接或定位后即可恢复访问。",

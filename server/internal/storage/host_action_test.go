@@ -567,7 +567,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	// now sits on: the continuity risk joins the review.
 	if _, err := manager.queries.UpdateStorageLocationMountFingerprint(ctx, repo.UpdateStorageLocationMountFingerprintParams{
 		StorageLocationID: externalRoot.StorageLocationID, MountFingerprint: "registered-on-another-disk",
-		UpdatedAt:         dbtypes.NewTimestamp(time.Now().UTC()),
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}); err != nil {
 		t.Fatal(err)
 	}

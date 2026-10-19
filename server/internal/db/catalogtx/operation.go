@@ -83,6 +83,7 @@ const (
 	OperationAssetMetadataPublish
 	OperationAssetDelete
 	OperationAssetRestore
+	OperationRepositoryRecovery
 	OperationAssetStagingCommit
 	OperationAssetReprocess
 	OperationAssetReindexRequest
@@ -342,6 +343,11 @@ var operationCatalog = [operationCount]OperationDescriptor{
 	OperationAssetDelete: {
 		Operation: OperationAssetDelete,
 		Name:      "asset.delete",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryRecovery: {
+		Operation: OperationRepositoryRecovery,
+		Name:      "repository.recovery",
 		Role:      RoleWriter,
 	},
 	OperationAssetRestore: {

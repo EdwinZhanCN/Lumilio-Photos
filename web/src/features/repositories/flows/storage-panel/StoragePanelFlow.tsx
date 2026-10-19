@@ -33,6 +33,7 @@ import { useStorageView } from "../../api/useStorageView";
 import type { RepositoryRef, StorageLocationOption } from "../../types";
 import AddRepositoryModal from "./AddRepositoryModal";
 import NativeHostActionModal from "./NativeHostActionModal";
+import RecoveryInventoryModal from "./RecoveryInventoryModal";
 import RemoveRepositoryModal from "./RemoveRepositoryModal";
 import RemoveStorageLocationModal from "./RemoveStorageLocationModal";
 import RenameRepositoryModal from "./RenameRepositoryModal";
@@ -124,6 +125,10 @@ export default function StoragePanelFlow({
     repositoryId?: string;
   } | null>(null);
   const [verificationHistoryRepository, setVerificationHistoryRepository] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [recoveryRepository, setRecoveryRepository] = useState<{
     id: string;
     name: string;
   } | null>(null);
@@ -258,6 +263,9 @@ export default function StoragePanelFlow({
           return;
         case "locate":
           setHostAction({ kind: "locate_repository", repositoryId: row.id });
+          return;
+        case "recovery":
+          setRecoveryRepository({ id: row.id, name: row.name });
           return;
       }
     },
@@ -618,6 +626,14 @@ export default function StoragePanelFlow({
           repositoryName={verificationHistoryRepository.name}
           isOpen
           onClose={() => setVerificationHistoryRepository(null)}
+        />
+      ) : null}
+      {recoveryRepository ? (
+        <RecoveryInventoryModal
+          repositoryId={recoveryRepository.id}
+          repositoryName={recoveryRepository.name}
+          isOpen
+          onClose={() => setRecoveryRepository(null)}
         />
       ) : null}
     </div>

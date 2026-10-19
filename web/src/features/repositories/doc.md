@@ -99,6 +99,16 @@ Parent Storage Location status does not veto a healthy child. Cloud
 credentials and import status come through the Cloud public entry rather
 than being reimplemented here.
 
+[RecoveryInventoryModal](./flows/storage-panel/RecoveryInventoryModal.tsx) is the private-recovery inventory of one
+Repository, read through [useRepositoryRecovery](./api/useRepositoryRecovery.ts) from the receipts a
+registration wrote: the inherited Trash still held out of automatic expiry
+(decided in the Trash view), Studio records attached to their proven photo
+or kept for review, and unfinished uploads and unknown files kept for
+export. Export leaves an item in place; delete is an explicit, confirmed
+removal recorded in the receipt. The row and the Inspector carry the held
+and pending counts from the Storage view; nothing in the inventory changes
+without the user.
+
 ## Data
 
 [useRepositoryOptions](./api/useRepositoryOptions.ts) adapts `GET /api/v1/storage/targets` through

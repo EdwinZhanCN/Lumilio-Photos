@@ -108,6 +108,11 @@ var (
 		"Repository identity mismatch", "The marker at the path carries a different Repository identity than the registration the command targets.")
 	StorageOriginalOnline = descriptor("storage/original-online", http.StatusConflict,
 		"Original Repository still online", "The registered Repository is still present at its original path, so there is nothing to reconnect.")
+	StorageRecoveryRequired = Descriptor{
+		Type: Namespace + "storage/recovery-required", Status: http.StatusConflict,
+		Title: "Repository recovery required", Definition: "An interrupted storage operation left the journal of this Repository open; conflicting commands are refused until journal recovery completes.",
+		Recovery: "Let the Server finish journal recovery (it runs at startup and on the maintenance pass), review the recovery inventory of the Repository on the Storage page, then retry.",
+	}
 	ServiceUnavailable = descriptor("service/unavailable", http.StatusServiceUnavailable,
 		"Service unavailable", "A required optional service is currently unavailable.")
 	InvalidMediaRequest = descriptor("media/invalid-request", http.StatusUnprocessableEntity,
@@ -162,6 +167,7 @@ var registry = mustRegistry(
 	StorageOwnershipUnavailable,
 	StorageIdentityMismatch,
 	StorageOriginalOnline,
+	StorageRecoveryRequired,
 	ServiceUnavailable,
 	InvalidMediaRequest,
 	ImageEmbeddingMissing,

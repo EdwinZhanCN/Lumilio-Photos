@@ -435,12 +435,21 @@ func TestStorageLocationAndCopyRegistrationUseDurableJournal(t *testing.T) {
 	if len(scanned) != 2 || scanned[1] != registered.RepoID.String() {
 		t.Fatalf("durably retried copy scans = %#v", scanned)
 	}
-	recovered, err := filepath.Glob(filepath.Join(copyPath, DefaultStructure.SystemDir, "recovery", "copied-from-*", "staging", "old-state"))
+	recovered, err := filepath.Glob(filepath.Join(copyPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*", "staging", "old-state"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(recovered) != 1 {
-		t.Fatalf("isolated private-state files = %v", recovered)
+		t.Fatalf("preserved staging files = %v", recovered)
+	}
+	receiptData, err := os.ReadFile(strings.TrimSuffix(filepath.Dir(filepath.Dir(recovered[0])), string(filepath.Separator)) + ".json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := ParseRecoveryReceipt(receiptData)
+	if err != nil || receipt.Event != RecoveryEventRegisterCopy ||
+		receipt.SourceRepositoryID != original.Repository.RepoID.String() || receipt.RepositoryID != registered.RepoID.String() {
+		t.Fatalf("copy receipt = %+v, err=%v", receipt, err)
 	}
 	var completed int
 	if err := catalog.SQL.QueryRowContext(ctx, `

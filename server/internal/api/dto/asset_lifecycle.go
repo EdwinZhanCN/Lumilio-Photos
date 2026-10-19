@@ -38,3 +38,17 @@ type AssetRestoredPathDTO struct {
 	OriginalPath string `json:"original_path"`
 	RestoredPath string `json:"restored_path"`
 }
+
+// AssetTrashHoldsDTO lists the Assets whose trashed files are held out of
+// automatic expiry because the Trash inherited them from a Repository that
+// was opened, copied, or restored into this catalog.
+type AssetTrashHoldsDTO struct {
+	AssetIDs []string `json:"asset_ids"`
+	Count    int      `json:"count" example:"3"`
+}
+
+// AssetRetentionAcceptedDTO reports how many held trashed files now follow
+// the ordinary retention, counted from the acceptance.
+type AssetRetentionAcceptedDTO struct {
+	Entries int64 `json:"entries" example:"3"`
+}

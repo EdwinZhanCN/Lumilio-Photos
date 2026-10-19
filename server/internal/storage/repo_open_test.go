@@ -45,7 +45,7 @@ func TestOpenRepositoryRejectsUnavailableCloudPlaceholderBeforeCatalogMutation(t
 	}
 }
 
-func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T) {
+func TestOpenRepositoryPreservesStagingUnderAReceiptAndSchedulesInitialScan(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -122,8 +122,10 @@ func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T)
 	if len(scanned) != 2 || scanned[1] != opened.RepoID.String() {
 		t.Fatalf("durably retried initial scans = %#v", scanned)
 	}
+	// Abandoned staging is moved under the registration's recovery receipt,
+	// out of the way of ordinary staging cleanup, never discarded.
 	recovered, err := filepath.Glob(filepath.Join(
-		opened.Path, DefaultStructure.SystemDir, "recovery", "reopened-*", "staging", "old-state",
+		opened.Path, filepath.FromSlash(RepositoryRecoveryDirectory), "*", "staging", "old-state",
 	))
 	if err != nil {
 		t.Fatal(err)

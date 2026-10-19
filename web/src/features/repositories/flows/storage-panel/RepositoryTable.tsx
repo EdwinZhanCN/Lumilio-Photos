@@ -124,6 +124,9 @@ export default function RepositoryTable({ rows, expandedId, onToggleRow, renderA
                         files: row.trashCount ?? 0,
                         bytes: formatBytes(row.trashBytes ?? 0),
                       })}
+                      {row.trashHeldCount
+                        ? ` · ${t("storagePanel.trashHeld", "{{count}} held", { count: row.trashHeldCount })}`
+                        : null}
                     </Link>
                   </td>
                   <td>

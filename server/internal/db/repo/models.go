@@ -979,6 +979,7 @@ type RepositoryEntry struct {
 	MissingSince            dbtypes.Timestamp `db:"missing_since" json:"missing_since"`
 	TrashID                 uuid.NullUUID     `db:"trash_id" json:"trash_id"`
 	TrashedAt               dbtypes.Timestamp `db:"trashed_at" json:"trashed_at"`
+	TrashHold               *string           `db:"trash_hold" json:"trash_hold"`
 	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
