@@ -340,15 +340,16 @@ func TestFreshDefaultElsewhereBeforeThePrimaryExists(t *testing.T) {
 	}
 	second.stop()
 
-	// The established default goes offline: the instance stays ready and
-	// degraded, the folder is not recreated, and setup is not reopened.
+	// The established default goes offline: the instance stays ready (setup
+	// completion is durable and the runtime keeps serving the other
+	// Repositories), the folder is not recreated, and setup is not reopened.
 	offlineDir := filepath.Join(first.root, "storage-fresh-unplugged")
 	if err := os.Rename(freshDir, offlineDir); err != nil {
 		t.Fatal(err)
 	}
 	third := startBlackboxServerWith(t, blackboxOptions{root: first.root, storageDir: freshDir, login: true, skipPrimary: true})
 	third.mustJSON(http.MethodGet, "/api/v1/setup/status", nil, &status)
-	if !status.Initialized || !status.PrimaryRepositoryInitialized || status.RuntimeState != "degraded" {
+	if !status.Initialized || !status.PrimaryRepositoryInitialized || status.RuntimeState != "active" {
 		t.Fatalf("status with the default offline = %+v", status)
 	}
 	if _, err := os.Stat(freshDir); !os.IsNotExist(err) {

@@ -717,8 +717,9 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   registered at the unchanged path): nothing is provisioned, the reason is
   logged, and `AssessDefaultStorageLocation` names the state for the
   administrator. `EnsureRootLayout` no longer creates `storage.path`, so an
-  offline default is not recreated as an empty folder; `StorageRuntimeStatus`
-  reports `degraded` while the registered default or primary is offline.
+  offline default is not recreated as an empty folder; the instance stays
+  ready and its runtime status active (the row-level offline reachability
+  is what the Storage page shows), as the matrix requires.
   Fatal causes are classified by `app.ClassifyStartupFailure`
   (`catalog_lineage_unsupported`, `catalog_newer`,
   `configuration_incompatible`, `configuration_upgrade_required`,
@@ -762,7 +763,7 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   `TestFreshDefaultElsewhereBeforeThePrimaryExists` (restart with another
   `storage.path` before the primary, old tree untouched, primary created in
   the new default; the established default offline later keeps the instance
-  ready and degraded and is not recreated). Service and handler tests for the
+  ready and is not recreated). Service and handler tests for the
   phase-only status, the review projection (no Repository path), the adopt
   binding and every refusal mapping. Desktop:
   `TestPatchDraftAllowsAFreshDefaultCandidateWithoutAPrimary`,
@@ -776,10 +777,7 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   hold and the reassociation follow the queued scan exactly as an open does.
   The Desktop binding enum (`models.ts`) was updated by hand to the Go
   codes because the Wails generator is not available in the sandbox; the
-  next `wails3 generate bindings` run produces the same entries. The
-  degraded runtime state now also covers a registered default or primary
-  that reconciliation found offline, so the access gate's recovery banner
-  appears for an unplugged default disk while the instance stays usable.
+  next `wails3 generate bindings` run produces the same entries.
 
 ### P6 — Complete reconnect journeys and volume semantics
 
