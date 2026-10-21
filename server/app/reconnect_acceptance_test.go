@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -34,17 +35,45 @@ type reconnectHarness struct {
 func startReconnectHarness(t *testing.T) *reconnectHarness {
 	t.Helper()
 	harness := &reconnectHarness{}
-	harness.blackboxServer = startBlackboxServerWith(t, blackboxOptions{
-		repositoryControl: func(control RepositoryControl) {
-			if control != nil {
-				harness.control = control
-			}
-		},
-	})
+	harness.blackboxServer = startBlackboxServerWith(t, blackboxOptions{repositoryControl: harness.capture})
 	if harness.control == nil {
 		t.Fatal("the native control plane was not handed to the harness")
 	}
 	return harness
+}
+
+func (h *reconnectHarness) capture(control RepositoryControl) {
+	if control != nil {
+		h.control = control
+	}
+}
+
+// move is the external move of a tree the Server registered. On Linux and
+// macOS it happens while the Server runs and holds the tree's runtime lock,
+// the case the ownership rekey exists for. Windows refuses to rename a
+// directory while any handle inside it is open, so there the move happens
+// with the Server stopped, the way an operator moves a folder Explorer
+// reports as in use, and the Server restarts on the same catalog.
+func (h *reconnectHarness) move(from, to string) {
+	h.t.Helper()
+	if runtime.GOOS != "windows" {
+		if err := os.Rename(from, to); err != nil {
+			h.t.Fatal(err)
+		}
+		return
+	}
+	root, storageDir := h.root, h.storageDir
+	h.stop()
+	if err := os.Rename(from, to); err != nil {
+		h.t.Fatal(err)
+	}
+	h.control = nil
+	h.blackboxServer = startBlackboxServerWith(h.t, blackboxOptions{
+		root: root, storageDir: storageDir, login: true, skipPrimary: true, repositoryControl: h.capture,
+	})
+	if h.control == nil {
+		h.t.Fatal("the native control plane was not handed to the restarted harness")
+	}
 }
 
 // externalDisk grants an external Storage Location the way the Desktop host
@@ -235,6 +264,37 @@ func originalHashes(tb testing.TB, root string) map[string]string {
 	return hashes
 }
 
+// copyTree copies a Repository tree the way a user duplicates a folder,
+// leaving out the OS lock files the running Server holds (Windows refuses
+// to read a locked region, and a copy carries no lock anyway).
+func copyTree(tb testing.TB, from, to string) {
+	tb.Helper()
+	err := filepath.WalkDir(from, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(from, name)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(to, relative)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if strings.HasSuffix(entry.Name(), ".lock") {
+			return nil
+		}
+		data, err := os.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o644)
+	})
+	if err != nil {
+		tb.Fatal(err)
+	}
+}
+
 func sameHashes(a, b map[string]string) bool {
 	if len(a) != len(b) {
 		return false
@@ -311,9 +371,7 @@ func TestMovedRegularRepositoryReconnectsThroughTheNativeTask(t *testing.T) {
 
 	// The disk moves while Lumilio is not looking.
 	movedPath := filepath.Join(diskB.Path, "travel")
-	if err := os.Rename(travel.Path, movedPath); err != nil {
-		t.Fatal(err)
-	}
+	h.move(travel.Path, movedPath)
 	task := h.approve(h.nativeTask(map[string]any{"kind": "locate_repository", "repository_id": travel.ID}), movedPath)
 	if task.Status != "succeeded" || task.Result == nil || task.Result.RepositoryID != travel.ID {
 		t.Fatalf("reconnect task = %+v problem=%+v refusal=%+v", task, task.Problem, task.Refusal)
@@ -354,9 +412,7 @@ func TestMovedRegularRepositoryReconnectsThroughTheNativeTask(t *testing.T) {
 
 	// A same-identity copy while the original is online is never a move.
 	copyPath := filepath.Join(diskA.Path, "travel-copy")
-	if err := os.CopyFS(copyPath, os.DirFS(canonicalMoved)); err != nil {
-		t.Fatal(err)
-	}
+	copyTree(t, canonicalMoved, copyPath)
 	refused := h.approve(h.nativeTask(map[string]any{"kind": "locate_repository", "repository_id": travel.ID}), copyPath)
 	if refused.Status != "failed" || !strings.HasSuffix(problemType(refused), "storage/original-online") {
 		t.Fatalf("online-copy task = %+v problem=%+v", refused, refused.Problem)
@@ -369,9 +425,7 @@ func TestMovedRegularRepositoryReconnectsThroughTheNativeTask(t *testing.T) {
 	// positively gone, and the row is untouched.
 	other := h.createIn(diskA, "Other", "other")
 	awayPath := filepath.Join(diskB.Path, "travel-away")
-	if err := os.Rename(canonicalMoved, awayPath); err != nil {
-		t.Fatal(err)
-	}
+	h.move(canonicalMoved, awayPath)
 	mismatch := h.approve(h.nativeTask(map[string]any{"kind": "locate_repository", "repository_id": travel.ID}), other.Path)
 	if mismatch.Status != "failed" || !strings.HasSuffix(problemType(mismatch), "storage/identity-mismatch") {
 		t.Fatalf("wrong-identity task = %+v problem=%+v", mismatch, mismatch.Problem)
@@ -445,9 +499,7 @@ func TestMovedStorageLocationReconnectsEveryChildOrNothing(t *testing.T) {
 	}
 
 	movedPath := filepath.Join(h.root, "disk-c-moved")
-	if err := os.Rename(diskC.Path, movedPath); err != nil {
-		t.Fatal(err)
-	}
+	h.move(diskC.Path, movedPath)
 	if offline := h.viewLocation(diskC.ID); len(offline.Actions) != 1 || offline.Actions[0] != "reconnect" {
 		t.Fatalf("moved external Location actions = %+v", offline)
 	}

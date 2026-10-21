@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -449,6 +450,13 @@ func TestStorageLocationReconnectAgreesWithThePolicy(t *testing.T) {
 // Storage Location with its children; a second process still cannot claim
 // the reconnected tree.
 func TestReconnectFollowsATreeMovedWhileItsRuntimeLockIsHeld(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Windows refuses to rename a directory while any handle inside it
+		// is open, so a tree cannot move while this process holds its lock;
+		// the moved-while-held case does not exist there. A re-lettered disk
+		// is covered by the same file-identity match on a stale handle.
+		t.Skip("a held tree cannot be renamed on Windows")
+	}
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
