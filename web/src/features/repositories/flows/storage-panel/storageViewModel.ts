@@ -82,12 +82,36 @@ export type RepositoryRow = {
   unavailableActions: RepositoryActionBlock[];
 };
 
+/** The closed Location-command vocabulary the Server's kind-aware policy emits. */
+export type StorageLocationAction = "reconnect" | "detach";
+
+export type StorageLocationActionBlock = {
+  action: StorageLocationAction;
+  blockers: string[];
+  alternatives: string[];
+};
+
+const STORAGE_LOCATION_ACTIONS: readonly StorageLocationAction[] = ["reconnect", "detach"];
+
+function isStorageLocationAction(value: unknown): value is StorageLocationAction {
+  return (
+    typeof value === "string" && (STORAGE_LOCATION_ACTIONS as readonly string[]).includes(value)
+  );
+}
+
 export type StorageLocationGroup = {
   id: string;
   name: string;
   kind: "default" | "external" | "unknown";
   canRemove: boolean;
   blockingReason?: string;
+  /**
+   * Location commands the Server admits on current facts: Reconnect only
+   * while the registered original is positively unavailable, Detach only for
+   * an empty external Location. The menu renders from this list.
+   */
+  actions: StorageLocationAction[];
+  unavailableActions: StorageLocationActionBlock[];
   repositories: RepositoryRow[];
 };
 
@@ -248,6 +272,18 @@ export function buildStorageView(data?: StorageViewResponse): StorageView {
       kind: location.kind === "default" || location.kind === "external" ? location.kind : "unknown",
       canRemove: location.can_remove === true,
       blockingReason: location.blocking_reason,
+      actions: (location.actions ?? []).filter(isStorageLocationAction),
+      unavailableActions: (location.unavailable_actions ?? []).flatMap((block) =>
+        isStorageLocationAction(block.action)
+          ? [
+              {
+                action: block.action,
+                blockers: block.blockers ?? [],
+                alternatives: block.alternatives ?? [],
+              },
+            ]
+          : [],
+      ),
       repositories: rowsByLocation.get(id) ?? [],
     });
   }

@@ -3,8 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"server/internal/db/dbtypes"
@@ -63,7 +61,15 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 		return nil
 	}
 
-	reachability, config := rm.inspectRepositoryOnDisk(current)
+	reachability, config, known := rm.inspectRepositoryOnDisk(current)
+	if !known {
+		// Denied or unknown is not absence: the row keeps its reachability
+		// until the path can be read again (R6, no false Missing).
+		rm.logger.Warn("repository path could not be read; reachability left unchanged",
+			zap.String("operation", "repository.reconcile"),
+			zap.String("repository_path", current.Path))
+		return nil
+	}
 
 	if reachability == dbtypes.RepositoryReachabilityActive && config != nil {
 		claimed, err := rm.tryClaimRuntimeRepository(ctx, current)
@@ -97,27 +103,28 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 }
 
 // inspectRepositoryOnDisk decides a repository's reachability from its recorded
-// path. An unreadable path means offline — the drive is elsewhere, the data is
-// not lost. A readable path holding a different or unparseable identity means
-// error, which needs a human.
-func (rm *DefaultRepositoryManager) inspectRepositoryOnDisk(current repo.Repository) (dbtypes.RepositoryReachability, *repocfg.RepositoryConfig) {
-	if _, err := os.Stat(filepath.Join(current.Path, ".lumiliorepo")); err != nil {
-		if info, pathErr := os.Stat(current.Path); pathErr == nil && info.IsDir() {
-			return dbtypes.RepositoryReachabilityIdentityError, nil
-		}
-		return dbtypes.RepositoryReachabilityOffline, nil
+// path. A positively absent path means offline — the drive is elsewhere, the
+// data is not lost. A readable path holding a different or unparseable
+// identity means error, which needs a human. A path that cannot be read at
+// all (permission denied, an unknown failure) decides nothing: known is
+// false and the caller keeps the current reachability.
+func (rm *DefaultRepositoryManager) inspectRepositoryOnDisk(current repo.Repository) (dbtypes.RepositoryReachability, *repocfg.RepositoryConfig, bool) {
+	switch rm.repositoryOriginalState(current.Path, repositoryIDString(current.RepoID)) {
+	case OriginalAbsent:
+		return dbtypes.RepositoryReachabilityOffline, nil, true
+	case OriginalIdentityDiffers:
+		return dbtypes.RepositoryReachabilityIdentityError, nil, true
+	case OriginalInaccessible:
+		return current.Reachability, nil, false
 	}
-
 	config, err := rm.identities().LoadRepository(current.Path)
 	if err != nil {
-		return dbtypes.RepositoryReachabilityIdentityError, nil
+		return dbtypes.RepositoryReachabilityIdentityError, nil, true
 	}
-
 	if config.ID != repositoryIDString(current.RepoID) {
-		return dbtypes.RepositoryReachabilityIdentityError, nil
+		return dbtypes.RepositoryReachabilityIdentityError, nil, true
 	}
-
-	return dbtypes.RepositoryReachabilityActive, config
+	return dbtypes.RepositoryReachabilityActive, config, true
 }
 
 func repositoryIDString(id uuid.UUID) string {

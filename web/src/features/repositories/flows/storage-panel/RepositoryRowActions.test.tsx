@@ -47,7 +47,7 @@ async function openMenu(subject: RepositoryRow, nativeHostAvailable = true) {
 
 const renameCopy = t("storagePanel.action.rename", { defaultValue: "Rename Repository" });
 const removeCopy = t("storagePanel.action.remove", { defaultValue: "Remove from Lumilio" });
-const locateCopy = t("storagePanel.action.locate", { defaultValue: "Locate on disk" });
+const locateCopy = t("storagePanel.action.reconnect", { defaultValue: "Reconnect" });
 
 // R10: the menu renders from the Server's role-aware actions and never
 // invents a protected or inapplicable command.

@@ -93,7 +93,7 @@ type RepositoryManager interface {
 	// that has a valid .lumiliorepo). It fails if the path is not a valid
 	// repository or is already registered. If the repository's ID is registered
 	// at a different path it returns a *RepositoryConflictError, which the caller
-	// resolves with RelocateRepository or RegisterRepositoryCopy.
+	// resolves with ReconnectRepository or RegisterRepositoryCopy.
 	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, storageLocationID ...uuid.UUID) (*repo.Repository, error)
 
 	// OpenRepository is the durable user-facing attach workflow. It preserves
@@ -110,17 +110,23 @@ type RepositoryManager interface {
 	// native Desktop grant, never an arbitrary shared-API path.
 	EnsureDefaultStorageLocation(ctx context.Context, path string, request ...LifecycleRequest) (*repo.StorageLocation, error)
 	AddStorageLocation(ctx context.Context, path, name string, request ...LifecycleRequest) (*repo.StorageLocation, error)
-	RelocateStorageLocation(ctx context.Context, id, path string, request ...LifecycleRequest) (*repo.StorageLocation, error)
+	// ReconnectStorageLocation re-points an external Storage Location and its
+	// child Repositories at the tree carrying its identity; it never moves data.
+	ReconnectStorageLocation(ctx context.Context, id, path string, request ...LifecycleRequest) (*repo.StorageLocation, error)
+	// StorageLocationActionPolicyFor derives the kind-aware Location policy
+	// (reconnect, detach) the storage view and the commands share.
+	StorageLocationActionPolicyFor(ctx context.Context, storageLocation repo.StorageLocation) (StorageLocationActionPolicy, error)
 	ListStorageLocations(ctx context.Context) ([]repo.StorageLocation, error)
 	GetStorageLocation(ctx context.Context, id string) (*repo.StorageLocation, error)
 	PreviewStorageLocationRemoval(ctx context.Context, id string) (StorageLocationRemovalImpact, error)
 	DeleteStorageLocation(ctx context.Context, id string, request ...LifecycleRequest) error
 	ReconcileStorageLocations(ctx context.Context) error
 
-	// RelocateRepository points an existing repository at a new on-disk
-	// location. Assets and Locations are untouched because repository node paths
-	// are relative graph projections.
-	RelocateRepository(ctx context.Context, id string, newPath string, request ...LifecycleRequest) (*repo.Repository, error)
+	// ReconnectRepository re-points a positively unavailable registration at
+	// the tree carrying its identity. Assets and Locations are untouched
+	// because repository node paths are relative graph projections; data is
+	// never moved.
+	ReconnectRepository(ctx context.Context, id string, newPath string, request ...LifecycleRequest) (*repo.Repository, error)
 
 	// RegisterRepositoryCopy registers a duplicated repository directory as an
 	// independent repository by minting a fresh UUID into its .lumiliorepo.
@@ -234,7 +240,7 @@ type DefaultRepositoryManager struct {
 	markerFiles    marker.AtomicFS
 	ownershipMu    sync.Mutex
 	ownershipOn    bool
-	ownership      map[string]func()
+	ownership      map[string]runtimeOwnership
 }
 
 // SetMarkerFiles installs the filesystem the manager's guarded marker writes

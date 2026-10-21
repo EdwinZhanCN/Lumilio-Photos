@@ -102,7 +102,7 @@ func TestStorageLocationRemovalBlocksDefaultAndRegisteredRepositories(t *testing
 	}
 }
 
-func TestRelocateRepositoryRefusesWhileOriginalIdentityIsOnline(t *testing.T) {
+func TestReconnectRepositoryRefusesWhileOriginalIdentityIsOnline(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -143,7 +143,7 @@ func TestRelocateRepositoryRefusesWhileOriginalIdentityIsOnline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := manager.RelocateRepository(ctx, created.Repository.RepoID.String(), target); !errors.Is(err, ErrRepositoryOriginalOnline) {
+	if _, err := manager.ReconnectRepository(ctx, created.Repository.RepoID.String(), target); !errors.Is(err, ErrRepositoryOriginalOnline) {
 		t.Fatalf("relocate error = %v, want ErrRepositoryOriginalOnline", err)
 	}
 	current, err := manager.GetRepository(created.Repository.RepoID.String())
@@ -155,7 +155,7 @@ func TestRelocateRepositoryRefusesWhileOriginalIdentityIsOnline(t *testing.T) {
 	}
 }
 
-func TestRelocateRepositorySucceedsAcrossRegisteredStorageLocations(t *testing.T) {
+func TestReconnectRepositorySucceedsAcrossRegisteredStorageLocations(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -187,7 +187,7 @@ func TestRelocateRepositorySucceedsAcrossRegisteredStorageLocations(t *testing.T
 	if err := os.Rename(created.Repository.Path, newPath); err != nil {
 		t.Fatal(err)
 	}
-	relocated, err := manager.RelocateRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
+	relocated, err := manager.ReconnectRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
 		RequestID: "cross-storageLocation-relocate", Actor: "test", ConfirmationType: "update_location",
 	})
 	if err != nil {

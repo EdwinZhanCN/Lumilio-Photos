@@ -344,7 +344,10 @@ jobs:
         name: web (Task)
         needs: changes
         if: needs.changes.outputs.web_job == 'true'
-        runs-on: ubuntu-latest
+        # Pinned like the release workflows: `ubuntu-latest` moved to 26.04 on
+        # 2026-10-21 and the pinned Playwright refuses to install Chromium
+        # there ("does not support chromium on ubuntu26.04-x64").
+        runs-on: ubuntu-24.04
         permissions:
             contents: read
             packages: read

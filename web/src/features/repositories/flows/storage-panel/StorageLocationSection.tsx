@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { FolderPlus, HardDrive, Trash2 } from "lucide-react";
+import { FolderPlus, FolderSearch, HardDrive, Trash2 } from "lucide-react";
 import AnchoredMenu, { MenuItem } from "@/components/ui/AnchoredMenu";
+import { localizeStorageActionBlockers } from "@/lib/http-commons/problem";
 import { useI18n } from "@/lib/i18n";
 import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import RepositoryTable from "./RepositoryTable";
@@ -13,13 +14,19 @@ type Props = {
   renderActions: (row: RepositoryRow) => ReactNode;
   onAddRepository: () => void;
   onRemoveLocation: () => void;
+  /** The Location Reconnect entry needs a Desktop host to choose the folder. */
+  nativeHostAvailable?: boolean;
+  onReconnectLocation?: () => void;
 };
 
 /**
  * One Storage Location section. The header carries identity and Location-level
  * commands only: capacity is never shown here, because a Location can hold
  * Repositories on different mounts and a single figure would misattribute at
- * least one of them.
+ * least one of them. On a Desktop host an external Location also carries its
+ * direct Reconnect entry; while the Server withholds it, the entry stays
+ * visible but disabled with the Server's reason, so the prerequisite (the
+ * original is positively unavailable) is never a mystery.
  */
 export default function StorageLocationSection({
   group,
@@ -28,8 +35,13 @@ export default function StorageLocationSection({
   renderActions,
   onAddRepository,
   onRemoveLocation,
+  nativeHostAvailable = false,
+  onReconnectLocation,
 }: Props) {
   const { t } = useI18n();
+  const reconnectAllowed = group.actions.includes("reconnect");
+  const reconnectBlock = group.unavailableActions.find((block) => block.action === "reconnect");
+  const showReconnect = nativeHostAvailable && group.kind === "external" && onReconnectLocation;
   const displayName = getStorageEntityDisplayName(
     { entityType: "storage_location", kind: group.kind, rawName: group.name, path: "" },
     t,
@@ -62,7 +74,7 @@ export default function StorageLocationSection({
             name: displayName,
           })}
           menuWidth={256}
-          menuHeight={140}
+          menuHeight={180}
           triggerClassName="btn btn-square btn-ghost btn-xs shrink-0"
         >
           {({ close }) => (
@@ -76,6 +88,26 @@ export default function StorageLocationSection({
                 <FolderPlus className="size-4" aria-hidden />
                 {t("storagePanel.action.addRepository", "Add Repository")}
               </MenuItem>
+              {showReconnect ? (
+                <MenuItem
+                  disabled={!reconnectAllowed}
+                  hint={
+                    reconnectAllowed
+                      ? t(
+                          "storagePanel.action.reconnectLocationHint",
+                          "Choose the folder that holds this Storage Location and its Repositories now; nothing is moved.",
+                        )
+                      : localizeStorageActionBlockers(reconnectBlock?.blockers, t)
+                  }
+                  onSelect={() => {
+                    close();
+                    onReconnectLocation();
+                  }}
+                >
+                  <FolderSearch className="size-4" aria-hidden />
+                  {t("storagePanel.action.reconnectLocation", "Reconnect Storage Location")}
+                </MenuItem>
+              ) : null}
               <MenuItem
                 danger
                 disabled={!group.canRemove}

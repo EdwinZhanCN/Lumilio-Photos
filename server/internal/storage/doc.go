@@ -7,7 +7,7 @@
 // # Responsibilities
 //
 //   - [RepositoryManager]: repository lifecycle — create, register existing,
-//     look up, list, update, relocate, remove — keeping catalog records and
+//     look up, list, update, reconnect, remove — keeping catalog records and
 //     the on-disk repository in sync. Constructors return the concrete
 //     [DefaultRepositoryManager]; callers depend on the narrow slice they
 //     need. Removal purges the repository's entries through
@@ -18,7 +18,7 @@
 //   - [StagingManager]: transient staging files for uploads and cloud
 //     imports, before the sourcing pipeline commits them into the inbox.
 //   - [RepositoryFS] and [RepositoryFSFactory]: every repository file
-//     operation is rooted here and serialized against relocation and
+//     operation is rooted here and serialized against reconnect and
 //     removal; nothing else opens repository paths.
 //   - [server/internal/storage/scan]: the repository scan index. The catalog
 //     mirrors each repository tree in repository_entries; walks diff

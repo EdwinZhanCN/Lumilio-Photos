@@ -9,7 +9,11 @@ import (
 	"server/internal/db/dbtypes"
 )
 
-func TestRepositoryRelocationRollsBackCatalogWhenAuditPersistenceFails(t *testing.T) {
+// A reconnect whose command audit cannot be persisted rolls its catalog
+// transaction back: the row keeps its path, no succeeded command audit row
+// exists for the request, and the journal records the operation as failed
+// rather than leaving it running.
+func TestRepositoryReconnectRollsBackCatalogWhenAuditPersistenceFails(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
@@ -41,7 +45,7 @@ func TestRepositoryRelocationRollsBackCatalogWhenAuditPersistenceFails(t *testin
 		t.Fatal(err)
 	}
 
-	if _, err := manager.RelocateRepository(ctx, created.Repository.RepoID.String(), movedPath, LifecycleRequest{
+	if _, err := manager.ReconnectRepository(ctx, created.Repository.RepoID.String(), movedPath, LifecycleRequest{
 		RequestID: "relocate-audit-failure", Actor: "web:admin", HostInstanceID: "web-server-1",
 		ConfirmationType: "update_location",
 	}); err == nil {
@@ -57,11 +61,15 @@ func TestRepositoryRelocationRollsBackCatalogWhenAuditPersistenceFails(t *testin
 	var audits int
 	if err := catalog.SQL.QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_audit_events
-		WHERE request_id = 'relocate-audit-failure'
+		WHERE request_id = 'relocate-audit-failure' AND action = 'update_repository_location'
 	`).Scan(&audits); err != nil {
 		t.Fatal(err)
 	}
 	if audits != 0 {
-		t.Fatalf("relocation audit rows = %d after rolled-back transaction", audits)
+		t.Fatalf("reconnect command audit rows = %d after rolled-back transaction", audits)
+	}
+	operation, err := manager.queries.GetLifecycleOperationByRequestID(ctx, "relocate-audit-failure")
+	if err != nil || operation.Status == lifecycleStatusRunning || operation.Status == lifecycleStatusCompleted {
+		t.Fatalf("reconnect journal after rolled-back transaction = %#v err=%v", operation, err)
 	}
 }

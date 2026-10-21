@@ -30,7 +30,9 @@ type adoptPrimaryManagerStub struct {
 	defaults    storage.DefaultStorageAssessment
 }
 
-func (s *adoptPrimaryManagerStub) HostOwnerID(context.Context) (*int32, error) { return s.hostOwnerID, nil }
+func (s *adoptPrimaryManagerStub) HostOwnerID(context.Context) (*int32, error) {
+	return s.hostOwnerID, nil
+}
 
 func (s *adoptPrimaryManagerStub) AdoptPrimaryRepository(_ context.Context, spec storage.AdoptPrimarySpec) (*storage.AdoptPrimaryResult, error) {
 	s.spec = spec
@@ -88,9 +90,9 @@ func TestSetupStatusIsPhaseOnlyAndThePrimaryTargetCarriesTheReview(t *testing.T)
 		review: &storage.SetupPrimaryAssessment{
 			CreateTargetAssessment: &storage.CreateTargetAssessment{Intent: storage.IntentSetupPrimary, DirectoryName: "primary", Path: "/Volumes/Photos/primary", Token: "v1.setup", Risks: []storage.StorageRisk{storage.RiskRemovable}},
 			State:                  storage.SetupPrimaryLayoutRepairable, Actions: []string{storage.SetupActionAdopt, storage.SetupActionFreshElsewhere},
-			LayoutMissing:          []string{".lumilio"},
-			Existing:               &storage.SetupPrimaryExisting{RepositoryID: repositoryID, Name: "Old Primary", MarkerVersion: "1.0"},
-			Recovery:               &storage.SetupPrimaryRecoveryPreview{TrashFiles: 2, StudioRecords: 1, StagingFiles: 2, UnknownFiles: 1},
+			LayoutMissing: []string{".lumilio"},
+			Existing:      &storage.SetupPrimaryExisting{RepositoryID: repositoryID, Name: "Old Primary", MarkerVersion: "1.0"},
+			Recovery:      &storage.SetupPrimaryRecoveryPreview{TrashFiles: 2, StudioRecords: 1, StagingFiles: 2, UnknownFiles: 1},
 		},
 	}
 	handler := NewSetupHandler(service.NewSetupService(setupBootstrapStub{}, manager, "/Volumes/Photos"), true)

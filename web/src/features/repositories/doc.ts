@@ -88,8 +88,13 @@
  * chose is reviewed by the Server's shared storage assessment: a
  * `storage_risk` decision renders {@link StorageRiskConfirmation} with the
  * same risk codes as the create review and is confirmed by those codes, and a
- * changed risk set asks again. Relocate-versus-copy conflicts return
- * user-facing resolutions and require an explicit copy confirmation. A task
+ * changed risk set asks again. Reconnect-versus-copy conflicts return
+ * user-facing resolutions and require an explicit copy confirmation. Reconnect
+ * re-points a registration at the folder that holds it now and never moves
+ * files: the row offers it only while the Server reports the registered
+ * original as positively unavailable, and the external Storage Location menu
+ * carries a direct **Reconnect Storage Location** entry on a Desktop host,
+ * disabled with the Server's reason while the policy withholds it. A task
  * the role-aware policy withheld carries its typed Problem and blockers, and
  * an expired or declined request is a normal outcome that keeps the form and
  * offers to send it again. Standalone and Docker deployments use

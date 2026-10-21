@@ -95,6 +95,9 @@ type blackboxOptions struct {
 	storageDir string
 	// login signs the administrator an earlier generation registered in.
 	login bool
+	// repositoryControl receives the in-process native control plane, the
+	// seam the Desktop host uses; setting it also enables the native tasks.
+	repositoryControl func(RepositoryControl)
 }
 
 const (
@@ -161,8 +164,9 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 	done := make(chan error, 1)
 	go func() {
 		done <- Run(ctx, appConfig, OperatorControls{
-			RuntimeReady:       func(info RuntimeInfo) { ready <- info },
-			ChangeWatchBackend: options.changeWatch,
+			RuntimeReady:           func(info RuntimeInfo) { ready <- info },
+			ChangeWatchBackend:     options.changeWatch,
+			RepositoryManagerReady: options.repositoryControl,
 		})
 	}()
 	stop := func() {

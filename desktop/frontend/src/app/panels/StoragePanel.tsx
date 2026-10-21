@@ -299,10 +299,10 @@ function hostActionLabel(kind: string, t: ReturnType<typeof useTranslation>["t"]
     return t("storage.hostActionOpenRepository", "Open Existing Repository");
   }
   if (kind === "locate_storage_location") {
-    return t("storage.hostActionLocateLocation", "Locate Storage Location");
+    return t("storage.hostActionLocateLocation", "Reconnect Storage Location");
   }
   if (kind === "locate_repository") {
-    return t("storage.hostActionLocateRepository", "Locate Repository");
+    return t("storage.hostActionLocateRepository", "Reconnect Repository");
   }
   return t("storage.hostAction", "Storage request");
 }

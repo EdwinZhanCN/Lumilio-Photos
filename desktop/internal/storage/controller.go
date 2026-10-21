@@ -276,9 +276,9 @@ func hostActionPickerTitle(action runtime.HostAction) string {
 	case "open_repository":
 		return "Open Existing Repository"
 	case "locate_storage_location":
-		return "Locate Storage Location"
+		return "Reconnect Storage Location"
 	case "locate_repository":
-		return "Locate Repository"
+		return "Reconnect Repository"
 	default:
 		return "Choose Folder"
 	}

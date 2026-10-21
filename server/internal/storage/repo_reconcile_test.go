@@ -46,7 +46,7 @@ func TestInspectRepositoryOnDiskReportsActiveWhenIDMatches(t *testing.T) {
 	id := uuid.New()
 	row := writeRepositoryAt(t, filepath.Join(canonicalTempDir(t), "library"), id)
 
-	status, config := manager.inspectRepositoryOnDisk(row)
+	status, config, _ := manager.inspectRepositoryOnDisk(row)
 
 	if status != dbtypes.RepositoryReachabilityActive {
 		t.Fatalf("status = %q, want active", status)
@@ -66,7 +66,7 @@ func TestInspectRepositoryOnDiskReportsOfflineWhenPathMissing(t *testing.T) {
 		Reachability: dbtypes.RepositoryReachabilityActive,
 	}
 
-	status, config := manager.inspectRepositoryOnDisk(row)
+	status, config, _ := manager.inspectRepositoryOnDisk(row)
 
 	if status != dbtypes.RepositoryReachabilityOffline {
 		t.Fatalf("status = %q, want offline", status)
@@ -83,7 +83,7 @@ func TestInspectRepositoryOnDiskReportsErrorWhenIDDiffers(t *testing.T) {
 	row := writeRepositoryAt(t, filepath.Join(canonicalTempDir(t), "library"), uuid.New())
 	row.RepoID = uuid.New()
 
-	status, config := manager.inspectRepositoryOnDisk(row)
+	status, config, _ := manager.inspectRepositoryOnDisk(row)
 
 	if status != dbtypes.RepositoryReachabilityIdentityError {
 		t.Fatalf("status = %q, want identity_error", status)
@@ -108,7 +108,7 @@ func TestInspectRepositoryOnDiskReportsErrorWhenConfigUnparseable(t *testing.T) 
 		Reachability: dbtypes.RepositoryReachabilityActive,
 	}
 
-	status, _ := manager.inspectRepositoryOnDisk(row)
+	status, _, _ := manager.inspectRepositoryOnDisk(row)
 
 	if status != dbtypes.RepositoryReachabilityIdentityError {
 		t.Fatalf("status = %q, want identity_error", status)
@@ -126,13 +126,13 @@ func TestInspectRepositoryOnDiskRecoversFromOffline(t *testing.T) {
 		Reachability: dbtypes.RepositoryReachabilityOffline,
 	}
 
-	if status, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepositoryReachabilityOffline {
+	if status, _, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepositoryReachabilityOffline {
 		t.Fatalf("status = %q, want offline before remount", status)
 	}
 
 	writeRepositoryAt(t, path, id)
 
-	if status, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepositoryReachabilityActive {
+	if status, _, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepositoryReachabilityActive {
 		t.Fatalf("status = %q, want active after remount", status)
 	}
 }

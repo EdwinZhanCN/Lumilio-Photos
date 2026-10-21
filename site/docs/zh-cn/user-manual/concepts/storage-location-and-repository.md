@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/storage/rootcfg/root_config.go
 - server/internal/storage/repocfg/repo_config.go
 - server/internal/storage/storage_locations.go
-- server/internal/storage/repo_relocate.go
+- server/internal/storage/repo_reconnect.go
 -->
 
 # 存储位置身份与资源库身份
