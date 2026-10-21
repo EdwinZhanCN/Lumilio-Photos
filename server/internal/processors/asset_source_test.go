@@ -12,15 +12,15 @@ import (
 
 	"server/config"
 	"server/internal/db"
-	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/locations"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
-	"server/internal/storage/roe/locations"
-	roematerializer "server/internal/storage/roe/materializer"
 	"server/internal/storage/rootcfg"
+	"server/internal/storage/scan"
 
 	"github.com/google/uuid"
 )
@@ -56,15 +56,15 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	rootConfig := rootcfg.New("processor root")
-	rootConfig.ID = rootID.String()
+	rootConfig.ID = storageLocationID.String()
 	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "processor root", Path: filepath.Dir(repositoryPath),
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	if _, err := catalog.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "processor root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -72,14 +72,16 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "moved job", Path: repositoryPath, Config: *repositoryConfig,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
-		CreatedAt: now, UpdatedAt: now, RootID: rootID, DefaultOwnerID: &owner.UserID,
+		CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID, DefaultOwnerID: &owner.UserID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	oldPath := "inbox/queued.jpg"
-	newPath := "Trips/queued.jpg"
+	// The new path sorts after the old one, so resolution must fall through
+	// the stale entry to the current file.
+	newPath := "trips/queued.jpg"
 	content := []byte("original media bytes")
 	if err := os.MkdirAll(filepath.Join(repositoryPath, "inbox"), 0o755); err != nil {
 		t.Fatal(err)
@@ -106,46 +108,45 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		}
 		return observation
 	}
-	materializer := roematerializer.NewHashApplier()
-	publish := func(eventKey, relative string, observation storage.FileObservation) roematerializer.Result {
+	scanner, err := scan.New(catalog.ReaderQueries, catalog, files, scan.Config{
+		Semantics: pathsemantics.HostDefault(),
+		Activate: func(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
+			return service.ApplyAssetActivationTx(ctx, tx, queries, repositoryID, entryID, assetID, contentID)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publish := func(relative string, observation storage.FileObservation) scan.KnownBinding {
 		t.Helper()
-		var result roematerializer.Result
-		err := catalog.WithTx(ctx, catalogtx.OperationRepositoryMaterializeKnownContent, func(tx *sql.Tx, queries *repo.Queries) error {
-			applied, err := materializer.ApplyKnownContent(ctx, tx, roematerializer.KnownContent{
-				RepositoryID: repositoryID, OwnerID: owner.UserID, Source: "upload", SourceEventKey: eventKey,
-				RelativePath: relative, OriginalFilename: "queued.jpg", MimeType: "image/jpeg", AssetType: "PHOTO",
-				FullHash: *observation.ContentHash, FileSize: observation.Size, Observation: observation,
-			})
-			if err != nil {
-				return err
-			}
-			result = applied
-			return service.ApplyAssetActivationTx(ctx, tx, queries, result.RepositoryID, result.NodeID, result.AssetID, result.ContentID)
+		binding, err := scanner.BindKnownContent(ctx, scan.KnownContent{
+			RepositoryID: repositoryID, OwnerID: owner.UserID, RelativePath: relative,
+			MimeType: "image/jpeg", AssetType: "PHOTO", FullHash: *observation.ContentHash, Observation: observation,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return result
+		return binding
 	}
 
 	oldObservation := inspect(oldPath)
-	first := publish("old-location", oldPath, oldObservation)
-	if err := os.MkdirAll(filepath.Join(repositoryPath, "Trips"), 0o755); err != nil {
+	first := publish(oldPath, oldObservation)
+	if err := os.MkdirAll(filepath.Join(repositoryPath, "trips"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(filepath.Join(repositoryPath, filepath.FromSlash(oldPath)), filepath.Join(repositoryPath, filepath.FromSlash(newPath))); err != nil {
 		t.Fatal(err)
 	}
 	newObservation := inspect(newPath)
-	second := publish("new-location", newPath, newObservation)
-	if second.AssetID != first.AssetID || second.ContentID != first.ContentID || second.NewAsset {
+	second := publish(newPath, newObservation)
+	if second.AssetID != first.AssetID || second.ContentID != first.ContentID || second.EntryID == first.EntryID {
 		t.Fatalf("exact location did not reuse logical asset: first=%+v second=%+v", first, second)
 	}
 
 	processor := &AssetProcessor{
 		reader:           catalog.ReaderQueries,
 		readerDatabase:   catalog.ReaderSQL,
-		locationResolver: locations.NewResolver(catalog.ReaderQueries, catalog.ReaderSQL, files),
+		locationResolver: locations.NewResolver(catalog.ReaderQueries, files),
 	}
 	source, err := processor.resolveCurrentAssetSource(ctx, first.AssetID, first.ContentID)
 	if err != nil {
@@ -168,6 +169,11 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	}
 	if err := source.Close(); err != nil {
 		t.Fatal(err)
+	}
+	// Video frames and metadata find the Asset's repository through its
+	// present entries.
+	if _, located, err := processor.loadAssetAndRepoForContent(ctx, first.AssetID, first.ContentID); err != nil || located.RepoID != repositoryID {
+		t.Fatalf("repository for content = %s, %v; want %s", located.RepoID, err, repositoryID)
 	}
 
 	work, err := processor.LoadThumbnailTask(ctx, ThumbnailArgs{
@@ -214,7 +220,7 @@ func (unavailableLocationResolver) LocalAssetPath(context.Context, uuid.UUID) (*
 }
 
 func (r deleteLocationResolver) LocalAssetPath(ctx context.Context, assetID uuid.UUID) (*locations.OpenedMedia, string, error) {
-	if _, err := r.database.ExecContext(ctx, `DELETE FROM asset_locations WHERE asset_id = ?`, assetID); err != nil {
+	if _, err := r.database.ExecContext(ctx, `UPDATE repository_entries SET state = 'missing', missing_since = 1 WHERE asset_id = ?`, assetID); err != nil {
 		return nil, "", err
 	}
 	return nil, "", locations.ErrAssetUnavailable

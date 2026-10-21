@@ -90,11 +90,28 @@ type AudioSpecificMetadata struct {
 	SampleRate  int    `json:"sample_rate,omitempty" example:"44100"`
 	Channels    int    `json:"channels,omitempty" example:"2"`
 	Artist      string `json:"artist,omitempty" example:"John Doe"`
+	AlbumArtist string `json:"album_artist,omitempty" example:"John Doe"`
 	Album       string `json:"album,omitempty" example:"Album Title"`
 	Title       string `json:"title,omitempty" example:"Song Title"`
 	Genre       string `json:"genre,omitempty" example:"Pop"`
 	Year        int    `json:"year,omitempty" example:"2023"`
 	Description string `json:"description,omitempty" example:"Song Description"`
+
+	// Ordered credits and identifiers are kept as extracted evidence. They are
+	// deliberately not inferred by splitting punctuation in a display name.
+	Artists          []string `json:"artists,omitempty"`
+	AlbumArtists     []string `json:"album_artists,omitempty"`
+	ArtistIDs        []string `json:"artist_ids,omitempty"`
+	AlbumArtistIDs   []string `json:"album_artist_ids,omitempty"`
+	ReleaseID        string   `json:"release_id,omitempty"`
+	ReleaseDate      string   `json:"release_date,omitempty"`
+	ReleasePrecision string   `json:"release_precision,omitempty"`
+	Edition          string   `json:"edition,omitempty"`
+	DiscNumber       *int     `json:"disc_number,omitempty"`
+	DiscTotal        *int     `json:"disc_total,omitempty"`
+	TrackNumber      *int     `json:"track_number,omitempty"`
+	TrackTotal       *int     `json:"track_total,omitempty"`
+	Compilation      *bool    `json:"compilation,omitempty"`
 }
 
 // CommonMetadata is the normalized, non-JSON projection produced alongside

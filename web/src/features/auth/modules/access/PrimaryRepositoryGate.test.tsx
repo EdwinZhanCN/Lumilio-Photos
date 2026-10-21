@@ -14,11 +14,6 @@ describe("PrimaryRepositoryGate", () => {
           primary_repository_initialized: true,
           runtime_state: "degraded",
           runtime_reason: "storage_recovery_required",
-          repository_defaults: {
-            default_root: "/configured/storage",
-            storage_strategy: "date",
-            duplicate_handling: "rename",
-          },
         }),
       ),
     );
@@ -32,7 +27,6 @@ describe("PrimaryRepositoryGate", () => {
     await expect
       .element(screen.getByText(t("auth.storageRecovery.title"), { exact: true }))
       .toBeVisible();
-    await expect.element(screen.getByText("/configured/storage/primary")).toBeVisible();
     await expect.element(screen.getByText("ordinary repository content")).toBeVisible();
   });
 
@@ -44,15 +38,41 @@ describe("PrimaryRepositoryGate", () => {
           phase: "admin_created",
           admin_initialized: true,
           primary_repository_initialized: false,
+        }),
+      ),
+      http.get("*/api/v1/setup/primary-target", () =>
+        HttpResponse.json({
+          setup_complete: false,
+          native_host: false,
           repository_defaults: {
-            default_root: "/storage",
-            storage_strategy: "date",
+            storage_location: "/storage",
+            strategy: "date",
             duplicate_handling: "rename",
-            risk_warnings: ["removable_storage"],
+          },
+          default_storage: {
+            path: "/storage",
+            registered: true,
+            state: "ready",
+            marker_state: "valid",
+          },
+          target: {
+            state: "creatable",
+            actions: ["create", "fresh_elsewhere"],
+            assessment: {
+              token: "v1.setup",
+              intent: "setup_primary",
+              storage_location_id: "6b767057-d6f1-465c-b816-d1229f622a20",
+              storage_location_kind: "default",
+              directory_name: "primary",
+              support: "supported",
+              risks: ["removable_storage"],
+              can_create: true,
+              marker_state: "absent",
+            },
           },
         }),
       ),
-      http.post("*/api/v1/repositories", async ({ request }) => {
+      http.post("*/api/v1/setup/primary-repository", async ({ request }) => {
         requestBody = await request.json();
         return HttpResponse.json({
           repository: {
@@ -61,7 +81,7 @@ describe("PrimaryRepositoryGate", () => {
             role: "primary",
             storage_strategy: "cas",
           },
-          warnings: [],
+          acknowledged_risks: ["removable_storage"],
         });
       }),
     );
@@ -89,9 +109,9 @@ describe("PrimaryRepositoryGate", () => {
       .poll(() => requestBody)
       .toEqual({
         name: "Primary Storage",
-        role: "primary",
         storage_strategy: "cas",
-        risk_confirmation: true,
+        assessment_token: "v1.setup",
+        acknowledged_risks: ["removable_storage"],
       });
   });
 });

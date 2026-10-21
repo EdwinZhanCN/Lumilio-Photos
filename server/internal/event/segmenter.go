@@ -255,18 +255,30 @@ func buildSegments(items []Candidate, boundaries []bool) []Segment {
 	return result
 }
 
+func isVisualKind(kind string) bool {
+	return kind == "" || kind == "photo" || kind == "video" || kind == "live_photo"
+}
+
 func segmentFrom(items []Candidate) Segment {
 	ids := make([]string, len(items))
+	var coverCandidate string
 	for i := range items {
 		ids[i] = items[i].MediaItemID
+		if coverCandidate == "" && isVisualKind(items[i].MediaKind) {
+			coverCandidate = items[i].MediaItemID
+		}
+	}
+	if coverCandidate == "" && len(ids) > 0 {
+		coverCandidate = ids[0]
 	}
 	timezone := items[0].Timezone
 	return Segment{
-		MediaItemIDs: ids,
-		StartAt:      items[0].CapturedAt,
-		EndAt:        items[len(items)-1].CapturedAt,
-		Timezone:     timezone,
-		Coordinate:   sphericalCentroidCandidates(items),
+		MediaItemIDs:     ids,
+		StartAt:          items[0].CapturedAt,
+		EndAt:            items[len(items)-1].CapturedAt,
+		Timezone:         timezone,
+		Coordinate:       sphericalCentroidCandidates(items),
+		CoverCandidateID: coverCandidate,
 	}
 }
 

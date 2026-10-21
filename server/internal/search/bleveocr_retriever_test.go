@@ -73,14 +73,14 @@ VALUES (1, ?, 0, 1);
 	require.NoError(t, err)
 	require.Equal(t, []uuid.UUID{relaxedBicycle}, candidateUUIDs(candidates))
 
-	isDeleted := true
+	trashed := "trashed"
 	candidates, err = retriever.Retrieve(ctx, Request{
 		Query: "red bicycle",
 		TopK:  10,
 		Filter: Filter{
-			OwnerID:      &ownerID,
-			RepositoryID: &repositoryA,
-			IsDeleted:    &isDeleted,
+			OwnerID:        &ownerID,
+			RepositoryID:   &repositoryA,
+			LifecycleState: &trashed,
 		},
 	})
 	require.NoError(t, err)
@@ -110,17 +110,17 @@ INSERT INTO users (
 
 func insertRetrieverRepositories(t *testing.T, database *db.DB, repositoryA, repositoryB uuid.UUID) {
 	t.Helper()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err := database.SQL.Exec(`
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
 ) VALUES
     (?, 'repo-a', '/media/a', 1, 1, 1, ?),
     (?, 'repo-b', '/media/b', 1, 1, 1, ?);
-`, rootID, repositoryA, rootID, repositoryB, rootID)
+`, storageLocationID, repositoryA, storageLocationID, repositoryB, storageLocationID)
 	require.NoError(t, err)
 }
 
@@ -137,7 +137,7 @@ func insertRetrieverOCRAsset(
 	_, err := testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
 		AssetID: assetID, RepositoryID: repositoryID, OwnerID: ownerID,
 		AssetType: "PHOTO", Filename: assetID.String() + ".jpg", MIMEType: "image/jpeg",
-		FileSize: 1, IsDeleted: isDeleted,
+		FileSize: 1, EntryState: testutil.EntryStateTrashedIf(isDeleted),
 	})
 	require.NoError(t, err)
 	_, err = database.SQL.Exec(`

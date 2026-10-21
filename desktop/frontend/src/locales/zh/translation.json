@@ -30,6 +30,8 @@
     "updates": "更新"
   },
   "errors": {
+    "catalogIncompatible": "该目录由预发布版本或更新版本的流明集写入，此版本不会打开它。把应用状态移到别处即可新建目录；媒体文件夹不受影响，初始化时可以接管其中的主资源库。",
+    "configurationIncompatible": "运行时配置由其他版本写入。请在设置中重新检查并再次应用。",
     "controllerBusy": "Desktop 控制器正忙，请稍后再试。",
     "invalidArgument": "请求无效。",
     "lumenNotInstalled": "请先安装 Lumen Hub，再启动它。",
@@ -41,12 +43,15 @@
     "repositoryControlUnavailable": "运行时就绪后才能管理存储位置。",
     "runtimeNotConfigured": "请先完成运行时配置。",
     "runtimeNotReady": "运行时尚未就绪。",
+    "selectionCancelled": "已取消选择文件夹。请求仍在等待处理。",
     "shutdownInProgress": "Desktop 正在退出或恢复中。",
     "signatureInvalid": "下载的文件未通过签名验证。",
     "staleConfig": "运行时配置已发生变化，请重新检查后再保存。",
     "staleVersion": "此页面已过期，需要重新加载最新状态。",
     "stopTimeout": "进程未能在安全时限内停止，需要清理。",
     "storageLocationOffline": "此存储位置已离线或不再获得授权。",
+    "storageMigrationRejected": "所选默认存储位置不包含已登记的身份及其主资源库，更改已回滚。只有在主资源库尚未建立时才能选择全新的默认存储位置。",
+    "storageUnavailable": "无法创建或占用默认存储位置。请确认该文件夹可写，且没有被另一个运行中的实例占用。",
     "unknown": "Desktop 控制平面返回了未知错误。"
   },
   "general": {
@@ -284,6 +289,7 @@
     "riskCloudSync": "云同步软件管理的文件夹",
     "riskMountChanged": "挂载的文件系统已变化",
     "riskNetwork": "网络文件系统",
+    "riskNonDefault": "位于默认存储位置之外",
     "riskPlaceholder": "必须先下载文件",
     "riskRemovable": "可移动存储",
     "startServerHint": "请先启动 Server，再添加其他存储位置。",

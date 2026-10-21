@@ -4,7 +4,7 @@ import { normalizeRepositoryOptions } from "../model/repositoryOptions";
 export function useRepositoryOptions() {
   const query = $api.useQuery(
     "get",
-    "/api/v1/assets/indexing/repositories",
+    "/api/v1/storage/targets",
     {},
     {
       staleTime: 5 * 60 * 1000,

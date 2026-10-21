@@ -1,7 +1,7 @@
 /**
  * # Assets
  *
- * Assets owns catalog and Trash browsing, reusable asset-set presentation,
+ * Assets owns catalog, Missing, and Trash browsing, reusable asset-set presentation,
  * selection, filtering, viewer inspection, and export/bulk asset actions.
  * Collection, People, Home, Share, Studio, and Lumilio reuse its reviewed
  * public surfaces instead of implementing another gallery or viewer.
@@ -26,7 +26,7 @@
  *
  * ```mermaid
  * flowchart TD
- *     ROUTES["Assets / Trash / scoped routes"] --> SCOPE["AssetBrowserScope"]
+ *     ROUTES["Assets / Missing / Trash / scoped routes"] --> SCOPE["AssetBrowserScope"]
  *     SCOPE --> BROWSER["AssetBrowser"]
  *     BROWSER --> SOURCE["catalog or pin source"]
  *     BROWSER --> GALLERY["Justified / Square gallery"]
@@ -80,6 +80,21 @@
  * visual-search recovery branches on exact Problem type rather than message
  * text.
  *
+ * Missing and Trash reuse the lifecycle-constrained gallery. Missing is reached
+ * from each Repository's Storage count; selection and Repository-wide purge
+ * require explicit confirmation. Trash restores a selection in one command,
+ * reports non-overwriting destination names, and offers permanent delete and
+ * Empty trash. Delete previews enumerate Assets, files, bytes, Repositories,
+ * and the configured retention before the whole-selection preflight.
+ * {@link TrashHoldNotice} names the trashed files the Trash inherited from a
+ * Repository opened, copied, or restored into this catalog: they are held out
+ * of automatic deletion until the user restores them, deletes them
+ * permanently, or keeps them with the normal retention, for the whole
+ * Repository from the notice or for a selection through the bulk action.
+ * The viewer reads typed availability Problems while metadata stays readable.
+ * Lifecycle commands invalidate browse, Storage counts, and affected projections
+ * even when a purge reports a partial failure.
+ *
  * {@link useAssetMediaItem} resolves RAW/JPEG and Live Photo components.
  * {@link useAssetOCR} reads the generated asset-detail contract with only
  * `include_ocr=true`; SQLite relation data remains server state, and changing
@@ -122,6 +137,7 @@ import type { AssetActionsDialog } from "./flows/viewer/AssetActionsDialog.tsx";
 import type { AssetExportDialog } from "./flows/export/AssetExportDialog.tsx";
 import type Assets from "./flows/library/AssetsFlow.tsx";
 import type AssetsTrash from "./flows/trash/AssetsTrashFlow.tsx";
+import type TrashHoldNotice from "./flows/lifecycle/TrashHoldNotice.tsx";
 import type { AssetSimilarRail } from "./flows/viewer/AssetSimilarRail.tsx";
 import type AssetViewer from "./flows/viewer/AssetViewer.tsx";
 import type FullScreenBasicInfo from "./flows/viewer/info/FullScreenBasicInfo.tsx";
@@ -136,5 +152,3 @@ import type { mergeAssetFilters } from "./model/filter.ts";
 import type PhotoPicker from "./picker/PhotoPicker.tsx";
 import type { AssetsViewResult, BrowseGroup, BrowseItem } from "./types.ts";
 import type { readProblemResponse } from "../../lib/http-commons/problem.ts";
-
-export {};

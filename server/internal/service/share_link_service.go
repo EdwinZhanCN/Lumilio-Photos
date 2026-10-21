@@ -148,19 +148,19 @@ type shareLinkService struct {
 // the token-hashing key is derived from the same root secret used for
 // JWT/media-token signing (see auth_service.go's NewAuthService), under its
 // own scope so a leaked share-hashing key can't be used to forge auth tokens
-// and vice versa. Panics on secret key initialization failure, matching
-// NewAuthService's existing convention.
-func NewShareLinkService(queries *repo.Queries, assetService AssetService, pinService *pins.Service, secretKeyPath string) *shareLinkService {
+// and vice versa. A secret key initialization failure is returned, matching
+// NewAuthService, so startup reports a diagnosable error instead of panicking.
+func NewShareLinkService(queries *repo.Queries, assetService AssetService, pinService *pins.Service, secretKeyPath string) (*shareLinkService, error) {
 	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(secretKeyPath))
 	if err != nil {
-		panic(fmt.Sprintf("failed to initialize root secret key: %v", err))
+		return nil, fmt.Errorf("initialize share link root secret key: %w", err)
 	}
 	return &shareLinkService{
 		queries:      queries,
 		assetService: assetService,
 		pins:         pinService,
 		hmacKey:      secretbox.DeriveScopedSecret(rootSecret, shareLinkTokenHashScope),
-	}
+	}, nil
 }
 
 func (s *shareLinkService) generateToken() (string, error) {

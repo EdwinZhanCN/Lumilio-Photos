@@ -1,7 +1,3 @@
-// Package problem defines Lumilio's language-neutral RFC 9457 vocabulary.
-//
-// It is intentionally a leaf package: handlers and transports may depend on
-// these descriptors, while domain packages remain unaware of HTTP problem URIs.
 package problem
 
 import (
@@ -36,6 +32,9 @@ type Extension struct {
 }
 
 var (
+	AssetMissing       = descriptor("asset/missing", http.StatusConflict, "Asset missing", "The Asset has no present file. Reconnect its Repository or return the file and scan again.")
+	AssetOffline       = descriptor("asset/offline", http.StatusConflict, "Asset offline", "All copies of the Asset are in unavailable Repositories.")
+	AssetTrashed       = descriptor("asset/trashed", http.StatusConflict, "Asset trashed", "The Asset is in the Trash. Restore it to open the original.")
 	InvalidCredentials = descriptor("auth/invalid-credentials", http.StatusUnauthorized,
 		"Invalid credentials", "The supplied sign-in credentials were not accepted.")
 	AuthenticationRequired = descriptor("auth/authentication-required", http.StatusUnauthorized,
@@ -70,8 +69,55 @@ var (
 			{Name: "actions", Schema: "array[string]", Description: "Stable recovery actions allowed for this conflict."},
 		},
 	}
-	StorageConfirmationRequired = descriptor("storage/confirmation-required", http.StatusConflict,
-		"Storage confirmation required", "The storage operation requires explicit administrator risk confirmation.")
+	StorageConfirmationRequired = Descriptor{
+		Type: Namespace + "storage/confirmation-required", Status: http.StatusConflict,
+		Title: "Storage confirmation required", Definition: "The storage target carries placement risks that the administrator has not acknowledged for this command.",
+		Recovery: "Review the listed risks, then retry the same command with the assessment token and every risk code acknowledged.",
+		Extensions: []Extension{
+			{Name: "risks", Schema: "array[string]", Description: "Stable risk codes the command requires acknowledged."},
+			{Name: "assessment_token", Schema: "string", Description: "Opaque token binding an acknowledgement to the assessed target facts."},
+		},
+	}
+	StorageAssessmentStale = descriptor("storage/assessment-stale", http.StatusConflict,
+		"Storage assessment stale", "The facts of the storage target changed since it was assessed, so the supplied acknowledgement no longer applies.")
+	StorageUnsupportedFilesystem = descriptor("storage/unsupported-filesystem", http.StatusConflict,
+		"Unsupported storage filesystem", "The storage target is on a network or remote filesystem that this release does not support for Storage Locations and Repositories.")
+	StorageNotMountedVolume = descriptor("storage/not-a-mounted-volume", http.StatusConflict,
+		"Target is not a mounted volume", "The existing empty target lives in the ephemeral container layer rather than on a mounted host volume.")
+	StorageObservationUnknown = descriptor("storage/observation-unknown", http.StatusConflict,
+		"Storage target could not be observed", "The filesystem facts of the storage target could not be read, so its support and risks are unknown.")
+	StoragePermissionDenied = descriptor("storage/permission-denied", http.StatusConflict,
+		"Storage target access denied", "The Server was denied access to the storage target.")
+	StorageMaterializationRequired = descriptor("storage/materialization-required", http.StatusConflict,
+		"Storage target must be downloaded first", "The storage target holds cloud placeholders whose content is not available locally.")
+	StorageActionUnavailable = Descriptor{
+		Type: Namespace + "storage/action-unavailable", Status: http.StatusConflict,
+		Title: "Repository action unavailable", Definition: "The role-aware storage policy withholds this Repository action on the current facts, so the command was not run.",
+		Recovery: "Read the blockers and take one of the listed alternatives; the same action is not retried automatically.",
+		Extensions: []Extension{
+			{Name: "action", Schema: "string", Description: "The withheld action: verify, rename, detach, or reconnect."},
+			{Name: "blockers", Schema: "array[string]", Description: "Stable codes naming why the action is withheld."},
+			{Name: "alternatives", Schema: "array[string]", Description: "Stable codes naming legal entries to take instead."},
+		},
+	}
+	StorageBusy = descriptor("storage/busy", http.StatusConflict,
+		"Repository busy", "Another storage command holds the Repository barrier, so this command did not start.")
+	StorageOwnershipUnavailable = descriptor("storage/ownership-unavailable", http.StatusConflict,
+		"Repository ownership unavailable", "Another process owns the Repository tree, so this Server cannot take the exclusive ownership the command needs.")
+	StorageIdentityMismatch = descriptor("storage/identity-mismatch", http.StatusConflict,
+		"Repository identity mismatch", "The marker at the path carries a different Repository identity than the registration the command targets.")
+	StorageOriginalOnline = descriptor("storage/original-online", http.StatusConflict,
+		"Original Repository still online", "The registered Repository is still present at its original path, so there is nothing to reconnect.")
+	StorageLayoutObstructed = Descriptor{
+		Type: Namespace + "storage/layout-obstructed", Status: http.StatusConflict,
+		Title: "Repository layout repair obstructed", Definition: "The Repository at the target is missing part of its layout, and a file or a denied directory sits where the missing directory belongs, so the bounded repair was not run.",
+		Recovery: "Move the obstructing file out of the Repository folder or fix its permissions, then review the setup target again; nothing in the folder was changed. Choosing a fresh Default Storage Location is the other way out.",
+	}
+	StorageRecoveryRequired = Descriptor{
+		Type: Namespace + "storage/recovery-required", Status: http.StatusConflict,
+		Title: "Repository recovery required", Definition: "An interrupted storage operation left the journal of this Repository open; conflicting commands are refused until journal recovery completes.",
+		Recovery: "Let the Server finish journal recovery (it runs at startup and on the maintenance pass), review the recovery inventory of the Repository on the Storage page, then retry.",
+	}
 	ServiceUnavailable = descriptor("service/unavailable", http.StatusServiceUnavailable,
 		"Service unavailable", "A required optional service is currently unavailable.")
 	InvalidMediaRequest = descriptor("media/invalid-request", http.StatusUnprocessableEntity,
@@ -92,13 +138,17 @@ var (
 		"Backup restore failed", "An accepted database restore could not be completed.")
 	HostActionFailed = descriptor("storage/host-action-failed", http.StatusInternalServerError,
 		"Native host action failed", "An accepted native host action could not be completed.")
-	HostActionExpired = descriptor("storage/host-action-expired", http.StatusInternalServerError,
-		"Native host action expired", "A native host action expired before it was approved.")
+	HostActionExpired = Descriptor{
+		Type: Namespace + "storage/host-action-expired", Status: http.StatusConflict,
+		Title: "Native host action expired", Definition: "A native host action expired before Desktop approved it; nothing was changed.",
+		Recovery: "Send the request again from the Storage page when Desktop is ready to approve it; the request form is kept.",
+	}
 	CloudImportFailed = descriptor("cloud/import-failed", http.StatusInternalServerError,
 		"Cloud import failed", "An accepted cloud import could not be completed.")
 )
 
 var registry = mustRegistry(
+	AssetMissing, AssetOffline, AssetTrashed,
 	InvalidCredentials,
 	AuthenticationRequired,
 	SessionExpired,
@@ -111,6 +161,19 @@ var registry = mustRegistry(
 	RepositoryUnavailable,
 	RepositoryConflict,
 	StorageConfirmationRequired,
+	StorageAssessmentStale,
+	StorageUnsupportedFilesystem,
+	StorageNotMountedVolume,
+	StorageObservationUnknown,
+	StoragePermissionDenied,
+	StorageMaterializationRequired,
+	StorageActionUnavailable,
+	StorageBusy,
+	StorageOwnershipUnavailable,
+	StorageIdentityMismatch,
+	StorageOriginalOnline,
+	StorageLayoutObstructed,
+	StorageRecoveryRequired,
 	ServiceUnavailable,
 	InvalidMediaRequest,
 	ImageEmbeddingMissing,
@@ -184,6 +247,23 @@ type RepositoryConflictDetails struct {
 	Actions      []string `json:"actions,omitempty" example:"relocate,copy"`
 }
 
+// StorageConfirmationRequiredDetails carries the risk codes to acknowledge
+// and the opaque assessment token the acknowledgement is bound to.
+type StorageConfirmationRequiredDetails struct {
+	Details
+	Risks           []string `json:"risks" binding:"required" example:"removable_storage,non_default_location"`
+	AssessmentToken string   `json:"assessment_token" binding:"required" example:"v1.0123456789abcdef"`
+}
+
+// StorageActionUnavailableDetails carries the withheld action, why it is
+// withheld, and the legal alternatives, as stable codes only.
+type StorageActionUnavailableDetails struct {
+	Details
+	Action       string   `json:"action" binding:"required" example:"rename"`
+	Blockers     []string `json:"blockers" binding:"required" example:"primary_protected"`
+	Alternatives []string `json:"alternatives,omitempty" example:"default_configuration"`
+}
+
 // Reference is the transport-neutral equivalent used by streams and
 // persisted asynchronous operation DTOs. It intentionally has no HTTP status.
 type Reference struct {
@@ -239,6 +319,8 @@ const (
 	baseBody bodyKind = iota
 	rateLimitedBody
 	repositoryConflictBody
+	storageConfirmationRequiredBody
+	storageActionUnavailableBody
 )
 
 // Failure pairs one safe public descriptor with its private diagnostic cause.
@@ -252,6 +334,11 @@ type Failure struct {
 	conflictType      string
 	repositoryID      string
 	actions           []string
+	risks             []string
+	assessmentToken   string
+	action            string
+	blockers          []string
+	alternatives      []string
 }
 
 // About creates a generic about:blank failure for a status whose meaning and
@@ -289,6 +376,25 @@ func NewRepositoryConflict(cause error, conflictType, repositoryID string, actio
 	}
 }
 
+// NewStorageConfirmationRequired creates the exact typed storage consent
+// subtype: the risks to acknowledge and the token that binds them.
+func NewStorageConfirmationRequired(cause error, risks []string, assessmentToken string) Failure {
+	return Failure{
+		descriptor: StorageConfirmationRequired, status: StorageConfirmationRequired.Status, cause: cause,
+		kind: storageConfirmationRequiredBody, risks: append([]string{}, risks...), assessmentToken: assessmentToken,
+	}
+}
+
+// NewStorageActionUnavailable creates the exact typed refusal of a
+// role-aware Repository action.
+func NewStorageActionUnavailable(cause error, action string, blockers, alternatives []string) Failure {
+	return Failure{
+		descriptor: StorageActionUnavailable, status: StorageActionUnavailable.Status, cause: cause,
+		kind: storageActionUnavailableBody, action: action,
+		blockers: append([]string{}, blockers...), alternatives: append([]string(nil), alternatives...),
+	}
+}
+
 func (f Failure) Status() int            { return f.status }
 func (f Failure) Type() string           { return f.descriptor.Type }
 func (f Failure) Cause() error           { return f.cause }
@@ -305,6 +411,14 @@ func (f Failure) Body(instance string) any {
 		return RepositoryConflictDetails{
 			Details: base, ConflictType: f.conflictType, RepositoryID: f.repositoryID,
 			Actions: append([]string(nil), f.actions...),
+		}
+	case storageConfirmationRequiredBody:
+		return StorageConfirmationRequiredDetails{
+			Details: base, Risks: append([]string{}, f.risks...), AssessmentToken: f.assessmentToken,
+		}
+	case storageActionUnavailableBody:
+		return StorageActionUnavailableDetails{
+			Details: base, Action: f.action, Blockers: append([]string{}, f.blockers...), Alternatives: append([]string(nil), f.alternatives...),
 		}
 	default:
 		return base

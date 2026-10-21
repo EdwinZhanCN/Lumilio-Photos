@@ -1,19 +1,23 @@
 import type { components } from "@/lib/http-commons/schema";
 import type {
+  RepositoryOption,
   RepositoryRole,
-  RepositoryRootsResponse,
+  StorageLocationsResponse,
   StorageDiagnostic,
   StorageDiagnosticsResponse,
   StorageEntity,
   StorageLocationKind,
 } from "../types";
 
-type RepositoryRootsDTO = components["schemas"]["dto.ListRepositoryRootsResponseDTO"];
+type StorageViewResponseDTO = components["schemas"]["dto.StorageViewResponseDTO"];
 type StorageDiagnosticsDTO = components["schemas"]["dto.StorageDiagnosticsResponseDTO"];
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
-export function getStorageEntityDisplayName(entity: StorageEntity, t: TranslateFn): string {
+export function getStorageEntityDisplayName(
+  entity: StorageEntity | RepositoryOption,
+  t: TranslateFn,
+): string {
   if (entity.entityType === "storage_location" && entity.kind === "default") {
     return t("productTerms.defaultStorageLocation", {
       defaultValue: "Default Storage Location",
@@ -26,7 +30,10 @@ export function getStorageEntityDisplayName(entity: StorageEntity, t: TranslateF
     });
   }
 
-  return entity.rawName || entity.path;
+  // A Repository selector carries no path, so the fallback applies only when
+  // the entity actually has one.
+  const fallback = "path" in entity ? entity.path : "";
+  return entity.rawName || fallback;
 }
 
 export function normalizeStorageLocationKind(kind?: string): StorageLocationKind {
@@ -40,16 +47,17 @@ export function normalizeRepositoryRole(role?: string, isPrimary = false): Repos
   return "unknown";
 }
 
-export function normalizeRepositoryRootsResponse(
-  data: RepositoryRootsDTO,
-): RepositoryRootsResponse {
+export function normalizeStorageViewLocations(
+  data: StorageViewResponseDTO,
+): StorageLocationsResponse {
   return {
-    roots: (data.roots ?? []).map(({ kind, name, path, ...root }) => ({
-      ...root,
+    storage_locations: (data.storage_locations ?? []).map(({ kind, name, id, ...location }) => ({
+      ...location,
+      id: id ?? "",
       entityType: "storage_location",
       kind: normalizeStorageLocationKind(kind),
       rawName: name ?? "",
-      path: path ?? "",
+      path: "",
     })),
   };
 }

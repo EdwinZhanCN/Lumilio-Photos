@@ -87,9 +87,10 @@ tasks:
       - web:dev
 
   test:
-    desc: Run repository architecture, Server, and Web tests
+    desc: Run repository architecture, Atlas, Server, and Web tests
     cmds:
       - task: architecture:check
+      - task: atlas:check
       - task: test:modules
 
   test:modules:
@@ -110,6 +111,88 @@ tasks:
     desc: Check repository architecture constraints
     cmds:
       - go -C server run ./tools/architecturecheck
+
+  # The Atlas spans Server, Desktop, and Web, so its targets live here. The Web
+  # facts are extracted first; the Go tool joins them with the Go packages.
+  atlas:
+    desc: Open the Atlas code map in the internal docs site (http://localhost:6690/atlas/)
+    cmds:
+      - task: atlas:data
+      - task: site:atlas
+
+  atlas:data:
+    desc: Write the Atlas site model to .local/atlas; an open Atlas page hot-reloads
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas data
+
+  atlas:generate:
+    desc: Regenerate docs/atlas/generated; fails on broken anchors, undeclared dependencies, or stale views
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas generate
+
+  atlas:check:
+    desc: Fail if any Atlas anchor, dependency declaration, package doc, or generated file is out of sync
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas check
+
+  atlas:lock:
+    desc: Mark every Atlas view verified against the current code (only after re-reading stale views)
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas lock
+
+  # Published-artifact smoke (release-smoke.yml): install one Server image the
+  # way the release bundle does, from its Compose file and .env into host
+  # directories, run the browser journey against it, and keep what it made as
+  # the compatibility fixture. SUDO=sudo on runners where the container's app
+  # user owns the bind mounts.
+  release:smoke:up:
+    desc: Install LUMILIO_IMAGE from the release bundle's Compose files into .local/release-smoke and wait for it
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+    cmds:
+      - test -n "$LUMILIO_IMAGE" || { echo "LUMILIO_IMAGE is required (tag or @sha256 digest reference)" >&2; exit 1; }
+      - mkdir -p {{.SMOKE_DIR}}/bundle {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/app-state
+      - cp deploy/compose/compose.yml {{.SMOKE_DIR}}/bundle/compose.yml
+      - printf 'LUMILIO_IMAGE=%s\nLUMILIO_STORAGE=%s\nLUMILIO_STATE=%s\n' "$LUMILIO_IMAGE" "{{.SMOKE_DIR}}/media" "{{.SMOKE_DIR}}/app-state" > {{.SMOKE_DIR}}/bundle/.env
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke pull --quiet
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke up -d --wait --wait-timeout 180
+
+  release:smoke:fixture:
+    desc: Stop the smoke install and collect its catalog, config, backups, originals, and markers into .local/release-smoke/fixture (SUDO=sudo when the app user owns the mounts)
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+      SUDO: '{{default "" .SUDO}}'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke stop
+      - '{{.SUDO}} rm -rf {{.SMOKE_DIR}}/fixture'
+      - mkdir -p {{.SMOKE_DIR}}/fixture/app-state
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke cp lumilio:/app/config/docker-http.toml {{.SMOKE_DIR}}/fixture/config.toml
+      - '{{.SUDO}} cp -a {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/fixture/media'
+      - '{{.SUDO}} cp -a {{.SMOKE_DIR}}/app-state/library.sqlite3 {{.SMOKE_DIR}}/app-state/river.sqlite3 {{.SMOKE_DIR}}/app-state/backups {{.SMOKE_DIR}}/fixture/app-state/'
+      - '{{.SUDO}} chown -R "$(id -u):$(id -g)" {{.SMOKE_DIR}}/fixture'
+      - >-
+        docker image inspect "$LUMILIO_IMAGE" --format '{"image":"{{"{{"}}.Id{{"}}"}}","repo_digests":{{"{{"}}json .RepoDigests{{"}}"}},"revision":{{"{{"}}json (index .Config.Labels "org.opencontainers.image.revision"){{"}}"}},"version":{{"{{"}}json (index .Config.Labels "org.opencontainers.image.version"){{"}}"}}}'
+        > {{.SMOKE_DIR}}/fixture/image.json
+
+  release:smoke:logs:
+    desc: Print the smoke install's Server logs
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke logs --no-color
+
+  release:smoke:down:
+    desc: Remove the smoke install and its host directories (SUDO=sudo when the app user owns the mounts)
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+      SUDO: '{{default "" .SUDO}}'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke down --remove-orphans || true
+      - '{{.SUDO}} rm -rf {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/app-state {{.SMOKE_DIR}}/bundle'
 
   compose:test:
     desc: Validate every Docker Compose configuration
@@ -276,7 +359,8 @@ tasks:
       - task: dto
       - task: config:examples
       - task: web:docs
-      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
+      - task: atlas:generate
+      - git diff --exit-code -- docs/atlas server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
 
   # CI contracts exist only when they orchestrate more than one module target.
   # One-to-one wrappers are forbidden: workflows call the module target
@@ -295,6 +379,7 @@ tasks:
       - task: site:install:ci
       - task: site:checks
       - task: site:build
+      - task: site:build:atlas
 
   ci:desktop:panel:
     desc: Install and build the Desktop control panel frontend

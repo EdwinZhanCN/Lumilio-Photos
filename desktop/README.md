@@ -74,3 +74,9 @@ access, and runtime fields, sees an explicit draft/save state, and can inspect
 the full TOML only from the optional Advanced tab. Reading or editing a draft
 does not persist intent; only a successful Save or Apply changes the current
 fingerprint.
+
+`internal/storage` remains the native grant and tray-shortcut host. Shortcuts
+open a Storage Location folder from a readable registered path; catalog Location
+status does not gate `CanOpen` or reveal. Native authorization nonces and
+approval paths stay in the Desktop control plane while Web Storage admin drives
+the durable `/api/v1/storage/native-tasks` lifecycle.

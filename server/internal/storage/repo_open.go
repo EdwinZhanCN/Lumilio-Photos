@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -14,10 +15,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// OpenRepository durably registers an existing repository after isolating all
-// repository-private state from its prior registration. Original media and the
-// .lumiliorepo marker are never moved. The subsequent authoritative scan is the
-// only mechanism that rebuilds current catalog-derived state.
+// OpenRepository durably registers an existing repository and preserves the
+// repository-private state of its prior registration by class: the Trash and
+// Studio records stay in place for the recovery service to adopt and
+// reassociate, uncommitted staging is moved under a recovery receipt, logs
+// and derivatives stay, and unknown content is listed untouched. Original
+// media and the .lumiliorepo marker are never moved. The subsequent
+// authoritative scan rebuilds the catalog-derived state.
 func (rm *DefaultRepositoryManager) OpenRepository(
 	ctx context.Context,
 	path string,
@@ -33,7 +37,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		return nil, fmt.Errorf("invalid repository path: %w", err)
 	}
 	if err := rm.claimRuntimeStoragePath(ctx, "repository", cleanPath); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrRepositoryOwnershipUnavailable, err)
 	}
 	validation, err := rm.validateRepository(cleanPath)
 	if err != nil {
@@ -53,7 +57,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository identity: %w", err)
 	}
-	rootID, err := rm.repositoryRootIDForPath(ctx, cleanPath)
+	storageLocationID, err := rm.storageLocationIDForPath(ctx, cleanPath)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +66,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		RequestID: request.RequestID,
 		Kind:      lifecycleKindOpenRepository,
 		Payload: openRepositoryOperationPayload{
-			Path: cleanPath, RootID: rootID.String(), OwnerID: defaultOwnerID, Role: dbtypes.RepoRoleRegular, RiskConfirmation: request.RiskConfirmation,
+			Path: cleanPath, StorageLocationID: storageLocationID.String(), OwnerID: defaultOwnerID, Role: dbtypes.RepoRoleRegular, RiskConfirmation: request.RiskConfirmation,
 		},
 		Actor:          request.Actor,
 		ActorUserID:    request.ActorUserID,
@@ -101,7 +105,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		return failPrepared(fmt.Errorf("look up repository identity: %w", lookupErr))
 	}
 
-	releaseRoot := rm.acquireRepositoryRootRead(rootID)
+	releaseStorageLocation := rm.acquireStorageLocationRead(storageLocationID)
 	releaseMutation := rm.acquireRepositoryMutation(repositoryID)
 	locksReleased := false
 	releaseLocks := func() {
@@ -110,26 +114,27 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		}
 		locksReleased = true
 		releaseMutation()
-		releaseRoot()
+		releaseStorageLocation()
 	}
 	defer releaseLocks()
 
-	rollbackData, err := planRepositoryPrivateStateIsolation(cleanPath, "reopened-"+config.ID)
+	plan, err := planPrivatePreservation(cleanPath, RecoveryEventOpen, operation.Actor, operation.RequestID, config.ID, config.ID, time.Now())
 	if err != nil {
 		return failPrepared(err)
 	}
+	rollbackData := registerRepositoryCopyRollbackData{Preservation: plan}
 	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhasePrepared, rollbackData); err != nil {
 		return failPrepared(fmt.Errorf("persist repository-open rollback plan: %w", err))
 	}
 	rollback := func(cause error) error {
-		rollbackErr := rollbackRepositoryPrivateStateIsolation(cleanPath, rollbackData)
+		rollbackErr := rollbackPrivateState(cleanPath, plan)
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, rollbackErr == nil, cause, rollbackData)
 		if rollbackErr != nil {
 			return errors.Join(cause, fmt.Errorf("rollback repository open: %w", rollbackErr))
 		}
 		return cause
 	}
-	if err := applyRepositoryPrivateStateIsolation(cleanPath, rollbackData); err != nil {
+	if err := applyPrivatePreservation(cleanPath, plan); err != nil {
 		return nil, rollback(err)
 	}
 	if err := rm.dirManager.CreateStructure(cleanPath); err != nil {
@@ -139,7 +144,7 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		return nil, rollback(fmt.Errorf("persist open-repository filesystem phase: %w", err))
 	}
 
-	databaseRepository, err := rm.addRepository(ctx, cleanPath, defaultOwnerID, dbtypes.RepoRoleRegular, true, rootID)
+	databaseRepository, err := rm.addRepository(ctx, cleanPath, defaultOwnerID, dbtypes.RepoRoleRegular, true, storageLocationID)
 	if err != nil {
 		return nil, rollback(err)
 	}
@@ -164,6 +169,6 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 	}
 	rm.repoAudit(cleanPath).Operation("repository.open",
 		zap.String("repository_id", databaseRepository.RepoID.String()),
-		zap.String("private_state_recovery_path", rollbackData.RecoveryPath))
+		zap.String("recovery_receipt_id", plan.ReceiptID()))
 	return databaseRepository, nil
 }

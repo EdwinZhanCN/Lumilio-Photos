@@ -154,10 +154,7 @@ export function invalidateAuthRefresh(): void {
  * `task dto` remains the source-of-truth update that moves these calls back to
  * the typed client after OpenAPI regeneration.
  */
-export async function authenticatedFetch(
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
+export async function authenticatedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const browserFetch = globalThis.fetch.bind(globalThis);
   const request = new Request(`${baseUrl}${path}`, {
     ...init,

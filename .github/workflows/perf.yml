@@ -1,0 +1,43 @@
+name: Scan performance (non-required)
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan-perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Install libvips, libraw, and SQLite headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev libheif-plugin-aomenc libheif-plugin-libde265
+      - name: Measure scan performance
+        working-directory: server
+        env:
+          LUMILIO_PERF: '1'
+          LUMILIO_PERF_OUT: ${{ runner.temp }}/scan-perf
+          CGO_ENABLED: '1'
+          CGO_LDFLAGS_ALLOW: -Xpreprocessor
+          CGO_CFLAGS_ALLOW: -Xpreprocessor
+          GOFLAGS: -buildvcs=false
+        run: |
+          mkdir -p "$LUMILIO_PERF_OUT"
+          set -o pipefail
+          go test -p=1 -tags=sqlite_fts5 ./internal/storage/scan/ ./app/ -run '^(TestScanCostIsLinearAndWriterHoldIsBounded|TestLifecycleRegressionScanCostIsLinear)$' -count=1 -v 2>&1 | tee "$LUMILIO_PERF_OUT/test.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: scan-perf
+          path: ${{ runner.temp }}/scan-perf

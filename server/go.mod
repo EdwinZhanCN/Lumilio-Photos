@@ -38,6 +38,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag/v2 v2.0.0-rc5
+	github.com/syncthing/notify v0.0.0-20250528144937-c7027d4f7465
 	github.com/zeebo/blake3 v0.2.4
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.53.0
@@ -159,7 +160,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/riverqueue/river/riverdriver v0.41.0 // indirect
+	github.com/riverqueue/river/riverdriver v0.41.0
 	github.com/riverqueue/river/rivershared v0.41.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
@@ -215,7 +216,7 @@ require (
 	golang.org/x/net v0.56.0
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.46.0
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.40.0
 	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

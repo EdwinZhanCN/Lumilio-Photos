@@ -1,4 +1,3 @@
-// Package vectorindex owns the rebuildable Vec1 semantic index policy.
 package vectorindex
 
 import (
@@ -176,10 +175,10 @@ func repairDerivedRows(ctx context.Context, writer *catalogtx.Writer, rowCount i
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO search_embeddings_vec (
-			rowid, embedding, space_id, owner_id, is_deleted, asset_type
+			rowid, embedding, space_id, owner_id, lifecycle_state, asset_type
 		)
 		SELECT
-			e.id, e.vector, e.space_id, a.owner_id, a.is_deleted, a.type
+			e.id, e.vector, e.space_id, a.owner_id, a.lifecycle_state, a.type
 		FROM search_embeddings e
 		JOIN assets a ON a.asset_id = e.asset_id
 	`); err != nil {

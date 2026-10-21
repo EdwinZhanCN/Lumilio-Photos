@@ -11,15 +11,23 @@
  *
  * {@link useLumilioChatStore} owns thread/run identity, streamed blocks,
  * generation and error state, confirmation interrupts, token usage, and
- * send/resume/stop/new-conversation commands. {@link useContextStore} is the
+ * send/retry/resume/stop/new-conversation commands. A turn that fails before
+ * any output can be retried with the same in-memory request scope.
+ * {@link saveAgentSession} keeps the settled transcript, thread identity, and
+ * any pending confirmation identity in per-tab `sessionStorage`, bounded by
+ * the server's two-hour conversation memory. A reload restores the thread,
+ * marks unfinished tools cancelled, keeps an undecided confirmation
+ * actionable, and reconciles a submitted confirmation through the scoped
+ * effect-status endpoint instead of replaying the mutation.
+ * {@link useContextStore} is the
  * lower shared context bus for current selections and viewer context.
  * {@link useDockStore} owns only the user's collapse override.
  *
  * Pins, ref hydration, widget data, mention sources, and capabilities remain
  * TanStack Query server state. Closing or collapsing the dock does not cancel a
  * run. {@link resetLumilioSession} is the user-session boundary: it starts a
- * best-effort server cancellation, closes transport, and clears chat and
- * context state.
+ * best-effort server cancellation, closes transport, and clears chat,
+ * persisted transcript, and context state.
  *
  * ## Flows
  *
@@ -83,6 +91,7 @@ import type { useWidgetData } from "./modules/widgets/useWidgetData.ts";
 import type { cancelActiveBlocks } from "./state/blocks.ts";
 import type { useLumilioChatStore } from "./state/chatStore.ts";
 import type { resetLumilioSession } from "./state/resetSession.ts";
+import type { saveAgentSession } from "./state/chatSessionPersistence.ts";
 import type { useBrowseSelectionContext } from "../assets/flows/browse/useBrowseSelectionContext.ts";
 import type { useViewerContextContributor } from "../assets/flows/viewer/useViewerContextContributor.ts";
 import type { useContextStore, useDockStore } from "../../lib/assistant/index.ts";

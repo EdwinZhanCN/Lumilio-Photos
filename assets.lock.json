@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "repository": "https://github.com/EdwinZhanCN/Lumilio-Assets.git",
-  "revision": "018a007e3d0d5aa6b7680f4513941037b5d93438",
-  "release": "assets-v1.2.0",
+  "revision": "2e5439f77e562706859ef82166ab9a452c603d67",
+  "release": "assets-v1.3.0",
   "profile": "smoke",
-  "manifestSha256": "e73d7bda52bf00239addca868f0bc23bb90c5ea30253aa2bf861805cab74a8f2"
+  "manifestSha256": "2490f4b2c55096c833c4f05fd1a0651387c9d35559d183b75e7705e1e70c1024"
 }

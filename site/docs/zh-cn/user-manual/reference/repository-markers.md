@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/internal/storage/rootcfg/root_config.go
 - server/internal/storage/repocfg/repo_config.go
-- server/internal/storage/repository_roots.go
+- server/internal/storage/storage_locations.go
 -->
 
 # `.lumilioroot` 与 `.lumiliorepo` 参考

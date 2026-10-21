@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"crypto/hmac"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -30,7 +31,7 @@ var (
 	ErrRepositoryDirectoryConflict           = errors.New("repository storage folder conflicts with an existing directory")
 	ErrRepositoryTargetNotEmpty              = errors.New("repository target directory is not empty")
 	ErrRepositoryStorageNotWritable          = errors.New("repository storage is not writable")
-	ErrRepositoryExistingTargetNotMountPoint = errors.New("existing empty repository target is not a Linux mount point")
+	ErrRepositoryExistingTargetNotMountPoint = errors.New(NotMountedVolumeMessage)
 	ErrRepositoryRiskConfirmationRequired    = errors.New("storage placement risk confirmation is required")
 )
 
@@ -51,11 +52,15 @@ type CreateRepositorySpec struct {
 	DirectoryName     string
 	Role              dbtypes.RepoRole
 	Root              string
-	RootID            string
+	StorageLocationID string
 	OwnerID           *int32
 	StorageStrategy   string
 	DuplicateHandling string
-	RiskConfirmation  bool
+	// AssessmentToken and AcknowledgedRisks bind the administrator's risk
+	// acknowledgement to the AssessCreateTarget review of this exact target.
+	// Both are ignored for server-internal actors.
+	AssessmentToken   string
+	AcknowledgedRisks []string
 }
 
 // ExistingRepositoryFoundError reports that Create derived a target carrying
@@ -84,11 +89,11 @@ func (e *RepositoryMarkerInvalidError) Error() string {
 
 func (e *RepositoryMarkerInvalidError) Unwrap() error { return e.Cause }
 
-// CreateRepositoryResult carries the created repository plus any non-fatal
-// warnings the path policy raised about its location.
+// CreateRepositoryResult carries the created repository plus the risks the
+// actor acknowledged to create it there.
 type CreateRepositoryResult struct {
-	Repository *repo.Repository
-	Warnings   []string
+	Repository        *repo.Repository
+	AcknowledgedRisks []StorageRisk
 }
 
 // CreateRepository is the single entry point for creating a repository: it
@@ -108,35 +113,32 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		}
 	}
 
-	var rootIDs []uuid.UUID
-	if strings.TrimSpace(spec.RootID) != "" && strings.TrimSpace(spec.Root) != "" {
-		return nil, fmt.Errorf("%w: root_id and root path cannot both be supplied", ErrPathNotAllowed)
+	var storageLocationIDs []uuid.UUID
+	var selectedLocation *repo.StorageLocation
+	if strings.TrimSpace(spec.StorageLocationID) != "" && strings.TrimSpace(spec.Root) != "" {
+		return nil, fmt.Errorf("%w: storage_location_id and root path cannot both be supplied", ErrPathNotAllowed)
 	}
 	if strings.TrimSpace(spec.Root) == "" {
-		selectedRoot, err := rm.resolveRepositoryRootForCreate(ctx, spec.RootID, role)
+		selectedRoot, err := rm.resolveStorageLocationForCreate(ctx, spec.StorageLocationID, role)
 		if err != nil {
 			return nil, err
 		}
 		spec.Root = selectedRoot.Path
-		rootIDs = append(rootIDs, selectedRoot.RootID)
+		selectedLocation = selectedRoot
+		storageLocationIDs = append(storageLocationIDs, selectedRoot.StorageLocationID)
 	}
 
 	repoPath, err := resolveRepositoryCreatePath(spec.Root, spec.DirectoryName, role)
 	if err != nil {
 		return nil, err
 	}
-	warnings := StoragePlacementWarnings(spec.Root)
-	if len(warnings) > 0 && !spec.RiskConfirmation && !strings.HasPrefix(spec.Actor, "server:") {
-		if _, auditErr := rm.RecordLifecycleAudit(ctx, LifecycleAuditInput{
-			Actor: spec.Actor, ActorUserID: spec.ActorUserID, HostInstanceID: spec.HostInstanceID,
-			RequestID: spec.RequestID, Action: lifecycleKindCreateRepository, TargetType: "repository",
-			Source: auditSourceForActor(spec.Actor), ConfirmationType: "none", NewPath: repoPath,
-			Result: AuditResultRejected, FailureStage: "risk_confirmation",
-			Details: map[string]any{"risk_confirmation": false, "risk_warnings": warnings},
-		}); auditErr != nil {
-			return nil, fmt.Errorf("%w: persist rejected storage risk decision: %v", ErrRepositoryRiskConfirmationRequired, auditErr)
+	var acknowledged []StorageRisk
+	if !strings.HasPrefix(spec.Actor, "server:") {
+		target := rm.assessResolvedCreateTarget(ctx, createIntentForRole(role), selectedLocation, filepath.Base(repoPath), repoPath)
+		acknowledged, err = rm.admitCreateTarget(ctx, spec, target)
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("%w: %s", ErrRepositoryRiskConfirmationRequired, strings.Join(warnings, ", "))
 	}
 	defaults, err := rm.GetRepositoryDefaults(ctx)
 	if err != nil {
@@ -147,7 +149,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		repocfg.WithStorageStrategy(firstNonEmpty(spec.StorageStrategy, defaults.Strategy, "date")),
 		repocfg.WithLocalSettings(firstNonEmpty(spec.DuplicateHandling, defaults.DuplicateHandling, "rename")),
 	)
-	associatedRootID, err := rm.resolveRepositoryAssociation(ctx, repoPath, rootIDs)
+	associatedStorageLocationID, err := rm.resolveRepositoryAssociation(ctx, repoPath, storageLocationIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -156,10 +158,10 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		RequestID: spec.RequestID,
 		Kind:      lifecycleKindCreateRepository,
 		Payload: createRepositoryOperationPayload{
-			Name: spec.Name, Path: repoPath, RootID: associatedRootID.String(), Role: role,
+			Name: spec.Name, Path: repoPath, StorageLocationID: associatedStorageLocationID.String(), Role: role,
 			OwnerID: spec.OwnerID, StorageStrategy: cfg.StorageStrategy,
 			DuplicateHandling: cfg.LocalSettings.HandleDuplicateFilenames,
-			RiskConfirmation:  spec.RiskConfirmation,
+			AcknowledgedRisks: RiskCodes(acknowledged),
 		},
 		Actor:          spec.Actor,
 		ActorUserID:    spec.ActorUserID,
@@ -186,7 +188,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		if err != nil {
 			return nil, fmt.Errorf("load completed repository create result: %w", err)
 		}
-		return &CreateRepositoryResult{Repository: dbRepo, Warnings: warnings}, nil
+		return &CreateRepositoryResult{Repository: dbRepo, AcknowledgedRisks: acknowledged}, nil
 	}
 	failPrepared := func(cause error) (*CreateRepositoryResult, error) {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, cause, createRepositoryRollbackData{Path: repoPath})
@@ -210,7 +212,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		return failPrepared(fmt.Errorf("look up repository create target: %w", lookupErr))
 	}
 
-	if repocfg.IsRepositoryRoot(repoPath) {
+	if repocfg.IsStorageLocation(repoPath) {
 		config, loadErr := repocfg.LoadConfigFromFile(repoPath)
 		if loadErr != nil {
 			return failPrepared(&RepositoryMarkerInvalidError{RequestedPath: repoPath, Cause: loadErr})
@@ -243,14 +245,88 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		}
 	}
 
-	dbRepo, err := rm.initializeRepository(ctx, repoPath, *cfg, spec.OwnerID, role, &operation, associatedRootID)
+	dbRepo, err := rm.initializeRepository(ctx, repoPath, *cfg, spec.OwnerID, role, &operation, associatedStorageLocationID)
 	if err != nil {
 		if current, loadErr := rm.queries.GetLifecycleOperation(ctx, operation.OperationID); loadErr == nil && current.Phase == lifecyclePhasePrepared {
 			_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err, createRepositoryRollbackData{Path: repoPath})
 		}
 		return nil, err
 	}
-	return &CreateRepositoryResult{Repository: dbRepo, Warnings: warnings}, nil
+	return &CreateRepositoryResult{Repository: dbRepo, AcknowledgedRisks: acknowledged}, nil
+}
+
+// consentAdmission is one command's consent input: who asks, what the
+// command is called in the audit, and the acknowledgement it carries.
+// TokenRequired makes the token mandatory even when the target reports no
+// risk, so a command that binds to an identity (adoption) cannot run on a
+// review it never saw.
+type consentAdmission struct {
+	Actor             string
+	ActorUserID       *int32
+	HostInstanceID    string
+	RequestID         string
+	Action            string
+	AssessmentToken   string
+	AcknowledgedRisks []string
+	TokenRequired     bool
+}
+
+// admitCreateTarget is the create command's consent gate. The target was
+// just re-sampled, so the decision rests on current facts: an unsupported or
+// unobservable target is refused outright; a risky target needs an
+// acknowledgement whose token still matches those facts. Every refusal is
+// audited before it is returned, and nothing on disk changes.
+func (rm *DefaultRepositoryManager) admitCreateTarget(ctx context.Context, spec CreateRepositorySpec, target *CreateTargetAssessment) ([]StorageRisk, error) {
+	return rm.admitAssessedTarget(ctx, consentAdmission{
+		Actor: spec.Actor, ActorUserID: spec.ActorUserID, HostInstanceID: spec.HostInstanceID,
+		RequestID: spec.RequestID, Action: lifecycleKindCreateRepository,
+		AssessmentToken: spec.AssessmentToken, AcknowledgedRisks: spec.AcknowledgedRisks,
+	}, target)
+}
+
+// admitAssessedTarget is the shared consent gate of every command that
+// binds to a create-target assessment.
+func (rm *DefaultRepositoryManager) admitAssessedTarget(ctx context.Context, admission consentAdmission, target *CreateTargetAssessment) ([]StorageRisk, error) {
+	audit := func(stage string, details map[string]any) error {
+		_, err := rm.RecordLifecycleAudit(ctx, LifecycleAuditInput{
+			Actor: admission.Actor, ActorUserID: admission.ActorUserID, HostInstanceID: admission.HostInstanceID,
+			RequestID: admission.RequestID, Action: admission.Action, TargetType: "repository",
+			Source: auditSourceForActor(admission.Actor), ConfirmationType: "none", NewPath: target.Path,
+			Result: AuditResultRejected, FailureStage: stage, Details: details,
+		})
+		return err
+	}
+	if refusal := target.RefusalError(); refusal != nil {
+		if err := audit("storage_support", map[string]any{"problem": string(target.Problem())}); err != nil {
+			return nil, fmt.Errorf("%w: persist rejected storage support decision: %v", refusal, err)
+		}
+		return nil, refusal
+	}
+	if len(target.Risks) == 0 && !admission.TokenRequired {
+		return nil, nil
+	}
+	details := map[string]any{
+		"risk_warnings": RiskCodes(target.Risks), "acknowledged_risks": admission.AcknowledgedRisks,
+		"assessment_token_present": strings.TrimSpace(admission.AssessmentToken) != "",
+	}
+	switch {
+	case strings.TrimSpace(admission.AssessmentToken) == "":
+		if err := audit("risk_confirmation", details); err != nil {
+			return nil, fmt.Errorf("%w: persist rejected storage risk decision: %v", ErrRepositoryRiskConfirmationRequired, err)
+		}
+		return nil, &StorageRiskConfirmationError{Risks: target.Risks, Token: target.Token}
+	case !hmac.Equal([]byte(strings.TrimSpace(admission.AssessmentToken)), []byte(target.Token)):
+		if err := audit("assessment_stale", details); err != nil {
+			return nil, fmt.Errorf("%w: persist rejected stale assessment: %v", ErrStorageAssessmentStale, err)
+		}
+		return nil, fmt.Errorf("%w: %s", ErrStorageAssessmentStale, joinRisks(target.Risks))
+	case !acknowledgesRisks(admission.AcknowledgedRisks, target.Risks):
+		if err := audit("risk_confirmation", details); err != nil {
+			return nil, fmt.Errorf("%w: persist rejected storage risk decision: %v", ErrRepositoryRiskConfirmationRequired, err)
+		}
+		return nil, &StorageRiskConfirmationError{Risks: target.Risks, Token: target.Token}
+	}
+	return target.Risks, nil
 }
 
 func uniqueStrings(values []string) []string {
@@ -300,17 +376,18 @@ func (rm *DefaultRepositoryManager) primaryRepositoryExists(ctx context.Context)
 }
 
 // resolveRepositoryCreatePath resolves the on-disk path for a new repository
-// under root. Primary repositories always live at <root>/primary; a regular
-// repository uses the explicit stable storage-folder segment independently of
-// its mutable display name. The result is a direct child of root.
+// under a Storage Location. Primary repositories always live at
+// <storage location>/primary; a regular repository uses the explicit stable
+// storage-folder segment independently of its mutable display name. The result
+// is a direct child of the Storage Location.
 func resolveRepositoryCreatePath(root, directoryName string, role dbtypes.RepoRole) (string, error) {
 	trimmed := strings.TrimSpace(root)
 	if trimmed == "" {
-		return "", errors.New("storage root is not configured")
+		return "", errors.New("storage location is not configured")
 	}
 	cleanRoot, err := CanonicalizeRepositoryPath(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("invalid storage root: %w", err)
+		return "", fmt.Errorf("invalid storage location: %w", err)
 	}
 
 	folderName := directoryName
@@ -325,7 +402,7 @@ func resolveRepositoryCreatePath(root, directoryName string, role dbtypes.RepoRo
 		return "", fmt.Errorf("invalid repository path: %w", err)
 	}
 	if !pathIsDirectChild(cleanRoot, repoPath) {
-		return "", errors.New("repository path must be a direct child of storage root")
+		return "", errors.New("repository path must be a direct child of a Storage Location")
 	}
 	if err := rejectCaseInsensitiveRepositoryDirectoryConflict(cleanRoot, folderName); err != nil {
 		return "", err
@@ -379,7 +456,7 @@ func ValidateRepositoryDirectoryName(name string) error {
 func rejectCaseInsensitiveRepositoryDirectoryConflict(root, requestedName string) error {
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return fmt.Errorf("list storage root: %w", err)
+		return fmt.Errorf("list storage location: %w", err)
 	}
 	for _, entry := range entries {
 		existingName := entry.Name()

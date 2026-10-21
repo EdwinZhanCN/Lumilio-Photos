@@ -14,7 +14,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     content.full_hash AS content_hash,
     content.file_size,
     COALESCE((
@@ -153,8 +153,7 @@ type GetAssetWithRelationsRow struct {
 	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
 	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
 	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	LifecycleState       string                   `db:"lifecycle_state" json:"lifecycle_state"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating               *int64                   `db:"rating" json:"rating"`
 	Liked                bool                     `db:"liked" json:"liked"`
@@ -191,8 +190,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) 
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -217,7 +215,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) 
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
         SELECT json_group_array(
             json_object(
@@ -253,8 +251,7 @@ type GetAssetWithTagsRow struct {
 	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
 	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
 	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	LifecycleState       string                   `db:"lifecycle_state" json:"lifecycle_state"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating               *int64                   `db:"rating" json:"rating"`
 	Liked                bool                     `db:"liked" json:"liked"`
@@ -284,8 +281,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetA
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -303,7 +299,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetA
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
         SELECT json_group_array(
             json_object(
@@ -342,8 +338,7 @@ type GetAssetWithThumbnailsRow struct {
 	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
 	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
 	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	LifecycleState       string                   `db:"lifecycle_state" json:"lifecycle_state"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating               *int64                   `db:"rating" json:"rating"`
 	Liked                bool                     `db:"liked" json:"liked"`
@@ -373,8 +368,7 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID uuid.UUID)
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,

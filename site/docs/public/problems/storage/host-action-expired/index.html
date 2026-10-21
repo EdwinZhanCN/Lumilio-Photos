@@ -11,9 +11,9 @@
   <h1>Native host action expired</h1>
   <dl>
     <dt>Type</dt><dd><code>https://lumilio.org/problems/storage/host-action-expired</code></dd>
-    <dt>Normal HTTP status</dt><dd>500</dd>
-    <dt>Definition</dt><dd>A native host action expired before it was approved.</dd>
-    <dt>Recovery</dt><dd>Correct the documented condition, then retry the operation.</dd>
+    <dt>Normal HTTP status</dt><dd>409</dd>
+    <dt>Definition</dt><dd>A native host action expired before Desktop approved it; nothing was changed.</dd>
+    <dt>Recovery</dt><dd>Send the request again from the Storage page when Desktop is ready to approve it; the request form is kept.</dd>
   </dl>
   <h2>Extension members</h2>
   <p>This Problem type defines no extension members.</p>

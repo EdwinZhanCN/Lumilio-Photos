@@ -30,6 +30,8 @@
     "updates": "Updates"
   },
   "errors": {
+    "catalogIncompatible": "The catalog was written by a pre-release or a newer Lumilio Photos and is not opened by this build. Move the application state aside to start a new catalog; your media folders are untouched and setup offers to adopt the Primary Repository they hold.",
+    "configurationIncompatible": "The runtime configuration was written by another build. Review it in Settings and apply it again.",
     "controllerBusy": "The Desktop controller is busy. Try again shortly.",
     "invalidArgument": "The request is not valid.",
     "lumenNotInstalled": "Install Lumen Hub before starting it.",
@@ -41,12 +43,15 @@
     "repositoryControlUnavailable": "Storage control is available only after the runtime is ready.",
     "runtimeNotConfigured": "Complete the runtime configuration first.",
     "runtimeNotReady": "The runtime is not ready yet.",
+    "selectionCancelled": "The folder selection was cancelled. The request is still waiting.",
     "shutdownInProgress": "Desktop is shutting down or recovering.",
     "signatureInvalid": "The downloaded artifact failed signature verification.",
     "staleConfig": "The runtime configuration changed. Review it again before saving.",
     "staleVersion": "This view is out of date. Reloading the latest state is required.",
     "stopTimeout": "The process did not stop within the safety budget; cleanup is required.",
     "storageLocationOffline": "This Storage Location is offline or no longer authorized.",
+    "storageMigrationRejected": "The selected Default Storage Location does not carry the registered identity and its Primary Repository, so the change was rolled back. A fresh Default Storage Location is possible only before the Primary Repository exists.",
+    "storageUnavailable": "The Default Storage Location could not be created or claimed. Check that the folder is writable and not held by another running instance.",
     "unknown": "The Desktop control plane returned an unknown error."
   },
   "general": {
@@ -285,6 +290,7 @@
     "riskCloudSync": "Cloud-sync managed folder",
     "riskMountChanged": "Mounted filesystem changed",
     "riskNetwork": "Network filesystem",
+    "riskNonDefault": "Outside the Default Storage Location",
     "riskPlaceholder": "Files must be downloaded first",
     "riskRemovable": "Removable storage",
     "startServerHint": "Start the Server before adding another Storage Location.",

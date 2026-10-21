@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/db/backup/backup.go
 - server/internal/storage/directory_manager.go
 - server/internal/storage/doc.go
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_media_handler.go
 -->
 
 # 为什么完整备份需要两部分

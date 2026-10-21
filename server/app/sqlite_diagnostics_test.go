@@ -25,7 +25,7 @@ func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
 	t.Cleanup(func() { _ = catalog.Close() })
 	for _, statement := range []string{
 		`CREATE TABLE asset_pipeline_state(desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER)`,
-		`CREATE TABLE repository_observation_state(desired_epoch INTEGER,applied_epoch INTEGER,full_verification_required INTEGER,terminal_error TEXT,updated_at INTEGER)`,
+		`CREATE TABLE repository_scan_state(pending INTEGER,completed_at INTEGER)`,
 		`CREATE TABLE event_projection_pipeline_state(source_revision INTEGER,applied_revision INTEGER,terminal_error TEXT,updated_at INTEGER)`,
 		`CREATE TABLE location_projection_state(source_revision INTEGER,published_revision INTEGER,terminal_error TEXT,updated_at INTEGER)`,
 		`CREATE TABLE location_resolution_pipeline_state(projection_version INTEGER,applied_revision INTEGER,terminal_error TEXT,updated_at INTEGER)`,
@@ -33,7 +33,7 @@ func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
 		`CREATE TABLE asset_reindex_requests(requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE catalog_operation_receipts(desired_version INTEGER,applied_version INTEGER,state TEXT,updated_at INTEGER)`,
 		`INSERT INTO asset_pipeline_state VALUES(3,1,NULL,1)`,
-		`INSERT INTO repository_observation_state VALUES(1,1,1,NULL,1)`,
+		`INSERT INTO repository_scan_state VALUES(1,NULL)`,
 		`INSERT INTO event_projection_pipeline_state VALUES(5,2,'attempts_exhausted',1)`,
 		`INSERT INTO location_projection_state VALUES(2,2,NULL,105000000)`,
 		`INSERT INTO asset_reindex_requests VALUES(4,4,106000000)`,

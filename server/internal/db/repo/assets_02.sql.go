@@ -38,7 +38,7 @@ page_items AS (
     END AS sort_time
   FROM media_item_browse_facts facts
   JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-  WHERE pa.is_deleted = COALESCE(?6, false)
+  WHERE pa.lifecycle_state = COALESCE(?6, 'active')
     AND (
       (SELECT asset_ids_json FROM filter_params) IS NULL
       OR EXISTS (
@@ -65,9 +65,15 @@ page_items AS (
     )
     AND (?9 IS NULL OR facts.owner_id = ?9)
     AND (?10 IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = ?10
+      AND occurrence.state = CASE COALESCE(?6, 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(?6, 'active')
+      END
   ))
     AND (
       ?11 IS NULL
@@ -220,7 +226,7 @@ SELECT
   p.stack_id,
   p.stack_position,
   p.stack_kind,
-  pa.asset_id, pa.owner_id, pa.content_id, pa.type, pa.original_filename, pa.mime_type, pa.width, pa.height, pa.duration, pa.upload_time, pa.taken_time, pa.capture_offset_minutes, pa.is_deleted, pa.deleted_at, pa.specific_metadata, pa.rating, pa.liked, pa.status, pa.updated_at, pa.gps_latitude, pa.gps_longitude, pa.gps_geohash_5, pa.gps_geohash_7, pa.exif_raw
+  pa.asset_id, pa.owner_id, pa.content_id, pa.type, pa.original_filename, pa.mime_type, pa.width, pa.height, pa.duration, pa.upload_time, pa.taken_time, pa.capture_offset_minutes, pa.lifecycle_state, pa.specific_metadata, pa.rating, pa.liked, pa.status, pa.updated_at, pa.gps_latitude, pa.gps_longitude, pa.gps_geohash_5, pa.gps_geohash_7, pa.exif_raw
 FROM page_items p
 JOIN assets pa ON pa.asset_id = p.primary_asset_id
 ORDER BY p.sort_time DESC, p.media_item_id DESC
@@ -232,7 +238,7 @@ type GetMediaItemsUnifiedParams struct {
 	TagNames         *string     `db:"tag_names" json:"tag_names"`
 	StackKinds       *string     `db:"stack_kinds" json:"stack_kinds"`
 	SortBy           interface{} `db:"sort_by" json:"sort_by"`
-	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	LifecycleState   *string     `db:"lifecycle_state" json:"lifecycle_state"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
@@ -284,7 +290,7 @@ func (q *Queries) GetMediaItemsUnified(ctx context.Context, arg GetMediaItemsUni
 		arg.TagNames,
 		arg.StackKinds,
 		arg.SortBy,
-		arg.IsDeleted,
+		arg.LifecycleState,
 		arg.Query,
 		arg.AssetType,
 		arg.OwnerID,
@@ -342,8 +348,7 @@ func (q *Queries) GetMediaItemsUnified(ctx context.Context, arg GetMediaItemsUni
 			&i.Asset.UploadTime,
 			&i.Asset.TakenTime,
 			&i.Asset.CaptureOffsetMinutes,
-			&i.Asset.IsDeleted,
-			&i.Asset.DeletedAt,
+			&i.Asset.LifecycleState,
 			&i.Asset.SpecificMetadata,
 			&i.Asset.Rating,
 			&i.Asset.Liked,

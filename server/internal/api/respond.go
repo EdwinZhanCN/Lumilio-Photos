@@ -16,6 +16,19 @@ const ProblemMediaType = problem.MediaType
 type ProblemResponse = problem.Details
 type RateLimitedProblemResponse = problem.RateLimitedDetails
 type RepositoryConflictProblemResponse = problem.RepositoryConflictDetails
+type StorageConfirmationRequiredProblemResponse = problem.StorageConfirmationRequiredDetails
+type StorageActionUnavailableProblemResponse = problem.StorageActionUnavailableDetails
+
+// RepositoryCommandProblemResponse is the OpenAPI placeholder for the 409
+// union of the Repository commands (rename, detach, candidate reconnect):
+// openapinormalize replaces its schema with the exact oneOf of the typed
+// action refusal, busy, ownership, identity, and original-online Problems.
+type RepositoryCommandProblemResponse = problem.Details
+
+// RepositoryCreateProblemResponse is the OpenAPI placeholder for the create
+// commands' 409 union; openapinormalize replaces its schema with the exact
+// oneOf of repository/conflict and the typed storage refusals.
+type RepositoryCreateProblemResponse = problem.Details
 type ProblemReference = problem.Reference
 
 const (

@@ -11,6 +11,7 @@ import (
 	"server/internal/api/dto"
 	"server/internal/db/repo"
 	"server/internal/service"
+	"server/internal/storage/trash"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -251,9 +252,12 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 		DuplicateAssetIDs: duplicates,
 		Policy:            policy,
 		RequireOwner:      ownerScopeID(c),
+		Trash:             trashRequestFrom(c),
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, trash.ErrRejected):
+			writeTrashProblem(c, err)
 		case errors.Is(err, service.ErrDuplicateGroupNotFound):
 			api.WriteProblem(c, api.NotFound(err))
 		case errors.Is(err, service.ErrDuplicateGroupAlreadyResolved):

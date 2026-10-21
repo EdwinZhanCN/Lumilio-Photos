@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -54,7 +52,7 @@ type RepositoryConflictError struct {
 }
 
 func repositoryConflictActions(registeredPath, repositoryID string) []string {
-	if marker, err := repocfg.LoadConfigFromFile(registeredPath); err == nil && marker.ID == repositoryID {
+	if marker, err := (LocalRepositoryIdentityDetector{}).LoadRepository(registeredPath); err == nil && marker.ID == repositoryID {
 		return []string{"copy"}
 	}
 	return []string{"relocate", "copy"}
@@ -68,12 +66,13 @@ func (e *RepositoryConflictError) Error() string {
 //
 // Assets and Locations are untouched by construction: repository node paths
 // are relative graph projections, so every consumer resolves the new root
-// through RepositoryFS. Relocate is one UPDATE.
+// through RepositoryFS. The catalog path update and observation fence commit
+// together; original media bytes are never moved.
 func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id string, newPath string, requests ...LifecycleRequest) (*repo.Repository, error) {
 	return rm.relocateRepository(ctx, id, newPath, nil, requests...)
 }
 
-func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id string, newPath string, associatedRootID *uuid.UUID, requests ...LifecycleRequest) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id string, newPath string, associatedStorageLocationID *uuid.UUID, requests ...LifecycleRequest) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
@@ -87,17 +86,16 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	if err != nil {
 		return nil, err
 	}
-	if current.Role == dbtypes.RepoRolePrimary {
-		return nil, fmt.Errorf("%w: primary repository location follows the default Storage Location", ErrPathNotAllowed)
+	// The role-aware policy on the projected row, before the destination is
+	// even looked at; the decision that counts is re-derived under the lease.
+	if err := rm.admitReconnect(ctx, *current); err != nil {
+		return nil, err
 	}
 	if current.Path == cleanPath {
 		return current, nil
 	}
 	if err := rm.claimRuntimeStoragePath(ctx, "repository", cleanPath); err != nil {
-		return nil, err
-	}
-	if current.Activity != dbtypes.RepositoryActivityIdle {
-		return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
+		return nil, fmt.Errorf("%w: %v", ErrRepositoryOwnershipUnavailable, err)
 	}
 
 	result, err := rm.validateRepository(cleanPath)
@@ -108,7 +106,7 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		return nil, fmt.Errorf("invalid repository at %s: %v", cleanPath, result.Errors)
 	}
 
-	config, err := repocfg.LoadConfigFromFile(cleanPath)
+	config, err := rm.identities().LoadRepository(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load repository configuration: %w", err)
 	}
@@ -116,30 +114,53 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		return nil, fmt.Errorf("%w: %s holds repository %s, not %s",
 			ErrRepositoryIDMismatch, cleanPath, config.ID, id)
 	}
-	if marker, markerErr := repocfg.LoadConfigFromFile(current.Path); markerErr == nil && marker.ID == id {
+	if marker, markerErr := rm.identities().LoadRepository(current.Path); markerErr == nil && marker.ID == id {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
 	}
 
 	now := time.Now()
-	rootID := uuid.Nil
-	if associatedRootID == nil {
-		rootID, err = rm.repositoryRootIDForPath(ctx, cleanPath)
+	storageLocationID := uuid.Nil
+	if associatedStorageLocationID == nil {
+		storageLocationID, err = rm.storageLocationIDForPath(ctx, cleanPath)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rootID = *associatedRootID
+		storageLocationID = *associatedStorageLocationID
 	}
-	releaseRoot, err := rm.files.AccessCoordinator().AcquireRootReadContext(ctx, rootID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
-	}
-	defer releaseRoot()
 	releaseMutation, err := rm.files.AccessCoordinator().AcquireMutationsContext(ctx, []uuid.UUID{repoUUID})
 	if err != nil {
 		return nil, fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
 	}
 	defer releaseMutation()
+	current, err = rm.GetRepository(id)
+	if err != nil {
+		return nil, err
+	}
+	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
+	if oldMarkerErr == nil && oldMarker.ID == id {
+		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
+	}
+	if err := rm.admitReconnect(ctx, *current); err != nil {
+		return nil, err
+	}
+	if current.Activity != dbtypes.RepositoryActivityIdle {
+		if oldMarkerErr == nil && !repositoryReachabilityAllowsStaleActivityDetach(current.Reachability) {
+			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
+		}
+		if _, err := rm.queries.FinishRepositoryActivity(ctx, repo.FinishRepositoryActivityParams{
+			RepoID: repoUUID, Activity: current.Activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); err != nil {
+			return nil, fmt.Errorf("clear stale repository activity before relocate: %w", err)
+		}
+		current, err = rm.GetRepository(id)
+		if err != nil {
+			return nil, err
+		}
+		if current.Activity != dbtypes.RepositoryActivityIdle {
+			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
+		}
+	}
 	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRelocate, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin repository relocation: %w", err)
@@ -147,11 +168,11 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	defer func() { _ = tx.Rollback() }()
 	queries := rm.queries.WithTx(tx.Raw())
 	dbRepo, err := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID:       repoUUID,
-		Path:         cleanPath,
-		RootID:       rootID,
-		Reachability: dbtypes.RepositoryReachabilityActive,
-		UpdatedAt:    dbtypes.NewTimestamp(now),
+		RepoID:            repoUUID,
+		Path:              cleanPath,
+		StorageLocationID: storageLocationID,
+		Reachability:      dbtypes.RepositoryReachabilityActive,
+		UpdatedAt:         dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		if isUniquePathViolation(err) {
@@ -160,6 +181,10 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		}
 		rm.repoAudit(cleanPath).Error("repository.relocate", err, zap.String("repository_id", id))
 		return nil, fmt.Errorf("failed to relocate repository: %w", err)
+	}
+	nowStamp := dbtypes.NewTimestamp(now)
+	if err := invalidateRepositoryObservationAfterRelocation(ctx, tx, repoUUID, cleanPath, nowStamp); err != nil {
+		return nil, err
 	}
 	request := LifecycleRequest{}
 	if len(requests) > 0 {
@@ -208,6 +233,34 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	return &dbRepo, nil
 }
 
+// admitReconnect applies the role-aware policy to a reconnect. The catalog
+// may still project an original as active after it went away, so the marker
+// probe, not the projection, decides whether there is something to
+// reconnect: an original that is positively online is ErrRepositoryOriginalOnline,
+// any other withheld verdict is the typed refusal with its blockers.
+func (rm *DefaultRepositoryManager) admitReconnect(ctx context.Context, current repo.Repository) error {
+	facts, err := rm.repositoryActionFacts(ctx, current)
+	if err != nil {
+		return err
+	}
+	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
+	originalOnline := oldMarkerErr == nil && oldMarker.ID == current.RepoID.String()
+	if facts.Reachability == dbtypes.RepositoryReachabilityActive && !originalOnline {
+		facts.Reachability = dbtypes.RepositoryReachabilityOffline
+	}
+	verdict := DeriveRepositoryActions(facts).Verdict(ActionReconnect)
+	if verdict.Allowed() {
+		return nil
+	}
+	if len(verdict.Blockers) == 1 && verdict.Blockers[0] == BlockerOriginalAvailable {
+		return fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
+	}
+	return &RepositoryActionUnavailableError{
+		RepositoryID: current.RepoID.String(), Action: ActionReconnect,
+		Blockers: verdict.Blockers, Alternatives: verdict.Alternatives,
+	}
+}
+
 // RegisterRepositoryCopy registers a duplicated repository directory as a new,
 // independent repository by minting a fresh UUID into its .lumiliorepo. This is
 // the `git clone` answer to a same-ID conflict, and it turns a dead-end error
@@ -221,7 +274,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
-	config, err := repocfg.LoadConfigFromFile(cleanPath)
+	config, err := rm.identities().LoadRepository(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load repository configuration: %w", err)
 	}
@@ -236,7 +289,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	} else if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
 		return nil, fmt.Errorf("check copied repository role: %w", lookupErr)
 	}
-	rootID, err := rm.repositoryRootIDForPath(ctx, cleanPath)
+	storageLocationID, err := rm.storageLocationIDForPath(ctx, cleanPath)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +301,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
 		RequestID: request.RequestID, Kind: lifecycleKindRegisterRepositoryCopy,
 		Payload: registerRepositoryCopyOperationPayload{
-			Path: cleanPath, RootID: rootID.String(), OwnerID: defaultOwnerID, Role: normalizeRepoRole(role), RiskConfirmation: request.RiskConfirmation,
+			Path: cleanPath, StorageLocationID: storageLocationID.String(), OwnerID: defaultOwnerID, Role: normalizeRepoRole(role), RiskConfirmation: request.RiskConfirmation,
 		},
 		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID, TargetType: "repository", TargetID: &newID,
 		RollbackData: registerRepositoryCopyRollbackData{PreviousRepositoryID: previousID},
@@ -266,7 +319,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return rm.GetRepository(*operation.TargetID)
 	}
 	newID = *operation.TargetID
-	releaseRoot := rm.acquireRepositoryRootRead(rootID)
+	releaseStorageLocation := rm.acquireStorageLocationRead(storageLocationID)
 	releaseMutation := rm.acquireRepositoryMutation(previousUUID)
 	locksReleased := false
 	releaseLocks := func() {
@@ -275,16 +328,16 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		}
 		locksReleased = true
 		releaseMutation()
-		releaseRoot()
+		releaseStorageLocation()
 	}
 	defer releaseLocks()
-	rollbackData, err := planRepositoryPrivateStateIsolation(cleanPath, "copied-from-"+previousID)
+	plan, err := planPrivatePreservation(cleanPath, RecoveryEventRegisterCopy, operation.Actor, operation.RequestID, previousID, newID, time.Now())
 	if err != nil {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err,
 			registerRepositoryCopyRollbackData{PreviousRepositoryID: previousID})
 		return nil, err
 	}
-	rollbackData.PreviousRepositoryID = previousID
+	rollbackData := registerRepositoryCopyRollbackData{PreviousRepositoryID: previousID, Preservation: plan}
 	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhasePrepared, rollbackData); err != nil {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err, rollbackData)
 		return nil, fmt.Errorf("persist repository-copy rollback plan: %w", err)
@@ -292,7 +345,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	rollback := func(cause error) error {
 		config.ID = previousID
 		identityErr := config.SaveConfigToFile(cleanPath)
-		stateErr := rollbackRepositoryPrivateStateIsolation(cleanPath, rollbackData)
+		stateErr := rollbackPrivateState(cleanPath, plan)
 		rollbackErr := errors.Join(identityErr, stateErr)
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, rollbackErr == nil, cause, rollbackData)
 		if rollbackErr != nil {
@@ -300,7 +353,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		}
 		return cause
 	}
-	if err := applyRepositoryPrivateStateIsolation(cleanPath, rollbackData); err != nil {
+	if err := applyPrivatePreservation(cleanPath, plan); err != nil {
 		return nil, rollback(err)
 	}
 	config.ID = newID
@@ -314,7 +367,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return nil, rollback(fmt.Errorf("persist register-copy filesystem phase: %w", err))
 	}
 
-	dbRepo, err := rm.AddRepository(cleanPath, defaultOwnerID, role, rootID)
+	dbRepo, err := rm.AddRepository(cleanPath, defaultOwnerID, role, storageLocationID)
 	if err != nil {
 		return nil, rollback(err)
 	}
@@ -343,119 +396,10 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	rm.repoAudit(cleanPath).Operation("repository.register_copy",
 		zap.String("repository_id", config.ID),
 		zap.String("copied_from_repository_id", previousID),
+		zap.String("recovery_receipt_id", plan.ReceiptID()),
 	)
 
 	return dbRepo, nil
-}
-
-func planRepositoryPrivateStateIsolation(repositoryPath, recoveryPrefix string) (registerRepositoryCopyRollbackData, error) {
-	privateRoot := filepath.Join(repositoryPath, DefaultStructure.SystemDir)
-	entries, err := os.ReadDir(privateRoot)
-	if errors.Is(err, os.ErrNotExist) {
-		return registerRepositoryCopyRollbackData{PrivateRootExisted: false}, nil
-	}
-	if err != nil {
-		return registerRepositoryCopyRollbackData{}, fmt.Errorf("read repository private state: %w", err)
-	}
-	recoveryPath := filepath.Join(
-		privateRoot,
-		"recovery",
-		recoveryPrefix+"-"+time.Now().UTC().Format("20060102T150405.000000000Z")+"-"+uuid.NewString()[:8],
-	)
-	rollback := registerRepositoryCopyRollbackData{RecoveryPath: recoveryPath, PrivateRootExisted: true}
-	for _, entry := range entries {
-		if entry.Name() != "recovery" {
-			rollback.MovedEntries = append(rollback.MovedEntries, entry.Name())
-		}
-	}
-	return rollback, nil
-}
-
-func applyRepositoryPrivateStateIsolation(repositoryPath string, rollback registerRepositoryCopyRollbackData) error {
-	if !rollback.PrivateRootExisted || strings.TrimSpace(rollback.RecoveryPath) == "" {
-		return nil
-	}
-	privateRoot := filepath.Join(repositoryPath, DefaultStructure.SystemDir)
-	recoveryPath := filepath.Clean(rollback.RecoveryPath)
-	if err := os.MkdirAll(recoveryPath, 0o755); err != nil {
-		return fmt.Errorf("create repository copy recovery directory: %w", err)
-	}
-	for _, name := range rollback.MovedEntries {
-		if filepath.Base(name) != name || name == "." || name == ".." {
-			return fmt.Errorf("invalid private-state entry %q", name)
-		}
-		if err := os.Rename(filepath.Join(privateRoot, name), filepath.Join(recoveryPath, name)); err != nil {
-			return fmt.Errorf("isolate repository private state %s: %w", name, err)
-		}
-	}
-	return nil
-}
-
-func rollbackRepositoryPrivateStateIsolation(repositoryPath string, rollback registerRepositoryCopyRollbackData) error {
-	privateRoot := filepath.Join(repositoryPath, DefaultStructure.SystemDir)
-	if !rollback.PrivateRootExisted && strings.TrimSpace(rollback.RecoveryPath) == "" {
-		if err := os.RemoveAll(privateRoot); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("remove fresh repository private state: %w", err)
-		}
-		return nil
-	}
-	if strings.TrimSpace(rollback.RecoveryPath) == "" {
-		return nil
-	}
-	cleanRecovery := filepath.Clean(rollback.RecoveryPath)
-	recoveryRoot := filepath.Join(privateRoot, "recovery") + string(os.PathSeparator)
-	if !strings.HasPrefix(cleanRecovery+string(os.PathSeparator), recoveryRoot) {
-		return fmt.Errorf("recovery path escapes repository private state")
-	}
-	var rollbackErrors []error
-	planned := make(map[string]struct{}, len(rollback.MovedEntries))
-	for _, name := range rollback.MovedEntries {
-		planned[name] = struct{}{}
-	}
-	entries, readErr := os.ReadDir(privateRoot)
-	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-		rollbackErrors = append(rollbackErrors, readErr)
-	}
-	for _, entry := range entries {
-		if entry.Name() == "recovery" {
-			continue
-		}
-		if _, wasPlanned := planned[entry.Name()]; wasPlanned {
-			if _, sourceErr := os.Stat(filepath.Join(cleanRecovery, entry.Name())); errors.Is(sourceErr, os.ErrNotExist) {
-				// A crash may have happened before this planned entry moved. Keep
-				// the original in place instead of mistaking it for fresh state.
-				continue
-			}
-		}
-		if err := os.RemoveAll(filepath.Join(privateRoot, entry.Name())); err != nil {
-			rollbackErrors = append(rollbackErrors, fmt.Errorf("remove fresh private-state entry %s: %w", entry.Name(), err))
-		}
-	}
-	for _, name := range rollback.MovedEntries {
-		if filepath.Base(name) != name || name == "." || name == ".." {
-			rollbackErrors = append(rollbackErrors, fmt.Errorf("invalid private-state entry %q", name))
-			continue
-		}
-		source := filepath.Join(cleanRecovery, name)
-		destination := filepath.Join(privateRoot, name)
-		if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
-			if _, destinationErr := os.Stat(destination); destinationErr == nil {
-				continue
-			}
-			rollbackErrors = append(rollbackErrors, fmt.Errorf("private-state entry %s is missing from both locations", name))
-			continue
-		} else if err != nil {
-			rollbackErrors = append(rollbackErrors, err)
-			continue
-		}
-		if err := os.Rename(source, destination); err != nil {
-			rollbackErrors = append(rollbackErrors, err)
-		}
-	}
-	if len(rollbackErrors) == 0 {
-		_ = os.Remove(cleanRecovery)
-	}
-	return errors.Join(rollbackErrors...)
 }
 
 // refreshRepositoryConfigCache writes the on-disk config into the database's

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Repository recovery required · Lumilio API Problem</title>
+  <style>body{max-width:52rem;margin:4rem auto;padding:0 1.5rem;font:16px/1.6 system-ui,sans-serif;color:#202124}code{background:#f3f4f6;padding:.15rem .35rem;border-radius:.25rem}dt{font-weight:700;margin-top:1rem}dd{margin-left:0}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #ddd;padding:.6rem}</style>
+</head>
+<body>
+  <p><a href="/problems/">Lumilio API Problems</a></p>
+  <h1>Repository recovery required</h1>
+  <dl>
+    <dt>Type</dt><dd><code>https://lumilio.org/problems/storage/recovery-required</code></dd>
+    <dt>Normal HTTP status</dt><dd>409</dd>
+    <dt>Definition</dt><dd>An interrupted storage operation left the journal of this Repository open; conflicting commands are refused until journal recovery completes.</dd>
+    <dt>Recovery</dt><dd>Let the Server finish journal recovery (it runs at startup and on the maintenance pass), review the recovery inventory of the Repository on the Storage page, then retry.</dd>
+  </dl>
+  <h2>Extension members</h2>
+  <p>This Problem type defines no extension members.</p>
+  <p>Runtime clients identify this condition by <code>type</code>; they do not dereference this page automatically.</p>
+</body>
+</html>

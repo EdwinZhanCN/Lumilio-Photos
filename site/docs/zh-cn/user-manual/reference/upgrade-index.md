@@ -21,6 +21,7 @@ code-evidence:
 
 | 目标 | 文档 |
 | --- | --- |
+| 先了解版本变更和已知问题 | [发布说明](./release-notes.md) |
 | 更新 Desktop 或 Docker | [安全升级](../admin/upgrade.md) |
 | 升级后无法启动 | [升级后无法启动](../troubleshooting/upgrade-startup.md) |
 | 移到新电脑或新主机 | [迁移到新设备](../admin/migrate-device.md) |

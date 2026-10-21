@@ -217,11 +217,16 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 	}
 	defer repositoryFS.Close()
 
-	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID, repositoryFS)
+	// A user's manual person assignments survive a re-detection of changed
+	// content (#223 in-place carry-over): they are captured before the old
+	// faces go and re-applied to the new faces before emptied people are
+	// dissolved.
+	manualAssignments, err := captureManualFaceAssignments(ctx, queries, assetID)
 	if err != nil {
 		return err
 	}
-	if err := s.cleanupAffectedClustersWithQueries(ctx, queries, affectedClusters); err != nil {
+	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID, repositoryFS)
+	if err != nil {
 		return err
 	}
 
@@ -297,8 +302,24 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 	if err := s.recognizePendingFacesForAssetWithQueries(ctx, queries, *asset, createdItems); err != nil {
 		return fmt.Errorf("recognize pending faces: %w", err)
 	}
+	reapplied, err := reapplyManualFaceAssignments(ctx, queries, manualAssignments, createdItems)
+	if err != nil {
+		return err
+	}
+	return s.cleanupAffectedClustersWithQueries(ctx, queries, uniqueClusterIDs(append(affectedClusters, reapplied...)))
+}
 
-	return nil
+func uniqueClusterIDs(ids []int32) []int32 {
+	seen := make(map[int32]bool, len(ids))
+	out := make([]int32, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 func largestFaceIndex(faces []types.Face) int {

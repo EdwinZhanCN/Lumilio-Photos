@@ -1,10 +1,15 @@
 import type { components } from "@/lib/http-commons/schema";
 
-type RepositoryRootDTO = components["schemas"]["dto.RepositoryRootDTO"];
+type StorageLocationViewDTO = components["schemas"]["dto.StorageLocationViewDTO"];
 type StorageDiagnosticDTO = components["schemas"]["dto.StorageDiagnosticDTO"];
 
 export type StorageLocationKind = "default" | "external" | "unknown";
 export type RepositoryRole = "primary" | "regular" | "unknown";
+
+export type AdmissionDecision = {
+  allowed: boolean;
+  reasons: readonly string[];
+};
 
 export type StorageLocationEntity = {
   entityType: "storage_location";
@@ -28,11 +33,13 @@ export type UnknownStorageEntity = {
 
 export type StorageEntity = StorageLocationEntity | RepositoryEntity | UnknownStorageEntity;
 
-export type StorageLocationOption = Omit<RepositoryRootDTO, "kind" | "name" | "path"> &
-  StorageLocationEntity;
+export type StorageLocationOption = Omit<StorageLocationViewDTO, "kind" | "name"> &
+  StorageLocationEntity & {
+    id: string;
+  };
 
-export type RepositoryRootsResponse = {
-  roots?: StorageLocationOption[];
+export type StorageLocationsResponse = {
+  storage_locations?: StorageLocationOption[];
 };
 
 export type StorageDiagnostic = Omit<StorageDiagnosticDTO, "kind" | "name" | "path" | "role"> &
@@ -43,30 +50,38 @@ export type StorageDiagnosticsResponse = {
   items?: StorageDiagnostic[];
 };
 
-export type RepositoryOption = RepositoryEntity & {
+export type RepositoryOption = {
+  entityType: "repository";
   id: string;
-  rootId: string;
-  /**
-   * Reachability of the repository's on-disk location. Offline and invalid
-   * repositories stay selectable as browse filters but are not upload targets.
-   */
-  reachability: RepositoryReachability;
-  /** Work is orthogonal to reachability and never hides an unavailable state. */
-  activity: RepositoryActivity;
-  pauseReason?: string;
+  rawName: string;
+  role: RepositoryRole;
+  read: AdmissionDecision;
+  upload: AdmissionDecision;
 };
 
-export type RepositoryReachability =
-  | "active"
+/**
+ * The identity a command needs to target one Repository. Commands that only
+ * name an existing Repository take this instead of {@link RepositoryOption}:
+ * admission is a Server fact served by `/storage/targets`, so a command must
+ * not carry locally invented eligibility.
+ */
+export type RepositoryRef = {
+  id: string;
+  rawName: string;
+  role: RepositoryRole;
+};
+
+/** Closed Server admission reasons plus local presentation fallbacks. */
+export type RepositoryAdmissionReason =
   | "offline"
   | "identity_error"
-  | "recovery_required"
-  | "maintenance";
+  | "read_only"
+  | "low_space"
+  | "paused"
+  | "busy"
+  | "recovery_required";
 
-export type RepositoryActivity = "idle" | "scanning" | "importing" | "processing" | "paused";
+export type RepositoryEffectiveState = "active" | RepositoryAdmissionReason | "blocked";
 
-export type RepositoryEffectiveState =
-  | RepositoryReachability
-  | "storage_location_offline"
-  | "storage_location_error"
-  | "storage_location_maintenance";
+/** @deprecated Use RepositoryEffectiveState. Kept as a public alias. */
+export type RepositoryReachability = RepositoryEffectiveState;

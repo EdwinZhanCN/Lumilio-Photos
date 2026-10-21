@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -16,8 +15,8 @@ type SQLExecutor interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
-// AssetOccurrenceParams describes one normalized catalog Asset and one active
-// physical Location. The user and repository rows must already exist.
+// AssetOccurrenceParams describes one normalized catalog Asset and its one
+// file entry. The user and repository rows must already exist.
 type AssetOccurrenceParams struct {
 	AssetID      uuid.UUID
 	RepositoryID uuid.UUID
@@ -29,23 +28,22 @@ type AssetOccurrenceParams struct {
 	FileSize     int64
 	UploadTime   int64
 	TakenTime    *int64
-	IsDeleted    bool
-	Status       string
-	ContentID    uuid.UUID
-	FullHash     string
+	// EntryState is the entry's state: present (the default), missing, or
+	// trashed. The Asset's lifecycle state is derived from it.
+	EntryState string
+	Status     string
+	ContentID  uuid.UUID
+	FullHash   string
 }
 
 type AssetOccurrence struct {
-	ContentID  uuid.UUID
-	RootNodeID uuid.UUID
-	NodeID     uuid.UUID
-	LocationID uuid.UUID
+	ContentID uuid.UUID
+	EntryID   uuid.UUID
 }
 
-// InsertAssetOccurrence seeds the normalized owner/content/Asset/node/
-// Location contract. It intentionally does not create repository observations:
-// the active occurrence projection requires the current node and binding, while
-// observation history belongs only in tests that exercise reconciliation.
+// InsertAssetOccurrence seeds the owner/content/Asset contract with one file
+// entry at the repository root, which is what the active occurrence
+// projection and the Asset's lifecycle state read.
 func InsertAssetOccurrence(
 	ctx context.Context,
 	database SQLExecutor,
@@ -75,6 +73,19 @@ func InsertAssetOccurrence(
 	if params.Status == "" {
 		params.Status = `{"state":"completed"}`
 	}
+	if params.EntryState == "" {
+		params.EntryState = "present"
+	}
+	var missingSince, trashID, trashedAt any
+	switch params.EntryState {
+	case "present":
+	case "missing":
+		missingSince = int64(1)
+	case "trashed":
+		trashID, trashedAt = uuid.NewString(), int64(1)
+	default:
+		return AssetOccurrence{}, fmt.Errorf("unsupported fixture entry state %q", params.EntryState)
+	}
 	if params.ContentID == uuid.Nil {
 		params.ContentID = uuid.New()
 	}
@@ -93,54 +104,54 @@ func InsertAssetOccurrence(
 	if _, err := database.ExecContext(ctx, `
 		INSERT INTO assets (
 			asset_id, owner_id, content_id, type, original_filename, mime_type,
-			upload_time, taken_time, is_deleted, status, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+			upload_time, taken_time, status, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 	`, params.AssetID, params.OwnerID, params.ContentID, params.AssetType,
 		params.Filename, params.MIMEType, params.UploadTime, params.TakenTime,
-		params.IsDeleted, params.Status); err != nil {
+		params.Status); err != nil {
 		return AssetOccurrence{}, fmt.Errorf("insert fixture asset: %w", err)
 	}
 
-	var rootNodeID uuid.UUID
-	err := database.QueryRowContext(ctx, `
-		SELECT node_id FROM repository_nodes
-		WHERE repository_id = ? AND parent_node_id IS NULL AND lifecycle = 'active'
-	`, params.RepositoryID).Scan(&rootNodeID)
-	if errors.Is(err, sql.ErrNoRows) {
-		rootNodeID = uuid.New()
-		if _, err := database.ExecContext(ctx, `
-			INSERT INTO repository_nodes (
-				node_id, repository_id, parent_node_id, name, name_key, kind,
-				observation_revision, created_at, updated_at
-			) VALUES (?, ?, NULL, '', '', 'directory', 1, 1, 1)
-		`, rootNodeID, params.RepositoryID); err != nil {
-			return AssetOccurrence{}, fmt.Errorf("insert fixture repository root node: %w", err)
-		}
-	} else if err != nil {
-		return AssetOccurrence{}, fmt.Errorf("load fixture repository root node: %w", err)
+	entryID := uuid.New()
+	if _, err := database.ExecContext(ctx, `
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, missing_since, trash_id,
+			trashed_at, revision, updated_at
+		) VALUES (?, ?, ?, lower(?), '', 'file', ?, 1, 1, ?, ?, ?, ?, ?, ?, 1, 1)
+	`, entryID, params.RepositoryID, params.NodeName, params.NodeName, params.FileSize,
+		params.EntryState, params.ContentID, params.AssetID, missingSince, trashID, trashedAt); err != nil {
+		return AssetOccurrence{}, fmt.Errorf("insert fixture repository entry: %w", err)
 	}
+	return AssetOccurrence{ContentID: params.ContentID, EntryID: entryID}, nil
+}
 
-	nodeID := uuid.New()
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, file_size, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, 'file', 2, ?, 1, 1)
-	`, nodeID, params.RepositoryID, rootNodeID, params.NodeName,
-		params.NodeName, params.FileSize); err != nil {
-		return AssetOccurrence{}, fmt.Errorf("insert fixture repository file node: %w", err)
+// EntryStateTrashedIf is the fixture entry state of an Asset that is in the
+// repository trash when trashed is set and active otherwise.
+func EntryStateTrashedIf(trashed bool) string {
+	if trashed {
+		return "trashed"
 	}
-	locationID := uuid.New()
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision,
-			created_at, updated_at
-		) VALUES (?, ?, ?, 2, 1, 1)
-	`, locationID, nodeID, params.AssetID); err != nil {
-		return AssetOccurrence{}, fmt.Errorf("insert fixture asset Location: %w", err)
+	return "present"
+}
+
+// SetAssetEntriesState moves every file entry of an Asset to present,
+// missing, or trashed, as a scan or the repository trash would; the Asset's
+// lifecycle state follows its entries.
+func SetAssetEntriesState(ctx context.Context, database SQLExecutor, assetID uuid.UUID, state string) error {
+	switch state {
+	case "present", "missing", "trashed":
+	default:
+		return fmt.Errorf("unsupported fixture entry state %q", state)
 	}
-	return AssetOccurrence{
-		ContentID: params.ContentID, RootNodeID: rootNodeID,
-		NodeID: nodeID, LocationID: locationID,
-	}, nil
+	_, err := database.ExecContext(ctx, `
+		UPDATE repository_entries
+		SET state = ?1,
+		    missing_since = CASE WHEN ?1 = 'missing' THEN 1 END,
+		    trash_id = CASE WHEN ?1 = 'trashed' THEN ?2 END,
+		    trashed_at = CASE WHEN ?1 = 'trashed' THEN 1 END,
+		    revision = revision + 1
+		WHERE asset_id = ?3 AND kind = 'file'
+	`, state, uuid.NewString(), assetID)
+	return err
 }

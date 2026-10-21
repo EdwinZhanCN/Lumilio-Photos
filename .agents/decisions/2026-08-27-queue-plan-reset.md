@@ -85,3 +85,8 @@ will be recreated as final evidence against the new contracts.
 Rejected because independent catalog and queue lifecycles are required for
 fault isolation, disposable queue recovery, and separate WAL/checkpoint
 telemetry. The split database is retained; the execution model is replaced.
+
+## 2026-10-07 update
+
+Radxa/N100 acceptance is now optional reference-hardware evidence, not a
+completion gate. See [lighter gates](2026-10-07-lighter-gates.md).

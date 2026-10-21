@@ -57,27 +57,13 @@ type RebuildAssetIndexesResponseDTO struct {
 	RepositoryID   *string  `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
-type IndexingRepositoryOptionDTO struct {
-	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name string `json:"name" example:"Family Repository"`
-	// Path is only populated for admin callers; repository filesystem
-	// locations are never exposed to regular users.
-	Path string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
-	Role string `json:"role" example:"regular"`
-	// RootID identifies the parent Storage Location so clients can derive an
-	// effective state with parent reachability taking priority.
-	RootID string `json:"root_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	// Reachability lets a selector keep an unreachable repository visible as a
-	// browse filter while refusing it as an upload target. Activity is separate
-	// so scanning never masks storage availability.
-	Reachability string `json:"reachability" example:"active"`
-	Activity     string `json:"activity" example:"idle"`
-	PauseReason  string `json:"pause_reason,omitempty" example:"low_space"`
-	IsPrimary    bool   `json:"is_primary" example:"false"`
-}
-
-type IndexingRepositoryListResponseDTO struct {
-	Repositories []IndexingRepositoryOptionDTO `json:"repositories"`
+// AssetIndexingRebuildStatusDTO reports one rebuild receipt. "completed" means
+// every page was requested and every enrichment stage it requested applied;
+// index coverage alone cannot distinguish that from an earlier rebuild.
+type AssetIndexingRebuildStatusDTO struct {
+	ReceiptID     string `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
+	State         string `json:"state" enums:"pending,completed,failed" example:"pending"`
+	TerminalError string `json:"terminal_error,omitempty" example:"attempts_exhausted"`
 }
 
 type AssetIndexingTaskStatsDTO struct {
@@ -244,29 +230,31 @@ type UploadOperationStatusResponseDTO struct {
 
 // AssetDTO represents an asset
 type AssetDTO struct {
-	AssetID              string                          `json:"asset_id"`
-	OwnerID              *int32                          `json:"owner_id"`
-	ContentID            string                          `json:"content_id"`
-	Type                 string                          `json:"type"`
-	OriginalFilename     string                          `json:"original_filename"`
-	MimeType             string                          `json:"mime_type"`
-	FileSize             *int64                          `json:"file_size,omitempty"`
-	Hash                 *string                         `json:"hash,omitempty"`
-	Width                *int32                          `json:"width"`
-	Height               *int32                          `json:"height"`
-	Duration             *float64                        `json:"duration"`
-	UploadTime           time.Time                       `json:"upload_time"`
-	TakenTime            *time.Time                      `json:"taken_time,omitempty"`
-	CaptureOffsetMinutes *int16                          `json:"capture_offset_minutes,omitempty"`
-	GPSLatitude          *float64                        `json:"gps_latitude,omitempty"`
-	GPSLongitude         *float64                        `json:"gps_longitude,omitempty"`
-	Rating               *int32                          `json:"rating,omitempty"`
-	Liked                *bool                           `json:"liked,omitempty"`
-	IsDeleted            *bool                           `json:"is_deleted"`
-	DeletedAt            *time.Time                      `json:"deleted_at,omitempty"`
-	Metadata             dbtypes.SpecificMetadata        `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
-	Status               []byte                          `json:"status"`
-	SpeciesPredictions   []dbtypes.SpeciesPredictionMeta `json:"species_predictions,omitempty"`
+	AssetID              string     `json:"asset_id"`
+	OwnerID              *int32     `json:"owner_id"`
+	ContentID            string     `json:"content_id"`
+	Type                 string     `json:"type"`
+	OriginalFilename     string     `json:"original_filename"`
+	MimeType             string     `json:"mime_type"`
+	FileSize             *int64     `json:"file_size,omitempty"`
+	Hash                 *string    `json:"hash,omitempty"`
+	Width                *int32     `json:"width"`
+	Height               *int32     `json:"height"`
+	Duration             *float64   `json:"duration"`
+	UploadTime           time.Time  `json:"upload_time"`
+	TakenTime            *time.Time `json:"taken_time,omitempty"`
+	CaptureOffsetMinutes *int16     `json:"capture_offset_minutes,omitempty"`
+	GPSLatitude          *float64   `json:"gps_latitude,omitempty"`
+	GPSLongitude         *float64   `json:"gps_longitude,omitempty"`
+	Rating               *int32     `json:"rating,omitempty"`
+	Liked                *bool      `json:"liked,omitempty"`
+	// LifecycleState is derived from the Asset's files: active while any is
+	// present, missing while any is missing, trashed when all are in the
+	// repository trash.
+	LifecycleState     string                          `json:"lifecycle_state" enums:"active,missing,trashed"`
+	Metadata           dbtypes.SpecificMetadata        `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
+	Status             []byte                          `json:"status"`
+	SpeciesPredictions []dbtypes.SpeciesPredictionMeta `json:"species_predictions,omitempty"`
 	// Stack fields (populated when stack mode is enabled)
 	Stack *StackPreviewDTO `json:"stack,omitempty"`
 }
@@ -485,11 +473,6 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	if a.UploadTime.Valid {
 		uploadTime = a.UploadTime.Time
 	}
-	var deletedAt *time.Time
-	if a.DeletedAt.Valid {
-		t := a.DeletedAt.Time
-		deletedAt = &t
-	}
 	var takenTime *time.Time
 	if a.TakenTime.Valid {
 		t := a.TakenTime.Time
@@ -516,7 +499,6 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		rating = &value
 	}
 	liked := a.Liked
-	isDeleted := a.IsDeleted
 	return AssetDTO{
 		AssetID:              id,
 		OwnerID:              a.OwnerID,
@@ -534,8 +516,7 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		GPSLongitude:         a.GpsLongitude,
 		Rating:               rating,
 		Liked:                &liked,
-		IsDeleted:            &isDeleted,
-		DeletedAt:            deletedAt,
+		LifecycleState:       a.LifecycleState,
 		Metadata:             a.SpecificMetadata,
 		Status:               a.Status,
 	}
@@ -685,6 +666,23 @@ type AssetFaceItemDTO struct {
 	ClusterName *string         `json:"cluster_name,omitempty"`
 }
 
+// assetFaceResultAggregate is the raw SQLite JSON shape of `face_result`:
+// timestamps are Unix microseconds and `is_primary` is a 0/1 integer, neither
+// of which decodes into the public DTO directly.
+type assetFaceResultAggregate struct {
+	ModelID          string                   `json:"model_id"`
+	TotalFaces       *int32                   `json:"total_faces,omitempty"`
+	ProcessingTimeMs *int32                   `json:"processing_time_ms,omitempty"`
+	CreatedAt        *int64                   `json:"created_at,omitempty"`
+	UpdatedAt        *int64                   `json:"updated_at,omitempty"`
+	Faces            []assetFaceItemAggregate `json:"faces"`
+}
+
+type assetFaceItemAggregate struct {
+	AssetFaceItemDTO
+	IsPrimary *int64 `json:"is_primary,omitempty"`
+}
+
 // AssetFaceResultDTO mirrors the `face_result` object produced by
 // GetAssetWithRelations when include_faces is requested.
 type AssetFaceResultDTO struct {
@@ -733,11 +731,6 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		t := r.TakenTime.Time
 		takenTime = &t
 	}
-	var deletedAt *time.Time
-	if r.DeletedAt.Valid {
-		t := r.DeletedAt.Time
-		deletedAt = &t
-	}
 	var width *int32
 	if r.Width != nil {
 		value := int32(*r.Width)
@@ -759,7 +752,6 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		rating = &value
 	}
 	liked := r.Liked
-	isDeleted := r.IsDeleted
 
 	base := AssetDTO{
 		AssetID:              id,
@@ -780,8 +772,7 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		GPSLongitude:         r.GpsLongitude,
 		Rating:               rating,
 		Liked:                &liked,
-		IsDeleted:            &isDeleted,
-		DeletedAt:            deletedAt,
+		LifecycleState:       r.LifecycleState,
 		Metadata:             r.SpecificMetadata,
 		Status:               r.Status,
 	}
@@ -827,9 +818,24 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		}
 	}
 	if inc.Faces {
-		var face AssetFaceResultDTO
-		if unmarshalJSONColumn(r.FaceResult, &face) {
-			detail.FaceResult = &face
+		var aggregate assetFaceResultAggregate
+		if unmarshalJSONColumn(r.FaceResult, &aggregate) {
+			faces := make([]AssetFaceItemDTO, len(aggregate.Faces))
+			for i, item := range aggregate.Faces {
+				faces[i] = item.AssetFaceItemDTO
+				if item.IsPrimary != nil {
+					primary := *item.IsPrimary != 0
+					faces[i].IsPrimary = &primary
+				}
+			}
+			detail.FaceResult = &AssetFaceResultDTO{
+				ModelID:          aggregate.ModelID,
+				TotalFaces:       aggregate.TotalFaces,
+				ProcessingTimeMs: aggregate.ProcessingTimeMs,
+				CreatedAt:        timeFromUnixMicro(aggregate.CreatedAt),
+				UpdatedAt:        timeFromUnixMicro(aggregate.UpdatedAt),
+				Faces:            faces,
+			}
 		}
 	}
 
@@ -1087,15 +1093,17 @@ type AssetFilterDTO struct {
 	Liked        *bool               `json:"liked,omitempty" example:"true"`
 	Filename     *FilenameFilterDTO  `json:"filename,omitempty"`
 	Date         *DateRangeDTO       `json:"date,omitempty"`
-	IsDeleted    *bool               `json:"is_deleted,omitempty" example:"false"`
-	CameraModel  *string             `json:"camera_model,omitempty" example:"Canon EOS R5"`
-	Lens         *string             `json:"lens,omitempty" example:"EF 50mm f/1.8"`
-	Location     *LocationBBoxDTO    `json:"location,omitempty"`
-	TagName      *string             `json:"tag_name,omitempty" example:"document"`
-	TagSource    *string             `json:"tag_source,omitempty" example:"zeroshot"`
-	TagNames     []string            `json:"tag_names,omitempty"`
-	PersonID     *int32              `json:"person_id,omitempty" example:"42"`
-	FolderPath   *string             `json:"folder_path,omitempty" example:"inbox/2026/05"`
+	// LifecycleState selects Assets in one lifecycle state; omitted means
+	// active. The Trash lists "trashed" and the Missing view "missing".
+	LifecycleState *string          `json:"lifecycle_state,omitempty" enums:"active,missing,trashed" example:"active"`
+	CameraModel    *string          `json:"camera_model,omitempty" example:"Canon EOS R5"`
+	Lens           *string          `json:"lens,omitempty" example:"EF 50mm f/1.8"`
+	Location       *LocationBBoxDTO `json:"location,omitempty"`
+	TagName        *string          `json:"tag_name,omitempty" example:"document"`
+	TagSource      *string          `json:"tag_source,omitempty" example:"zeroshot"`
+	TagNames       []string         `json:"tag_names,omitempty"`
+	PersonID       *int32           `json:"person_id,omitempty" example:"42"`
+	FolderPath     *string          `json:"folder_path,omitempty" example:"inbox/2026/05"`
 	// FolderRecursive controls whether FolderPath matches descendants (default true) or direct contents only.
 	FolderRecursive *bool `json:"folder_recursive,omitempty" example:"true"`
 }

@@ -1,9 +1,7 @@
 import React from "react";
 import {
   ArrowRight,
-  CheckCircle,
   Fingerprint,
-  FolderPlus,
   Globe,
   HardDrive,
   KeyRound,
@@ -16,7 +14,6 @@ import {
   User,
 } from "lucide-react";
 import { SUPPORTED_LANGUAGES } from "@/lib/i18n.tsx";
-import { StorageRiskConfirmation, StorageStrategyPicker } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   PASSWORD_HINT,
@@ -40,7 +37,7 @@ import {
   TotpSetupPanel,
   type StepperStep,
 } from "../../components/ui";
-import { repositoryNameErrorMessage } from "../../model/repositoryNameValidation.ts";
+import PrimarySetupPanel from "../primary-setup/PrimarySetupPanel.tsx";
 import { useBootstrapFlow } from "./useBootstrapFlow.ts";
 
 const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
@@ -83,19 +80,7 @@ const BootstrapFlow: React.FC = () => {
     setLanguage,
     region,
     setRegion,
-    repoName,
-    setRepoName,
-    repoNameError,
-    repoRoot,
-    storageStrategy,
-    setStorageStrategy,
-    placementRisks,
-    riskConfirmation,
-    setRiskConfirmation,
-    canSubmitRepo,
-    submitRepo,
-    repoError,
-    isCreatingRepository,
+    openDashboard,
   } = useBootstrapFlow();
 
   const appName = t("app.name", { defaultValue: "Lumilio Photos" });
@@ -486,83 +471,9 @@ const BootstrapFlow: React.FC = () => {
                       "The Primary Repository is the first concrete media unit inside the configured Default Storage Location.",
                   })}
                 />
-
-                {repoError && (
-                  <div className="mt-4">
-                    <InlineError>{repoError}</InlineError>
-                  </div>
-                )}
-
-                <form className="mt-5 flex flex-col gap-4" onSubmit={(e) => void submitRepo(e)}>
-                  <Field
-                    label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
-                    hint={t(
-                      "auth.primaryRepository.nameHint",
-                      "This display name can be changed later. The Primary Repository directory remains primary/.",
-                    )}
-                    error={
-                      repoName.length > 0 && repoNameError
-                        ? repositoryNameErrorMessage(repoNameError, t)
-                        : undefined
-                    }
-                  >
-                    <TextInput
-                      icon={FolderPlus}
-                      type="text"
-                      value={repoName}
-                      onChange={(e) => setRepoName(e.target.value)}
-                      disabled={isCreatingRepository}
-                      invalid={repoName.length > 0 && repoNameError !== null}
-                      required
-                    />
-                  </Field>
-
-                  <Field
-                    label={t("auth.primaryRepository.root", {
-                      defaultValue: "Default Storage Location",
-                    })}
-                    hint={t("auth.primaryRepository.rootHint", {
-                      defaultValue:
-                        "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
-                    })}
-                  >
-                    <TextInput
-                      icon={HardDrive}
-                      type="text"
-                      value={repoRoot}
-                      readOnly
-                      tabIndex={-1}
-                      className="bg-base-200 font-mono text-sm"
-                    />
-                  </Field>
-
-                  <StorageStrategyPicker
-                    value={storageStrategy}
-                    onChange={setStorageStrategy}
-                    disabled={isCreatingRepository}
-                    idPrefix="bootstrap-primary"
-                  />
-
-                  <StorageRiskConfirmation
-                    warnings={placementRisks}
-                    checked={riskConfirmation}
-                    onChange={setRiskConfirmation}
-                    disabled={isCreatingRepository}
-                  />
-
-                  <Btn
-                    type="submit"
-                    variant="neutral"
-                    icon={CheckCircle}
-                    loading={isCreatingRepository}
-                    disabled={!canSubmitRepo}
-                    className="self-start px-6"
-                  >
-                    {t("auth.bootstrap.repository.submit", {
-                      defaultValue: "Create Primary Repository & open dashboard",
-                    })}
-                  </Btn>
-                </form>
+                <div className="mt-5">
+                  <PrimarySetupPanel variant="bootstrap" onCompleted={openDashboard} />
+                </div>
               </div>
             )}
 

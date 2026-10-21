@@ -1,9 +1,29 @@
 # Architecture
 
-This is the compact system map for contributors. Keep details here stable and
-useful; implementation plans belong in `exec-plans/`.
+This is the compact system map: how Lumilio is delivered, which rules hold
+across every module, and where to look next. It deliberately does not list
+packages or describe their internals — that structure is derived from source
+and would drift if it were copied here.
 
-## Runtime Shape
+## Start with the Atlas
+
+The [Atlas](atlas/README.md) is the map of the code. Browse it with
+`task atlas` (an interactive explorer at <http://localhost:6690/atlas/>), or read the
+generated markdown under [`atlas/generated/`](atlas/generated/README.md):
+
+- **Architecture** — [system context](atlas/generated/architecture/system-context.md),
+  then the derived [Server](atlas/generated/architecture/server-groups.md),
+  [Desktop](atlas/generated/architecture/desktop-groups.md), and
+  [Web](atlas/generated/architecture/web-groups.md) group maps and one package
+  map per group. The group dependency rules live in
+  [`atlas/atlas.yaml`](atlas/atlas.yaml).
+- **Sequence, data flow, lifecycle** — authored views whose every element is
+  anchored to a real symbol, API operation, or table.
+- **Modules** — [module catalog](atlas/generated/modules.md): every Go package
+  and Web module with its group and one-line purpose. Each package's own
+  `doc.go` (Go) or `doc.ts` (Web features) is the full description.
+
+## Runtime shape
 
 - Docker production on Linux starts with `deploy/compose/compose.yml`, a
   zero-input host-network HTTP deployment at port 6680. Optional
@@ -18,161 +38,116 @@ useful; implementation plans belong in `exec-plans/`.
 - Published versions use `YY.TRAIN.PATCH[-beta.N|-rc.N]`. One tag on `main`
   builds every Desktop and Server artifact before creating the GitHub Release;
   its Server bundle pins the multi-architecture image by OCI digest.
-- Runtime state has three non-overlapping owners: frontend preferences in browser localStorage; runtime-mutable settings in the SQLite catalog through Settings/Setup APIs; and runtime-immutable process configuration in a complete schema-versioned TOML manifest.
-- First-run bootstrap (`fresh → catalog_ready → admin_created → ready`) is an orthogonal state machine. It observes owner and primary-repository gates; it is not a fourth configuration source.
+- Runtime state has three non-overlapping owners: frontend preferences in
+  browser localStorage; runtime-mutable settings in the SQLite catalog through
+  the Settings and Setup APIs; and runtime-immutable process configuration in a
+  complete schema-versioned TOML manifest.
+- First-run bootstrap (`fresh → catalog_ready → admin_created → ready`) is an
+  orthogonal state machine. It observes owner and primary-repository gates; it
+  is not a fourth configuration source. Atlas:
+  [bootstrap](atlas/generated/lifecycle/bootstrap.md).
 - `server/config/examples/` holds one complete manifest per deployment scenario
   (`dev/`, `desktop/`, `docker/`), generated from `server/config/profiles.go`.
   Because TOML comments cannot express conditional legality, a valid manifest
   per scenario is what documents the matrix; `task dev` renders `dev-vite`
   into `.local/dev/config/server.toml`. Container images ship complete
   `docker-http` and `docker-caddy` manifests; ACME and custom operator
-  manifests are generated into app-state by `server config init`. The
-  Desktop keeps a complete schema-v6 runtime intent and projects it through
-  the same strict `server/config` loader before calling `server/app`.
-- Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
+  manifests are generated into app-state by `server config init`. The Desktop
+  keeps a schema-versioned runtime intent and projects it through the same
+  strict `server/config` loader before calling `server/app`.
+- Standalone requires `--config <path>`. Ordinary environment variables never
+  override `AppConfig`; only CLI diagnostics and the explicit break-glass
+  whitelist are single-run host controls.
 
-## Backend
+## Cross-cutting invariants
 
-- `server/cmd/main.go`: thin entrypoint (flags, signals, break-glass env whitelist, strict manifest load) that calls `server/app`.
-- `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg, controls)`. It rejects configuration not produced by the strict loader.
-- `server/config`: leaf package exposing the runtime constructor
-  `LoadAppConfig(path)` plus a one-shot complete-manifest generator. It strictly
-  decodes schema v5, resolves manifest-relative paths and secret files,
-  validates the complete graph, and fingerprints the source bytes.
-- `server/internal/httporigin`: request-derived target/browser Origin policy
-  and trusted-proxy client-IP recovery.
-- `server/internal/servertransport`: plaintext and CertMagic ACME listener lifecycle.
-- `server/internal/api/router.go`: route map, auth boundaries, CORS.
-- `server/internal/api/handler`: HTTP request/response layer.
-- `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
-- `server/internal/processors`: read/compute stages for ingest, metadata,
-  derivatives, transcode, and enrichment. Background results are committed by
-  the shared coordinator rather than by processors themselves.
-- `server/internal/queue`: the River adapter, closed macro-job catalog, and
-  operational diagnostics. River is disposable control state, not product
-  truth.
-- Event topology is owner-wide and derived from logical `media_item` facts.
-  `source_revision`/`published_revision` and the shared Event resolver are the
-  lifecycle authority; repository Browse Scope is applied only as a read
-  projection.
-- Owner scope is explicit at topology boundaries: a generic administrator
-  asset browse may omit `OwnerID` to view the whole library, but an
-  owner-scoped topology such as Event must always carry its resolved owner into
-  downstream asset queries. `nil` must never be used to infer an Event owner.
-- `server/internal/storage`: RepositoryFS, repository layout/configuration,
-  staging, and the Repository Observation Engine (ROE). ROE persists a node
-  graph, resumable directory frontiers, native change cursors, revisioned
-  observations and Locations, and exact content identity. Its
-  `C0 → crawl → fixed C1 → dirty verification → finalize` protocol never
-  treats a watcher hint as absence authority.
-- Catalog migrations establish the current desired/applied pipeline state and
-  typed execution ledgers. QueueDB migrations are independent and may be
-  recreated without a catalog cutover or compatibility journal.
-- `server/internal/sourcing`: recoverable staged materialization for upload and
-  cloud flows. A committed source publishes the same node/content/Location
-  facts as repository observation.
-- `server/internal/db` and `server/migrations`: one physical catalog writer
-  plus four query-only WAL readers for product facts, and an independent
-  one-writer/four-reader QueueDB for disposable River macro-job control state.
-  Typed desired/applied records are the durable handoff. A bounded scheduler
-  derives disposable River work directly from those records. Catalog QoS is
-  projected into River priority metadata rather than serialized in job
-  arguments. Committed catalog writes wake the scheduler through a coalesced
-  process-local hint, while the periodic pass remains the recovery path; River
-  traffic never admits directly to the catalog writer.
-  Planning snapshots are short; filesystem, media, network, and unbounded CPU
-  work never occurs inside write transactions. Large atomic changes are
-  set-based and restartable derived projections publish in bounded,
-  revision-fenced turns. Automatic WAL checkpoints are disabled; one runtime
-  monitor observes writer wait/WAL growth and requests explicit passive
-  checkpoints through each database's sole writer. This boundary owns catalog
-  migrations and verified snapshots; QueueDB owns River migrations. The catalog
-  still owns FTS5 and the statically linked SQLite Vec1 semantic index.
-- `server/internal/db/catalogtx`: the closed, compile-time named transaction
-  and observed-connector boundary. It measures writer/reader admission,
-  bounded transaction/statement/cursor lifetimes, outcomes, cancellations,
-  and `DBStats` reconciliation. An AST inventory prevents raw transaction or
-  standalone writer escape hatches from reappearing in production code.
-- Foreground bootstrap/setup/status and repository-list requests are strictly
-  read-only. Incomplete bootstrap gates are derived through query-only readers;
-  repository reachability is a cached projection refreshed at boot and by the
-  portable background reconciler. HTTP reads never trigger reconciliation or
-  expiry writes merely to render current state.
-- The bounded Catalog scheduler derives outstanding work only from catalog
-  desired/applied state. It never inspects River state to decide whether
-  product work exists. River uniqueness covers active delivery states only, so
-  a discarded delivery can be re-created while Catalog still reports lag.
-- ROE claims bounded deterministic directory frontiers. Asset, repository, and
-  projection pipelines publish typed work identities, execute under one global
-  resource governor, and acknowledge background catalog results through the
-  bounded commit coordinator.
-- `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR
-  rows remain authoritative; a revision outbox feeds
-  `<sqlite-directory>/indexes/bleve/ocr-v1/`.
+These hold across packages, so no single `doc.go` owns them. Each is enforced
+by a gate or test where one is named.
 
-## Frontend
-
-- `web/ARCHITECTURE.md`: authoritative and boundary-enforced frontend ownership, feature vocabulary, dependency direction, and state-placement rules.
-- `web/src/features/*`: domain features. User journeys live in named `flows/`; reusable server access in `api/`; React-free rules and codecs in `model/`; cross-flow state or persistence in `state/`; isolated technical capabilities in `modules/`.
-- Feature route files are thin entries. Runtime imports between features go through the target feature's narrow `index.ts`, except the reviewed `assets/map` and `assets/picker` entries.
-- `web/src/lib/http-commons`: generated OpenAPI types and typed API client.
-- `web/src/contexts`: cross-cutting runtime capabilities and provider boundaries.
-- `web/src/components`: reusable UI components.
-- `web/src/wasm` and `web/src/workers`: checked-in `blake3`/`studio` browser bundles and worker entry points for compute-heavy paths.
-- `wasm/*`: Rust source crates for `blake3-wasm`, `studio-wasm`, `thumbnail-wasm`, and `export-wasm`.
-
-## Desktop
-
-- `desktop/`: Wails v3 tray host with a private React Settings window. `main.go`
-  only assembles services; `internal/host` owns Wails application/window/tray
-  adapters, while `internal/state` owns the immutable revisioned snapshot and
-  `internal/operation` owns request-id idempotency and aggregate mutation gates.
-- `internal/runtime` calls `server/app.Run` in-process and owns one guarded
-  Server generation. `RuntimeReady` and `RepositoryManagerReady` are the typed
-  readiness/Storage handoffs; Desktop never proves ownership by probing its own
-  HTTP listener. The product SPA remains in the system browser.
-- `internal/lumen` is an optional supervised child-process boundary with signed,
-  staged artifacts, an owner lock, parent-liveness contract, and platform
-  process-tree termination. Its install, desired, and process states remain
-  separate in the snapshot.
-- `internal/runtime/runtimeconfig`, `internal/resources`, and
-  `internal/update` use schema-versioned metadata, atomic files, fingerprints,
-  signatures, and explicit journals. `internal/storage` exposes only the typed
-  repository handoff and a discardable shortcut cache; no private HTTP bridge
-  exists.
-- Desktop onboarding materialises a complete candidate from the explicit
-  `desktop-local` profile, substitutes OS-owned paths, and runs the same strict
-  loader before exposing a small structured projection to React. Draft reads
-  and patches do not persist intent; Save/Apply is the only pointer-changing
-  boundary. The Settings UI is a sidebar-free Linear-style single column with
-  beUI controls and a six-destination Dock; full TOML is an optional Advanced
-  recovery surface, not a first-run requirement.
+- **The catalog is product truth.** One physical SQLite writer applies product
+  facts and desired/applied work state; bounded query-only WAL readers serve
+  foreground reads. River on QueueDB is disposable delivery state; deleting
+  QueueDB only delays work. Atlas:
+  [background work](atlas/generated/dataflow/background-work.md).
+- **No work inside write transactions.** Filesystem, media, network, hashing,
+  and unbounded CPU work happen before a transaction begins. Writer
+  transactions are named, bounded, and admitted through
+  `internal/db/catalogtx` (`task architecture:check` rejects raw ones).
+- **Background results have one writer.** Workers compute; the commit
+  coordinator alone applies their results and checks each result's fence.
+- **Foreground reads never write.** Bootstrap, setup, status, and storage read
+  models derive their answer through query-only readers; an HTTP read never
+  triggers reconciliation or expiry merely to render current state.
+- **Originals are never rewritten; deletion follows explicit lifecycle policy.**
+  A scan, watcher, or cloud sync never unlinks, trashes, or purges. An Asset exists exactly while
+  it has a repository entry; `lifecycle.PurgeEntriesTx` is the only Asset
+  hard-delete boundary, also used by repository removal (`task architecture:check`).
+  User Delete moves files into repository Trash; configured retention authorizes
+  expiry. Atlas:
+  [Asset lifecycle](atlas/generated/lifecycle/asset-lifecycle.md).
+- **Owner scope is explicit.** `owner_id` is the only hard partition;
+  repositories are unowned shared storage. Owner-scoped topology (Events)
+  always carries its resolved owner into downstream queries.
+- **Events contain photos and videos only.** Audio belongs in Music and never
+  influences Event segmentation, membership, counts, covers, or shares. See
+  [Event semantics](../server/internal/event/doc.go).
+- **ML and LLM are optional.** Media management, browsing, and non-semantic
+  search keep working when Lumen or an LLM provider is absent or failing.
+- **The Desktop App supervises, it does not reimplement.** It runs
+  `server/app.Run` in-process, learns readiness through typed handoffs rather
+  than probing its own HTTP listener, and keeps the product UI in the system
+  browser. Atlas: [Desktop runtime phase](atlas/generated/lifecycle/desktop-runtime.md).
+- **Web dependency direction.** `web/ARCHITECTURE.md` is the authoritative
+  frontend ownership and import-direction contract, enforced by
+  `web/scripts/check-source-boundaries.ts`; the Atlas Web group map is its
+  derived picture.
 
 ## Contracts
 
 - OpenAPI is the HTTP contract source of truth. Regeneration:
   [lumilio-api-contract-change](../.agents/skills/lumilio-api-contract-change/SKILL.md).
-- Do not hand-edit generated OpenAPI artifacts.
+  Do not hand-edit generated OpenAPI artifacts.
 - `storage.path` is registered at startup as the non-removable default Storage
   Location, identified by `.lumilioroot`; startup does not create repositories.
-  Web creation selects a registered `root_id`, while the Desktop Control Panel
-  alone can authorize host paths or attach `.lumiliorepo` directories.
-- The SQLite catalog, cloud sessions, secrets, logs, and database backups are app-private state and
-  must be configured outside `storage.path`. Repository staging remains inside
-  its repository under `.lumilio/staging`.
+  Authenticated setup creates the primary through
+  `POST /api/v1/setup/primary-repository`. Ordinary users choose upload targets
+  from `GET /api/v1/storage/targets` on `/manage`; administrators manage storage
+  from `/storage` via `GET /api/v1/storage/view` and admin-only
+  `/api/v1/storage/*` commands (create/open, verify, detach, native tasks,
+  diagnostics). Repository cloud bindings and stack detection remain on
+  `/api/v1/repositories/{id}/cloud*` and `/api/v1/repositories/{id}/stacks/detect`.
+  Admin creation selects a registered Storage Location by
+  `storage_location_id`; the Desktop control plane authorizes host paths, while
+  standalone/Docker attach existing `.lumiliorepo` directories through
+  `/api/v1/storage/candidates`.
+- The SQLite catalog, cloud sessions, secrets, logs, and database backups are
+  app-private state and must be configured outside `storage.path`. Repository
+  staging remains inside its repository under `.lumilio/staging`.
 - Registered repository I/O is rooted by `internal/storage.RepositoryFS` and
-  serialized against repository relocation/removal. Assets own logical
-  owner/content identity, not paths; versioned Locations bind them to
-  repository nodes. Durable jobs carry stable IDs and expected revisions.
-  Native codecs receive absolute filenames only through the explicit
-  local-path adapter after resolving an active Location.
-- ROE streams bounded directory pages including `inbox/` and excluding
-  `.lumilio/`. Healthy native cursors make unchanged passes independent of tree
-  size. Gaps, overflow, offline volumes, access errors, cancellation, and
-  incomplete coverage preserve existing Locations until an authoritative
-  caught-up child set proves absence.
+  serialized against repository relocation and removal. Assets own logical
+  owner/content identity, not paths; `repository_entries` binds files to
+  Assets. Durable jobs carry stable IDs and expected revisions. Native codecs
+  receive absolute filenames only through the explicit local-path adapter
+  after resolving a present entry.
+- The scan index walks every repository including `inbox/` and excluding
+  `.lumilio/`. Watcher events are hints; a full scan is the authority, and a
+  catalog row becomes missing only after a positive absence probe with the
+  repository marker re-checked. Atlas:
+  [repository scan](atlas/generated/sequence/repository-scan.md).
 - Full BLAKE3 plus size is immutable exact content identity. SQL uniqueness
-  enforces one Asset per owner/content pair and allows any number of active
-  Locations. Revisioned outbox consumers are leased, bounded, at-least-once,
-  and idempotent.
-- ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.
+  enforces one Asset per owner/content pair, which may have any number of
+  present entries. Revisioned outbox consumers are leased, bounded,
+  at-least-once, and idempotent.
+- Entry triggers derive Asset lifecycle: present or bound pending-hash wins as
+  active, then missing, then trashed. Offline is availability only; Missing and
+  Trash retain readable metadata. See [lifecycle](../server/internal/lifecycle/doc.go).
+- Delete preflights the whole selection before journaled, non-overwriting moves
+  into repository Trash. Restore keeps identity and metadata and chooses a free
+  sibling name. Startup recovery and hourly recovery, sidecar rebuild, and
+  expiry use required `repository_trash.retention_days` (generated configs: 30).
+  See [Trash](../server/internal/storage/trash/doc.go).
+- Permanent delete unlinks trashed files before purging entries; Remove missing
+  items touches no files. An Asset and its metadata disappear only after its
+  last entry is gone. Explicit irreversible API actions require `confirm: true`;
+  Repository-wide actions require an administrator. See
+  [HTTP lifecycle boundaries](../server/internal/api/handler/doc.go).

@@ -1,9 +1,6 @@
 import type { TFunction } from "i18next";
 
-export type ProviderTextResolver = (
-  key?: string,
-  params?: Record<string, string>,
-) => string;
+export type ProviderTextResolver = (key?: string, params?: Record<string, string>) => string;
 
 /**
  * Resolves backend-emitted i18n keys for cloud provider descriptors
@@ -22,18 +19,9 @@ export function createProviderTextResolver(t: TFunction): ProviderTextResolver {
       "cloudProvider.icloud.securityNote",
       "Lumilio Photos uses the password only during authentication and stores the resulting session in an isolated credential directory.",
     ),
-    "cloudProvider.icloud.field.username": t(
-      "cloudProvider.icloud.field.username",
-      "Apple ID",
-    ),
-    "cloudProvider.icloud.field.password": t(
-      "cloudProvider.icloud.field.password",
-      "Password",
-    ),
-    "cloudProvider.icloud.field.domain": t(
-      "cloudProvider.icloud.field.domain",
-      "Apple domain",
-    ),
+    "cloudProvider.icloud.field.username": t("cloudProvider.icloud.field.username", "Apple ID"),
+    "cloudProvider.icloud.field.password": t("cloudProvider.icloud.field.password", "Password"),
+    "cloudProvider.icloud.field.domain": t("cloudProvider.icloud.field.domain", "Apple domain"),
     "cloudProvider.icloud.option.domain.com": t(
       "cloudProvider.icloud.option.domain.com",
       "Global iCloud",
