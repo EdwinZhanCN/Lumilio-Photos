@@ -175,7 +175,7 @@ func TestCommandsAgreeWithTheActionPolicy(t *testing.T) {
 			return err
 		}},
 		{ActionReconnect, func(r repo.Repository) error {
-			_, err := f.manager.RelocateRepository(f.ctx, r.RepoID.String(), destination, LifecycleRequest{RequestID: "agree-reconnect-" + uuid.NewString(), Actor: "test"})
+			_, err := f.manager.ReconnectRepository(f.ctx, r.RepoID.String(), destination, LifecycleRequest{RequestID: "agree-reconnect-" + uuid.NewString(), Actor: "test"})
 			return err
 		}},
 	}
@@ -324,7 +324,7 @@ func TestRenameRefreshesTheLeasedRowAfterAReconnect(t *testing.T) {
 	<-parked
 	testHookBeforeRenameLease = nil
 	newPath := f.moveRepositoryTree(repository, location.Path)
-	if _, err := f.manager.RelocateRepository(f.ctx, repository.RepoID.String(), newPath,
+	if _, err := f.manager.ReconnectRepository(f.ctx, repository.RepoID.String(), newPath,
 		LifecycleRequest{RequestID: "reconnect-during-rename", Actor: "test"}); err != nil {
 		t.Fatal(err)
 	}

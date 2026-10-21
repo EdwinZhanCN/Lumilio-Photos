@@ -1,6 +1,6 @@
 ---
 title: "移动、复制与身份冲突"
-description: "使用可携带 UUID 区分同一存储或资源库的重定位与克隆。"
+description: "使用可携带 UUID 区分同一存储或资源库的重新连接与克隆。"
 page_id: "admin/identity-conflicts"
 audience: "管理员"
 platform: "Desktop、Server"
@@ -12,7 +12,7 @@ verification_status: "verified-with-todo"
 <!--
 code-evidence:
 - server/internal/storage/storage_locations.go
-- server/internal/storage/repo_relocate.go
+- server/internal/storage/repo_reconnect.go
 - server/internal/storage/repo_manager.go
 - server/app/repository_control.go
 - desktop/internal/runtime/repository.go
@@ -25,7 +25,7 @@ code-evidence:
 
 ## 移动
 
-原位置已经不再使用，身份应继续指向新路径。重定位保留数据库关系和资源库身份。
+原位置已经不再使用，身份应继续指向新路径。重新连接只重新指向登记信息，绝不移动文件，并保留数据库关系和资源库身份；只有在原登记文件夹确已不存在时才会提供，无法读取的文件夹不会被当作已不存在。
 
 ## 复制
 
@@ -38,7 +38,7 @@ code-evidence:
 3. 完整复制，包括隐藏标记与 `.lumilio/`。
 4. 决定旧位置是否继续存在。
 5. 尝试附加新路径并保留身份冲突信息。
-6. 只有在产品提供明确的“重定位”或“注册副本”控制后再选择对应动作。
+6. 只有在产品提供明确的“重新连接”或“注册副本”控制后再选择对应动作。
 7. 验证单个资源库后再恢复扫描。
 
 底层控制面已经实现两种动作，但当前 Desktop 适配器没有把冲突解决方法暴露给 UI，Web 也没有相应公共路由。手工删除或改写 UUID 可能绕过冲突检测并制造不可恢复的数据库映射，不能作为常规修复方法。

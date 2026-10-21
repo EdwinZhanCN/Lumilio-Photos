@@ -51,7 +51,7 @@ func seedRelocationScanState(t *testing.T, catalog *db.DB, repositoryID uuid.UUI
 	return entryID, runningScanID
 }
 
-func TestRelocateRepositorySucceedsWhenOriginalPathIsMissing(t *testing.T) {
+func TestReconnectRepositorySucceedsWhenOriginalPathIsMissing(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -112,7 +112,7 @@ func TestRelocateRepositorySucceedsWhenOriginalPathIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	relocated, err := manager.RelocateRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
+	relocated, err := manager.ReconnectRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
 		RequestID: "reconnect-missing-old-tx", Actor: "test", ConfirmationType: "update_location",
 	})
 	if err != nil {
@@ -137,7 +137,7 @@ func TestRelocateRepositorySucceedsWhenOriginalPathIsMissing(t *testing.T) {
 	}
 }
 
-func TestRelocateRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *testing.T) {
+func TestReconnectRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -189,7 +189,7 @@ func TestRelocateRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *testi
 		t.Fatal(err)
 	}
 
-	relocated, err := manager.RelocateRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
+	relocated, err := manager.ReconnectRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
 		RequestID: "reconnect-stale-activity-tx", Actor: "test", ConfirmationType: "update_location",
 	})
 	if err != nil {
@@ -200,7 +200,7 @@ func TestRelocateRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *testi
 	}
 }
 
-func TestRelocateRepositoryRescansAndForgetsVolumeFileIdentity(t *testing.T) {
+func TestReconnectRepositoryRescansAndForgetsVolumeFileIdentity(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -248,7 +248,7 @@ func TestRelocateRepositoryRescansAndForgetsVolumeFileIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := manager.RelocateRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
+	if _, err := manager.ReconnectRepository(ctx, created.Repository.RepoID.String(), newPath, LifecycleRequest{
 		RequestID: "reconnect-fence-tx", Actor: "test", ConfirmationType: "update_location",
 	}); err != nil {
 		t.Fatal(err)

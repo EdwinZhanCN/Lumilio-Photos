@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"server/internal/db/dbtypes"
@@ -24,7 +25,7 @@ func (rm *DefaultRepositoryManager) AcquireRuntimeStorageOwnership(ctx context.C
 		return nil, fmt.Errorf("runtime storage ownership is already active")
 	}
 	rm.ownershipOn = true
-	rm.ownership = make(map[string]func())
+	rm.ownership = make(map[string]runtimeOwnership)
 	rm.ownershipMu.Unlock()
 
 	repositories, err := rm.queries.ListRepositories(ctx)
@@ -79,6 +80,22 @@ func existingDirectory(path string) bool {
 	return err == nil && info.IsDir()
 }
 
+// runtimeOwnership is one held runtime lock: its release and the identity
+// of the lock file it holds, so a tree that moves on disk while the lock is
+// held (an external rename or remount before a reconnect) is recognized at
+// its new path instead of contending with this process's own lock.
+type runtimeOwnership struct {
+	release func()
+	lock    os.FileInfo
+}
+
+func runtimeLockPath(kind, path string) string {
+	if kind == "storage_location" {
+		return filepath.Join(path, ".lumilioroot.lock")
+	}
+	return filepath.Join(path, ".lumiliorepo.lock")
+}
+
 func (rm *DefaultRepositoryManager) claimRuntimeStoragePath(ctx context.Context, kind, path string) error {
 	key := kind + ":" + path
 	rm.ownershipMu.Lock()
@@ -89,24 +106,37 @@ func (rm *DefaultRepositoryManager) claimRuntimeStoragePath(ctx context.Context,
 	if _, exists := rm.ownership[key]; exists {
 		return nil
 	}
+	lockPath := runtimeLockPath(kind, path)
+	// The lock file at the new path may be the very file this process already
+	// holds, carried along by the move of its tree. Advisory locks are held
+	// per open file, so re-locking it would refuse our own ownership; the
+	// held ownership follows the tree instead.
+	if info, err := os.Stat(lockPath); err == nil {
+		for heldKey, held := range rm.ownership {
+			if held.lock == nil || !strings.HasPrefix(heldKey, kind+":") || !os.SameFile(held.lock, info) {
+				continue
+			}
+			delete(rm.ownership, heldKey)
+			rm.ownership[key] = held
+			rm.logger.Info("runtime ownership followed a moved tree",
+				zap.String("kind", kind), zap.String("from", strings.TrimPrefix(heldKey, kind+":")), zap.String("to", path))
+			return nil
+		}
+	}
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 	}
-	var (
-		release func()
-		err     error
-	)
-	if kind == "storage_location" {
-		release, err = rm.locks().Acquire(ctx, filepath.Join(path, ".lumilioroot.lock"), true)
-	} else {
-		release, err = rm.locks().Acquire(ctx, filepath.Join(path, ".lumiliorepo.lock"), true)
-	}
+	release, err := rm.locks().Acquire(ctx, lockPath, true)
 	if err != nil {
 		return fmt.Errorf("claim runtime %s ownership for %s: %w", kind, path, err)
 	}
-	rm.ownership[key] = release
+	held := runtimeOwnership{release: release}
+	if info, statErr := os.Stat(lockPath); statErr == nil {
+		held.lock = info
+	}
+	rm.ownership[key] = held
 	return nil
 }
 
@@ -119,7 +149,7 @@ func (rm *DefaultRepositoryManager) releaseRuntimeStorageOwnership() {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 	for _, key := range keys {
-		rm.ownership[key]()
+		rm.ownership[key].release()
 	}
 	rm.ownership = nil
 	rm.ownershipOn = false

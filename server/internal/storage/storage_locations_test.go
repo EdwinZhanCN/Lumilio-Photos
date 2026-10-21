@@ -134,7 +134,7 @@ func TestEnsureDefaultStorageLocationSwitchesOnlyToMovedIdentityWithFixedPrimary
 	}
 }
 
-func TestRelocateStorageLocationRejectsOnlineOriginalIdentity(t *testing.T) {
+func TestReconnectStorageLocationRejectsOnlineOriginalIdentity(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -157,13 +157,10 @@ func TestRelocateStorageLocationRejectsOnlineOriginalIdentity(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(copyPath, ".lumilioroot"), marker, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.RelocateStorageLocation(ctx, storageLocation.StorageLocationID.String(), copyPath); err == nil {
-		t.Fatal("relocate accepted a duplicate storageLocation while the registered original remained online")
-	} else {
-		var conflict *StorageLocationConflictError
-		if !errors.As(err, &conflict) || len(conflict.Actions) != 0 {
-			t.Fatalf("online-original error = %T %v", err, err)
-		}
+	if _, err := manager.ReconnectStorageLocation(ctx, storageLocation.StorageLocationID.String(), copyPath); err == nil {
+		t.Fatal("reconnect accepted a duplicate Storage Location while the registered original remained online")
+	} else if !errors.Is(err, ErrStorageLocationOriginalOnline) {
+		t.Fatalf("online-original error = %T %v, want ErrStorageLocationOriginalOnline", err, err)
 	}
 }
 
@@ -206,7 +203,7 @@ func TestRecoverLifecycleOperationsRollsForwardInterruptedRootRelocate(t *testin
 	}
 	targetID := storageLocation.StorageLocationID.String()
 	operation, _, err := manager.beginLifecycleOperation(ctx, lifecycleBeginInput{
-		RequestID: "interrupted-storageLocation-relocate", Kind: lifecycleKindRelocateStorage,
+		RequestID: "interrupted-storageLocation-relocate", Kind: lifecycleKindReconnectStorage,
 		Payload: switchDefaultStorageOperationPayload{StorageLocationID: storageLocation.StorageLocationID.String(), OldPath: storageLocation.Path, NewPath: canonicalNewPath},
 		Actor:   "test", TargetType: "storage_location", TargetID: &targetID,
 	})

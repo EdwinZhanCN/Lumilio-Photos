@@ -41,6 +41,19 @@ const storageViewFixture = {
       kind: "default",
       repository_count: 2,
       can_remove: false,
+      actions: [],
+      unavailable_actions: [
+        {
+          action: "reconnect",
+          blockers: ["default_protected"],
+          alternatives: ["default_configuration"],
+        },
+        {
+          action: "detach",
+          blockers: ["default_protected"],
+          alternatives: ["default_configuration"],
+        },
+      ],
     },
     {
       id: "loc-archive",
@@ -48,6 +61,11 @@ const storageViewFixture = {
       kind: "external",
       repository_count: 2,
       can_remove: false,
+      actions: [],
+      unavailable_actions: [
+        { action: "reconnect", blockers: ["original_available"], alternatives: [] },
+        { action: "detach", blockers: ["registered_repositories"], alternatives: [] },
+      ],
     },
     {
       id: "loc-scratch",
@@ -55,6 +73,10 @@ const storageViewFixture = {
       kind: "external",
       repository_count: 0,
       can_remove: true,
+      actions: ["detach"],
+      unavailable_actions: [
+        { action: "reconnect", blockers: ["original_available"], alternatives: [] },
+      ],
     },
   ],
   repositories: [
@@ -867,7 +889,7 @@ test("a withheld native reconnect shows the policy blocker, not a generic failur
     })
     .click();
   await screen
-    .getByRole("menuitem", { name: t("storagePanel.action.locate"), exact: true })
+    .getByRole("menuitem", { name: t("storagePanel.action.reconnect"), exact: true })
     .click();
   await screen
     .getByRole("button", { name: t("manage.repositories.hostAction.send"), exact: true })
@@ -886,6 +908,129 @@ test("a withheld native reconnect shows the policy blocker, not a generic failur
       }),
     )
     .toBeVisible();
+});
+
+// R9: an external Storage Location on a Desktop host carries its direct
+// Reconnect entry. While the Server withholds it the entry is disabled and
+// carries the Server's reason, so the prerequisite is visible; the Default
+// Storage Location never offers it.
+test("a withheld Storage Location Reconnect shows the Server's reason on the entry", async () => {
+  mockStoragePanelApis();
+  mockNativeTask({ kind: "locate_storage_location", status: "pending" });
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+  await expect.element(screen.getByText("Family Archive", { exact: true })).toBeVisible();
+
+  await screen
+    .getByRole("button", {
+      name: t("storagePanel.locationActions", {
+        defaultValue: "Actions for {{name}}",
+        name: "Archive Disk",
+      }),
+      exact: true,
+    })
+    .click();
+  const reconnect = screen.getByRole("menuitem", {
+    name: t("storagePanel.action.reconnectLocation", {
+      defaultValue: "Reconnect Storage Location",
+    }),
+    exact: true,
+  });
+  await expect.element(reconnect).toBeDisabled();
+  expect(reconnect.element().closest("li")?.getAttribute("data-tip")).toBe(
+    t("apiErrors.storage.actionUnavailable.originalAvailable"),
+  );
+
+  await screen
+    .getByRole("button", {
+      name: t("storagePanel.locationActions", {
+        defaultValue: "Actions for {{name}}",
+        name: t("productTerms.defaultStorageLocation"),
+      }),
+      exact: true,
+    })
+    .click();
+  await expect
+    .element(
+      screen.getByRole("menuitem", {
+        name: t("storagePanel.action.removeLocation", { defaultValue: "Remove Storage Location" }),
+        exact: true,
+      }),
+    )
+    .toBeVisible();
+  await expect
+    .element(
+      screen.getByRole("menuitem", {
+        name: t("storagePanel.action.reconnectLocation", {
+          defaultValue: "Reconnect Storage Location",
+        }),
+        exact: true,
+      }),
+    )
+    .not.toBeInTheDocument();
+});
+
+// R9: when the Server reports the Location's original as positively
+// unavailable, the entry is live and starts a locate_storage_location task
+// for exactly that Location, with the Reconnect wording on the request.
+test("an unavailable external Storage Location reconnects through a native Location task", async () => {
+  mockStoragePanelApis();
+  worker.use(
+    http.get("*/api/v1/storage/view", () =>
+      HttpResponse.json({
+        ...storageViewFixture,
+        storage_locations: storageViewFixture.storage_locations.map((location) =>
+          location.id === "loc-archive"
+            ? {
+                ...location,
+                actions: ["reconnect"],
+                unavailable_actions: [
+                  { action: "detach", blockers: ["registered_repositories"], alternatives: [] },
+                ],
+              }
+            : location,
+        ),
+      }),
+    ),
+  );
+  const native = mockNativeTask({ kind: "locate_storage_location", status: "pending" });
+  await page.viewport(1280, 1000);
+  const screen = await renderWithProviders(<StoragePanel />);
+  await expect.element(screen.getByText("Family Archive", { exact: true })).toBeVisible();
+
+  await screen
+    .getByRole("button", {
+      name: t("storagePanel.locationActions", {
+        defaultValue: "Actions for {{name}}",
+        name: "Archive Disk",
+      }),
+      exact: true,
+    })
+    .click();
+  const reconnect = screen.getByRole("menuitem", {
+    name: t("storagePanel.action.reconnectLocation", {
+      defaultValue: "Reconnect Storage Location",
+    }),
+    exact: true,
+  });
+  await expect.element(reconnect).toBeEnabled();
+  await reconnect.click();
+  await expect
+    .element(
+      screen.getByRole("heading", {
+        name: t("manage.repositories.hostAction.locateLocation"),
+        exact: true,
+      }),
+    )
+    .toBeVisible();
+  await screen
+    .getByRole("button", { name: t("manage.repositories.hostAction.send"), exact: true })
+    .click();
+  await expect.poll(() => native.created.length).toBe(1);
+  expect(native.created[0]?.body).toMatchObject({
+    kind: "locate_storage_location",
+    storage_location_id: "loc-archive",
+  });
 });
 
 type RecoveryResponse = components["schemas"]["dto.RepositoryRecoveryDTO"];

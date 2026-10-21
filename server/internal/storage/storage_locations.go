@@ -33,6 +33,11 @@ var (
 // StorageLocationConflictError reports a portable .lumilioroot identity that is
 // already registered at another path. The host must not infer whether the
 // directory moved or was copied.
+// ErrStorageLocationOriginalOnline reports that the registered Storage
+// Location is still online at its registered path, so there is nothing to
+// reconnect; a same-identity tree elsewhere is a copy, never a move.
+var ErrStorageLocationOriginalOnline = errors.New("registered storage location is still online at its original path")
+
 type StorageLocationConflictError struct {
 	StorageLocationID string
 	RegisteredPath    string
@@ -221,7 +226,7 @@ func (rm *DefaultRepositoryManager) switchDefaultStorageLocation(
 	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseFilesystemApplied, nil); err != nil {
 		return nil, err
 	}
-	storageLocation, err := rm.relocateStorageLocation(ctx, existing.StorageLocationID.String(), newPath, true)
+	storageLocation, err := rm.reconnectStorageLocation(ctx, existing.StorageLocationID.String(), newPath, true)
 	if err != nil {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, false, err, nil)
 		return nil, err
@@ -545,10 +550,12 @@ func (rm *DefaultRepositoryManager) AddStorageLocation(ctx context.Context, path
 	return registered, nil
 }
 
-// RelocateStorageLocation reconnects an existing external Storage Location at
-// a new native-host-authorized path. The marker at the requested path must
-// carry the registered identity; this never rewrites or guesses identity.
-func (rm *DefaultRepositoryManager) RelocateStorageLocation(ctx context.Context, id, path string, requests ...LifecycleRequest) (*repo.StorageLocation, error) {
+// ReconnectStorageLocation re-points an existing external Storage Location,
+// and every child Repository with it, at the tree that now carries its
+// identity after an external move or remount. The marker at the requested
+// path must carry the registered identity; this never rewrites or guesses
+// identity and never moves data.
+func (rm *DefaultRepositoryManager) ReconnectStorageLocation(ctx context.Context, id, path string, requests ...LifecycleRequest) (*repo.StorageLocation, error) {
 	storageLocationID, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
 		return nil, fmt.Errorf("invalid storage location id: %w", err)
@@ -564,21 +571,36 @@ func (rm *DefaultRepositoryManager) RelocateStorageLocation(ctx context.Context,
 	targetID := storageLocationID.String()
 	request := firstLifecycleRequest(requests)
 	oldPath := registered.Path
+	replaying := false
 	if requestID := strings.TrimSpace(request.RequestID); requestID != "" {
 		if existing, lookupErr := rm.queries.GetLifecycleOperationByRequestID(ctx, requestID); lookupErr == nil {
 			var existingPayload switchDefaultStorageOperationPayload
-			if existing.Kind != lifecycleKindRelocateStorage || json.Unmarshal(existing.Payload, &existingPayload) != nil ||
+			if existing.Kind != lifecycleKindReconnectStorage || json.Unmarshal(existing.Payload, &existingPayload) != nil ||
 				existingPayload.StorageLocationID != storageLocationID.String() || existingPayload.NewPath != cleanPath {
 				return nil, ErrLifecycleRequestConflict
 			}
 			oldPath = existingPayload.OldPath
+			replaying = true
 		} else if !errors.Is(lookupErr, sql.ErrNoRows) {
-			return nil, fmt.Errorf("find Storage Location relocate request: %w", lookupErr)
+			return nil, fmt.Errorf("find Storage Location reconnect request: %w", lookupErr)
+		}
+	}
+	// The kind-aware policy on the projected row, before the destination is
+	// looked at: the Default Storage Location is never reconnected on its
+	// own, and a registered path that cannot be read admits nothing. A
+	// replay skips it; its row is already at the new path.
+	if !replaying && registered.Path != cleanPath {
+		if err := rm.admitStorageLocationAction(ctx, registered, LocationActionReconnect); err != nil {
+			var unavailable *StorageLocationActionUnavailableError
+			if errors.As(err, &unavailable) && len(unavailable.Blockers) == 1 && unavailable.Blockers[0] == BlockerOriginalAvailable {
+				return nil, fmt.Errorf("%w: %s", ErrStorageLocationOriginalOnline, registered.Path)
+			}
+			return nil, err
 		}
 	}
 	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
 		RequestID: request.RequestID,
-		Kind:      lifecycleKindRelocateStorage,
+		Kind:      lifecycleKindReconnectStorage,
 		Payload:   switchDefaultStorageOperationPayload{StorageLocationID: storageLocationID.String(), OldPath: oldPath, NewPath: cleanPath},
 		Actor:     request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
 		TargetType: "storage_location", TargetID: &targetID,
@@ -593,7 +615,7 @@ func (rm *DefaultRepositoryManager) RelocateStorageLocation(ctx context.Context,
 		storageLocation, err := rm.queries.GetStorageLocation(ctx, storageLocationID)
 		return &storageLocation, err
 	}
-	storageLocation, err := rm.relocateStorageLocation(ctx, id, cleanPath, false)
+	storageLocation, err := rm.reconnectStorageLocation(ctx, id, cleanPath, false)
 	if err != nil {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, false, err, nil)
 		return nil, err
@@ -604,7 +626,7 @@ func (rm *DefaultRepositoryManager) RelocateStorageLocation(ctx context.Context,
 	return storageLocation, nil
 }
 
-func (rm *DefaultRepositoryManager) relocateStorageLocation(ctx context.Context, id, path string, allowDefault bool) (*repo.StorageLocation, error) {
+func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context, id, path string, allowDefault bool) (*repo.StorageLocation, error) {
 	storageLocationID, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
 		return nil, fmt.Errorf("invalid storage location id: %w", err)
@@ -626,13 +648,20 @@ func (rm *DefaultRepositoryManager) relocateStorageLocation(ctx context.Context,
 		return nil, err
 	}
 	if config.ID != storageLocationID.String() {
-		return nil, fmt.Errorf("%w: selected directory has a different .lumilioroot identity", ErrStorageLocationInvalid)
+		return nil, fmt.Errorf("%w: %w: selected directory has a different .lumilioroot identity", ErrStorageLocationInvalid, ErrRepositoryIDMismatch)
 	}
 	if registered.Path != cleanPath {
-		if originalConfig, originalErr := rm.identities().LoadLocation(registered.Path); originalErr == nil && originalConfig.ID == storageLocationID.String() {
-			return nil, &StorageLocationConflictError{
-				StorageLocationID: storageLocationID.String(), RegisteredPath: registered.Path, RequestedPath: cleanPath,
-				Actions: []string{},
+		// The registered path decides under the barrier: an original that is
+		// online is a conflict, and one that cannot be read authorizes
+		// nothing. Only a positively unavailable original is reconnected.
+		switch rm.storageLocationOriginalState(registered.Path, storageLocationID.String()) {
+		case OriginalOnline:
+			return nil, fmt.Errorf("%w: %s", ErrStorageLocationOriginalOnline, registered.Path)
+		case OriginalInaccessible:
+			return nil, &StorageLocationActionUnavailableError{
+				StorageLocationID: storageLocationID.String(), Action: LocationActionReconnect,
+				Blockers:     []RepositoryActionBlocker{BlockerOriginalInaccessible},
+				Alternatives: []RepositoryActionAlternative{AlternativeCheckAccess},
 			}
 		}
 	}
@@ -671,12 +700,15 @@ func (rm *DefaultRepositoryManager) relocateStorageLocation(ctx context.Context,
 		if moveErr != nil {
 			return nil, moveErr
 		}
+		// Every child must be where the Location layout says it is, carrying
+		// its registered identity; one that is missing or different refuses
+		// the whole reconnect before any row changes.
 		repositoryConfig, loadErr := rm.identities().LoadRepository(requestedRepositoryPath)
 		if loadErr != nil {
-			return nil, fmt.Errorf("validate repository after Storage Location move: %w", loadErr)
+			return nil, fmt.Errorf("%w: %w: %s does not hold repository %s: %v", ErrStorageLocationInvalid, ErrRepositoryIDMismatch, requestedRepositoryPath, repository.RepoID, loadErr)
 		}
 		if repositoryConfig.ID != repository.RepoID.String() {
-			return nil, fmt.Errorf("%w: repository identity differs at %s", ErrStorageLocationInvalid, requestedRepositoryPath)
+			return nil, fmt.Errorf("%w: %w: repository identity differs at %s", ErrStorageLocationInvalid, ErrRepositoryIDMismatch, requestedRepositoryPath)
 		}
 		if occupying, findErr := rm.queries.GetRepositoryByPath(ctx, requestedRepositoryPath); findErr == nil && occupying.RepoID != repository.RepoID {
 			return nil, fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, requestedRepositoryPath)

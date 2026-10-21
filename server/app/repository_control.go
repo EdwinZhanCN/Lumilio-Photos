@@ -137,7 +137,7 @@ func (c *repositoryControl) AddStorageLocation(ctx context.Context, requestID, p
 }
 
 func (c *repositoryControl) ResolveStorageLocationConflict(ctx context.Context, storageLocationID, path string) (StorageLocationInfo, error) {
-	storageLocation, err := c.manager.RelocateStorageLocation(ctx, storageLocationID, path, desktopLifecycleRequest("", "update_location", true))
+	storageLocation, err := c.manager.ReconnectStorageLocation(ctx, storageLocationID, path, desktopLifecycleRequest("", "update_location", true))
 	if err != nil {
 		return StorageLocationInfo{}, err
 	}
@@ -181,7 +181,7 @@ func (c *repositoryControl) ResolveRepositoryConflict(ctx context.Context, actio
 		if len(requestIDs) > 0 {
 			requestID = requestIDs[0]
 		}
-		repository, err = c.manager.RelocateRepository(ctx, repositoryID, path,
+		repository, err = c.manager.ReconnectRepository(ctx, repositoryID, path,
 			desktopLifecycleRequest(requestID, "update_location", true))
 	case "copy":
 		var ownerID *int32

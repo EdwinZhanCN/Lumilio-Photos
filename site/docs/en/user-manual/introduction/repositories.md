@@ -66,7 +66,7 @@ The primary repository is the exception: first-run setup creates it in the non-r
 
 If that repository identity is already registered at another path, Desktop asks you to decide explicitly:
 
-- **Use as moved original** when the repository moved to another disk, mount point, or Windows drive letter. Relocation is refused while the registered original is still online.
+- **Use as moved original** when the repository moved to another disk, mount point, or Windows drive letter. This is a Reconnect: it re-points the registration and never moves files. It is refused while the registered original is still online, and a registered folder that Lumilio cannot read is never treated as gone.
 - **Add as separate repository** when this directory is an independent copy that needs a new identity. Lumilio preserves the copied private state the same way, mints a fresh repository UUID, and requires explicit confirmation.
 
 Lumilio does not guess whether a directory moved or was copied based on whether its old path is currently online.
@@ -75,7 +75,7 @@ Lumilio does not guess whether a directory moved or was copied based on whether 
 
 When an external drive or network volume disconnects, its Storage Location and Repositories become offline. Lumilio preserves their identity, browsing records, and valid Locations, but refuses writes and absence finalization until they reconnect. It does not silently create a replacement directory on another disk.
 
-If the same `.lumilioroot` appears at a new mount path or drive letter, choose **Reconnect Storage Location** in Web and approve the local Desktop request. Child repository paths are updated while preserving their relative layout.
+If the same `.lumilioroot` appears at a new mount path or drive letter, choose **Reconnect Storage Location** from that Storage Location's menu on the Web Storage page (offered on a Desktop host; while the registered folder is still there the entry is disabled with the reason) and approve the local Desktop request. Every child Repository must be where the Location layout says it is, carrying its own identity; then the Location and all its children are re-pointed together, and nothing is moved. A single moved Repository uses **Reconnect** in its own row menu the same way.
 
 Removing an unused external Storage Location only removes its registration. It does not delete its directory, marker, or media. A location still referenced by registered repositories cannot be removed.
 
@@ -83,7 +83,7 @@ Removing a regular repository from Lumilio is also registration-only. The confir
 
 ## Docker and standalone Server candidates
 
-Docker and standalone Server have one configured default Storage Location. Web can inspect only its direct child directories and classifies each as registered, ready to open, empty and writable, non-empty without a marker, invalid marker, or identity conflict. An identity conflict offers the same explicit **Use as moved original** and **Add as separate repository** decisions as Desktop; relocation remains unavailable while the registered original is online. The API accepts a portable directory name, never an arbitrary server path.
+Docker and standalone Server have one configured default Storage Location. Web can inspect only its direct child directories and classifies each as registered, ready to open, empty and writable, non-empty without a marker, invalid marker, or identity conflict. An identity conflict offers the same explicit **Use as moved original** and **Add as separate repository** decisions as Desktop; Reconnect remains unavailable while the registered original is online. The API accepts a portable directory name, never an arbitrary server path.
 
 Use Compose long syntax for host directories and disable automatic source creation:
 

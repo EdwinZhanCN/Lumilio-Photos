@@ -179,7 +179,7 @@ func (rm *DefaultRepositoryManager) ResolveDefaultRepositoryCandidate(
 	switch strings.TrimSpace(resolution) {
 	case "update_location":
 		request.ConfirmationType = "update_location"
-		updated, relocateErr := rm.RelocateRepository(ctx, registered.RepoID.String(), path, request)
+		updated, relocateErr := rm.ReconnectRepository(ctx, registered.RepoID.String(), path, request)
 		if relocateErr != nil {
 			return nil, relocateErr
 		}

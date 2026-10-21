@@ -764,10 +764,14 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 // Anything else falls through to the caller.
 func writeRepositoryCommandFailure(c *gin.Context, err error) bool {
 	var unavailable *storage.RepositoryActionUnavailableError
+	var locationUnavailable *storage.StorageLocationActionUnavailableError
 	switch {
 	case errors.As(err, &unavailable):
 		api.WriteProblem(c, problem.NewStorageActionUnavailable(err, string(unavailable.Action),
 			storage.BlockerCodes(unavailable.Blockers), storage.AlternativeCodes(unavailable.Alternatives)))
+	case errors.As(err, &locationUnavailable):
+		api.WriteProblem(c, problem.NewStorageActionUnavailable(err, string(locationUnavailable.Action),
+			storage.BlockerCodes(locationUnavailable.Blockers), storage.AlternativeCodes(locationUnavailable.Alternatives)))
 	case errors.Is(err, storage.ErrLifecycleRequestConflict):
 		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 	case errors.Is(err, storage.ErrLifecycleOperationRunning), errors.Is(err, storage.ErrRepositoryBusy):
@@ -778,7 +782,7 @@ func writeRepositoryCommandFailure(c *gin.Context, err error) bool {
 		api.WriteProblem(c, api.KnownProblem(problem.StorageIdentityMismatch, err))
 	case errors.Is(err, storage.ErrLifecycleRecoveryRequired):
 		api.WriteProblem(c, api.KnownProblem(problem.StorageRecoveryRequired, err))
-	case errors.Is(err, storage.ErrRepositoryOriginalOnline):
+	case errors.Is(err, storage.ErrRepositoryOriginalOnline), errors.Is(err, storage.ErrStorageLocationOriginalOnline):
 		api.WriteProblem(c, api.KnownProblem(problem.StorageOriginalOnline, err))
 	case errors.Is(err, storage.ErrRepositoryOffline):
 		api.WriteProblem(c, api.KnownProblem(problem.RepositoryUnavailable, err))

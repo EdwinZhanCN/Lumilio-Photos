@@ -28,7 +28,8 @@ const (
 	lifecycleKindOpenRepository         = "open_repository"
 	lifecycleKindRegisterRepositoryCopy = "register_repository_copy"
 	lifecycleKindSwitchDefaultStorage   = "switch_default_storage_location"
-	lifecycleKindRelocateStorage        = "relocate_storage_location"
+	lifecycleKindReconnectStorage       = "reconnect_storage_location"
+	lifecycleKindReconnectRepository    = "reconnect_repository"
 	lifecycleKindRenameRepository       = "rename_repository"
 	lifecycleKindDetachRepository       = "detach_repository"
 	lifecycleKindAdoptPrimaryRepository = "adopt_primary_repository"
@@ -487,7 +488,7 @@ func (rm *DefaultRepositoryManager) recordJournalAudit(
 	confirmation := "none"
 	if operation.Kind == lifecycleKindRegisterRepositoryCopy {
 		confirmation = "independent_identity"
-	} else if operation.Kind == lifecycleKindSwitchDefaultStorage {
+	} else if operation.Kind == lifecycleKindSwitchDefaultStorage || operation.Kind == lifecycleKindReconnectRepository {
 		if value, _ := payload["confirmation_type"].(string); strings.TrimSpace(value) != "" {
 			confirmation = value
 		}
@@ -549,7 +550,7 @@ func (rm *DefaultRepositoryManager) RecoverLifecycleOperations(ctx context.Conte
 			if err := rm.recoverRegisterRepositoryCopyOperation(ctx, operation); err != nil {
 				return err
 			}
-		case lifecycleKindSwitchDefaultStorage, lifecycleKindRelocateStorage:
+		case lifecycleKindSwitchDefaultStorage, lifecycleKindReconnectStorage:
 			if err := rm.recoverSwitchDefaultStorageOperation(ctx, operation); err != nil {
 				return err
 			}
@@ -559,6 +560,10 @@ func (rm *DefaultRepositoryManager) RecoverLifecycleOperations(ctx context.Conte
 			}
 		case lifecycleKindDetachRepository:
 			if err := rm.recoverDetachRepositoryOperation(ctx, operation); err != nil {
+				return err
+			}
+		case lifecycleKindReconnectRepository:
+			if err := rm.recoverReconnectRepositoryOperation(ctx, operation); err != nil {
 				return err
 			}
 		case lifecycleKindAdoptPrimaryRepository:
@@ -589,8 +594,10 @@ func (rm *DefaultRepositoryManager) claimLifecycleRecoveryTargets(ctx context.Co
 	switch operation.Kind {
 	case lifecycleKindCreateStorageLocation:
 		kind = "storage_location"
-	case lifecycleKindSwitchDefaultStorage, lifecycleKindRelocateStorage:
+	case lifecycleKindSwitchDefaultStorage, lifecycleKindReconnectStorage:
 		kind = "storage_location"
+		path = strings.TrimSpace(target.NewPath)
+	case lifecycleKindReconnectRepository:
 		path = strings.TrimSpace(target.NewPath)
 	case lifecycleKindCreateRepository, lifecycleKindOpenRepository,
 		lifecycleKindRegisterRepositoryCopy, lifecycleKindRenameRepository,
@@ -666,6 +673,37 @@ func (rm *DefaultRepositoryManager) recoverDetachRepositoryOperation(ctx context
 	}
 	return rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, true,
 		errors.New("repository detach was interrupted before its catalog commit"), nil)
+}
+
+// recoverReconnectRepositoryOperation settles a reconnect interrupted by a
+// crash. The command changes no file: its only mutation is one catalog
+// transaction, so the row is either still at the old path (nothing happened;
+// the operation is recorded as failed and the administrator may retry) or
+// already at the new path (the operation completes).
+func (rm *DefaultRepositoryManager) recoverReconnectRepositoryOperation(ctx context.Context, operation repo.LifecycleOperation) error {
+	var payload reconnectRepositoryOperationPayload
+	if err := json.Unmarshal(operation.Payload, &payload); err != nil {
+		return fmt.Errorf("%w: decode reconnect payload: %v", ErrLifecycleRecoveryRequired, err)
+	}
+	repositoryID, err := uuid.Parse(payload.RepositoryID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid reconnect repository ID", ErrLifecycleRecoveryRequired)
+	}
+	current, err := rm.queries.GetRepository(ctx, repositoryID)
+	if err != nil {
+		return fmt.Errorf("recover reconnect: %w", err)
+	}
+	switch current.Path {
+	case payload.NewPath:
+		return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID, reconnectRepositoryOperationResult{
+			RepositoryID: payload.RepositoryID, StorageLocationID: payload.StorageLocationID, FilesPreserved: true,
+		})
+	case payload.OldPath:
+		return rm.recoverLifecycleOperationFailure(ctx, operation.OperationID, true,
+			errors.New("repository reconnect was interrupted before its catalog commit"), nil)
+	default:
+		return fmt.Errorf("%w: repository path changed outside the reconnect operation", ErrLifecycleRecoveryRequired)
+	}
 }
 
 func (rm *DefaultRepositoryManager) recoverOpenRepositoryOperation(ctx context.Context, operation repo.LifecycleOperation) error {
@@ -754,7 +792,7 @@ func (rm *DefaultRepositoryManager) recoverSwitchDefaultStorageOperation(ctx con
 				}
 			}
 		}
-		if _, err := rm.relocateStorageLocation(ctx, storageLocationID.String(), payload.NewPath, operation.Kind == lifecycleKindSwitchDefaultStorage); err != nil {
+		if _, err := rm.reconnectStorageLocation(ctx, storageLocationID.String(), payload.NewPath, operation.Kind == lifecycleKindSwitchDefaultStorage); err != nil {
 			return fmt.Errorf("%w: roll forward default Storage Location switch: %v", ErrLifecycleRecoveryRequired, err)
 		}
 	} else if storageLocation.Path != payload.NewPath {

@@ -19301,6 +19301,17 @@ export interface components {
             storage_location_name?: string;
         };
         "dto.StorageLocationViewDTO": {
+            /**
+             * @description Actions are the Location commands the policy admits on the current
+             *     facts (reconnect needs a positively unavailable original; detach needs
+             *     an empty external Location); UnavailableActions explain the withheld
+             *     ones with the shared blocker vocabulary. Menus render from these and
+             *     never invent a protected action.
+             * @example [
+             *       "reconnect"
+             *     ]
+             */
+            actions?: ("reconnect" | "detach")[];
             /** @example registered_repositories */
             blocking_reason?: string;
             can_remove?: boolean;
@@ -19317,6 +19328,7 @@ export interface components {
             name?: string;
             /** @example 2 */
             repository_count?: number;
+            unavailable_actions?: components["schemas"]["dto.RepositoryActionBlockDTO"][];
         };
         "dto.StorageRepositoryVerificationSummaryDTO": {
             /** @example manual */

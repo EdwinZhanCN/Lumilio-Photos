@@ -24,8 +24,9 @@ type StorageTargetsResponseDTO struct {
 	Targets []StorageTargetDTO `json:"targets"`
 }
 
-// StorageLocationViewDTO carries registration identity and detach facts only.
-// Capacity and health are never authoritative on a Storage Location.
+// StorageLocationViewDTO carries registration identity and the Location
+// commands the kind-aware policy admits. Capacity and health are never
+// authoritative on a Storage Location.
 type StorageLocationViewDTO struct {
 	ID              string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name            string `json:"name" example:"Default Storage"`
@@ -34,6 +35,13 @@ type StorageLocationViewDTO struct {
 	BlockingReason  string `json:"blocking_reason,omitempty" example:"registered_repositories"`
 	FilesPreserved  bool   `json:"files_preserved" example:"true"`
 	RepositoryCount int64  `json:"repository_count" example:"2"`
+	// Actions are the Location commands the policy admits on the current
+	// facts (reconnect needs a positively unavailable original; detach needs
+	// an empty external Location); UnavailableActions explain the withheld
+	// ones with the shared blocker vocabulary. Menus render from these and
+	// never invent a protected action.
+	Actions            []string                   `json:"actions" example:"reconnect" enums:"reconnect,detach"`
+	UnavailableActions []RepositoryActionBlockDTO `json:"unavailable_actions"`
 }
 
 // StorageRepositoryWritePolicyDTO exposes manual pause and space facts separately

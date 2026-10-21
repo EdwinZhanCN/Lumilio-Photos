@@ -506,6 +506,10 @@ export default function StoragePanelFlow({
                     can_remove: group.canRemove,
                   } as StorageLocationOption)
                 }
+                nativeHostAvailable={nativeHostAvailable}
+                onReconnectLocation={() =>
+                  setHostAction({ kind: "locate_storage_location", storageLocationId: group.id })
+                }
               />
             ))}
 
