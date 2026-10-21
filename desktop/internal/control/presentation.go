@@ -31,9 +31,26 @@ func PresentRuntime(snapshot dto.RuntimeSnapshot) dto.ProcessPresentation {
 		return dto.ProcessPresentation{Color: dto.DotGray, Label: "Stopped"}
 	}
 	if snapshot.Phase == dto.RuntimeFailed {
-		return dto.ProcessPresentation{Color: dto.DotRed, Label: "Failed"}
+		return dto.ProcessPresentation{Color: dto.DotRed, Label: startupFailureLabel(snapshot.RecoveryCause)}
 	}
 	return dto.ProcessPresentation{Color: dto.DotGray, Label: "Stopped"}
+}
+
+// startupFailureLabel names the Server-classified startup failures so the
+// tray and Settings say what stopped the runtime, not just that it failed.
+func startupFailureLabel(cause dto.ErrorCode) string {
+	switch cause {
+	case dto.ErrorCatalogIncompatible:
+		return "Catalog incompatible"
+	case dto.ErrorConfigurationIncompatible:
+		return "Configuration incompatible"
+	case dto.ErrorStorageMigrationRejected:
+		return "Storage folder rejected"
+	case dto.ErrorStorageUnavailable:
+		return "Storage unavailable"
+	default:
+		return "Failed"
+	}
 }
 
 func PresentLumen(snapshot dto.LumenSnapshot) dto.ProcessPresentation {

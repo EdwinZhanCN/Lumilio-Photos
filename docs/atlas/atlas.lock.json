@@ -132,7 +132,7 @@
     "ts:useLoginFlow": "237aa3a36d631275"
   },
   "system-context": {
-    "go:api.NewRouter": "201916fc2352d217",
+    "go:api.NewRouter": "dc5192b593fd0234",
     "go:api.RegisterSPA": "acbd734046d4f776",
     "go:bleveocr.Index": "86f49a74107230c4",
     "go:bleveocr.Writer": "f1ae366249a2c8d7",

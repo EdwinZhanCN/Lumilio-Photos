@@ -29,6 +29,23 @@ func (q *Queries) DeleteExternalStorageLocation(ctx context.Context, storageLoca
 	return result.RowsAffected()
 }
 
+const deleteUnusedDefaultStorageLocation = `-- name: DeleteUnusedDefaultStorageLocation :execrows
+DELETE FROM storage_locations
+WHERE storage_locations.storage_location_id = ?1
+  AND storage_locations.kind = 'default'
+  AND NOT EXISTS (
+      SELECT 1 FROM repositories WHERE repositories.storage_location_id = storage_locations.storage_location_id
+  )
+`
+
+func (q *Queries) DeleteUnusedDefaultStorageLocation(ctx context.Context, storageLocationID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUnusedDefaultStorageLocation, storageLocationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getDefaultStorageLocation = `-- name: GetDefaultStorageLocation :one
 SELECT storage_location_id, name, path, kind, status, mount_fingerprint, created_at, updated_at FROM storage_locations
 WHERE kind = 'default'

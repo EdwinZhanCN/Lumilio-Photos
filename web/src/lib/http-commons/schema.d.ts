@@ -13071,6 +13071,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/setup/primary-repository/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adopt the existing Primary Repository during setup
+         * @description Explicitly register the compatible, unregistered Repository found at the Default Storage Location's primary/ folder as this catalog's Primary Repository, keeping its identity and originals. The command binds to the setup primary target review: the expected Repository identity, the assessment token, and every reported risk acknowledged. Private state (Trash, Studio records, unfinished uploads, unknown files) is preserved by class under a recovery receipt; a missing layout is completed with empty directories only. Returns 409 once setup is complete, when the target is not adoptable, or with a typed storage refusal.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Adoption bound to the setup review */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.AdoptPrimaryRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AdoptPrimaryRepositoryResponseDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Setup already completed, target not adoptable, layout obstructed, Repository conflict, or typed storage refusal */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/primary-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review the Primary Repository setup target
+         * @description Read-only review for the authenticated administrator while first-run setup has not completed: the configured Default Storage Location and its root marker, and the state of its primary/ folder with the actions setup may take (create, adopt the compatible Repository already there, or start fresh elsewhere), the risks to acknowledge, the token those acknowledgements bind to, and the private state an adoption would preserve. Nothing is written. Once setup is complete only setup_complete is reported.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.SetupPrimaryTargetDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/setup/status": {
         parameters: {
             query?: never;
@@ -13080,7 +13226,7 @@ export interface paths {
         };
         /**
          * Get system setup status
-         * @description Report whether the first owner and primary repository have been created.
+         * @description Report whether the first owner and primary repository have been created. Public and phase-only: it never carries a host path, a marker reading, or a review token; those are the authenticated setup primary target.
          */
         get: {
             parameters: {
@@ -15911,7 +16057,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageRecoveryRequiredProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageLayoutObstructedProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageRecoveryRequiredProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
         "api.RepositoryCommandProblemResponse": components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"];
         "api.RepositoryConflictProblemResponse": {
             actions?: string[];
@@ -16051,6 +16197,36 @@ export interface components {
              *     ]
              */
             reasons?: string[];
+        };
+        "dto.AdoptPrimaryRepositoryRequestDTO": {
+            /**
+             * @example [
+             *       "removable_storage"
+             *     ]
+             */
+            acknowledged_risks?: string[];
+            /** @example v1.0123456789abcdef */
+            assessment_token: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            expected_repository_id: string;
+        };
+        "dto.AdoptPrimaryRepositoryResponseDTO": {
+            acknowledged_risks?: string[];
+            /**
+             * @example [
+             *       ".lumilio"
+             *     ]
+             */
+            layout_repaired?: string[];
+            recovery?: components["schemas"]["dto.SetupPrimaryRecoveryDTO"];
+            /**
+             * @description RecoveryReceiptID names the adopt receipt; empty when the tree carried
+             *     no private state.
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            recovery_receipt_id?: string;
+            replayed?: boolean;
+            repository?: components["schemas"]["dto.RepositoryDTO"];
         };
         "dto.AgentDateRangeDTO": {
             from?: string;
@@ -18373,7 +18549,6 @@ export interface components {
             storage_strategy?: string;
         };
         "dto.RepositoryDefaultsDTO": {
-            assessment?: components["schemas"]["dto.StorageAssessmentDTO"];
             /** @example rename */
             duplicate_handling?: string;
             /** @example /data/storage */
@@ -18744,6 +18919,58 @@ export interface components {
         "dto.SetPersonHiddenRequestDTO": {
             hidden?: boolean;
         };
+        "dto.SetupDefaultStorageDTO": {
+            /** @example parse storage location marker: yaml: line 1 */
+            detail?: string;
+            /**
+             * @example valid
+             * @enum {string}
+             */
+            marker_state?: "valid" | "absent" | "permission_denied" | "unknown" | "corrupt" | "unsupported_version";
+            /** @example /data/storage */
+            path?: string;
+            registered?: boolean;
+            /**
+             * @description State names the one condition that decides what setup can do here.
+             * @example ready
+             * @enum {string}
+             */
+            state?: "ready" | "offline" | "path_changed" | "marker_missing" | "marker_invalid" | "marker_unsupported" | "identity_mismatch" | "repository_marker" | "unregistered" | "unavailable";
+        };
+        "dto.SetupPrimaryExistingDTO": {
+            created_at?: string;
+            /** @example 1.0 */
+            marker_version?: string;
+            /** @example Primary Storage */
+            name?: string;
+            /**
+             * @description RegisteredRole is set when the identity is already registered in this
+             *     catalog; setup cannot adopt it then.
+             * @example regular
+             * @enum {string}
+             */
+            registered_role?: "primary" | "regular";
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+        };
+        "dto.SetupPrimaryRecoveryDTO": {
+            /** @example 12 */
+            derived_files?: number;
+            /** @example 2 */
+            log_files?: number;
+            /** @example 0 */
+            receipts?: number;
+            /** @example 2 */
+            staging_files?: number;
+            /** @example 1 */
+            studio_records?: number;
+            /** @example 4096 */
+            trash_bytes?: number;
+            /** @example 2 */
+            trash_files?: number;
+            /** @example 1 */
+            unknown_files?: number;
+        };
         "dto.SetupPrimaryRepositoryRequestDTO": {
             /**
              * @example [
@@ -18766,6 +18993,40 @@ export interface components {
              */
             storage_strategy?: "date" | "flat" | "cas";
         };
+        "dto.SetupPrimaryReviewDTO": {
+            /**
+             * @description Actions are the legal transitions; fresh_elsewhere is always listed
+             *     before the Primary Repository exists.
+             */
+            actions?: ("create" | "adopt" | "fresh_elsewhere")[];
+            assessment?: components["schemas"]["dto.StorageAssessmentDTO"];
+            existing?: components["schemas"]["dto.SetupPrimaryExistingDTO"];
+            /**
+             * @description LayoutMissing lists the layout directories an adoption would add.
+             * @example [
+             *       ".lumilio"
+             *     ]
+             */
+            layout_missing?: string[];
+            recovery?: components["schemas"]["dto.SetupPrimaryRecoveryDTO"];
+            /**
+             * @example adoptable
+             * @enum {string}
+             */
+            state?: "creatable" | "adoptable" | "layout_repairable" | "registered" | "nonempty_unmarked" | "marker_invalid" | "marker_unsupported" | "unavailable";
+        };
+        "dto.SetupPrimaryTargetDTO": {
+            default_storage?: components["schemas"]["dto.SetupDefaultStorageDTO"];
+            /**
+             * @description NativeHost reports a Desktop host: a fresh Default Storage Location is
+             *     chosen in Desktop Settings and applied; without it the operator edits
+             *     storage.path in the manifest and restarts.
+             */
+            native_host?: boolean;
+            repository_defaults?: components["schemas"]["dto.RepositoryDefaultsDTO"];
+            setup_complete?: boolean;
+            target?: components["schemas"]["dto.SetupPrimaryReviewDTO"];
+        };
         "dto.SetupStatusDTO": {
             admin_initialized?: boolean;
             initialized?: boolean;
@@ -18776,7 +19037,6 @@ export interface components {
              */
             next_registration_role?: string;
             primary_repository_initialized?: boolean;
-            repository_defaults?: components["schemas"]["dto.RepositoryDefaultsDTO"];
             /** @example storage_recovery_required */
             runtime_reason?: string;
             /**
@@ -18891,11 +19151,6 @@ export interface components {
         "dto.StartRepositoryCloudImportRequest": {
             credential_id?: string;
         };
-        /**
-         * @description Assessment reviews the Primary Repository target below the Default
-         *     Storage Location and carries the token the setup create binds to.
-         *     It is absent while the target cannot be assessed.
-         */
         "dto.StorageAssessmentDTO": {
             /**
              * @description CanCreate reports whether the target is reviewable for creation: an
@@ -20476,6 +20731,27 @@ export interface components {
              */
             type: "https://lumilio.org/problems/storage/identity-mismatch";
         };
+        "api.StorageLayoutObstructedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/layout-obstructed";
+        };
+        "api.StorageLayoutObstructedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/layout-obstructed";
+        };
         "api.StorageMaterializationRequiredProblem": {
             /** Format: uri */
             instance: string;
@@ -20665,7 +20941,7 @@ export interface components {
              */
             type: "https://lumilio.org/problems/upload/processing-failed";
         };
-        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageActionUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageBusyProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageIdentityMismatchProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StorageOriginalOnlineProblemReference"] | components["schemas"]["api.StorageOwnershipUnavailableProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageRecoveryRequiredProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
+        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AssetMissingProblemReference"] | components["schemas"]["api.AssetOfflineProblemReference"] | components["schemas"]["api.AssetTrashedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageActionUnavailableProblemReference"] | components["schemas"]["api.StorageAssessmentStaleProblemReference"] | components["schemas"]["api.StorageBusyProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.StorageIdentityMismatchProblemReference"] | components["schemas"]["api.StorageLayoutObstructedProblemReference"] | components["schemas"]["api.StorageMaterializationRequiredProblemReference"] | components["schemas"]["api.StorageNotAMountedVolumeProblemReference"] | components["schemas"]["api.StorageObservationUnknownProblemReference"] | components["schemas"]["api.StorageOriginalOnlineProblemReference"] | components["schemas"]["api.StorageOwnershipUnavailableProblemReference"] | components["schemas"]["api.StoragePermissionDeniedProblemReference"] | components["schemas"]["api.StorageRecoveryRequiredProblemReference"] | components["schemas"]["api.StorageUnsupportedFilesystemProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
         "api.RateLimitedProblemResponse": {
             /** Format: uri */
             instance: string;

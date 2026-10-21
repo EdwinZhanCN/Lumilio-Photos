@@ -44,16 +44,20 @@ the `.lumilioroot` and `.lumiliorepo` markers the beta wrote.
 2. Stop the beta build and move its application state aside. Docker: the
    `LUMILIO_STATE` directory (the catalog, secrets, and backups). Desktop: the
    `Lumilio Photos` folder under your user's application-data directory
-   (see [Installation](./installation)). Do not delete the media folder.
-3. Rename the beta's Primary Repository folder, `primary/` inside the Default
-   Storage Location, to another name inside the same Storage Location, for
-   example `beta-primary/`. rc.1 setup creates a new Primary Repository at
-   `primary/` and stops if that folder already holds a Repository.
-4. Install rc.1 and complete the first-run setup.
-5. On the **Storage** page, add the renamed folder as an existing Repository
-   and let the scan register its files. Repeat for every other Repository the
-   beta used. Trash contents the beta never moved to disk do not exist; a
-   file the beta showed in its Trash is a normal file again.
+   (see [Installation](./installation)). Do not move or rename the media
+   folder.
+3. Install rc.1 and run the first-run setup with the same Default Storage
+   Location. At the storage step, setup finds the beta's Primary Repository
+   in `primary/` and offers **Adopt Primary Repository**: adopt it to keep its
+   identity and every file; the scan registers them again. To start over
+   instead, point the Default Storage Location at another folder first
+   (Desktop: **Settings → Storage**; Docker: `storage.path`); the beta's
+   folder is left untouched.
+4. On the **Storage** page, add every other Repository the beta used as an
+   existing Repository and let the scan register its files. Trash contents
+   the beta kept on disk are listed and held in the Trash until you decide;
+   a file the beta showed in its Trash without moving it is a normal file
+   again.
 
 ## Desktop (macOS / Windows)
 

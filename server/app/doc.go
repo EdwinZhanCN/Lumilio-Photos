@@ -17,6 +17,16 @@
 // server.tls.mode. Missing, corrupt, or post-restore OCR indexes are rebuilt
 // before HTTP starts.
 //
+// Startup is catalog-first: a usable catalog whose configured Default Storage
+// Location is offline or carries a marker this build cannot adopt serves in a
+// restricted recovery runtime (setup and the Storage page name the way out;
+// no marker is provisioned or replaced), while a pre-release or newer catalog
+// or manifest, a configured path that claims to be a move of an established
+// default without proving it, or a first run that cannot create its default
+// at all are fatal. [ClassifyStartupFailure] and [DescribeStartupFailure] are
+// the Server-owned facade both hosts present: the CLI prints the code and the
+// operator steps, Desktop maps the code to its recovery cause.
+//
 // The optional pprof listener belongs to the outer Run and stays stable across
 // in-process database restore generations. The latest bounded SQLite
 // telemetry, pool statistics, WAL state, and checkpoint result are published

@@ -344,3 +344,83 @@ func TestRelocatedRepositoryPathAcrossWindowsDriveLetters(t *testing.T) {
 		t.Fatalf("relocated path = %q, want %q", got, want)
 	}
 }
+
+// A corrupt or newer .lumilioroot at the configured path is reported as an
+// invalid Storage Location and never replaced, for a fresh catalog and for a
+// registered default alike; the read-only assessment names the state.
+func TestEnsureDefaultStorageLocationNeverReplacesAnUnreadableRootMarker(t *testing.T) {
+	ctx := context.Background()
+	for _, variant := range []struct {
+		name  string
+		bytes string
+		state DefaultStorageState
+	}{
+		{"corrupt", "version: [unterminated\n", DefaultStorageMarkerInvalid},
+		{"newer", "version: \"99.0\"\nid: 11111111-1111-4111-8111-111111111111\nname: Later\ncreated_at: 2026-01-02T03:04:05Z\n", DefaultStorageMarkerUnsupported},
+	} {
+		t.Run(variant.name+" marker on a fresh catalog", func(t *testing.T) {
+			_, manager := newCatalogRepositoryManager(t)
+			rootPath := filepath.Join(t.TempDir(), "default")
+			if err := os.MkdirAll(rootPath, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(rootPath, ".lumilioroot"), []byte(variant.bytes), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manager.EnsureDefaultStorageLocation(ctx, rootPath); !errors.Is(err, ErrStorageLocationInvalid) {
+				t.Fatalf("ensure = %v, want ErrStorageLocationInvalid", err)
+			}
+			data, err := os.ReadFile(filepath.Join(rootPath, ".lumilioroot"))
+			if err != nil || string(data) != variant.bytes {
+				t.Fatalf("marker bytes changed: %q err=%v", data, err)
+			}
+			assessment, err := manager.AssessDefaultStorageLocation(ctx, rootPath)
+			if err != nil || assessment.Registered || assessment.State != variant.state || assessment.Usable() {
+				t.Fatalf("assessment = %+v err=%v", assessment, err)
+			}
+		})
+	}
+	t.Run("registered default whose marker turns corrupt", func(t *testing.T) {
+		_, manager := newCatalogRepositoryManager(t)
+		rootPath := filepath.Join(t.TempDir(), "default")
+		registered, err := manager.EnsureDefaultStorageLocation(ctx, rootPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(rootPath, ".lumilioroot"), []byte("version: [unterminated\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := manager.EnsureDefaultStorageLocation(ctx, rootPath); !errors.Is(err, ErrStorageLocationInvalid) {
+			t.Fatalf("ensure = %v, want ErrStorageLocationInvalid", err)
+		}
+		assessment, err := manager.AssessDefaultStorageLocation(ctx, rootPath)
+		if err != nil || !assessment.Registered || assessment.State != DefaultStorageMarkerInvalid || assessment.RegisteredPath != registered.Path {
+			t.Fatalf("assessment = %+v err=%v", assessment, err)
+		}
+		if err := os.Remove(filepath.Join(rootPath, ".lumilioroot")); err != nil {
+			t.Fatal(err)
+		}
+		if assessment, err := manager.AssessDefaultStorageLocation(ctx, rootPath); err != nil || assessment.State != DefaultStorageMarkerMissing {
+			t.Fatalf("missing-marker assessment = %+v err=%v", assessment, err)
+		}
+		if err := os.RemoveAll(rootPath); err != nil {
+			t.Fatal(err)
+		}
+		if assessment, err := manager.AssessDefaultStorageLocation(ctx, rootPath); err != nil || assessment.State != DefaultStorageOffline {
+			t.Fatalf("offline assessment = %+v err=%v", assessment, err)
+		}
+		if assessment, err := manager.AssessDefaultStorageLocation(ctx, filepath.Join(t.TempDir(), "elsewhere")); err != nil || assessment.State != DefaultStorageOffline && assessment.State != DefaultStoragePathChanged {
+			t.Fatalf("changed-path assessment = %+v err=%v", assessment, err)
+		}
+	})
+	t.Run("ready default", func(t *testing.T) {
+		_, manager := newCatalogRepositoryManager(t)
+		rootPath := filepath.Join(t.TempDir(), "default")
+		if _, err := manager.EnsureDefaultStorageLocation(ctx, rootPath); err != nil {
+			t.Fatal(err)
+		}
+		if assessment, err := manager.AssessDefaultStorageLocation(ctx, rootPath); err != nil || !assessment.Usable() || assessment.State != DefaultStorageReady {
+			t.Fatalf("ready assessment = %+v err=%v", assessment, err)
+		}
+	})
+}

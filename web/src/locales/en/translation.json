@@ -72,6 +72,7 @@
       "hostActionExpired": "The Desktop approval expired. Start the action again.",
       "hostActionFailed": "The Desktop could not complete the storage action.",
       "identityMismatch": "The folder holds a different Repository than the one you chose. Nothing was changed.",
+      "layoutObstructed": "A file or a denied folder sits where a Repository folder belongs, so the layout was not repaired. Move it out of the way and review again; nothing was changed.",
       "materializationRequired": "Files in this folder must be downloaded locally before it can be used. Make the folder available offline and try again.",
       "notMountedVolume": "This folder is not a mounted volume; data stored here would be lost when the container is recreated. Mount a host directory in your compose file.",
       "observationUnknown": "The storage target could not be inspected. Check the mount and access, then try again.",
@@ -751,8 +752,51 @@
       "storageLocation": "Default Storage Location",
       "storageLocationHint": "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
       "submit": "Create Primary Repository",
-      "targetUnavailable": "The Default Storage Location cannot hold the Primary Repository right now.",
-      "title": "Create Primary Repository"
+      "targetUnavailable": "The Default Storage Location cannot hold the Primary Repository right now."
+    },
+    "primarySetup": {
+      "adopt": {
+        "body": "{{name}} was found in the primary/ folder of the Default Storage Location. Adopt it to keep its identity and every file, or start fresh elsewhere. Nothing changes until you choose.",
+        "disclosure": "Albums, People, ratings, Event names and share links live in the catalog, not in the folder. To get them back, restore a compatible database backup of the earlier installation instead of adopting. Adoption rebuilds only what the folder carries: trashed files stay held until you decide, and Studio edits reattach once their photos are proven.",
+        "heldTrash": "Held in Trash",
+        "heldTrashValue_one": "{{count}} files ({{size}})",
+        "heldTrashValue_other": "{{count}} files ({{size}})",
+        "identity": "Identity",
+        "layoutRepair": "Its {{folders}} folder is missing and will be added empty; nothing else in the folder changes.",
+        "staging": "Unfinished uploads",
+        "studio": "Studio edits",
+        "submit": "Adopt Primary Repository",
+        "title": "A Primary Repository is already here",
+        "unknown": "Other private files",
+        "unnamed": "An earlier Primary Repository"
+      },
+      "blocked": {
+        "markerInvalid": "The Repository marker in primary/ cannot be read. It is left untouched. Restore .lumiliorepo from a known backup, or start fresh elsewhere.",
+        "markerUnsupported": "The Repository in primary/ was written by a newer Lumilio Photos. Install that version, or start fresh elsewhere.",
+        "nonemptyUnmarked": "primary/ holds files but no Repository marker. Lumilio never initializes over them. Move them out of primary/ to create a new Primary Repository here, or start fresh elsewhere.",
+        "registered": "The Repository in primary/ is already registered in this catalog, so it cannot become the Primary Repository.",
+        "title": "The primary/ folder cannot become the Primary Repository",
+        "unavailable": "primary/ cannot be inspected right now. Check its access and mount, then check again."
+      },
+      "defaultStorage": {
+        "identityMismatch": "The folder carries a different Storage Location identity than the one registered here.",
+        "markerInvalid": "The folder's .lumilioroot marker cannot be read. It is left untouched; restore it from a known backup or start fresh elsewhere.",
+        "markerMissing": "The folder lost its .lumilioroot marker. Restore it from a known backup; Lumilio never writes a new one over a registered folder.",
+        "markerUnsupported": "The folder's .lumilioroot marker was written by a newer Lumilio Photos. Install that version, or start fresh elsewhere.",
+        "offline": "The configured folder is not reachable right now. Reconnect the disk or mount, then check again.",
+        "pathChanged": "The configured path differs from the registered Default Storage Location and was not accepted as a move.",
+        "repositoryMarker": "The configured folder is itself a Repository. Point the Default Storage Location at its parent or at another folder.",
+        "title": "The Default Storage Location needs attention",
+        "unavailable": "The folder cannot be inspected right now. Check its access and mount, then check again.",
+        "unregistered": "The folder could not be registered when the server started. Check the server log, fix the folder, then restart."
+      },
+      "freshElsewhere": {
+        "desktop": "Open Settings → Storage in Lumilio Photos Desktop, choose another folder and apply it. The current folder is left untouched, and a new Primary Repository is created in the new one.",
+        "server": "Point storage.path in server.toml (Docker: the media volume) at another folder and restart the server. The current folder is left untouched, and a new Primary Repository is created in the new one.",
+        "title": "Start fresh elsewhere"
+      },
+      "loadFailed": "Unable to load the Primary Repository setup review.",
+      "title": "Set up the Primary Repository"
     },
     "register": {
       "confirmPassword": "Confirm password",

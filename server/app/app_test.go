@@ -47,30 +47,50 @@ func TestDefaultStorageRecoveryKeepsRuntimeStartableInDegradedMode(t *testing.T)
 		StorageLocationID: uuid.New(), Kind: dbtypes.StorageLocationKindDefault,
 		Status: dbtypes.StorageLocationStatusOffline, Path: "/missing/default",
 	}
-	storageLocation, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+	startup, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
 		ensureErr:        storage.ErrStorageLocationOffline,
 		storageLocations: []repo.StorageLocation{registered},
 	}, registered.Path)
 	if err != nil {
 		t.Fatalf("registered default storage stopped runtime startup: %v", err)
 	}
-	if !degraded || storageLocation == nil || storageLocation.StorageLocationID != registered.StorageLocationID {
-		t.Fatalf("degraded result = storage location %#v degraded %t", storageLocation, degraded)
+	if !startup.Degraded || startup.Location == nil || startup.Location.StorageLocationID != registered.StorageLocationID || startup.Reason != defaultStorageReasonOffline {
+		t.Fatalf("degraded result = %+v", startup)
 	}
 
-	_, degraded, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+	// A corrupt or newer marker at the registered path is the same restricted
+	// runtime with its own reason; the marker is never replaced.
+	startup, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr:        storage.ErrStorageLocationInvalid,
+		storageLocations: []repo.StorageLocation{registered},
+	}, registered.Path)
+	if err != nil || !startup.Degraded || startup.Location == nil || startup.Reason != defaultStorageReasonMarkerInvalid {
+		t.Fatalf("invalid registered marker = %+v err=%v", startup, err)
+	}
+
+	// A first run that cannot create its default at all is fatal and classified.
+	startup, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
 		ensureErr: storage.ErrStorageLocationOffline,
 	}, "/fresh/unavailable")
-	if err == nil || degraded {
-		t.Fatalf("fresh initialization failure = %v degraded %t", err, degraded)
+	if err == nil || startup.Degraded || ClassifyStartupFailure(err).Code != StartupFailureDefaultStorageUnavailable {
+		t.Fatalf("fresh initialization failure = %v startup=%+v", err, startup)
 	}
 
-	_, degraded, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+	// A first run whose configured folder holds a marker this build cannot
+	// adopt serves restricted: nothing registered, nothing provisioned.
+	startup, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr: storage.ErrStorageLocationInvalid,
+	}, "/fresh/corrupt-marker")
+	if err != nil || !startup.Degraded || startup.Location != nil || startup.Reason != defaultStorageReasonMarkerInvalid {
+		t.Fatalf("fresh invalid marker = %+v err=%v", startup, err)
+	}
+
+	startup, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
 		ensureErr:        storage.ErrStorageLocationInvalid,
 		storageLocations: []repo.StorageLocation{registered},
 	}, "/different/identity")
-	if err == nil || degraded {
-		t.Fatalf("invalid migration target = %v degraded %t", err, degraded)
+	if err == nil || startup.Degraded || ClassifyStartupFailure(err).Code != StartupFailureDefaultStorageMigrationRejected {
+		t.Fatalf("invalid migration target = %v startup=%+v", err, startup)
 	}
 }
 
@@ -84,12 +104,12 @@ func TestDefaultStorageRecoveryCanonicalizesOfflinePathAliases(t *testing.T) {
 		StorageLocationID: uuid.New(), Kind: dbtypes.StorageLocationKindDefault,
 		Status: dbtypes.StorageLocationStatusOffline, Path: filepath.Join(realParent, "offline-default"),
 	}
-	root, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+	startup, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
 		ensureErr:        storage.ErrStorageLocationOffline,
 		storageLocations: []repo.StorageLocation{registered},
 	}, filepath.Join(aliasParent, "offline-default"))
-	if err != nil || !degraded || root == nil || root.StorageLocationID != registered.StorageLocationID {
-		t.Fatalf("canonical offline alias was not recognized: root=%#v degraded=%t err=%v", root, degraded, err)
+	if err != nil || !startup.Degraded || startup.Location == nil || startup.Location.StorageLocationID != registered.StorageLocationID {
+		t.Fatalf("canonical offline alias was not recognized: %+v err=%v", startup, err)
 	}
 }
 

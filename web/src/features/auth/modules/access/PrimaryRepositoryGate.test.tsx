@@ -14,11 +14,6 @@ describe("PrimaryRepositoryGate", () => {
           primary_repository_initialized: true,
           runtime_state: "degraded",
           runtime_reason: "storage_recovery_required",
-          repository_defaults: {
-            storage_location: "/configured/storage",
-            storage_strategy: "date",
-            duplicate_handling: "rename",
-          },
         }),
       ),
     );
@@ -32,7 +27,6 @@ describe("PrimaryRepositoryGate", () => {
     await expect
       .element(screen.getByText(t("auth.storageRecovery.title"), { exact: true }))
       .toBeVisible();
-    await expect.element(screen.getByText("/configured/storage/primary")).toBeVisible();
     await expect.element(screen.getByText("ordinary repository content")).toBeVisible();
   });
 
@@ -44,10 +38,26 @@ describe("PrimaryRepositoryGate", () => {
           phase: "admin_created",
           admin_initialized: true,
           primary_repository_initialized: false,
+        }),
+      ),
+      http.get("*/api/v1/setup/primary-target", () =>
+        HttpResponse.json({
+          setup_complete: false,
+          native_host: false,
           repository_defaults: {
             storage_location: "/storage",
-            storage_strategy: "date",
+            strategy: "date",
             duplicate_handling: "rename",
+          },
+          default_storage: {
+            path: "/storage",
+            registered: true,
+            state: "ready",
+            marker_state: "valid",
+          },
+          target: {
+            state: "creatable",
+            actions: ["create", "fresh_elsewhere"],
             assessment: {
               token: "v1.setup",
               intent: "setup_primary",

@@ -61,3 +61,11 @@ WHERE storage_locations.storage_location_id = ?1
   AND NOT EXISTS (
       SELECT 1 FROM repositories WHERE repositories.storage_location_id = storage_locations.storage_location_id
   );
+
+-- name: DeleteUnusedDefaultStorageLocation :execrows
+DELETE FROM storage_locations
+WHERE storage_locations.storage_location_id = ?1
+  AND storage_locations.kind = 'default'
+  AND NOT EXISTS (
+      SELECT 1 FROM repositories WHERE repositories.storage_location_id = storage_locations.storage_location_id
+  );

@@ -260,6 +260,7 @@ type Querier interface {
 	// A scan indexed the restored file before the restore commit; its live entry
 	// stands for the file.
 	DeleteTrashedRepositoryEntry(ctx context.Context, entryID uuid.UUID) (int64, error)
+	DeleteUnusedDefaultStorageLocation(ctx context.Context, storageLocationID uuid.UUID) (int64, error)
 	DeleteUser(ctx context.Context, userID int32) error
 	DeleteUserRecoveryCodes(ctx context.Context, userID int32) error
 	DeleteUserTOTPCredential(ctx context.Context, userID int32) error

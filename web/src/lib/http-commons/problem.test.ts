@@ -252,6 +252,11 @@ describe("storage consent Problems", () => {
         "An interrupted storage operation on this Repository must be recovered first. Check its recovery inventory on the Storage page, then try again.",
         "此资源库上有一项被中断的存储操作需要先完成恢复。请在存储页面查看其恢复清单，然后重试。",
       ],
+      [
+        "https://lumilio.org/problems/storage/layout-obstructed",
+        "A file or a denied folder sits where a Repository folder belongs, so the layout was not repaired. Move it out of the way and review again; nothing was changed.",
+        "本应是资源库文件夹的位置被一个文件或无法访问的文件夹占据，因此未修复布局。请把它移开后重新检查；未做任何更改。",
+      ],
     ];
     for (const [type, en, zh] of cases) {
       const value = normalizeProblem({

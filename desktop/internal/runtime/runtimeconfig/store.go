@@ -244,6 +244,19 @@ func (s *Store) draftFromBytes(data []byte, baseFingerprint, source string) (dto
 	}, nil
 }
 
+// validateStoragePathChange is the Desktop's pre-check of a changed Default
+// Storage Location. Two shapes are legal and the Server decides both
+// authoritatively at the controlled restart (a refusal rolls the intent back):
+//
+//   - a move of the established default: the candidate carries the same
+//     .lumilioroot and primary/.lumiliorepo identities as the current path;
+//   - a fresh default before the Primary Repository exists: the candidate
+//     holds no Primary Repository (absent, empty, or a folder with at most a
+//     compatible root marker), so setup starts fresh there and the previous
+//     tree is left untouched.
+//
+// A candidate that is itself a Repository, or whose root marker this build
+// cannot read, is refused here because no restart could accept it.
 func (s *Store) validateStoragePathChange(candidate string) error {
 	pointer, err := s.CurrentPointer()
 	if err != nil {
@@ -261,13 +274,25 @@ func (s *Store) validateStoragePathChange(candidate string) error {
 	if currentPath == candidatePath {
 		return nil
 	}
-	newStorageLocationID, err := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
-	if err != nil {
-		return fmt.Errorf("selected default storage location has no valid .lumilioroot marker: %w", err)
+	if _, repoErr := os.Stat(filepath.Join(candidatePath, ".lumiliorepo")); repoErr == nil {
+		return errors.New("selected default storage location is a Repository folder; choose its parent or another folder")
 	}
-	newPrimaryID, err := loadPortableMarkerID(filepath.Join(candidatePath, "primary", ".lumiliorepo"))
-	if err != nil {
-		return fmt.Errorf("selected default storage location has no valid primary/.lumiliorepo marker: %w", err)
+	newStorageLocationID, rootErr := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
+	if rootErr != nil && !errors.Is(rootErr, os.ErrNotExist) {
+		return fmt.Errorf("selected default storage location has a .lumilioroot marker this build cannot adopt: %w", rootErr)
+	}
+	newPrimaryID, primaryErr := loadPortableMarkerID(filepath.Join(candidatePath, "primary", ".lumiliorepo"))
+	if primaryErr != nil {
+		if !errors.Is(primaryErr, os.ErrNotExist) {
+			return fmt.Errorf("selected default storage location has a primary/.lumiliorepo marker this build cannot adopt: %w", primaryErr)
+		}
+		// No Primary Repository under the candidate: a fresh default. The
+		// Server accepts it only before the Primary Repository exists and
+		// refuses it afterwards, which rolls this intent back.
+		return nil
+	}
+	if rootErr != nil {
+		return fmt.Errorf("selected default storage location has no valid .lumilioroot marker: %w", rootErr)
 	}
 	// If the old path is still online, the Desktop can prove immediately that
 	// the selected directory is the same portable root and primary repository.

@@ -17,6 +17,7 @@ stateDiagram-v2
     n_fresh --> n_catalog_ready: startup Reconcile finds no admin
     n_catalog_ready --> n_admin_created: the owner registers (first account becomes admin)
     n_admin_created --> n_ready: POST /setup/primary-repository creates the primary
+    n_admin_created --> n_ready: POST /setup/primary-repository/adopt adopts the primary found at <default>/primary
 ```
 
 ## States
@@ -36,6 +37,11 @@ stateDiagram-v2
 | fresh | catalog_ready | startup Reconcile finds no admin | `go:service.BootstrapService.Reconcile` [`server/internal/service/bootstrap_service.go:31`](../../../../server/internal/service/bootstrap_service.go#L31) |
 | catalog_ready | admin_created | the owner registers (first account becomes admin) | `api:POST /api/v1/auth/register/start` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
 | admin_created | ready | POST /setup/primary-repository creates the primary | `api:POST /api/v1/setup/primary-repository` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
+| admin_created | ready | POST /setup/primary-repository/adopt adopts the primary found at <default>/primary | `api:POST /api/v1/setup/primary-repository/adopt` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
+
+## Create or adopt, never implicit
+
+The authenticated administrator reviews the fixed primary target through `GET /setup/primary-target` (admin only; the public status is phase-only) and takes the one transition the review allows: create, adopt the compatible Repository already there (identity, originals and private state kept), or start fresh elsewhere through the host's configuration. A leftover, unmarked, corrupt or newer primary is never initialized over.
 
 ## Derived, never stored mid-setup
 

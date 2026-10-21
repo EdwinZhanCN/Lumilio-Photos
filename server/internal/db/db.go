@@ -488,7 +488,8 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	}
 	if info.SchemaVersion > SchemaVersion {
 		return CatalogInfo{}, fmt.Errorf(
-			"SQLite catalog schema version = %d is newer than this build supports (%d): it was written by a newer Lumilio Photos",
+			"%w: SQLite catalog schema version = %d is newer than this build supports (%d)",
+			ErrCatalogNewer,
 			info.SchemaVersion,
 			SchemaVersion,
 		)

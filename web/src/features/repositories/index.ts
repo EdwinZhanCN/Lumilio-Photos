@@ -3,6 +3,7 @@ export { useBrowseScope } from "./flows/browse-scope/useBrowseScope";
 export { useWorkingRepository } from "./flows/working-repository/useWorkingRepository";
 export { buildCreateRepositoryRequestBody, useCreateRepository } from "./api/useCreateRepository";
 export {
+  buildAdoptPrimaryRepositoryRequestBody,
   buildSetupPrimaryRepositoryRequestBody,
   useSetupPrimaryRepository,
 } from "./api/useSetupPrimaryRepository";
