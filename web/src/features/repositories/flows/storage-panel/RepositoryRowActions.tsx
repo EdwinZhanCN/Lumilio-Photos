@@ -41,11 +41,12 @@ type Props = {
 };
 
 /**
- * Row commands. Rename, Remove, and the native reconnect entry render only
+ * Row commands. Rename, Remove, and the native Reconnect entry render only
  * when the Server's role-aware policy lists them for this row, so the menu
  * never offers a command the Server would refuse on the same facts; the
- * Primary never shows them. Destructive entries sit last and are the only
- * colored item.
+ * Primary never shows them. Reconnect re-points a positively unavailable
+ * Repository at the folder that holds it now and never moves data.
+ * Destructive entries sit last and are the only colored item.
  */
 export default function RepositoryRowActions({
   row,
@@ -65,8 +66,14 @@ export default function RepositoryRowActions({
       menuHeight={420}
     >
       {({ close }) => {
-        const item = (command: RepositoryCommand, icon: ReactNode, label: string) => (
+        const item = (
+          command: RepositoryCommand,
+          icon: ReactNode,
+          label: string,
+          hint?: string,
+        ) => (
           <MenuItem
+            hint={hint}
             onSelect={() => {
               close();
               onCommand(command, row);
@@ -132,7 +139,11 @@ export default function RepositoryRowActions({
               ? item(
                   "locate",
                   <FolderSearch className="size-4" aria-hidden />,
-                  t("storagePanel.action.locate", "Locate on disk"),
+                  t("storagePanel.action.reconnect", "Reconnect"),
+                  t(
+                    "storagePanel.action.reconnectHint",
+                    "Its folder was moved or its disk remounted. Choose the folder that holds it now; nothing is moved.",
+                  ),
                 )
               : null}
 

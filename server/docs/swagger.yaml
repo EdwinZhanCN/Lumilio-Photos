@@ -5968,6 +5968,22 @@ components:
             type: object
         dto.StorageLocationViewDTO:
             properties:
+                actions:
+                    description: |-
+                        Actions are the Location commands the policy admits on the current
+                        facts (reconnect needs a positively unavailable original; detach needs
+                        an empty external Location); UnavailableActions explain the withheld
+                        ones with the shared blocker vocabulary. Menus render from these and
+                        never invent a protected action.
+                    example:
+                        - reconnect
+                    items:
+                        enum:
+                            - reconnect
+                            - detach
+                        type: string
+                    type: array
+                    uniqueItems: false
                 blocking_reason:
                     example: registered_repositories
                     type: string
@@ -5991,6 +6007,11 @@ components:
                 repository_count:
                     example: 2
                     type: integer
+                unavailable_actions:
+                    items:
+                        $ref: '#/components/schemas/dto.RepositoryActionBlockDTO'
+                    type: array
+                    uniqueItems: false
             type: object
         dto.StorageRepositoryVerificationSummaryDTO:
             properties:

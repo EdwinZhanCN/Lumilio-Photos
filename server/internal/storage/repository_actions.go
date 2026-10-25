@@ -59,6 +59,17 @@ const (
 	// BlockerOriginalAvailable: the original is online, so there is nothing
 	// to reconnect; a copy elsewhere is a separate review.
 	BlockerOriginalAvailable RepositoryActionBlocker = "original_available"
+	// BlockerOriginalInaccessible: the registered path could not be read
+	// (permission denied or an unknown failure). Denial is not absence, so
+	// nothing is concluded about the original and no reconnect is admitted
+	// on it.
+	BlockerOriginalInaccessible RepositoryActionBlocker = "original_inaccessible"
+	// BlockerDefaultProtected: the Default Storage Location follows the
+	// configured storage.path; it is never reconnected or detached on its own.
+	BlockerDefaultProtected RepositoryActionBlocker = "default_protected"
+	// BlockerRegisteredRepositories: a Storage Location with registered
+	// Repositories cannot be detached.
+	BlockerRegisteredRepositories RepositoryActionBlocker = "registered_repositories"
 )
 
 // RepositoryActionAlternative names a legal entry the administrator can take
@@ -73,6 +84,9 @@ const (
 	AlternativeRecoverOperation RepositoryActionAlternative = "recover_operation"
 	// AlternativeWaitForIdle: retry once current work finishes.
 	AlternativeWaitForIdle RepositoryActionAlternative = "wait_for_idle"
+	// AlternativeCheckAccess: fix access to the registered path, then
+	// reassess; the catalog and the tree are both left as they are.
+	AlternativeCheckAccess RepositoryActionAlternative = "check_access"
 )
 
 // RepositoryActionFacts are the catalog facts the action policy reads. They
@@ -84,6 +98,10 @@ type RepositoryActionFacts struct {
 	// PendingOperation is true while a journaled lifecycle operation that
 	// targets this Repository is running.
 	PendingOperation bool
+	// OriginalInaccessible is set by a command that read the registered path
+	// and could not: the original is neither online nor positively absent.
+	// Ordinary projections leave it false; they perform no I/O.
+	OriginalInaccessible bool
 }
 
 // RepositoryActionVerdict is the policy's answer for one action.
@@ -152,12 +170,15 @@ func DeriveRepositoryActions(facts RepositoryActionFacts) RepositoryActionPolicy
 				block(BlockerIdentityProblem)
 			}
 		default:
-			if action == ActionReconnect {
+			if action == ActionReconnect && !facts.OriginalInaccessible {
 				block(BlockerOriginalAvailable)
 			}
 		}
 		if facts.PendingOperation && action != ActionVerify {
 			block(BlockerPendingOperation, AlternativeWaitForIdle)
+		}
+		if facts.OriginalInaccessible && action == ActionReconnect {
+			block(BlockerOriginalInaccessible, AlternativeCheckAccess)
 		}
 		// Detach and reconnect need an idle Repository unless the original is
 		// positively unavailable, where stale activity cannot be finished.

@@ -189,8 +189,14 @@ func writeHostActionResolveFailure(c *gin.Context, err error) {
 		api.WriteProblem(c, api.KnownProblem(problem.StorageOriginalOnline, err))
 	case errors.Is(err, storage.ErrHostActionDecisionNeeded), errors.Is(err, storage.ErrHostActionNotPending):
 		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+	case writeRepositoryCommandFailure(c, err):
+		// The typed refusals of the reconnect and open commands (policy
+		// verdicts, identity mismatch, ownership, busy, recovery) are the
+		// same Problems the HTTP commands write; the task also records them.
 	default:
-		api.WriteProblem(c, api.BadRequest(err))
+		// Any other failure of the resumed command is the task's recorded
+		// outcome; the Web reads the task for its reason.
+		api.WriteProblem(c, api.KnownProblem(problem.HostActionFailed, err))
 	}
 }
 

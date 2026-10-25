@@ -312,7 +312,7 @@ func TestLifecycleRecoveryClaimsEveryJournalOnlyTargetBeforeMutation(t *testing.
 		{lifecycleKindRenameRepository, "repository", func(path string) any { return renameRepositoryOperationPayload{Path: path} }},
 		{lifecycleKindCreateStorageLocation, "storage_location", func(path string) any { return createStorageLocationOperationPayload{Path: path} }},
 		{lifecycleKindSwitchDefaultStorage, "storage_location", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
-		{lifecycleKindRelocateStorage, "storage_location", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
+		{lifecycleKindReconnectStorage, "storage_location", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
 	}
 	for _, test := range tests {
 		t.Run(test.kind, func(t *testing.T) {

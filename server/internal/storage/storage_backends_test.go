@@ -31,7 +31,7 @@ func (l *rejectingLocks) Inspect(string, string) (RepositoryLockInfo, error) {
 func TestRuntimeOwnershipUsesInstalledLockProvider(t *testing.T) {
 	rejection := errors.New("alternative ownership refused")
 	locks := &rejectingLocks{err: rejection}
-	rm := &DefaultRepositoryManager{ownershipOn: true, ownership: map[string]func(){}}
+	rm := &DefaultRepositoryManager{ownershipOn: true, ownership: map[string]runtimeOwnership{}}
 	rm.SetLockProvider(locks)
 	path := t.TempDir()
 	if err := rm.claimRuntimeStoragePath(context.Background(), "repository", path); !errors.Is(err, rejection) {

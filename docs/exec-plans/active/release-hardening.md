@@ -122,8 +122,8 @@ follow-up in the tech-debt tracker.
 | S2 | **Done 2026-10-16 (#250).** Storage P2 — assessment DTOs/endpoints, consent token, capability-backed Create, shared en/zh risk review. | #242 | [storage-repository-lifecycle.md](storage-repository-lifecycle.md) |
 | S3 | **Done 2026-10-18 (#252 P3a, #256 P3b).** Storage P3 — safe command boundary, in two PRs: P3a commands (role-aware action policy, rename refresh under the lease with guarded marker writes, journaled detach, typed refusals, receipts), then P3b native selection/review (host-action task outcomes, native/HTTP policy equivalence). | — | same |
 | S4 | **Done 2026-10-19 (#257).** Storage P4 — private preservation and recovery (held inherited Trash, Studio reassociation, journaled staging). Highest data risk; fault injection at every boundary. | — | same |
-| S5 | **In PR.** Storage P5 — setup and startup recovery (Adopt Primary / fresh elsewhere, authenticated setup recovery, startup facade). | leftover-primary dead end | same |
-| S6 | Storage P6 — reconnect journeys and volume semantics. Volume evidence comes from CI filesystem images (Linux loop-mounted vfat/exFAT/casefold-ext4, macOS `hdiutil` APFS/ExFAT); native picker paths from the embedded harness. May split: regular/Location reconnect, then default Apply. | silent Reconnect no-op | same |
+| S5 | **Done 2026-10-21 (#259).** Storage P5 — setup and startup recovery (Adopt Primary / fresh elsewhere, authenticated setup recovery, startup facade). | leftover-primary dead end | same |
+| S6 | Storage P6 — reconnect journeys and volume semantics, split in two PRs. **S6a in PR:** regular and Storage Location reconnect journeys (positively-unavailable rule, journaled reconnect, ownership following a moved tree, Location policy and direct entry, Reconnect wording), proven by the `server/app` R2 acceptance tests over the native task plus Web specs. **S6b next:** destination volume semantics (R11) with CI filesystem images (Linux loop-mounted vfat/exFAT/casefold-ext4, macOS `hdiutil` APFS/ExFAT) and default Apply crash/rollback evidence. | silent Reconnect no-op | same |
 | S7 | Storage P7 — remove competing classifiers and Desktop marker parsing; architecture checks that catch a deliberate violation. | — | same |
 | S8 | Storage P8 — `web:test:storage-recovery` E2E slice wired into `ci.yml` path filters; evidence tables; extract decisions; delete the plan. The Mac pass is recorded as an rc.2 checkpoint, not run. | storage plan complete | same |
 | S9 | **Done 2026-10-16 (#251).** #222 acceptance tests: no-change rescan counts hash calls and entry writes; album membership and cross-repository directory move; upload-then-scan zero rehash; watcher-off convergence; structural writer budget enforced by test and `architecturecheck`. | #222 | [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md) |
@@ -265,7 +265,7 @@ S13–S15 wait for everything before them and for an empty milestone.
   (#222 in #251, S9; #223 in S10). The plan is complete and deleted —
   [decision](../../../.agents/decisions/2026-10-16-asset-lifecycle-acceptance.md).
 - [ ] RC blocker #242 (closed by #250, S2) and the storage refactor P3–P8
-  (S3–S8; P3 and P4 done, P5 in PR) —
+  (S3–S8; P3–P5 done, P6a in PR) —
   [storage-repository-lifecycle.md](storage-repository-lifecycle.md).
 - [x] Release notes (user-facing, bilingual per the terminology registry) —
   S12, `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`; S5 and S6 add their

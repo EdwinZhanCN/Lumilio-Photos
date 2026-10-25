@@ -547,7 +547,7 @@ function hostActionTitle(kind: HostActionKind, t: ReturnType<typeof useI18n>["t"
     case "locate_storage_location":
       return t("manage.repositories.hostAction.locateLocation", "Reconnect Storage Location");
     case "locate_repository":
-      return t("manage.repositories.hostAction.locateRepository", "Locate Repository");
+      return t("manage.repositories.hostAction.locateRepository", "Reconnect Repository");
     default:
       return t("manage.repositories.hostAction.openRepository", "Open Existing Repository");
   }
@@ -563,12 +563,12 @@ function hostActionPurpose(kind: HostActionKind, t: ReturnType<typeof useI18n>["
     case "locate_storage_location":
       return t(
         "manage.repositories.hostAction.locateLocationPurpose",
-        "Choose the current folder for this moved or reconnected Storage Location",
+        "Choose the folder that holds this Storage Location now. Reconnect re-points the registration and its Repositories; it never moves files, and it needs the registered folder to be gone.",
       );
     case "locate_repository":
       return t(
         "manage.repositories.hostAction.locateRepositoryPurpose",
-        "Choose the current folder for this moved Repository",
+        "Choose the folder that holds this Repository now. Reconnect re-points the registration; it never moves files, and it needs the registered folder to be gone.",
       );
     default:
       return t(

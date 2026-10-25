@@ -10830,6 +10830,21 @@ const docTemplate = `{
             },
             "dto.StorageLocationViewDTO": {
                 "properties": {
+                    "actions": {
+                        "description": "Actions are the Location commands the policy admits on the current\nfacts (reconnect needs a positively unavailable original; detach needs\nan empty external Location); UnavailableActions explain the withheld\nones with the shared blocker vocabulary. Menus render from these and\nnever invent a protected action.",
+                        "example": [
+                            "reconnect"
+                        ],
+                        "items": {
+                            "enum": [
+                                "reconnect",
+                                "detach"
+                            ],
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "blocking_reason": {
                         "example": "registered_repositories",
                         "type": "string"
@@ -10860,6 +10875,13 @@ const docTemplate = `{
                     "repository_count": {
                         "example": 2,
                         "type": "integer"
+                    },
+                    "unavailable_actions": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryActionBlockDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"

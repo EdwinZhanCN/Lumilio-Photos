@@ -124,7 +124,7 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 			api.WriteProblem(c, api.Internal(impactErr))
 			return
 		}
-		locations = append(locations, dto.StorageLocationViewDTO{
+		locationView := dto.StorageLocationViewDTO{
 			ID:              storageLocation.StorageLocationID.String(),
 			Name:            storageLocation.Name,
 			Kind:            string(storageLocation.Kind),
@@ -132,7 +132,14 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 			BlockingReason:  impact.BlockingReason,
 			FilesPreserved:  impact.FilesPreserved,
 			RepositoryCount: impact.RepositoryCount,
-		})
+		}
+		locationPolicy, policyErr := h.repoManager.StorageLocationActionPolicyFor(ctx, storageLocation)
+		if policyErr != nil {
+			api.WriteProblem(c, api.Internal(fmt.Errorf("derive storage location actions: %w", policyErr)))
+			return
+		}
+		locationView.Actions, locationView.UnavailableActions = storageLocationActionDTOs(locationPolicy)
+		locations = append(locations, locationView)
 	}
 
 	capacityGroups, repoGroupIDs, repoStorage := buildStorageCapacityGroups(repositories)
@@ -266,6 +273,24 @@ func buildStorageCapacityGroups(repositories []*repo.Repository) ([]dto.StorageC
 		}
 	}
 	return capacityGroups, repoGroupIDs, repoStorage
+}
+
+// storageLocationActionDTOs is repositoryActionDTOs for the kind-aware
+// Storage Location policy; both lists are always present.
+func storageLocationActionDTOs(policy storage.StorageLocationActionPolicy) ([]string, []dto.RepositoryActionBlockDTO) {
+	actions := make([]string, 0, len(policy.Verdicts))
+	blocked := make([]dto.RepositoryActionBlockDTO, 0)
+	for _, verdict := range policy.Verdicts {
+		if verdict.Allowed() {
+			actions = append(actions, string(verdict.Action))
+			continue
+		}
+		blocked = append(blocked, dto.RepositoryActionBlockDTO{
+			Action: string(verdict.Action), Blockers: storage.BlockerCodes(verdict.Blockers),
+			Alternatives: storage.AlternativeCodes(verdict.Alternatives),
+		})
+	}
+	return actions, blocked
 }
 
 // repositoryActionDTOs splits the role-aware policy into the admitted action

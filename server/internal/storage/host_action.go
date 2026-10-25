@@ -551,10 +551,17 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 	// The native host goes through the same role-aware policy as the HTTP
 	// command: a reconnect the policy withholds is refused with its verdict
 	// before the selected folder is even reviewed.
-	if action.Kind == HostActionLocateRepository {
+	switch action.Kind {
+	case HostActionLocateRepository:
 		if current, lookupErr := rm.GetRepository(action.Summary.RepositoryID); lookupErr == nil && current != nil {
 			if admitErr := rm.admitReconnect(ctx, *current); admitErr != nil {
-				return rm.failHostActionTyped(ctx, actionID, "locate_repository_failed", "Repository location could not be updated", admitErr)
+				return rm.failHostActionTyped(ctx, actionID, "locate_repository_failed", "Repository could not be reconnected", admitErr)
+			}
+		}
+	case HostActionLocateStorageLocation:
+		if current, lookupErr := rm.GetStorageLocation(ctx, action.Summary.StorageLocationID); lookupErr == nil && current != nil {
+			if admitErr := rm.admitStorageLocationAction(ctx, *current, LocationActionReconnect); admitErr != nil {
+				return rm.failHostActionTyped(ctx, actionID, "locate_storage_location_failed", "Storage Location could not be reconnected", admitErr)
 			}
 		}
 	}
@@ -627,8 +634,8 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 			return rm.failHostActionTyped(ctx, actionID, "open_repository_failed", "Repository could not be opened", callErr)
 		}
 	case HostActionLocateStorageLocation:
-		root, callErr := rm.RelocateStorageLocation(ctx, action.Summary.StorageLocationID, cleanPath, LifecycleRequest{
-			RequestID: "host-action-relocate-root:" + action.ActionID, Actor: action.Actor,
+		root, callErr := rm.ReconnectStorageLocation(ctx, action.Summary.StorageLocationID, cleanPath, LifecycleRequest{
+			RequestID: "host-action-reconnect-root:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID,
 			ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk,
 		})
@@ -637,13 +644,13 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 		}
 		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	case HostActionLocateRepository:
-		repository, callErr := rm.RelocateRepository(ctx, action.Summary.RepositoryID, cleanPath, LifecycleRequest{
-			RequestID: "host-action-relocate:" + action.ActionID, Actor: action.Actor,
+		repository, callErr := rm.ReconnectRepository(ctx, action.Summary.RepositoryID, cleanPath, LifecycleRequest{
+			RequestID: "host-action-reconnect:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID,
 			ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk,
 		})
 		if callErr != nil {
-			return rm.failHostActionTyped(ctx, actionID, "locate_repository_failed", "Repository location could not be updated", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "locate_repository_failed", "Repository could not be reconnected", callErr)
 		}
 		actionResult = HostActionResult{RepositoryID: repository.RepoID.String(), Name: repository.Name}
 	}
@@ -701,25 +708,25 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 		if protocolAction != "relocate" {
 			return rm.failHostAction(ctx, actionID, "unsupported_resolution", "A copied Storage Location cannot be registered automatically", nil)
 		}
-		root, callErr := rm.RelocateStorageLocation(ctx, conflict.StorageLocationID, action.selectedPath, LifecycleRequest{
-			RequestID: "host-action-resolve-relocate-root:" + action.ActionID, Actor: action.Actor,
+		root, callErr := rm.ReconnectStorageLocation(ctx, conflict.StorageLocationID, action.selectedPath, LifecycleRequest{
+			RequestID: "host-action-resolve-reconnect-root:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: action.HostInstanceID,
 			ConfirmationType: "update_location",
 		})
 		if callErr != nil {
-			return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Storage Location location could not be updated", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Storage Location could not be reconnected", callErr)
 		}
 		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	} else {
 		var repositoryID string
 		if protocolAction == "relocate" {
-			repository, callErr := rm.RelocateRepository(ctx, conflict.RepositoryID, action.selectedPath, LifecycleRequest{
-				RequestID: "host-action-resolve-relocate:" + action.ActionID, Actor: action.Actor,
+			repository, callErr := rm.ReconnectRepository(ctx, conflict.RepositoryID, action.selectedPath, LifecycleRequest{
+				RequestID: "host-action-resolve-reconnect:" + action.ActionID, Actor: action.Actor,
 				ActorUserID: action.ActorUserID, HostInstanceID: action.HostInstanceID,
 				ConfirmationType: "update_location",
 			})
 			if callErr != nil {
-				return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Repository location could not be updated", callErr)
+				return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Repository could not be reconnected", callErr)
 			}
 			repositoryID = repository.RepoID.String()
 			actionResult = HostActionResult{RepositoryID: repositoryID, Name: repository.Name}
@@ -767,17 +774,21 @@ func (rm *DefaultRepositoryManager) failHostActionTyped(ctx context.Context, act
 	code := fallbackCode
 	var refusal *HostActionRefusal
 	var unavailable *RepositoryActionUnavailableError
+	var locationUnavailable *StorageLocationActionUnavailableError
 	switch {
 	case errors.As(cause, &unavailable):
 		code = hostActionCodeActionUnavailable
-		refusal = &HostActionRefusal{Action: string(unavailable.Action)}
-		for _, blocker := range unavailable.Blockers {
-			refusal.Blockers = append(refusal.Blockers, string(blocker))
+		refusal = &HostActionRefusal{
+			Action: string(unavailable.Action), Blockers: BlockerCodes(unavailable.Blockers),
+			Alternatives: AlternativeCodes(unavailable.Alternatives),
 		}
-		for _, alternative := range unavailable.Alternatives {
-			refusal.Alternatives = append(refusal.Alternatives, string(alternative))
+	case errors.As(cause, &locationUnavailable):
+		code = hostActionCodeActionUnavailable
+		refusal = &HostActionRefusal{
+			Action: string(locationUnavailable.Action), Blockers: BlockerCodes(locationUnavailable.Blockers),
+			Alternatives: AlternativeCodes(locationUnavailable.Alternatives),
 		}
-	case errors.Is(cause, ErrRepositoryOriginalOnline):
+	case errors.Is(cause, ErrRepositoryOriginalOnline), errors.Is(cause, ErrStorageLocationOriginalOnline):
 		code = hostActionCodeOriginalOnline
 	case errors.Is(cause, ErrRepositoryIDMismatch):
 		code = hostActionCodeIdentityMismatch

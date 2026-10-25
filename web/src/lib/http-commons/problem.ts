@@ -420,8 +420,16 @@ function localizeKnownProblem(
 /**
  * The first blocker names the reason an action is withheld; the Server lists
  * them most specific first. Unknown codes fall back to the generic refusal
- * rather than rendering a raw identifier.
+ * rather than rendering a raw identifier. Exported so menus can explain a
+ * withheld entry with the same copy the refused command would show.
  */
+export function localizeStorageActionBlockers(
+  blockers: readonly string[] | undefined,
+  t: TFunction,
+): string {
+  return localizeStorageActionUnavailable(blockers, t);
+}
+
 function localizeStorageActionUnavailable(
   blockers: readonly string[] | undefined,
   t: TFunction,
@@ -466,6 +474,21 @@ function localizeStorageActionUnavailable(
       return t(
         "apiErrors.storage.actionUnavailable.originalAvailable",
         "This Repository is still available at its registered location, so there is nothing to reconnect.",
+      );
+    case "original_inaccessible":
+      return t(
+        "apiErrors.storage.actionUnavailable.originalInaccessible",
+        "The registered location could not be read, so Lumilio cannot tell whether it is gone. Check access to it, then try again.",
+      );
+    case "default_protected":
+      return t(
+        "apiErrors.storage.actionUnavailable.defaultProtected",
+        "The Default Storage Location follows the configured storage path. Change it through the storage configuration instead.",
+      );
+    case "registered_repositories":
+      return t(
+        "apiErrors.storage.actionUnavailable.registeredRepositories",
+        "This Storage Location still registers Repositories. Remove them from Lumilio first.",
       );
     default:
       return t(

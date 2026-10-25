@@ -7,9 +7,13 @@ swappable lock/identity/watch adapters. P2 merged as PR #250 (session S2,
 2026-10-16). P3a (commands) merged as PR #252 (session S3a, 2026-10-18);
 P3b (native selection and review) merged as PR #256 (session S3b,
 2026-10-19). P4 (private preservation and recovery) merged as PR #257
-(session S4, 2026-10-19). P5 (setup and startup recovery) lands in this PR
-(session S5). P2 delivered (session S2): the create contract and shared
-risk review, closing #242. P6–P8 remain outstanding. Each fixing PR lands
+(session S4, 2026-10-19). P5 (setup and startup recovery) merged as PR #259 (session
+S5, 2026-10-21). P6 is split as the schedule allows: P6a (regular and
+Storage Location reconnect journeys, the positively-unavailable rule, the
+Reconnect wording) lands in this PR (session S6a); P6b (destination volume
+semantics with CI filesystem images, default Apply crash/rollback evidence)
+is the next session. P2 delivered (session S2): the create contract and
+shared risk review, closing #242. P6b–P8 remain outstanding. Each fixing PR lands
 its regression tests and updates this Status and the evidence tables.
 Child of [release-hardening.md](release-hardening.md); its session order
 (S2–S8, one phase per session, P3 and P6 may split) is the schedule.
@@ -121,11 +125,11 @@ designs below.
 | Missing marker; nonempty primary (`nonempty_unmarked`)                      | No initialization over tree                                                                                        | Fresh destination and explicit originals import; preserve old folder               | P0 unmarked fixture; P5 setup refusal pass (R3)     |
 | Valid marker; missing `.lumilio/` or `inbox/` (`layout_repairable`)         | Explicit bounded repair/adopt, identity unchanged                                                                  | Repair review; file obstruction/denial is a blocker, never replacement permission  | P1 compatible identity + absent layout pass; P5 repair and obstruction pass (R12) |
 | Registered readable identity                                                | Read/verify; upload subject to admission; regular rename/detach with fresh impact                                  | Storage journey and operation receipt                                              | R5, R8, R10 designed; P3                            |
-| Registered original positively unavailable                                  | Retain catalog metadata and ready state; begin regular reconnect; regular detach remains possible                  | Select matching tree; primary uses default recovery                                | R2, R3, R8 designed; P5–P6                          |
-| Registered marker missing/corrupt/different (`registered_identity_problem`) | No implicit replacement or marker overwrite                                                                        | Matching known tree/marker instructions, diagnose/retry                            | P1 guarded identity replacement pass; R2 reconnect P6                            |
-| Same UUID elsewhere, original online (`identity_copy`)                      | Use existing registration; regular independent-copy review; no reconnect commit                                    | Current conflict journey; primary copy prohibited                                  | P0 same-UUID copy; R2, R10 designed; P3, P6         |
-| Same UUID elsewhere, original unavailable                                   | Explicit regular reconnect or copy where permitted                                                                 | Primary routes to complete-default configuration recovery                          | R2 designed; P6                                     |
-| Original permission denied/unknown                                          | No conclusion of offline; no reconnect commit based on denial                                                      | Access diagnosis and reassessment                                                  | P1 denied/unknown/nil stat tests pass; R2 reconnect P6                             |
+| Registered original positively unavailable                                  | Retain catalog metadata and ready state; begin regular reconnect; regular detach remains possible                  | Select matching tree; primary uses default recovery                                | P6a regular reconnect over the native task pass (R2); R3, R8 designed |
+| Registered marker missing/corrupt/different (`registered_identity_problem`) | No implicit replacement or marker overwrite                                                                        | Matching known tree/marker instructions, diagnose/retry                            | P1 guarded identity replacement pass; P6a reconnect admitted from an identity problem (policy table) |
+| Same UUID elsewhere, original online (`identity_copy`)                      | Use existing registration; regular independent-copy review; no reconnect commit                                    | Current conflict journey; primary copy prohibited                                  | P0 same-UUID copy; P6a online-copy refusal on the task pass (R2); R10 designed |
+| Same UUID elsewhere, original unavailable                                   | Explicit regular reconnect or copy where permitted                                                                 | Primary routes to complete-default configuration recovery                          | P6a explicit reconnect pass (R2); primary routing P6b |
+| Original permission denied/unknown                                          | No conclusion of offline; no reconnect commit based on denial                                                      | Access diagnosis and reassessment (`original_inaccessible` / `check_access`)       | P1 denied/unknown/nil stat tests pass; P6a reconnect and reconcile refuse to conclude from denial (R2, R6) |
 | Read-only / permission-denied target                                        | Mutation blocked; retain identities/catalog facts                                                                  | Permissions, retry, writable supported destination, also pre-setup                 | P1 access distinction/read-only core pass; P2 transport pending                              |
 | Owned elsewhere / busy                                                      | No conflicting mutation; unrelated healthy trees usable                                                            | Stop owner, wait/inspect operation, retry; cancel only if supported                | R10 designed; P3                                    |
 | Unsupported network/remote filesystem                                       | Refuse create/open/reconnect before acknowledgement                                                                | Choose supported destination, with reason; confirmation cannot enable it           | P1 shared injected network classifier pass; P2 refusal wiring; #245 deferred                   |
@@ -133,9 +137,9 @@ designs below.
 | Private Trash/Studio/staging/unknown retained                               | Preserve by class; hold inherited Trash; rebuild/reassociate proven matches                                        | Reachable recovery inventory, review/export unresolved records                     | P4 preservation, holds, reassociation, inventory pass |
 | Interrupted mutation (`recovery_required`)                                  | Recover journal before conflicting mutation                                                                        | Recovery receipt, diagnose/retry                                                   | P3 journals; P4 `storage/recovery-required` and preservation rollback pass |
 | Unregistered native Location selection                                      | Review authorization; create root marker only when genuinely absent or register compatible marker                  | Native task review; stale/expired selection restarts without losing form           | R9, R10 designed; P3, P6                            |
-| Registered external Location                                                | Create/open direct children; reconnect complete identity; detach only with zero children/no pending mutation       | Direct Location reconnect entry, all child markers revalidated atomically          | R2, R9 designed; P6                                 |
+| Registered external Location                                                | Create/open direct children; reconnect complete identity; detach only with zero children/no pending mutation       | Direct Location reconnect entry, all child markers revalidated atomically          | P6a kind-aware Location policy, direct Web entry, all-or-nothing reconnect over the native task pass (R2, R9) |
 | Default, setup incomplete                                                   | Create/adopt fixed primary; choose fresh default only with no primary, no child registrations, no pending mutation | Desktop config selection/Apply or standalone manifest/restart; preserve old tree   | P5 fresh default (Server rule, Desktop pre-check) pass |
-| Default/primary, setup complete                                             | Identity-preserving whole-default reconnect through configuration Apply                                            | Default recovery handoff; no ordinary primary rename/detach/copy/reconnect         | R2, R10 designed; P3, P6                            |
+| Default/primary, setup complete                                             | Identity-preserving whole-default reconnect through configuration Apply                                            | Default recovery handoff; no ordinary primary rename/detach/copy/reconnect         | P3 primary protection, P6a `default_protected` Location verdict pass; Apply crash/rollback evidence P6b |
 | Parent marker unavailable/invalid, healthy registered child                 | Child read/rename/detach independently admitted; destination authorization still enforced                          | Parent diagnosis/reconnect separately                                              | P1 parent-independent child observation pass; P3 command boundary pending                                 |
 
 ### Error-to-recovery coverage
@@ -147,7 +151,7 @@ Endpoints named here are proposed unless already present; no P0 API change.
 | Problem / outcome                                              | Required action and entry                                                                                           | Evidence / phase  |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------- |
 | `storage/confirmation-required`                                | Review actual risks; retry current command with token/acknowledgements, also primary setup                          | R1; P2            |
-| `repository/conflict` / identity registered elsewhere          | Retain target context; Open regular, Adopt Primary, regular copy/reconnect, or choose elsewhere according to matrix | R2, R3, R9; P2–P6 |
+| `repository/conflict` / identity registered elsewhere          | Retain target context; Open regular, Adopt Primary, regular copy/reconnect, or choose elsewhere according to matrix | R2, R3, R9; P2–P6a |
 | `storage/assessment-stale`                                     | Refresh ordinary/setup assessment; review changed facts, preserve native task scope                                 | R1, R5; P2–P3     |
 | `storage/action-unavailable`                                   | Show current blockers and legal alternatives; no automatic rejected-action retry                                    | R10; P3           |
 | `storage/permission-denied`, `storage/read-only`               | In-place instructions, reassess, choose writable destination                                                        | R6; P1–P2         |
@@ -155,12 +159,12 @@ Endpoints named here are proposed unless already present; no P0 API change.
 | `storage/not-a-mounted-volume` | Mount a host directory in compose; preserve the existing Docker empty-folder rejection | `TestDockerEmptyTargetConstraint`; P1 code/copy, P2 transport |
 | `storage/unsupported-filesystem`                               | Supported destination or deployment instructions, no confirmation bypass                                            | R7; P1–P2         |
 | `storage/marker-invalid`, `storage/marker-version-unsupported` | Setup/storage diagnostics, compatible build, known-backup instructions, choose elsewhere; startup fallback          | P1 readings; P5 setup states and restricted startup |
-| `storage/identity-mismatch`, `storage/original-online`         | Matching-tree selection or existing registration/regular copy review; no overwrite/primary copy                     | R2, R10; P3, P6   |
+| `storage/identity-mismatch`, `storage/original-online`         | Matching-tree selection or existing registration/regular copy review; no overwrite/primary copy                     | R2, R10; P3, P6a (both refusals on the native task and the resolve route) |
 | `storage/ownership-unavailable`, `storage/busy`                | Owner/operation diagnostics, wait/retry, supported cancellation                                                     | R10; P3           |
 | `storage/materialization-required`                             | Bounded offending-file facts; local residency then retry deep preflight                                             | R6, R7; P1–P2     |
 | `storage/recovery-required`                                    | Setup/storage private-recovery inventory and journal receipt; retry recovery                                        | P4 Problem and Storage inventory; P5 adopt maps it |
 | `storage/host-action-expired` / native selection cancelled     | New phase-scoped task / return to selection with form retained; cancellation is a normal outcome                    | R9; P3, P6        |
-| Protected primary/default                                      | Default configuration handoff or standalone operator instructions                                                   | R2, R10; P3, P6   |
+| Protected primary/default                                      | Default configuration handoff or standalone operator instructions                                                   | R2, R10; P3, P6a (`default_protected`); Apply P6b |
 | Generic failure                                                | Receipt/diagnostics, refresh, explicit safe retry; do not invent a specific remedy                                  | R10; P3, P7       |
 | Authentication/authorization/bootstrap failure                 | Sign in, authorized admin entry, or owner/primary setup; no host facts leaked                                       | P5 public status phase-only, admin review; R10 P7 |
 
@@ -193,7 +197,7 @@ approved decisions.
 | Existing empty directory             | **Resolved 2026-10-07:** retain mounted-volume constraint permanently for Linux/Docker; ordinary empty folders are ephemeral            | P1–P2          |
 | Ambiguous Studio match               | Require proven content hash/size and valid source; review/export ambiguity, never filename guessing          | P4             |
 | Inherited Trash retention            | Hold until restore/export/delete/explicit retention acceptance; new deletes use configured retention         | P4             |
-| Unsupported volume semantics         | Refuse affected transition; extend support only with CI filesystem-image evidence                            | P6             |
+| Unsupported volume semantics         | Refuse affected transition; extend support only with CI filesystem-image evidence                            | P6b            |
 
 ## Execution phases
 
@@ -779,21 +783,100 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   codes because the Wails generator is not available in the sandbox; the
   next `wails3 generate bindings` run produces the same entries.
 
-### P6 — Complete reconnect journeys and volume semantics
+### P6a delivered (2026-10-21)
 
-- Depends on P3–P5. Native Open Existing, regular and whole-external-Location
-  reconnect, protected default/primary configuration handoff and Apply.
-  Qualify destination volume semantics, preflight collisions and bounded
-  revision-fenced key rebuild without false absence or dropped bindings.
+Session S6a. The reconnect journeys, split from the volume work as the
+schedule allows.
+
+- **Positively unavailable, never inferred from denial.** `OriginalIdentityState`
+  classifies one read-only look at a registered path (`online`, `absent`,
+  `identity_differs`, `inaccessible`). Repository and Location reconnect admit
+  only `absent` or `identity_differs`; an online original is
+  `storage/original-online` (`ErrStorageLocationOriginalOnline` for Locations,
+  same Problem); a denied or unknown read withholds the action with the new
+  blocker `original_inaccessible` and alternative `check_access`, on the
+  command, on the native task, and in the policy a menu renders from.
+  Reconcile no longer flips a row offline on a failed read; it keeps the
+  current reachability and logs (R6, no false Missing).
+- **Reconnect is journaled.** `ReconnectRepository` (renamed from
+  `RelocateRepository`; `relocateStorageLocation` → `ReconnectStorageLocation`,
+  kinds `reconnect_repository` and `reconnect_storage_location`, baseline
+  CHECK amended in place) replays the same request, conflicts on a different
+  destination under it, and is settled by startup recovery from the catalog
+  alone (row at the new path completes, row at the old path is recorded as
+  failed; the command moves no file). The journal audit carries the
+  administrator's confirmation type.
+- **Runtime ownership follows a moved tree.** A tree renamed or remounted
+  while the Server holds its runtime lock carries the lock file with it;
+  claiming the new path used to contend with this process's own advisory lock
+  and refused every such reconnect with `storage/ownership-unavailable`
+  (found by the R2 acceptance test, the first wired-runtime reconnect).
+  `claimRuntimeStoragePath` now recognizes a held lock by file identity and
+  rekeys the ownership to the new path, for a Repository and for a whole
+  Location with its children.
+- **Storage Locations have a policy.** `DeriveStorageLocationActions`
+  (`reconnect`, `detach`) with blockers `default_protected`,
+  `registered_repositories`, `original_available`, `original_inaccessible`,
+  `maintenance`, `pending_operation`; `StorageLocationActionUnavailableError`
+  shares the `storage/action-unavailable` Problem and the host-action refusal.
+  `ReconnectStorageLocation` admits through it before journaling and
+  re-reads the original under its barrier; a child missing or different at the
+  destination is a typed `storage/identity-mismatch` and nothing moves. The
+  storage view carries `actions` / `unavailable_actions` per Location.
+- **Resolve route.** A resumed command's typed refusals (policy verdicts,
+  identity mismatch, ownership, busy, recovery) now reach the Web as their
+  Problems from `POST /storage/native-tasks/{id}/resolve`; any other failure
+  is the host-action Problem, never a bare 400.
+- **Reconnect wording and prerequisites.** The row entry is **Reconnect** with
+  its prerequisite as the entry hint; the external Location menu has a direct
+  **Reconnect Storage Location** entry on a Desktop host, disabled with the
+  Server's reason while the policy withholds it; the native modal titles and
+  purposes say what Reconnect does and needs; Desktop picker and panel labels
+  match; registry row `reconnect` (重新连接) with `Relocate` / `Locate on disk`
+  as forbidden synonyms.
+- **Evidence.** Storage: `TestReconnectRefusesAnInaccessibleOriginal`,
+  `TestReconnectRepositoryIsJournaledReplayedAndRecovered`,
+  `TestReconcileKeepsReachabilityWhenTheRegisteredPathCannotBeRead`,
+  `TestDeriveStorageLocationActionsIsKindAware`,
+  `TestStorageLocationReconnectAgreesWithThePolicy`,
+  `TestReconnectFollowsATreeMovedWhileItsRuntimeLockIsHeld`,
+  `TestRepositoryReconnectRollsBackCatalogWhenAuditPersistenceFails`, the
+  existing agreement and relocate tests under the new names. Handler:
+  `TestStorageViewProjectsStorageLocationActions`. App (R2 over the wired
+  runtime, native task started over HTTP and approved through the in-process
+  control): `TestMovedRegularRepositoryReconnectsThroughTheNativeTask` (moved
+  tree reconnects with identity, Asset, album and bytes intact and the scan
+  re-queued; online copy, wrong identity and denied original each refuse
+  with their reason; the same destination reconnects once the original is
+  positively gone), `TestMovedStorageLocationReconnectsEveryChildOrNothing`
+  (view verdicts for default/online/moved Locations; partial tree refuses and
+  moves nothing; complete tree re-points Location and children atomically).
+  Web: `StoragePanel.spec.tsx` (withheld Location entry with the Server's
+  reason, Default Storage Location never offers it, unavailable Location
+  starts `locate_storage_location`), `RepositoryRowActions.test.tsx`.
+- **Deviations / P6b.** Destination volume semantics (R11: per-volume case and
+  normalization facts, collision preflight, bounded rekey) and the Linux
+  loop-mounted / macOS `hdiutil` filesystem-image CI jobs, plus the default
+  Apply crash/rollback evidence beyond the existing Desktop integration tests,
+  are P6b. Docker/standalone candidates still reach `ReconnectRepository`
+  through the legacy `risk_confirmation` gate (P7 with the classifier
+  removal). `DeleteStorageLocation` keeps its legacy checks; the policy's
+  detach verdict agrees with them through `Is`.
+
+### P6b — Volume semantics and default Apply evidence (remaining P6)
+
+- Depends on P6a. Qualify destination volume semantics, preflight collisions
+  and bounded revision-fenced key rebuild without false absence or dropped
+  bindings; protected default/primary configuration handoff and Apply crash,
+  rollback and success evidence.
 - Risks: scan fences, config rollback after catalog cutover, rekey loss.
-  Exit: R2/R9 regular/Location/native harness tests; Apply success, crash,
-  rollback; case/normalization image tests; “Reconnect” wording/prerequisites.
+  Exit: Apply success, crash, rollback; case/normalization image tests.
   Linux GHA loop-mounted vfat/exFAT/casefold-ext4 and macOS `hdiutil`
   case-sensitive APFS/ExFAT images provide reproducible volume evidence.
-- Edwin: supply R2 inputs and review; revisit volume-semantics default.
-  Real external disks and Windows NTFS are optional reference coverage.
-- Release notes: add the "Relocate is now Reconnect and never moves files"
-  line to `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`.
+- Edwin: review; revisit volume-semantics default. Real external disks and
+  Windows NTFS are optional reference coverage.
+- Release notes: the "Relocate is now Reconnect and never moves files" line
+  landed with P6a in `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`.
 
 ### P7 — Enforce and remove competing paths
 
@@ -848,14 +931,14 @@ Fixture self-tests below prove fixture construction only.
 | ID / failure                                                                  | Test layer and fixture                                                                                                                                                                                                                                   | Precise externally observable assertion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Fixing phase                                                     |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | R1 — #242 removable non-default new-child dead end                            | Go integration with valid default/external trees and P1 injected removable target facts; real StoragePanelFlow Web flow spec with `nativeHostAvailable=true`, candidates absent, new child under non-default Location                                    | Actual selected target returns risks; before acknowledgement command refuses with usable review; checkbox renders/enables submission; acknowledged create registers the selected child UUID/path, emits receipt and scan work. Editing target/intent/marker/mount/risk invalidates consent; capacity-only change does not. Default candidates cannot supply it; en/zh copy is usable                                                                                                                                                                                                                                                                 | P2                                                               |
-| R2 — Desktop relocate/reconnect failure                                       | Go Server integration + embedded Desktop picker/runtime-config harness + Web flow; valid regular tree externally renamed away from registered path, same-UUID online copy, wrong-UUID tree, whole-Location copy with translated children/default primary | For positively unavailable original and authorized matching destination, picker → review → command retains UUID, Asset/album bindings, updates paths atomically and fences scan/watch work; bytes are unchanged. Empty/wrong/unauthorized/online-copy targets refuse with specific reachable recovery; denied/unknown original does not authorize reconnect. Whole Location validates every child before any update. Default selection changes only draft until Save/Apply; Apply/restart makes config/current/LKG/catalog coherent; candidate failure/crash rolls back coherently. Primary row routes to default recovery, never ordinary reconnect. Picker returns a path then silent no-op is a regression: selection always reaches visible review, reasoned refusal, or success | P6 (protected-action boundary in P3)                             |
+| R2 — Desktop relocate/reconnect failure                                       | Go Server integration + embedded Desktop picker/runtime-config harness + Web flow; valid regular tree externally renamed away from registered path, same-UUID online copy, wrong-UUID tree, whole-Location copy with translated children/default primary | For positively unavailable original and authorized matching destination, picker → review → command retains UUID, Asset/album bindings, updates paths atomically and fences scan/watch work; bytes are unchanged. Empty/wrong/unauthorized/online-copy targets refuse with specific reachable recovery; denied/unknown original does not authorize reconnect. Whole Location validates every child before any update. Default selection changes only draft until Save/Apply; Apply/restart makes config/current/LKG/catalog coherent; candidate failure/crash rolls back coherently. Primary row routes to default recovery, never ordinary reconnect. Picker returns a path then silent no-op is a regression: selection always reaches visible review, reasoned refusal, or success | P6a delivered for regular and Location reconnect over the wired runtime (`server/app` reconnect acceptance tests); default Apply crash/rollback P6b (protected-action boundary in P3) |
 | R3 — leftover primary dead end                                                | Go app/API integration, shared primary-setup Web flow, fresh-bootstrap E2E; `NewLeftoverPrimary`, fresh app-state/catalog, valid root with corrupt/newer/missing primary variants, `NewUnmarkedPrimary`, retained incompatible catalog/config variants   | After admin authentication and before readiness, Adopt and fresh-elsewhere are reachable. Explicit Adopt keeps UUID/original hashes, assigns Host Owner, creates exactly one primary, queues scan and recovery hold, reaches ready. Fresh-elsewhere preserves old tree and registers only new fixed primary. No implicit adoption; nonempty unmarked/corrupt/newer bytes untouched; backup vs rebuild disclosure present. Registered offline default keeps ready, is not recreated or replaced. Public status/unauthorized requests expose no host details                                                                                           | P5 delivered (Go app/API, storage, Web flow); private holds from P4 |
 | R4 — `.lumilio/` isolation, inherited expiry and edit loss                    | Go integration + private-recovery Web flow; `NewLeftoverPrimary` opened as regular, adopted, and `CopyRepository` registered independently in fresh catalogs; injected crash boundaries and clock                                                        | Hash/tree inventory proves originals, Trash/info, Studio, staging, unknown children remain recoverable, with reachable recovery item actions after success/failure/restart. Trash view rebuilds source identities correctly, inherited entries remain held past ordinary expiry until explicit action, new deletes follow retention. Studio attaches only to proven content hash/size/source, ambiguous/newer records export/review without guessing; staged work never auto-resumes. Retry does not remint UUID or repeat moves                                                                                                                     | P4; adoption variant P5                                          |
 | R5 — rename race (unsafe outcome inferred by audit)                           | Deterministic Go integration/concurrency; valid marked Repository, external marker replacement or externally moved matching tree; hold/release operation-boundary hooks introduced with fix, no sleeps                                                   | Park Rename before lease acquisition, complete reconnect or replace marker, then release Rename. Re-query catalog and re-read both old/new markers: current leased row/path is used; only raw name changes; all other config/identity fields survive. A replaced identity produces specific stale/mismatch refusal and no overwrite, including rollback. Replay same payload returns same result, changed payload conflicts                                                                                                                                                                                                                          | P3                                                               |
 | R6 — stat panic / denied-as-absent / placeholder masking                      | Go unit observation + Go integration; valid tree, P1 observer returns nil info + `fs.ErrPermission`/other non-NotExist stat/read errors, genuine missing path and cloud placeholder controls                                                             | Public assessment/validation returns without panic; denial is permission-denied, arbitrary failures unknown, neither is absent/offline/placeholder. Re-query catalog/entries: no false Missing, no reconnect capability from unknown original, no marker provisioning. Only positively absent originals enable applicable recovery                                                                                                                                                                                                                                                                                                                   | P1; command/HTTP variants P2–P3                                  |
 | R7 — foreground write probes / inconsistent network classification            | Go unit + API integration; P1 write-incapable observer/event recorder, valid root/child tree snapshots; injected NFS/SMB/CIFS/AFP/sshfs/WebDAV/Windows remote-drive facts, Windows removable, cloud resident/evicted controls                            | Setup/status/candidate/assessment requests perform zero create/write/lock/reconcile/expiry calls and leave tree unchanged, including transient-event log. Every network variant returns the same unsupported fact before consent; create/open/reconnect cannot confirm past it. Removable/local-cloud facts produce reviewable risk, unavailable placeholders materialize/retry, permission errors remain distinct. Windows classification is exercised without hardware                                                                                                                                                                             | P1 core; P2 transports/review; P6 reconnect                      |
 | R8 — parent/child risk and continuity                                         | Go unit/integration; valid Location with independently mounted-child facts (parent local A, child B, B unchanged across samples), then missing/corrupt parent marker and healthy registered child                                                        | Child risk/support uses B; unchanged B has no mount-changed warning merely because A differs. Actual B replacement changes continuity; capacity grouping is independent. Parent fault does not deny registered child read/rename/detach, while new destination authorization still rejects invalid parent scope                                                                                                                                                                                                                                                                                                                                      | P1; rename/detach boundary P3                                    |
-| R9 — Open Existing / conflict handoff / external reconnect UI omissions       | Web flow + embedded Desktop picker-controller integration; non-default compatible marked child, actual StoragePanelFlow composition, new-create conflict, complete external Location                                                                     | Native-backed Open launches native selection for chosen Location instead of default candidates; standalone bounded candidates retain selected context. Conflict handoff reaches Open/reconnect/copy review with location/child retained. External Location menu has direct reconnect entry. Cancel/stale/expired picker retains form and returns legal restart action; task paths/nonces never leak to HTTP                                                                                                                                                                                                                                          | P2 create handoff; P3 task outcomes; P6 native/Location journeys |
+| R9 — Open Existing / conflict handoff / external reconnect UI omissions       | Web flow + embedded Desktop picker-controller integration; non-default compatible marked child, actual StoragePanelFlow composition, new-create conflict, complete external Location                                                                     | Native-backed Open launches native selection for chosen Location instead of default candidates; standalone bounded candidates retain selected context. Conflict handoff reaches Open/reconnect/copy review with location/child retained. External Location menu has direct reconnect entry. Cancel/stale/expired picker retains form and returns legal restart action; task paths/nonces never leak to HTTP                                                                                                                                                                                                                                          | P2 create handoff; P3 task outcomes; P6a direct Location entry and Location task (Web spec, app acceptance) |
 | R10 — illegal protected actions / generic unreachable failures / default hint | Go policy/API table integration + Web flow/presentation tests; adversarial capabilities, primary/default and regular/offline trees, owned/busy task controls                                                                                             | Menus never invent primary rename/copy/detach/ordinary reconnect; protected default hint directs to executable config/operator recovery. Every public Problem and async reason has an actor/phase-correct descriptor whose route/host entry can actually be followed from a real failure. Domain reasons survive native transport; auth/phase guards hold, arbitrary browser host paths are rejected; exhausted enum/risk/action cases have literal en/zh copy                                                                                                                                                                                       | P3 role/task policy; P5 setup reachability delivered; P7 exhaustiveness |
 | R11 — host-default scan-key volume debt                                       | Go integration + CI filesystem-image fixtures; sensitive/insensitive and normalization-distinct names, supported cross-volume reconnect and deliberate destination collisions                                                                            | Destination semantics determine keys; reconnect/rekey preserves entry IDs and Asset bindings, suppresses false absence, detects every collision before cutover, refuses without dropping rows or overwriting bytes. Unknown/mixed/directory-specific semantics refuse affected mutation until qualified by a reproducible fixture                                                                                                                                                                                                                                                                                                                    | P6                                                               |
 | R12 — marker/layout distinction and unsafe marker writes                      | Go unit/integration; all `Marker` states, `MissingPrivate`, missing inbox and required-directory file obstruction, injected marker replace/write failures                                                                                                | Compatible marker remains compatible when layout missing; explicit repair adds only allowed missing dirs and preserves UUID/originals. File obstruction/denial blocks repair; absent/denied/corrupt/unsupported markers stay distinct. Atomic-write failure leaves complete old/new marker, guarded replacement/rollback never clobbers external identity                                                                                                                                                                                                                                                                                            | P1 marker primitive; P3 command guard; P5 repair/adopt delivered |
@@ -866,8 +949,13 @@ no receipt. Audit pointers: `RepositoryRowActions.tsx:115`, `host_action.go:420`
 R2 must cover **picker returns a path, then silent no-op**: every outcome after
 selection must be visible as review, refusal with reason, or success. Exact
 destination type/path/marker IDs and whether the original was online are
-optional refinements for P6, not blockers. Current inspection establishes
-reconnect prerequisites and lower-stack Apply success, not the native cause.
+optional refinements for P6, not blockers. P6a finding (2026-10-21): the first
+wired-runtime reconnect of a tree moved while the Server ran failed with
+`storage/ownership-unavailable`, because the runtime lock file travels with
+the tree and the new-path claim contended with the process's own lock; the
+Web showed only the generic resolve failure. Both are fixed (ownership
+follows the moved lock; the resolve route maps typed refusals). The P3b task
+outcomes already made the remaining outcomes visible.
 
 ### P1 regression evidence
 

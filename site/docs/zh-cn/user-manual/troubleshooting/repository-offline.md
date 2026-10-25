@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/storage_locations.go
-- server/internal/storage/repo_relocate.go
+- server/internal/storage/repo_reconnect.go
 - server/app/repository_control.go
 - desktop/internal/runtime/repository.go
 - desktop/internal/storage/controller.go

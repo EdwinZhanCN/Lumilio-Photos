@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,7 +26,7 @@ var (
 	ErrRepositoryOffline = errors.New("repository is offline")
 
 	// ErrRepositoryIDMismatch reports that the .lumiliorepo at a path belongs to
-	// a different repository than the one being relocated.
+	// a different repository than the one being reconnected.
 	ErrRepositoryIDMismatch     = errors.New("repository ID at path does not match")
 	ErrRepositoryOriginalOnline = errors.New("registered repository is still online at its original path")
 
@@ -42,7 +43,7 @@ var (
 // gives the wrong answer in the ordinary external-drive sequence: the drive is
 // unplugged, the user registers a copy, and later the original drive returns.
 // Both locations are then real, and only the user knows which one is the
-// library. The caller must present the choice: relocate the existing
+// library. The caller must present the choice: reconnect the existing
 // repository, or register this path as a new, independent copy.
 type RepositoryConflictError struct {
 	RepositoryID   string
@@ -62,17 +63,67 @@ func (e *RepositoryConflictError) Error() string {
 	return fmt.Sprintf("repository %s is already registered at %s", e.RepositoryID, e.RegisteredPath)
 }
 
-// RelocateRepository points an existing repository at a new on-disk location.
+// ReconnectRepository re-points a registered Repository at the tree that now
+// carries its identity, after that tree was moved or remounted externally.
+// It never moves data (owner decision 5, "Relocate means reconnect only").
 //
 // Assets and Locations are untouched by construction: repository node paths
 // are relative graph projections, so every consumer resolves the new root
 // through RepositoryFS. The catalog path update and observation fence commit
-// together; original media bytes are never moved.
-func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id string, newPath string, requests ...LifecycleRequest) (*repo.Repository, error) {
-	return rm.relocateRepository(ctx, id, newPath, nil, requests...)
+// together under a journaled operation, so a retry with the same request ID
+// replays the result and startup recovery settles an interrupted one.
+func (rm *DefaultRepositoryManager) ReconnectRepository(ctx context.Context, id string, newPath string, requests ...LifecycleRequest) (*repo.Repository, error) {
+	return rm.reconnectRepository(ctx, id, newPath, nil, requests...)
 }
 
-func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id string, newPath string, associatedStorageLocationID *uuid.UUID, requests ...LifecycleRequest) (*repo.Repository, error) {
+type reconnectRepositoryOperationPayload struct {
+	RepositoryID      string `json:"repository_id"`
+	OldPath           string `json:"old_path"`
+	NewPath           string `json:"new_path"`
+	StorageLocationID string `json:"storage_location_id"`
+	ConfirmationType  string `json:"confirmation_type"`
+}
+
+type reconnectRepositoryOperationResult struct {
+	RepositoryID      string `json:"repository_id"`
+	StorageLocationID string `json:"storage_location_id"`
+	FilesPreserved    bool   `json:"files_preserved"`
+}
+
+// replayCompletedReconnect answers a retried reconnect before any admission:
+// the row it would re-admit is already at the new path, which the policy
+// would otherwise read as "original online". A different target under the
+// same request ID is a conflict.
+func (rm *DefaultRepositoryManager) replayCompletedReconnect(ctx context.Context, requestID, repositoryID, newPath string) (*repo.Repository, bool, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return nil, false, nil
+	}
+	operation, err := rm.queries.GetLifecycleOperationByRequestID(ctx, requestID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("find lifecycle request: %w", err)
+	}
+	if operation.Kind != lifecycleKindReconnectRepository {
+		return nil, false, ErrLifecycleRequestConflict
+	}
+	var payload reconnectRepositoryOperationPayload
+	if err := json.Unmarshal(operation.Payload, &payload); err != nil || payload.RepositoryID != repositoryID || payload.NewPath != newPath {
+		return nil, false, ErrLifecycleRequestConflict
+	}
+	if err := lifecycleReplayError(operation); err != nil {
+		return nil, false, err
+	}
+	current, err := rm.GetRepository(repositoryID)
+	if err != nil {
+		return nil, false, err
+	}
+	return current, true, nil
+}
+
+func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id string, newPath string, associatedStorageLocationID *uuid.UUID, requests ...LifecycleRequest) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
@@ -80,6 +131,15 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	cleanPath, err := CanonicalizeRepositoryPath(newPath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
+	}
+	request := LifecycleRequest{}
+	if len(requests) > 0 {
+		request = requests[0]
+	}
+	if replayed, ok, err := rm.replayCompletedReconnect(ctx, request.RequestID, id, cleanPath); err != nil {
+		return nil, err
+	} else if ok {
+		return replayed, nil
 	}
 
 	current, err := rm.GetRepository(id)
@@ -114,9 +174,6 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		return nil, fmt.Errorf("%w: %s holds repository %s, not %s",
 			ErrRepositoryIDMismatch, cleanPath, config.ID, id)
 	}
-	if marker, markerErr := rm.identities().LoadRepository(current.Path); markerErr == nil && marker.ID == id {
-		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
-	}
 
 	now := time.Now()
 	storageLocationID := uuid.Nil
@@ -137,21 +194,19 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	if err != nil {
 		return nil, err
 	}
-	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
-	if oldMarkerErr == nil && oldMarker.ID == id {
-		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
-	}
+	// Under the lease the marker at the registered path decides again: an
+	// original that came back online is refused, an unreadable one admits
+	// nothing, and only a positively unavailable one is reconnected.
 	if err := rm.admitReconnect(ctx, *current); err != nil {
 		return nil, err
 	}
 	if current.Activity != dbtypes.RepositoryActivityIdle {
-		if oldMarkerErr == nil && !repositoryReachabilityAllowsStaleActivityDetach(current.Reachability) {
-			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
-		}
+		// The policy admitted stale activity only because the original is
+		// positively unavailable; nothing can finish it, so it is cleared.
 		if _, err := rm.queries.FinishRepositoryActivity(ctx, repo.FinishRepositoryActivityParams{
 			RepoID: repoUUID, Activity: current.Activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 		}); err != nil {
-			return nil, fmt.Errorf("clear stale repository activity before relocate: %w", err)
+			return nil, fmt.Errorf("clear stale repository activity before reconnect: %w", err)
 		}
 		current, err = rm.GetRepository(id)
 		if err != nil {
@@ -161,11 +216,43 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
 		}
 	}
+	confirmation := strings.TrimSpace(request.ConfirmationType)
+	if confirmation == "" {
+		confirmation = "update_location"
+	}
+	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
+		RequestID: request.RequestID, Kind: lifecycleKindReconnectRepository,
+		Payload: reconnectRepositoryOperationPayload{
+			RepositoryID: id, OldPath: current.Path, NewPath: cleanPath,
+			StorageLocationID: storageLocationID.String(), ConfirmationType: confirmation,
+		},
+		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
+		TargetType: "repository", TargetID: &id,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if replay {
+		if err := lifecycleReplayError(operation); err != nil {
+			return nil, err
+		}
+		return rm.GetRepository(id)
+	}
+	failPrepared := func(cause error) (*repo.Repository, error) {
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, cause, nil)
+		return nil, cause
+	}
 	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRelocate, nil)
 	if err != nil {
-		return nil, fmt.Errorf("begin repository relocation: %w", err)
+		return failPrepared(fmt.Errorf("begin repository reconnect: %w", err))
 	}
 	defer func() { _ = tx.Rollback() }()
+	// The catalog has one writer: the reconnect transaction must be rolled
+	// back before the journal records the failure in its own transaction.
+	failInTx := func(cause error) (*repo.Repository, error) {
+		_ = tx.Rollback()
+		return failPrepared(cause)
+	}
 	queries := rm.queries.WithTx(tx.Raw())
 	dbRepo, err := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
 		RepoID:            repoUUID,
@@ -176,23 +263,15 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	})
 	if err != nil {
 		if isUniquePathViolation(err) {
-			rm.repoAudit(cleanPath).Error("repository.relocate", err, zap.String("repository_id", id))
-			return nil, fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, cleanPath)
+			rm.repoAudit(cleanPath).Error("repository.reconnect", err, zap.String("repository_id", id))
+			return failInTx(fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, cleanPath))
 		}
-		rm.repoAudit(cleanPath).Error("repository.relocate", err, zap.String("repository_id", id))
-		return nil, fmt.Errorf("failed to relocate repository: %w", err)
+		rm.repoAudit(cleanPath).Error("repository.reconnect", err, zap.String("repository_id", id))
+		return failInTx(fmt.Errorf("failed to reconnect repository: %w", err))
 	}
 	nowStamp := dbtypes.NewTimestamp(now)
 	if err := invalidateRepositoryObservationAfterRelocation(ctx, tx, repoUUID, cleanPath, nowStamp); err != nil {
-		return nil, err
-	}
-	request := LifecycleRequest{}
-	if len(requests) > 0 {
-		request = requests[0]
-	}
-	confirmation := strings.TrimSpace(request.ConfirmationType)
-	if confirmation == "" {
-		confirmation = "update_location"
+		return failInTx(err)
 	}
 	if _, err := recordLifecycleAuditWithQueries(ctx, queries, LifecycleAuditInput{
 		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
@@ -201,10 +280,15 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		OldPath: current.Path, NewPath: cleanPath, Result: AuditResultSucceeded,
 		Details: map[string]any{"risk_confirmation": request.RiskConfirmation},
 	}); err != nil {
-		return nil, fmt.Errorf("audit repository relocation: %w", err)
+		return failInTx(fmt.Errorf("audit repository reconnect: %w", err))
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit repository relocation: %w", err)
+		return failInTx(fmt.Errorf("commit repository reconnect: %w", err))
+	}
+	if err := rm.completeLifecycleOperation(ctx, operation.OperationID, reconnectRepositoryOperationResult{
+		RepositoryID: id, StorageLocationID: storageLocationID.String(), FilesPreserved: true,
+	}); err != nil {
+		return nil, fmt.Errorf("repository reconnected but journal completion failed: %w", err)
 	}
 
 	// The path is now correct and durable. Refreshing the DB's cached copy of
@@ -212,20 +296,20 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	// repository is still correctly located and the next boot reconcile will
 	// bring the cache forward.
 	if refreshed, err := rm.refreshRepositoryConfigCache(ctx, dbRepo, config); err != nil {
-		rm.logger.Warn("relocated repository but failed to refresh config cache",
-			zap.String("operation", "repository.relocate"),
+		rm.logger.Warn("reconnected repository but failed to refresh config cache",
+			zap.String("operation", "repository.reconnect"),
 			zap.String("repository_id", id),
 			zap.Error(err))
 	} else {
 		dbRepo = *refreshed
 	}
 
-	rm.repoAudit(cleanPath).Operation("repository.relocate",
+	rm.repoAudit(cleanPath).Operation("repository.reconnect",
 		zap.String("repository_id", id),
 		zap.String("repository_path", cleanPath),
 	)
-	rm.logger.Info("repository relocated",
-		zap.String("operation", "repository.relocate"),
+	rm.logger.Info("repository reconnected",
+		zap.String("operation", "repository.reconnect"),
 		zap.String("repository_id", id),
 		zap.String("repository_path", cleanPath),
 	)
@@ -234,22 +318,31 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 }
 
 // admitReconnect applies the role-aware policy to a reconnect. The catalog
-// may still project an original as active after it went away, so the marker
-// probe, not the projection, decides whether there is something to
-// reconnect: an original that is positively online is ErrRepositoryOriginalOnline,
-// any other withheld verdict is the typed refusal with its blockers.
+// may still project an original as active after it went away, so a read of
+// the registered path, not the projection, decides whether there is
+// something to reconnect: an original that is positively online is
+// ErrRepositoryOriginalOnline, an unreadable one withholds the action with
+// original_inaccessible (denial is never absence), and any other withheld
+// verdict is the typed refusal with its blockers.
 func (rm *DefaultRepositoryManager) admitReconnect(ctx context.Context, current repo.Repository) error {
 	facts, err := rm.repositoryActionFacts(ctx, current)
 	if err != nil {
 		return err
 	}
-	oldMarker, oldMarkerErr := rm.identities().LoadRepository(current.Path)
-	originalOnline := oldMarkerErr == nil && oldMarker.ID == current.RepoID.String()
-	if facts.Reachability == dbtypes.RepositoryReachabilityActive && !originalOnline {
-		facts.Reachability = dbtypes.RepositoryReachabilityOffline
+	state := rm.repositoryOriginalState(current.Path, current.RepoID.String())
+	switch state {
+	case OriginalInaccessible:
+		facts.OriginalInaccessible = true
+	case OriginalAbsent, OriginalIdentityDiffers:
+		if facts.Reachability == dbtypes.RepositoryReachabilityActive {
+			facts.Reachability = dbtypes.RepositoryReachabilityOffline
+		}
 	}
 	verdict := DeriveRepositoryActions(facts).Verdict(ActionReconnect)
 	if verdict.Allowed() {
+		if state == OriginalOnline {
+			return fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
+		}
 		return nil
 	}
 	if len(verdict.Blockers) == 1 && verdict.Blockers[0] == BlockerOriginalAvailable {

@@ -105,7 +105,7 @@ func TestStorageRuntimeStatusStaysAvailableWhileWriterIsBusy(t *testing.T) {
 	}
 }
 
-func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
+func TestReconnectStorageLocationIsAllOrNothing(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -152,7 +152,7 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 	if err := secondConfig.SaveConfigToFile(secondNewPath); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.RelocateStorageLocation(ctx, external.StorageLocationID.String(), newPath); err == nil {
+	if _, err := manager.ReconnectStorageLocation(ctx, external.StorageLocationID.String(), newPath); err == nil {
 		t.Fatal("relocate with invalid child identity unexpectedly succeeded")
 	}
 	rootAfterFailure, _ := manager.queries.GetStorageLocation(ctx, external.StorageLocationID)
@@ -168,10 +168,10 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	relocateRequest := LifecycleRequest{RequestID: "relocate-external-stable", Actor: "test"}
-	if _, err := manager.RelocateStorageLocation(ctx, external.StorageLocationID.String(), newPath, relocateRequest); err != nil {
+	if _, err := manager.ReconnectStorageLocation(ctx, external.StorageLocationID.String(), newPath, relocateRequest); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.RelocateStorageLocation(ctx, external.StorageLocationID.String(), newPath, relocateRequest); err != nil {
+	if _, err := manager.ReconnectStorageLocation(ctx, external.StorageLocationID.String(), newPath, relocateRequest); err != nil {
 		t.Fatalf("stable relocate retry: %v", err)
 	}
 	var stableOperations int
