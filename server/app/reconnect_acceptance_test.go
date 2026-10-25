@@ -84,7 +84,7 @@ func (h *reconnectHarness) externalDisk(name string) StorageLocationInfo {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		h.t.Fatal(err)
 	}
-	info, _, err := h.control.AddStorageLocation(context.Background(), "acceptance-"+name, path, name)
+	info, err := h.control.AddStorageLocation(context.Background(), "acceptance-"+name, path, name)
 	if err != nil {
 		h.t.Fatalf("add external Storage Location %s: %v", name, err)
 	}

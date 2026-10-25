@@ -14,6 +14,7 @@
     <dt>Normal HTTP status</dt><dd>409</dd>
     <dt>Definition</dt><dd>The Repository at the target is missing part of its layout, and a file or a denied directory sits where the missing directory belongs, so the bounded repair was not run.</dd>
     <dt>Recovery</dt><dd>Move the obstructing file out of the Repository folder or fix its permissions, then review the setup target again; nothing in the folder was changed. Choosing a fresh Default Storage Location is the other way out.</dd>
+    <dt>Recovery entry</dt><dd>actor <code>admin</code>, phase <code>setup</code>, kind <code>route</code>, route <code>/bootstrap</code></dd>
   </dl>
   <h2>Extension members</h2>
   <p>This Problem type defines no extension members.</p>

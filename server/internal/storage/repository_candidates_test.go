@@ -115,18 +115,27 @@ func TestResolveDefaultRepositoryCandidateSupportsMovedOriginalAndSeparateCopy(t
 		!containsString(movedCandidate.Actions, "relocate") || !containsString(movedCandidate.Actions, "copy") {
 		t.Fatalf("moved candidate = %#v", movedCandidate)
 	}
-	if !containsString(movedCandidate.RiskWarnings, "mount_fingerprint_changed") {
-		t.Fatalf("moved candidate risks = %v, want mount_fingerprint_changed", movedCandidate.RiskWarnings)
+	// Candidates suggest folders; the risks of one come from the shared
+	// review of that exact folder, and the acknowledgement is bound to it.
+	review, err := manager.AssessCreateTarget(ctx, AssessCreateTargetRequest{Intent: IntentOpenRepository, DirectoryName: "archive-moved"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsString(RiskCodes(review.Risks), string(RiskMountChanged)) || review.Token == "" {
+		t.Fatalf("moved candidate review = %+v, want mount_fingerprint_changed with a token", review)
 	}
 	if _, err := manager.ResolveDefaultRepositoryCandidate(
 		ctx, "archive-moved", "update_location", nil,
 		LifecycleRequest{RequestID: "candidate-relocate-rejected", Actor: "test"},
 	); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("unconfirmed relocation error = %v, want ErrRepositoryRiskConfirmationRequired", err)
+		t.Fatalf("unreviewed relocation error = %v, want ErrRepositoryRiskConfirmationRequired", err)
 	}
 	relocated, err := manager.ResolveDefaultRepositoryCandidate(
 		ctx, "archive-moved", "update_location", nil,
-		LifecycleRequest{RequestID: "candidate-relocate", Actor: "web:admin", HostInstanceID: "web-server-1", RiskConfirmation: true},
+		LifecycleRequest{
+			RequestID: "candidate-relocate", Actor: "web:admin", HostInstanceID: "web-server-1",
+			AssessmentToken: review.Token, AcknowledgedRisks: RiskCodes(review.Risks),
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -166,15 +175,21 @@ func TestResolveDefaultRepositoryCandidateSupportsMovedOriginalAndSeparateCopy(t
 	if err := manager.dirManager.CreateStructure(copyPath); err != nil {
 		t.Fatal(err)
 	}
+	// A review of another folder never admits this one: the token is bound
+	// to the exact target.
 	if _, err := manager.ResolveDefaultRepositoryCandidate(
 		ctx, "archive-copy", "add_separate", nil,
-		LifecycleRequest{RequestID: "candidate-copy-rejected", Actor: "test"},
-	); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("unconfirmed copy error = %v, want ErrRepositoryRiskConfirmationRequired", err)
+		LifecycleRequest{RequestID: "candidate-copy-stale", Actor: "test", AssessmentToken: review.Token, AcknowledgedRisks: RiskCodes(review.Risks)},
+	); !errors.Is(err, ErrStorageAssessmentStale) {
+		t.Fatalf("copy with the moved folder's token = %v, want ErrStorageAssessmentStale", err)
+	}
+	copyReview, err := manager.AssessCreateTarget(ctx, AssessCreateTargetRequest{Intent: IntentOpenRepository, DirectoryName: "archive-copy"})
+	if err != nil {
+		t.Fatal(err)
 	}
 	copyRepository, err := manager.ResolveDefaultRepositoryCandidate(
 		ctx, "archive-copy", "add_separate", nil,
-		LifecycleRequest{RequestID: "candidate-copy", Actor: "test", RiskConfirmation: true},
+		LifecycleRequest{RequestID: "candidate-copy", Actor: "test", AssessmentToken: copyReview.Token, AcknowledgedRisks: RiskCodes(copyReview.Risks)},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -220,26 +235,48 @@ func TestOpenDefaultRepositoryCandidateRequiresMountRiskConfirmation(t *testing.
 			break
 		}
 	}
-	if !containsString(existing.RiskWarnings, "mount_fingerprint_changed") {
-		t.Fatalf("existing candidate risks = %v, want mount_fingerprint_changed", existing.RiskWarnings)
+	if existing.Classification != RepositoryCandidateExisting || !existing.CanOpen {
+		t.Fatalf("existing candidate = %#v", existing)
+	}
+	review, err := manager.AssessCreateTarget(ctx, AssessCreateTargetRequest{Intent: IntentOpenRepository, DirectoryName: "existing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsString(RiskCodes(review.Risks), string(RiskMountChanged)) {
+		t.Fatalf("existing candidate review risks = %v, want mount_fingerprint_changed", RiskCodes(review.Risks))
 	}
 	if _, err := manager.OpenDefaultRepositoryCandidate(ctx, "existing", nil, LifecycleRequest{
 		RequestID: "candidate-open-rejected", Actor: "test",
 	}); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("unconfirmed open error = %v, want ErrRepositoryRiskConfirmationRequired", err)
+		t.Fatalf("unreviewed open error = %v, want ErrRepositoryRiskConfirmationRequired", err)
 	}
-	rejectedEvents, err := manager.ListLifecycleAudit(ctx, LifecycleAuditFilter{
-		TargetType: "repository", TargetID: "existing", Limit: 20,
-	})
+	// Acknowledging by code without the token, or with a token of other
+	// facts, is refused the same way the create command refuses it.
+	if _, err := manager.OpenDefaultRepositoryCandidate(ctx, "existing", nil, LifecycleRequest{
+		RequestID: "candidate-open-unbound", Actor: "test", AcknowledgedRisks: RiskCodes(review.Risks),
+	}); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
+		t.Fatalf("unbound acknowledgement error = %v, want ErrRepositoryRiskConfirmationRequired", err)
+	}
+	if _, err := manager.OpenDefaultRepositoryCandidate(ctx, "existing", nil, LifecycleRequest{
+		RequestID: "candidate-open-stale", Actor: "test", AssessmentToken: "v1.not-this-target", AcknowledgedRisks: RiskCodes(review.Risks),
+	}); !errors.Is(err, ErrStorageAssessmentStale) {
+		t.Fatalf("stale token error = %v, want ErrStorageAssessmentStale", err)
+	}
+	rejectedEvents, err := manager.ListLifecycleAudit(ctx, LifecycleAuditFilter{TargetType: "repository", TargetID: "existing", Limit: 50})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rejectedEvents) != 1 || rejectedEvents[0].RequestID != "candidate-open-rejected" ||
-		rejectedEvents[0].Result != AuditResultRejected || rejectedEvents[0].FailureStage != "risk_confirmation" {
-		t.Fatalf("candidate rejection audit = %#v", rejectedEvents)
+	stages := map[string]string{}
+	for _, event := range rejectedEvents {
+		if event.Result == AuditResultRejected {
+			stages[event.RequestID] = event.FailureStage
+		}
+	}
+	if stages["candidate-open-rejected"] != "risk_confirmation" || stages["candidate-open-unbound"] != "risk_confirmation" || stages["candidate-open-stale"] != "assessment_stale" {
+		t.Fatalf("candidate rejection audits = %v", stages)
 	}
 	opened, err := manager.OpenDefaultRepositoryCandidate(ctx, "existing", nil, LifecycleRequest{
-		RequestID: "candidate-open", Actor: "test", RiskConfirmation: true,
+		RequestID: "candidate-open", Actor: "test", AssessmentToken: review.Token, AcknowledgedRisks: RiskCodes(review.Risks),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -253,7 +290,11 @@ func TestOpenDefaultRepositoryCandidateRequiresMountRiskConfirmation(t *testing.
 	}
 }
 
-func TestRepositoryCandidateSurfacesPlaceholderRiskBeforeOpen(t *testing.T) {
+// A folder holding cloud placeholders is not a risk to acknowledge. The
+// review samples the folder itself (deep traversal is the command's
+// preflight), so it reports no refusal, and the open command's
+// materialization preflight refuses the tree whatever was acknowledged.
+func TestRepositoryCandidateWithPlaceholdersIsRefusedBeforeAnyConsent(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
@@ -271,29 +312,20 @@ func TestRepositoryCandidateSurfacesPlaceholderRiskBeforeOpen(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(path, ".photo.jpg.icloud"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	candidates, err := manager.ListDefaultRepositoryCandidates(ctx)
+	review, err := manager.AssessCreateTarget(ctx, AssessCreateTargetRequest{Intent: IntentOpenRepository, DirectoryName: "placeholder"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var placeholder RepositoryCandidate
-	for _, candidate := range candidates {
-		if candidate.DirectoryName == "placeholder" {
-			placeholder = candidate
-			break
+	if review.Problem() != "" || len(review.Risks) != 0 {
+		t.Fatalf("placeholder review = problem %q risks %v, want a reviewable folder", review.Problem(), RiskCodes(review.Risks))
+	}
+	for _, request := range []LifecycleRequest{
+		{RequestID: "placeholder-unreviewed", Actor: "web:admin"},
+		{RequestID: "placeholder-acknowledged", Actor: "web:admin", AssessmentToken: review.Token, AcknowledgedRisks: RiskCodes(review.Risks)},
+	} {
+		if _, err := manager.OpenDefaultRepositoryCandidate(ctx, "placeholder", nil, request); !errors.Is(err, ErrUnavailableCloudPlaceholder) {
+			t.Fatalf("%s: placeholder open error = %v, want ErrUnavailableCloudPlaceholder", request.RequestID, err)
 		}
-	}
-	if !containsString(placeholder.RiskWarnings, "unavailable_cloud_placeholder") {
-		t.Fatalf("placeholder risks = %v", placeholder.RiskWarnings)
-	}
-	if _, err := manager.OpenDefaultRepositoryCandidate(ctx, "placeholder", nil, LifecycleRequest{
-		RequestID: "placeholder-unconfirmed", Actor: "web:admin",
-	}); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("unconfirmed placeholder error = %v, want risk confirmation", err)
-	}
-	if _, err := manager.OpenDefaultRepositoryCandidate(ctx, "placeholder", nil, LifecycleRequest{
-		RequestID: "placeholder-confirmed", Actor: "web:admin", RiskConfirmation: true,
-	}); !errors.Is(err, ErrUnavailableCloudPlaceholder) {
-		t.Fatalf("confirmed unavailable placeholder error = %v", err)
 	}
 }
 

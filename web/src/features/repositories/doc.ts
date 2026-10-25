@@ -62,7 +62,10 @@
  * level of plain text — a single column on narrow screens, two from `sm` up.
  * Capacity has exactly one visual form there, a sentence naming its storage
  * once, and the diagnostic facts sit in the same grid rather than a nested
- * disclosure.
+ * disclosure. Every action the Server withholds is explained there in the
+ * same grid: the action's name from {@link storageActionLabel}, the Server's
+ * blockers, and the legal alternatives it listed, so a reader learns why a
+ * command is missing from the menu without trying it.
  * {@link deriveStorageLabel} turns the Server's mount path into the storage
  * identity a reader recognizes; nothing is grouped by backing storage, because
  * one Storage Location can hold Repositories on different mounts.
@@ -159,6 +162,7 @@ import type { useCreateRepository } from "./api/useCreateRepository.ts";
 import type { useStorageAssessment } from "./api/useStorageAssessment.ts";
 import type { StorageRiskConfirmation } from "./components/StorageRiskConfirmation.tsx";
 import type { storageRiskLabel } from "./model/storageRiskCopy.ts";
+import type { storageActionLabel } from "./model/storageActionCopy.ts";
 import type { useNativeHostAction, useNativeHostCapability } from "./api/useNativeHostActions.ts";
 import type { useRepositoryCandidates } from "./api/useRepositoryCandidates.ts";
 import type { useRepositoryOptions } from "./api/useRepositoryOptions.ts";

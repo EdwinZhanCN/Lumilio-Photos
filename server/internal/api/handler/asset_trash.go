@@ -43,14 +43,7 @@ func writeTrashProblem(c *gin.Context, err error) {
 			api.WriteProblem(c, problem.New(problem.AssetMissing, err))
 			return
 		}
-		actions := []string{}
-		switch rejection.Reason {
-		case trash.ReasonRepositoryOffline:
-			actions = []string{"reconnect"}
-		case trash.ReasonFileChanged:
-			actions = []string{"rescan"}
-		}
-		api.WriteProblem(c, problem.NewRepositoryConflict(err, rejection.Reason, repositoryID, actions))
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, rejection.Reason, repositoryID, rejection.Actions()))
 		return
 	}
 	log.Printf("asset trash operation failed: %v", err)

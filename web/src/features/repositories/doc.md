@@ -61,7 +61,10 @@ selection.
 level of plain text — a single column on narrow screens, two from `sm` up.
 Capacity has exactly one visual form there, a sentence naming its storage
 once, and the diagnostic facts sit in the same grid rather than a nested
-disclosure.
+disclosure. Every action the Server withholds is explained there in the
+same grid: the action's name from [storageActionLabel](./model/storageActionCopy.ts), the Server's
+blockers, and the legal alternatives it listed, so a reader learns why a
+command is missing from the menu without trying it.
 [deriveStorageLabel](./model/storageLabels.ts) turns the Server's mount path into the storage
 identity a reader recognizes; nothing is grouped by backing storage, because
 one Storage Location can hold Repositories on different mounts.

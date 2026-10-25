@@ -1295,6 +1295,75 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "api.RepositoryCandidateProblemResponse": {
+                "discriminator": {
+                    "mapping": {
+                        "https://lumilio.org/problems/repository/conflict": "#/components/schemas/api.RepositoryConflictProblem",
+                        "https://lumilio.org/problems/storage/action-unavailable": "#/components/schemas/api.StorageActionUnavailableProblem",
+                        "https://lumilio.org/problems/storage/assessment-stale": "#/components/schemas/api.StorageAssessmentStaleProblem",
+                        "https://lumilio.org/problems/storage/busy": "#/components/schemas/api.StorageBusyProblem",
+                        "https://lumilio.org/problems/storage/confirmation-required": "#/components/schemas/api.StorageConfirmationRequiredProblem",
+                        "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblem",
+                        "https://lumilio.org/problems/storage/materialization-required": "#/components/schemas/api.StorageMaterializationRequiredProblem",
+                        "https://lumilio.org/problems/storage/name-collision": "#/components/schemas/api.StorageNameCollisionProblem",
+                        "https://lumilio.org/problems/storage/not-a-mounted-volume": "#/components/schemas/api.StorageNotAMountedVolumeProblem",
+                        "https://lumilio.org/problems/storage/observation-unknown": "#/components/schemas/api.StorageObservationUnknownProblem",
+                        "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblem",
+                        "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblem",
+                        "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblem",
+                        "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblem",
+                        "https://lumilio.org/problems/storage/volume-unqualified": "#/components/schemas/api.StorageVolumeUnqualifiedProblem"
+                    },
+                    "propertyName": "type"
+                },
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/api.RepositoryConflictProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageConfirmationRequiredProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageAssessmentStaleProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageUnsupportedFilesystemProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageNotAMountedVolumeProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageObservationUnknownProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StoragePermissionDeniedProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageMaterializationRequiredProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageActionUnavailableProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageBusyProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOwnershipUnavailableProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageIdentityMismatchProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageOriginalOnlineProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageVolumeUnqualifiedProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageNameCollisionProblem"
+                    }
+                ]
+            },
             "api.RepositoryCommandProblemResponse": {
                 "discriminator": {
                     "mapping": {
@@ -8384,13 +8453,25 @@ const docTemplate = `{
             },
             "dto.OpenRepositoryCandidateRequestDTO": {
                 "properties": {
+                    "acknowledged_risks": {
+                        "example": [
+                            "mount_fingerprint_changed"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "assessment_token": {
+                        "description": "AssessmentToken and AcknowledgedRisks bind the administrator's risk\nacknowledgement to the open_repository assessment of this exact\nfolder; without them a risky folder answers storage/confirmation-required.",
+                        "example": "v1.0123456789abcdef",
+                        "type": "string"
+                    },
                     "directory_name": {
                         "description": "DirectoryName is a portable direct-child folder segment below the\nconfigured default Storage Location, never an arbitrary host path.",
                         "example": "family-archive",
                         "type": "string"
-                    },
-                    "risk_confirmation": {
-                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -9150,13 +9231,6 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
-                    "risk_warnings": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
                     "total_bytes": {
                         "type": "integer"
                     },
@@ -9755,6 +9829,20 @@ const docTemplate = `{
             },
             "dto.ResolveRepositoryCandidateRequestDTO": {
                 "properties": {
+                    "acknowledged_risks": {
+                        "example": [
+                            "mount_fingerprint_changed"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "assessment_token": {
+                        "example": "v1.0123456789abcdef",
+                        "type": "string"
+                    },
                     "directory_name": {
                         "example": "family-archive",
                         "type": "string"
@@ -9766,9 +9854,6 @@ const docTemplate = `{
                         ],
                         "example": "update_location",
                         "type": "string"
-                    },
-                    "risk_confirmation": {
-                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -10674,7 +10759,8 @@ const docTemplate = `{
                     "intent": {
                         "enum": [
                             "create_repository",
-                            "setup_primary"
+                            "setup_primary",
+                            "open_repository"
                         ],
                         "example": "create_repository",
                         "type": "string"
@@ -10740,20 +10826,22 @@ const docTemplate = `{
             "dto.StorageAssessmentRequestDTO": {
                 "properties": {
                     "directory_name": {
-                        "description": "DirectoryName is the direct-child folder for create_repository; ignored for setup_primary.",
+                        "description": "DirectoryName is the direct-child folder for create_repository and open_repository; ignored for setup_primary.",
                         "example": "family-photos",
                         "type": "string"
                     },
                     "intent": {
+                        "description": "Intent is the command the review is for: create_repository and\nsetup_primary review a create target, open_repository an existing\ndirect child of the Default Storage Location (the candidate journeys).",
                         "enum": [
                             "create_repository",
-                            "setup_primary"
+                            "setup_primary",
+                            "open_repository"
                         ],
                         "example": "create_repository",
                         "type": "string"
                     },
                     "storage_location_id": {
-                        "description": "StorageLocationID identifies a registered Storage Location. Empty selects\nthe configured default; setup_primary always uses the default.",
+                        "description": "StorageLocationID identifies a registered Storage Location. Empty selects\nthe configured default; setup_primary and open_repository always use the default.",
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     }
@@ -10872,13 +10960,6 @@ const docTemplate = `{
                     },
                     "removable_likely": {
                         "type": "boolean"
-                    },
-                    "risk_warnings": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
                     },
                     "role": {
                         "enum": [
@@ -28048,11 +28129,11 @@ const docTemplate = `{
                         "content": {
                             "application/problem+json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.RepositoryConflictProblemResponse"
+                                    "$ref": "#/components/schemas/api.RepositoryCandidateProblemResponse"
                                 }
                             }
                         },
-                        "description": "Conflict"
+                        "description": "Confirmation required, stale assessment, typed storage refusal, Repository conflict, or a Repository command refusal"
                     }
                 },
                 "security": [
@@ -28124,11 +28205,11 @@ const docTemplate = `{
                         "content": {
                             "application/problem+json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.RepositoryCommandProblemResponse"
+                                    "$ref": "#/components/schemas/api.RepositoryCandidateProblemResponse"
                                 }
                             }
                         },
-                        "description": "Conflict"
+                        "description": "Confirmation required, stale assessment, typed storage refusal, Repository conflict, or a Repository command refusal"
                     }
                 },
                 "security": [

@@ -226,7 +226,7 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 	server.mustJSON(http.MethodPost, "/api/v1/setup/primary-repository", map[string]any{
 		// The fixture's temporary directory may sit on a volume the storage
 		// path policy flags as risky; confirming it is the operator's choice.
-		"name": "Blackbox Primary", "storage_strategy": "flat", "risk_confirmation": true,
+		"name": "Blackbox Primary", "storage_strategy": "flat",
 	}, &created)
 	if created.Repository.ID == "" || created.Repository.Path == "" {
 		tb.Fatalf("primary repository = %+v", created.Repository)
@@ -443,7 +443,7 @@ func (s *blackboxServer) createRepository(name, directory string) blackboxReposi
 		Repository blackboxRepository `json:"repository"`
 	}
 	s.mustJSON(http.MethodPost, "/api/v1/storage/repositories", map[string]any{
-		"name": name, "directory_name": directory, "storage_strategy": "flat", "risk_confirmation": true,
+		"name": name, "directory_name": directory, "storage_strategy": "flat",
 	}, &created)
 	if created.Repository.ID == "" || created.Repository.Path == "" {
 		s.t.Fatalf("created repository = %+v", created.Repository)

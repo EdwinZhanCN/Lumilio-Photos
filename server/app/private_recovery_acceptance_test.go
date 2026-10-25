@@ -37,8 +37,17 @@ func TestPrivateStateOfAnOpenedRepositoryIsRecoverable(t *testing.T) {
 		Name string `json:"name"`
 		Path string `json:"path"`
 	}
+	// Opening a candidate is admitted by the shared review of that exact
+	// folder: the acknowledgement travels with the review's token.
+	var review struct {
+		Token string   `json:"token"`
+		Risks []string `json:"risks"`
+	}
+	server.mustJSON(http.MethodPost, "/api/v1/storage/assessments", map[string]any{
+		"intent": "open_repository", "directory_name": "inherited",
+	}, &review)
 	server.mustJSON(http.MethodPost, "/api/v1/storage/candidates/open", map[string]any{
-		"directory_name": "inherited", "risk_confirmation": true,
+		"directory_name": "inherited", "assessment_token": review.Token, "acknowledged_risks": review.Risks,
 	}, &opened)
 	repository := blackboxRepository{ID: opened.ID, Name: opened.Name, Path: opened.Path}
 	recoveryPath := "/api/v1/storage/repositories/" + url.PathEscape(repository.ID) + "/recovery"

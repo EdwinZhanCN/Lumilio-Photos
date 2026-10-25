@@ -33,11 +33,14 @@ type CreateRepositoryRequestDTO struct {
 // StorageAssessmentRequestDTO selects a create target by registered Storage
 // Location and direct-child folder. Clients never submit a filesystem path.
 type StorageAssessmentRequestDTO struct {
-	Intent string `json:"intent" binding:"required,oneof=create_repository setup_primary" example:"create_repository"`
+	// Intent is the command the review is for: create_repository and
+	// setup_primary review a create target, open_repository an existing
+	// direct child of the Default Storage Location (the candidate journeys).
+	Intent string `json:"intent" binding:"required,oneof=create_repository setup_primary open_repository" example:"create_repository"`
 	// StorageLocationID identifies a registered Storage Location. Empty selects
-	// the configured default; setup_primary always uses the default.
+	// the configured default; setup_primary and open_repository always use the default.
 	StorageLocationID string `json:"storage_location_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	// DirectoryName is the direct-child folder for create_repository; ignored for setup_primary.
+	// DirectoryName is the direct-child folder for create_repository and open_repository; ignored for setup_primary.
 	DirectoryName string `json:"directory_name,omitempty" example:"family-photos"`
 }
 
@@ -47,7 +50,7 @@ type StorageAssessmentRequestDTO struct {
 // vocabulary does.
 type StorageAssessmentDTO struct {
 	Token               string `json:"token" example:"v1.0123456789abcdef"`
-	Intent              string `json:"intent" enums:"create_repository,setup_primary" example:"create_repository"`
+	Intent              string `json:"intent" enums:"create_repository,setup_primary,open_repository" example:"create_repository"`
 	StorageLocationID   string `json:"storage_location_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	StorageLocationKind string `json:"storage_location_kind" enums:"default,external" example:"external"`
 	DirectoryName       string `json:"directory_name" example:"family-photos"`
@@ -230,7 +233,6 @@ type StorageDiagnosticDTO struct {
 	NetworkFilesystem          bool       `json:"network_filesystem"`
 	RemovableLikely            bool       `json:"removable_likely"`
 	CloudSyncProvider          string     `json:"cloud_sync_provider,omitempty"`
-	RiskWarnings               []string   `json:"risk_warnings,omitempty"`
 }
 
 type StorageDiagnosticsResponseDTO struct {
@@ -259,7 +261,6 @@ type RepositoryCandidateDTO struct {
 	TotalBytes         uint64   `json:"total_bytes,omitempty"`
 	AvailableBytes     uint64   `json:"available_bytes,omitempty"`
 	Filesystem         string   `json:"filesystem,omitempty"`
-	RiskWarnings       []string `json:"risk_warnings,omitempty"`
 }
 
 type ListRepositoryCandidatesResponseDTO struct {
@@ -269,14 +270,19 @@ type ListRepositoryCandidatesResponseDTO struct {
 type OpenRepositoryCandidateRequestDTO struct {
 	// DirectoryName is a portable direct-child folder segment below the
 	// configured default Storage Location, never an arbitrary host path.
-	DirectoryName    string `json:"directory_name" binding:"required" example:"family-archive"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
+	DirectoryName string `json:"directory_name" binding:"required" example:"family-archive"`
+	// AssessmentToken and AcknowledgedRisks bind the administrator's risk
+	// acknowledgement to the open_repository assessment of this exact
+	// folder; without them a risky folder answers storage/confirmation-required.
+	AssessmentToken   string   `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"mount_fingerprint_changed"`
 }
 
 type ResolveRepositoryCandidateRequestDTO struct {
-	DirectoryName    string `json:"directory_name" binding:"required" example:"family-archive"`
-	Resolution       string `json:"resolution" binding:"required,oneof=update_location add_separate" example:"update_location"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
+	DirectoryName     string   `json:"directory_name" binding:"required" example:"family-archive"`
+	Resolution        string   `json:"resolution" binding:"required,oneof=update_location add_separate" example:"update_location"`
+	AssessmentToken   string   `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"mount_fingerprint_changed"`
 }
 
 type RepositoryScanQueuedDTO struct {

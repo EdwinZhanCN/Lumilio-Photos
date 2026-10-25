@@ -1,16 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Copy, FolderOpen, RefreshCw, X } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
-import { localizeAPIProblem } from "@/lib/http-commons/problem";
+import {
+  localizeAPIProblem,
+  localizeProblemType,
+  normalizeProblem,
+} from "@/lib/http-commons/problem";
 import {
   type RepositoryCandidate,
   useOpenRepositoryCandidate,
   useRepositoryCandidates,
   useResolveRepositoryCandidate,
 } from "../../api/useRepositoryCandidates";
-import { storageRiskLabel } from "../../model/storageRiskCopy";
+import { useStorageAssessment } from "../../api/useStorageAssessment";
+import { StorageRiskConfirmation } from "../../components/StorageRiskConfirmation";
+import { ProblemRecoveryLink } from "@/components/problem/ProblemRecoveryLink";
 
+type CandidateAction = "open" | "update_location" | "add_separate";
+
+/** The Server asks for a fresh review of the same folder on these answers. */
+const CONSENT_PROBLEMS = new Set([
+  "https://lumilio.org/problems/storage/confirmation-required",
+  "https://lumilio.org/problems/storage/assessment-stale",
+]);
+
+/**
+ * Docker and standalone candidates: direct children of the Default Storage
+ * Location the Server classified. A candidate only suggests a folder; the
+ * decision to open it, use it as the moved original, or add it as a separate
+ * Repository goes through the same Server review and the same risk
+ * acknowledgement as a create, bound to that exact folder by the review's
+ * token. Nothing here classifies the folder itself.
+ */
 export default function RepositoryCandidateModal({
   isOpen,
   onClose,
@@ -28,70 +50,112 @@ export default function RepositoryCandidateModal({
   const resolveMutation = useResolveRepositoryCandidate();
   const candidates = candidatesQuery.data?.candidates ?? [];
   const busy = openMutation.isPending || resolveMutation.isPending;
-  const [riskConfirmations, setRiskConfirmations] = useState<Record<string, boolean>>({});
-  const [separateArmedFor, setSeparateArmedFor] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ directoryName: string; action: CandidateAction } | null>(
+    null,
+  );
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
 
-  const open = async (candidate: RepositoryCandidate) => {
-    if (!candidate.can_open || !candidate.directory_name) return;
-    try {
-      await openMutation.openRepositoryCandidate(
-        candidate.directory_name,
-        riskConfirmations[candidate.directory_name] ?? false,
-      );
-      showMessage(
-        "success",
+  const reviewQuery = useStorageAssessment(
+    { intent: "open_repository", directoryName: pending?.directoryName },
+    isOpen && pending !== null,
+  );
+  const review = pending ? reviewQuery.data : undefined;
+  const reviewRisks = review?.risks ?? [];
+  const reviewProblem = review?.problem
+    ? localizeProblemType(
+        `https://lumilio.org/problems/${review.problem}`,
+        t,
         t(
-          "manage.repositories.candidates.opened",
-          "Repository opened and its initial scan was queued.",
+          "manage.repositories.review.unavailable",
+          "This target cannot be used for a Repository right now.",
         ),
-      );
-      onClose();
-    } catch (reason: unknown) {
-      showMessage(
-        "error",
-        localizeAPIProblem(
-          reason,
-          t,
-          t("manage.repositories.candidates.openFailed", "Repository could not be opened."),
-        ),
-      );
-    }
+      )
+    : null;
+  const reviewToken = review?.token;
+  // An acknowledgement belongs to one token. New facts, a new token, a new review.
+  useEffect(() => {
+    setAcknowledged(false);
+  }, [reviewToken]);
+
+  const beginAction = (candidate: RepositoryCandidate, action: CandidateAction) => {
+    if (!candidate.directory_name) return;
+    setReviewNotice(null);
+    setAcknowledged(false);
+    setPending({ directoryName: candidate.directory_name, action });
   };
 
-  const resolve = async (
-    candidate: RepositoryCandidate,
-    resolution: "update_location" | "add_separate",
-  ) => {
-    if (!candidate.directory_name) return;
+  const cancelAction = () => {
+    setPending(null);
+    setReviewNotice(null);
+    setAcknowledged(false);
+  };
+
+  const confirmAction = async () => {
+    if (!pending || !review || review.problem) return;
+    if (reviewRisks.length > 0 && !acknowledged) return;
+    const consent = { assessmentToken: review.token, acknowledgedRisks: reviewRisks };
     try {
-      await resolveMutation.resolveRepositoryCandidate(
-        candidate.directory_name,
-        resolution,
-        riskConfirmations[candidate.directory_name] ?? false,
-      );
-      showMessage(
-        "success",
-        resolution === "update_location"
-          ? t("manage.repositories.candidates.relocated", "Repository location updated.")
-          : t("manage.repositories.candidates.copyAdded", "Separate Repository added."),
-      );
+      if (pending.action === "open") {
+        await openMutation.openRepositoryCandidate(pending.directoryName, consent);
+        showMessage(
+          "success",
+          t(
+            "manage.repositories.candidates.opened",
+            "Repository opened and its initial scan was queued.",
+          ),
+        );
+      } else {
+        await resolveMutation.resolveRepositoryCandidate(
+          pending.directoryName,
+          pending.action,
+          consent,
+        );
+        showMessage(
+          "success",
+          pending.action === "update_location"
+            ? t("manage.repositories.candidates.relocated", "Repository location updated.")
+            : t("manage.repositories.candidates.copyAdded", "Separate Repository added."),
+        );
+      }
+      cancelAction();
       onClose();
     } catch (reason: unknown) {
-      showMessage(
-        "error",
-        localizeAPIProblem(
-          reason,
-          t,
-          t(
-            "manage.repositories.candidates.resolveFailed",
-            "Repository decision could not be applied.",
-          ),
-        ),
-      );
+      const problem = normalizeProblem(reason);
+      const fallback =
+        pending.action === "open"
+          ? t("manage.repositories.candidates.openFailed", "Repository could not be opened.")
+          : t(
+              "manage.repositories.candidates.resolveFailed",
+              "Repository decision could not be applied.",
+            );
+      if (problem.kind === "problem" && CONSENT_PROBLEMS.has(problem.type)) {
+        // The folder's facts changed between review and command, or the
+        // acknowledgement did not cover them: review the current facts again.
+        setAcknowledged(false);
+        setReviewNotice(localizeAPIProblem(reason, t, fallback));
+        void reviewQuery.refetch();
+        return;
+      }
+      showMessage("error", localizeAPIProblem(reason, t, fallback));
     }
   };
 
   if (!isOpen) return null;
+
+  const confirmLabel = (action: CandidateAction) => {
+    switch (action) {
+      case "open":
+        return t("common.open", "Open");
+      case "update_location":
+        return t("manage.repositories.hostAction.updateLocation", "Use as moved original");
+      default:
+        return t(
+          "manage.repositories.candidates.addSeparateConfirm",
+          "Yes, add as separate Repository",
+        );
+    }
+  };
 
   return (
     <div className="modal modal-open z-modal">
@@ -149,7 +213,7 @@ export default function RepositoryCandidateModal({
         ) : (
           <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
             {candidates.map((candidate) => {
-              const armed = separateArmedFor === candidate.directory_name;
+              const isPending = pending?.directoryName === candidate.directory_name;
               return (
                 <div
                   key={candidate.directory_name}
@@ -173,126 +237,153 @@ export default function RepositoryCandidateModal({
                           {candidateLabel(candidate.classification, t)}
                         </span>
                       </div>
-                      {(candidate.risk_warnings?.length ?? 0) > 0 ? (
-                        <label className="mt-2 flex items-start gap-2 text-xs text-warning">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-warning checkbox-xs mt-0.5"
-                            checked={riskConfirmations[candidate.directory_name ?? ""] ?? false}
-                            onChange={(event) =>
-                              setRiskConfirmations((current) => ({
-                                ...current,
-                                [candidate.directory_name ?? ""]: event.target.checked,
-                              }))
-                            }
-                          />
-                          <span>
-                            <AlertTriangle className="mr-1 inline size-3" />
-                            {t("manage.repositories.candidates.riskConfirmation", {
-                              defaultValue:
-                                "I understand this location may be network-backed, removable, managed by cloud-sync software, mounted differently than when it was registered, or contain files that must be downloaded first.",
-                            })}
-                            <ul className="mt-1 list-disc pl-4">
-                              {(candidate.risk_warnings ?? []).map((risk) => (
-                                <li key={risk}>{storageRiskLabel(risk, t)}</li>
-                              ))}
-                            </ul>
-                          </span>
-                        </label>
-                      ) : null}
                     </div>
-                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                      {candidate.can_open ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => void open(candidate)}
-                          disabled={
-                            busy ||
-                            ((candidate.risk_warnings?.length ?? 0) > 0 &&
-                              !riskConfirmations[candidate.directory_name ?? ""])
-                          }
-                        >
-                          {busy ? (
-                            <span className="loading loading-spinner loading-xs" />
-                          ) : (
+                    {isPending ? null : (
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        {candidate.can_open ? (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => beginAction(candidate, "open")}
+                            disabled={busy || pending !== null}
+                          >
                             <FolderOpen size={15} />
-                          )}
-                          {t("common.open", "Open")}
-                        </button>
-                      ) : null}
-                      {candidate.allowed_resolutions?.includes("update_location") ? (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => void resolve(candidate, "update_location")}
-                          disabled={
-                            busy ||
-                            ((candidate.risk_warnings?.length ?? 0) > 0 &&
-                              !riskConfirmations[candidate.directory_name ?? ""])
-                          }
-                        >
-                          <FolderOpen size={15} />
-                          {t(
-                            "manage.repositories.hostAction.updateLocation",
-                            "Use as moved original",
-                          )}
-                        </button>
-                      ) : null}
-                      {candidate.allowed_resolutions?.includes("add_separate") ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => setSeparateArmedFor(candidate.directory_name ?? null)}
-                          disabled={
-                            busy ||
-                            ((candidate.risk_warnings?.length ?? 0) > 0 &&
-                              !riskConfirmations[candidate.directory_name ?? ""])
-                          }
-                        >
-                          <Copy size={15} />
-                          {t(
-                            "manage.repositories.hostAction.addSeparate",
-                            "Add as separate Repository",
-                          )}
-                        </button>
-                      ) : null}
-                    </div>
+                            {t("common.open", "Open")}
+                          </button>
+                        ) : null}
+                        {candidate.allowed_resolutions?.includes("update_location") ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => beginAction(candidate, "update_location")}
+                            disabled={busy || pending !== null}
+                          >
+                            <FolderOpen size={15} />
+                            {t(
+                              "manage.repositories.hostAction.updateLocation",
+                              "Use as moved original",
+                            )}
+                          </button>
+                        ) : null}
+                        {candidate.allowed_resolutions?.includes("add_separate") ? (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => beginAction(candidate, "add_separate")}
+                            disabled={busy || pending !== null}
+                          >
+                            <Copy size={15} />
+                            {t(
+                              "manage.repositories.hostAction.addSeparate",
+                              "Add as separate Repository",
+                            )}
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                  {armed ? (
-                    <div
-                      role="alert"
-                      className="alert alert-warning alert-soft mt-3 flex-wrap items-center gap-2 py-2 text-xs"
+                  {isPending && pending ? (
+                    <section
+                      aria-label={t("manage.repositories.candidates.reviewTitle", "Folder review")}
+                      className="mt-3 space-y-3"
                     >
-                      <AlertTriangle className="size-4 shrink-0" />
-                      <span className="min-w-0 flex-1">
-                        {t(
-                          "manage.repositories.candidates.copyConfirmation",
-                          "Add this as a separate Repository? Lumilio will create a new identity and isolate copied private state. This is not synchronization or a backup link.",
-                        )}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2">
+                      {pending.action === "add_separate" ? (
+                        <div
+                          role="note"
+                          className="alert alert-warning alert-soft flex-wrap items-center gap-2 py-2 text-xs"
+                        >
+                          <AlertTriangle className="size-4 shrink-0" />
+                          <span className="min-w-0 flex-1">
+                            {t(
+                              "manage.repositories.candidates.copyConfirmation",
+                              "Add this as a separate Repository? Lumilio will create a new identity and isolate copied private state. This is not synchronization or a backup link.",
+                            )}
+                          </span>
+                        </div>
+                      ) : null}
+                      {reviewQuery.isPending ? (
+                        <div className="flex items-center gap-2 text-xs text-base-content/60">
+                          <span className="loading loading-spinner loading-xs" />
+                          {t(
+                            "manage.repositories.review.assessing",
+                            "Reviewing the storage target…",
+                          )}
+                        </div>
+                      ) : null}
+                      {reviewQuery.isError ? (
+                        <div role="alert" className="alert alert-error alert-soft py-2 text-sm">
+                          <span>
+                            {localizeAPIProblem(
+                              reviewQuery.error,
+                              t,
+                              t(
+                                "manage.repositories.review.failed",
+                                "The target could not be reviewed.",
+                              ),
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            onClick={() => void reviewQuery.refetch()}
+                          >
+                            <RefreshCw size={15} /> {t("common.retry")}
+                          </button>
+                        </div>
+                      ) : null}
+                      {reviewProblem && review?.problem ? (
+                        <div role="alert" className="alert alert-error alert-soft py-2 text-sm">
+                          <span>{reviewProblem}</span>
+                          <ProblemRecoveryLink
+                            problem={{ type: `https://lumilio.org/problems/${review.problem}` }}
+                          />
+                        </div>
+                      ) : null}
+                      {reviewNotice ? (
+                        <div role="status" className="alert alert-warning alert-soft py-2 text-sm">
+                          <RefreshCw size={16} className="shrink-0" />
+                          <span>{reviewNotice}</span>
+                        </div>
+                      ) : null}
+                      {review && !review.problem ? (
+                        <StorageRiskConfirmation
+                          risks={reviewRisks}
+                          checked={acknowledged}
+                          onChange={setAcknowledged}
+                          disabled={busy}
+                        />
+                      ) : null}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
                           type="button"
-                          className="btn btn-ghost btn-xs"
-                          onClick={() => setSeparateArmedFor(null)}
+                          className="btn btn-ghost btn-sm"
+                          onClick={cancelAction}
                           disabled={busy}
                         >
                           {t("common.cancel", { defaultValue: "Cancel" })}
                         </button>
                         <button
                           type="button"
-                          className="btn btn-primary btn-xs"
-                          onClick={() => void resolve(candidate, "add_separate")}
-                          disabled={busy}
+                          className="btn btn-primary btn-sm"
+                          onClick={() => void confirmAction()}
+                          disabled={
+                            busy ||
+                            !review ||
+                            Boolean(review.problem) ||
+                            (reviewRisks.length > 0 && !acknowledged)
+                          }
                         >
-                          {t(
-                            "manage.repositories.candidates.addSeparateConfirm",
-                            "Yes, add as separate Repository",
+                          {busy ? (
+                            <span className="loading loading-spinner loading-xs" />
+                          ) : pending.action === "add_separate" ? (
+                            <Copy size={15} />
+                          ) : (
+                            <FolderOpen size={15} />
                           )}
+                          {confirmLabel(pending.action)}
                         </button>
-                      </span>
-                    </div>
+                      </div>
+                    </section>
                   ) : null}
                 </div>
               );
@@ -328,6 +419,7 @@ function candidateLabel(
       return t("manage.repositories.candidates.invalidMarker", "Invalid Repository marker");
     case "identity_error":
       return t("manage.repositories.candidates.identityError", "Identity already registered");
+    case "unavailable":
     default:
       return t("manage.repositories.candidates.unavailableStatus", "Unavailable");
   }

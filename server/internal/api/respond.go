@@ -27,6 +27,13 @@ type StorageNameCollisionProblemResponse = problem.StorageNameCollisionDetails
 // qualification, and name-collision Problems.
 type RepositoryCommandProblemResponse = problem.Details
 
+// RepositoryCandidateProblemResponse is the OpenAPI placeholder for the 409
+// union of the candidate commands (open, resolve): openapinormalize replaces
+// its schema with the exact oneOf of the create refusals (confirmation
+// required, stale assessment, the typed storage refusals, Repository
+// conflict) and the Repository command refusals.
+type RepositoryCandidateProblemResponse = problem.Details
+
 // RepositoryCreateProblemResponse is the OpenAPI placeholder for the create
 // commands' 409 union; openapinormalize replaces its schema with the exact
 // oneOf of repository/conflict and the typed storage refusals.

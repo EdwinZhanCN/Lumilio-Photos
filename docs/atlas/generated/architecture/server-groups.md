@@ -90,7 +90,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `runtime` → `ingest`: 5 package import(s), declared
 - `runtime` → `media`: 1 package import(s), declared
 - `runtime` → `service`: 1 package import(s), declared
-- `runtime` → `storage`: 6 package import(s), declared
+- `runtime` → `storage`: 9 package import(s), declared
 - `runtime` → `work`: 3 package import(s), declared
 - `service` → `agent`: 1 package import(s), declared
 - `service` → `catalog`: 4 package import(s), declared

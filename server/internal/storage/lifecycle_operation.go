@@ -58,6 +58,12 @@ type LifecycleRequest struct {
 	HostInstanceID   string
 	ConfirmationType string
 	RiskConfirmation bool
+	// AssessmentToken and AcknowledgedRisks bind an administrator's risk
+	// acknowledgement to the assessment of the exact target a candidate
+	// command opens; they are the HTTP candidate journeys' consent input and
+	// are read by nothing else.
+	AssessmentToken   string
+	AcknowledgedRisks []string
 }
 
 var (

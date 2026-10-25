@@ -69,6 +69,12 @@
         "repositoryBusy": "The Repository is busy with a scan or import. Wait for it to finish, then try again.",
         "repositoryOffline": "The Repository is offline. Reconnect it or remove it from Lumilio instead."
       },
+      "alternatives": {
+        "checkAccess": "Check access to the registered location, then try again.",
+        "defaultConfiguration": "Change the Default Storage Location through the storage configuration.",
+        "recoverOperation": "Let the interrupted operation recover, then try again.",
+        "waitForIdle": "Wait for the current work to finish, then try again."
+      },
       "assessmentStale": "The storage target changed since it was reviewed. Review it again before continuing.",
       "busy": "Another storage command is still working on this Repository. Wait for it to finish, then try again.",
       "confirmationRequired": "Review and acknowledge the storage risks before continuing.",
@@ -1520,7 +1526,7 @@
         "registered": "Registered",
         "relocated": "Repository location updated.",
         "resolveFailed": "Repository decision could not be applied.",
-        "riskConfirmation": "I understand this location may be network-backed, removable, managed by cloud-sync software, mounted differently than when it was registered, or contain files that must be downloaded first.",
+        "reviewTitle": "Folder review",
         "title": "Open Existing Repository",
         "unavailable": "Repository candidates are unavailable.",
         "unavailableStatus": "Unavailable"
@@ -1641,7 +1647,6 @@
         "unavailable": "This target cannot be used for a Repository right now."
       },
       "risks": {
-        "cloudPlaceholder": "Some files are cloud placeholders that must be downloaded first.",
         "cloudSyncDirectory": "Managed by cloud-sync software: sync clients may evict originals or duplicate files.",
         "mountChanged": "The mounted filesystem changed since this location was registered.",
         "networkFilesystem": "Network filesystem: not supported.",
@@ -2259,6 +2264,16 @@
     "studioSource": "Exports your current edits at the available working resolution.",
     "title": "Export photo"
   },
+  "problemRecovery": {
+    "continue": "Continue",
+    "desktopApproval": "Open Storage and choose the folder on the Desktop",
+    "openMissing": "Open the Repository's missing files",
+    "openSettings": "Open Settings",
+    "openSetup": "Open setup",
+    "openStorage": "Open Storage",
+    "openTrash": "Open the Repository's Trash",
+    "signIn": "Sign in"
+  },
   "productTerms": {
     "defaultStorageLocation": "Default Storage Location",
     "primaryRepository": "Primary Repository"
@@ -2812,6 +2827,12 @@
       "supportBundle": "Download support bundle",
       "verificationHistory": "Scan history"
     },
+    "actionName": {
+      "detach": "Remove from Lumilio",
+      "reconnect": "Reconnect",
+      "rename": "Rename",
+      "verify": "Scan"
+    },
     "actionsFor": "Actions for {{name}}",
     "audit": {
       "action": "Action",
@@ -2852,7 +2873,8 @@
       "repository": "Repository",
       "state": "State",
       "storage": "Storage",
-      "verification": "Scan"
+      "verification": "Scan",
+      "withheld": "{{action}} withheld"
     },
     "kind": {
       "external": "External"

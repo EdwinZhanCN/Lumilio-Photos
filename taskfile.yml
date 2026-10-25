@@ -104,7 +104,7 @@ tasks:
     cmds:
       - task: server:openapi
       - task: web:openapi-types
-      - go -C server run ./tools/problemcatalog ../site/docs/public/problems
+      - go -C server run ./tools/problemcatalog ../site/docs/public/problems ../web/src/lib/http-commons/problemRecovery.ts
       - task: site:openapi-docs
 
   architecture:check:
@@ -360,7 +360,7 @@ tasks:
       - task: config:examples
       - task: web:docs
       - task: atlas:generate
-      - git diff --exit-code -- docs/atlas server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
+      - git diff --exit-code -- docs/atlas server/docs web/src/lib/http-commons/schema.d.ts web/src/lib/http-commons/problemRecovery.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
 
   # CI contracts exist only when they orchestrate more than one module target.
   # One-to-one wrappers are forbidden: workflows call the module target

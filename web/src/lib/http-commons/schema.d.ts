@@ -14214,13 +14214,13 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
-                /** @description Conflict */
+                /** @description Confirmation required, stale assessment, typed storage refusal, Repository conflict, or a Repository command refusal */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
+                        "application/problem+json": components["schemas"]["api.RepositoryCandidateProblemResponse"];
                     };
                 };
             };
@@ -14279,13 +14279,13 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
-                /** @description Conflict */
+                /** @description Confirmation required, stale assessment, typed storage refusal, Repository conflict, or a Repository command refusal */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["api.RepositoryCommandProblemResponse"];
+                        "application/problem+json": components["schemas"]["api.RepositoryCandidateProblemResponse"];
                     };
                 };
             };
@@ -16058,6 +16058,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AssetMissingProblem"] | components["schemas"]["api.AssetOfflineProblem"] | components["schemas"]["api.AssetTrashedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageLayoutObstructedProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageNameCollisionProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageRecoveryRequiredProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.StorageVolumeUnqualifiedProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.RepositoryCandidateProblemResponse": components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageAssessmentStaleProblem"] | components["schemas"]["api.StorageUnsupportedFilesystemProblem"] | components["schemas"]["api.StorageNotAMountedVolumeProblem"] | components["schemas"]["api.StorageObservationUnknownProblem"] | components["schemas"]["api.StoragePermissionDeniedProblem"] | components["schemas"]["api.StorageMaterializationRequiredProblem"] | components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageVolumeUnqualifiedProblem"] | components["schemas"]["api.StorageNameCollisionProblem"];
         "api.RepositoryCommandProblemResponse": components["schemas"]["api.StorageActionUnavailableProblem"] | components["schemas"]["api.StorageBusyProblem"] | components["schemas"]["api.StorageOwnershipUnavailableProblem"] | components["schemas"]["api.StorageIdentityMismatchProblem"] | components["schemas"]["api.StorageOriginalOnlineProblem"] | components["schemas"]["api.StorageVolumeUnqualifiedProblem"] | components["schemas"]["api.StorageNameCollisionProblem"];
         "api.RepositoryConflictProblemResponse": {
             actions?: string[];
@@ -18199,12 +18200,24 @@ export interface components {
         };
         "dto.OpenRepositoryCandidateRequestDTO": {
             /**
+             * @example [
+             *       "mount_fingerprint_changed"
+             *     ]
+             */
+            acknowledged_risks?: string[];
+            /**
+             * @description AssessmentToken and AcknowledgedRisks bind the administrator's risk
+             *     acknowledgement to the open_repository assessment of this exact
+             *     folder; without them a risky folder answers storage/confirmation-required.
+             * @example v1.0123456789abcdef
+             */
+            assessment_token?: string;
+            /**
              * @description DirectoryName is a portable direct-child folder segment below the
              *     configured default Storage Location, never an arbitrary host path.
              * @example family-archive
              */
             directory_name: string;
-            risk_confirmation?: boolean;
         };
         "dto.Option": {
             /** @example Global */
@@ -18499,7 +18512,6 @@ export interface components {
             name?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
-            risk_warnings?: string[];
             total_bytes?: number;
             writable?: boolean;
         };
@@ -18767,6 +18779,14 @@ export interface components {
             resolution: "update_location" | "add_separate" | "confirm_risk";
         };
         "dto.ResolveRepositoryCandidateRequestDTO": {
+            /**
+             * @example [
+             *       "mount_fingerprint_changed"
+             *     ]
+             */
+            acknowledged_risks?: string[];
+            /** @example v1.0123456789abcdef */
+            assessment_token?: string;
             /** @example family-archive */
             directory_name: string;
             /**
@@ -18774,7 +18794,6 @@ export interface components {
              * @enum {string}
              */
             resolution: "update_location" | "add_separate";
-            risk_confirmation?: boolean;
         };
         "dto.RestoreOperationDTO": {
             /** @example 20260711T020000.000000Z-library.sqlite3 */
@@ -19168,7 +19187,7 @@ export interface components {
              * @example create_repository
              * @enum {string}
              */
-            intent?: "create_repository" | "setup_primary";
+            intent?: "create_repository" | "setup_primary" | "open_repository";
             /**
              * @description MarkerState is the typed reading of the target's Repository marker.
              * @example absent
@@ -19204,18 +19223,21 @@ export interface components {
         };
         "dto.StorageAssessmentRequestDTO": {
             /**
-             * @description DirectoryName is the direct-child folder for create_repository; ignored for setup_primary.
+             * @description DirectoryName is the direct-child folder for create_repository and open_repository; ignored for setup_primary.
              * @example family-photos
              */
             directory_name?: string;
             /**
+             * @description Intent is the command the review is for: create_repository and
+             *     setup_primary review a create target, open_repository an existing
+             *     direct child of the Default Storage Location (the candidate journeys).
              * @example create_repository
              * @enum {string}
              */
-            intent: "create_repository" | "setup_primary";
+            intent: "create_repository" | "setup_primary" | "open_repository";
             /**
              * @description StorageLocationID identifies a registered Storage Location. Empty selects
-             *     the configured default; setup_primary always uses the default.
+             *     the configured default; setup_primary and open_repository always use the default.
              * @example 550e8400-e29b-41d4-a716-446655440000
              */
             storage_location_id?: string;
@@ -19263,7 +19285,6 @@ export interface components {
             reachability?: string;
             registered_mount_fingerprint?: string;
             removable_likely?: boolean;
-            risk_warnings?: string[];
             /**
              * @example primary
              * @enum {string}

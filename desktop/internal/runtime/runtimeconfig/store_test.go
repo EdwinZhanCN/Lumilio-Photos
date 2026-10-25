@@ -325,9 +325,11 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 
 func writePortableStorageIdentity(t *testing.T, rootPath, storageLocationID, primaryID string) {
 	t.Helper()
+	// Complete markers, as the Server writes them: the Desktop no longer
+	// has a parser of its own, so a marker it hands over must be adoptable.
 	markers := map[string]string{
-		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + storageLocationID + "\n",
-		filepath.Join(rootPath, "primary", ".lumiliorepo"): "version: \"1.0\"\nid: " + primaryID + "\n",
+		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + storageLocationID + "\nname: Default Storage\ncreated_at: 2026-01-01T00:00:00Z\n",
+		filepath.Join(rootPath, "primary", ".lumiliorepo"): "version: \"1.0\"\nid: " + primaryID + "\nname: Primary\nstorage_strategy: date\nlocal_settings:\n  handle_duplicate_filenames: rename\ncreated_at: 2026-01-01T00:00:00Z\n",
 	}
 	for path, contents := range markers {
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
@@ -387,7 +389,7 @@ func TestPatchDraftAllowsAFreshDefaultCandidateWithoutAPrimary(t *testing.T) {
 	if err := os.MkdirAll(rootOnly, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(rootOnly, ".lumilioroot"), []byte("version: \"1.0\"\nid: "+uuid.NewString()+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(rootOnly, ".lumilioroot"), []byte("version: \"1.0\"\nid: "+uuid.NewString()+"\nname: Root Only\ncreated_at: 2026-01-01T00:00:00Z\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for _, candidate := range []string{absent, empty, rootOnly} {
@@ -405,7 +407,7 @@ func TestPatchDraftAllowsAFreshDefaultCandidateWithoutAPrimary(t *testing.T) {
 	if err := os.MkdirAll(repositoryFolder, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repositoryFolder, ".lumiliorepo"), []byte("version: \"1.0\"\nid: "+uuid.NewString()+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repositoryFolder, ".lumiliorepo"), []byte("version: \"1.0\"\nid: "+uuid.NewString()+"\nname: Repository\nstorage_strategy: date\nlocal_settings:\n  handle_duplicate_filenames: rename\ncreated_at: 2026-01-01T00:00:00Z\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	draft.Settings.StoragePath = repositoryFolder

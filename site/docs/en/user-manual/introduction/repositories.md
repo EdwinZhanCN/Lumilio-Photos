@@ -85,7 +85,7 @@ Removing a regular repository from Lumilio is also registration-only. The confir
 
 ## Docker and standalone Server candidates
 
-Docker and standalone Server have one configured default Storage Location. Web can inspect only its direct child directories and classifies each as registered, ready to open, empty and writable, non-empty without a marker, invalid marker, or identity conflict. An identity conflict offers the same explicit **Use as moved original** and **Add as separate repository** decisions as Desktop; Reconnect remains unavailable while the registered original is online. The API accepts a portable directory name, never an arbitrary server path.
+Docker and standalone Server have one configured default Storage Location. Web can inspect only its direct child directories and classifies each as registered, ready to open, empty and writable, non-empty without a marker, invalid marker, or identity conflict. An identity conflict offers the same explicit **Use as moved original** and **Add as separate repository** decisions as Desktop; Reconnect remains unavailable while the registered original is online. Opening or resolving a found folder runs the same review as **Add Repository**: the folder's risks are listed and acknowledged first (a folder on another disk than its registration recorded is called out), and the command carries that review's token, so a folder that changed in between is reviewed again. The API accepts a portable directory name, never an arbitrary server path.
 
 Use Compose long syntax for host directories and disable automatic source creation:
 

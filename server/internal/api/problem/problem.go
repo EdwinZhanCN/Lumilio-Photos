@@ -20,8 +20,169 @@ type Descriptor struct {
 	Status     int
 	Title      string
 	Definition string
+	// Recovery is the human sentence of the catalog page. Entry is the
+	// executable form of the same recovery: who acts, in which phase, and
+	// through which real entry (a Web route, a Desktop host action, a sign-in,
+	// a retry). The Web renders Entry; architecturecheck proves every route
+	// and host action it names exists.
 	Recovery   string
+	Entry      RecoveryEntry
 	Extensions []Extension
+}
+
+// RecoveryActor is who can act on a Problem.
+type RecoveryActor string
+
+// RecoveryPhase is when the entry is available: during first-run setup,
+// once the application runs, or in both.
+type RecoveryPhase string
+
+// RecoveryKind is the shape of the entry.
+type RecoveryKind string
+
+const (
+	ActorUser        RecoveryActor = "user"
+	ActorAdmin       RecoveryActor = "admin"
+	ActorOperator    RecoveryActor = "operator"
+	ActorDesktopHost RecoveryActor = "desktop_host"
+
+	PhaseAny     RecoveryPhase = "any"
+	PhaseSetup   RecoveryPhase = "setup"
+	PhaseRunning RecoveryPhase = "running"
+
+	// RecoveryRetry: the same request may be repeated, possibly after
+	// Retry-After or a fresh review; nothing else is needed.
+	RecoveryRetry RecoveryKind = "retry"
+	// RecoverySignIn: a session is needed; the entry is the sign-in route.
+	RecoverySignIn RecoveryKind = "sign_in"
+	// RecoveryRoute: the entry is a Web route the actor follows.
+	RecoveryRoute RecoveryKind = "route"
+	// RecoveryHostAction: the entry is a Desktop host action started from the
+	// Storage page and approved on the computer that holds the folder.
+	RecoveryHostAction RecoveryKind = "host_action"
+	// RecoveryOperator: only the operator of the installation can act
+	// (configuration, deployment); the Web offers no entry.
+	RecoveryOperator RecoveryKind = "operator"
+	// RecoveryNone: there is nothing to follow; the facts are the answer
+	// (choose another file, ask an administrator).
+	RecoveryNone RecoveryKind = "none"
+)
+
+// RecoveryEntry is the executable recovery of one Problem type.
+type RecoveryEntry struct {
+	Actor RecoveryActor
+	Phase RecoveryPhase
+	Kind  RecoveryKind
+	// Route is the Web route pattern for RecoveryRoute and RecoverySignIn;
+	// a `:repositoryId` segment is filled from the Problem's repository_id.
+	Route string
+	// HostAction is the Desktop host action kind for RecoveryHostAction.
+	HostAction string
+}
+
+// Web routes and host action kinds the entries may name. architecturecheck
+// verifies each against web/src/app/router/routes.tsx and
+// server/internal/storage/host_action.go, so a renamed route or kind fails
+// the gate instead of leaving a dead entry.
+const (
+	RouteLogin           = "/login"
+	RouteBootstrap       = "/bootstrap"
+	RouteStorage         = "/storage"
+	RouteRepositoryTrash = "/storage/:repositoryId/trash"
+	RouteMissingFiles    = "/storage/:repositoryId/missing"
+	RouteSettings        = "/settings"
+
+	HostActionLocateRepository      = "locate_repository"
+	HostActionLocateStorageLocation = "locate_storage_location"
+)
+
+func retry(actor RecoveryActor) RecoveryEntry {
+	return RecoveryEntry{Actor: actor, Phase: PhaseAny, Kind: RecoveryRetry}
+}
+func route(actor RecoveryActor, phase RecoveryPhase, route string) RecoveryEntry {
+	return RecoveryEntry{Actor: actor, Phase: phase, Kind: RecoveryRoute, Route: route}
+}
+func hostAction(kind string) RecoveryEntry {
+	return RecoveryEntry{Actor: ActorDesktopHost, Phase: PhaseRunning, Kind: RecoveryHostAction, Route: RouteStorage, HostAction: kind}
+}
+
+// recoveryEntries is the executable recovery registry: one entry per public
+// Problem type, matched to the registry at init. R10: every public Problem
+// has an actor/phase-correct entry that can actually be followed.
+var recoveryEntries = map[string]RecoveryEntry{
+	Namespace + "asset/missing":                             route(ActorAdmin, PhaseRunning, RouteMissingFiles),
+	Namespace + "asset/offline":                             route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "asset/trashed":                             route(ActorAdmin, PhaseRunning, RouteRepositoryTrash),
+	Namespace + "auth/invalid-credentials":                  {Actor: ActorUser, Phase: PhaseAny, Kind: RecoverySignIn, Route: RouteLogin},
+	Namespace + "auth/authentication-required":              {Actor: ActorUser, Phase: PhaseAny, Kind: RecoverySignIn, Route: RouteLogin},
+	Namespace + "auth/session-expired":                      {Actor: ActorUser, Phase: PhaseAny, Kind: RecoverySignIn, Route: RouteLogin},
+	Namespace + "auth/passkey-unavailable":                  {Actor: ActorUser, Phase: PhaseAny, Kind: RecoverySignIn, Route: RouteLogin},
+	Namespace + "auth/mfa-invalid":                          retry(ActorUser),
+	Namespace + "auth/permission-denied":                    {Actor: ActorAdmin, Phase: PhaseAny, Kind: RecoveryNone},
+	Namespace + "auth/untrusted-origin":                     {Actor: ActorOperator, Phase: PhaseAny, Kind: RecoveryOperator},
+	Namespace + "auth/rate-limited":                         retry(ActorUser),
+	Namespace + "bootstrap/app-not-initialized":             route(ActorAdmin, PhaseSetup, RouteBootstrap),
+	Namespace + "repository/unavailable":                    route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "repository/conflict":                       route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "repository/scan-failed":                    route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "repository/scan-incomplete":                retry(ActorAdmin),
+	Namespace + "storage/confirmation-required":             retry(ActorAdmin),
+	Namespace + "storage/assessment-stale":                  retry(ActorAdmin),
+	Namespace + "storage/unsupported-filesystem":            route(ActorAdmin, PhaseAny, RouteStorage),
+	Namespace + "storage/not-a-mounted-volume":              {Actor: ActorOperator, Phase: PhaseAny, Kind: RecoveryOperator},
+	Namespace + "storage/observation-unknown":               retry(ActorAdmin),
+	Namespace + "storage/permission-denied":                 {Actor: ActorOperator, Phase: PhaseAny, Kind: RecoveryOperator},
+	Namespace + "storage/materialization-required":          retry(ActorAdmin),
+	Namespace + "storage/action-unavailable":                route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "storage/busy":                              retry(ActorAdmin),
+	Namespace + "storage/ownership-unavailable":             retry(ActorAdmin),
+	Namespace + "storage/identity-mismatch":                 hostAction(HostActionLocateRepository),
+	Namespace + "storage/original-online":                   route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "storage/volume-unqualified":                hostAction(HostActionLocateRepository),
+	Namespace + "storage/name-collision":                    hostAction(HostActionLocateRepository),
+	Namespace + "storage/layout-obstructed":                 route(ActorAdmin, PhaseSetup, RouteBootstrap),
+	Namespace + "storage/recovery-required":                 route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "storage/host-action-failed":                route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "storage/host-action-expired":               route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "service/unavailable":                       retry(ActorUser),
+	Namespace + "media/invalid-request":                     {Actor: ActorUser, Phase: PhaseAny, Kind: RecoveryNone},
+	Namespace + "media/image-embedding-missing":             route(ActorAdmin, PhaseRunning, RouteSettings),
+	Namespace + "lumen/image-semantic-analysis-unavailable": route(ActorAdmin, PhaseRunning, RouteSettings),
+	Namespace + "agent/operation-failed":                    retry(ActorUser),
+	Namespace + "upload/processing-failed":                  route(ActorAdmin, PhaseRunning, RouteStorage),
+	Namespace + "backup/restore-failed":                     route(ActorAdmin, PhaseRunning, RouteSettings),
+	Namespace + "cloud/import-failed":                       retry(ActorUser),
+}
+
+// Validate reports an incomplete or self-contradicting entry.
+func (e RecoveryEntry) Validate() error {
+	switch e.Actor {
+	case ActorUser, ActorAdmin, ActorOperator, ActorDesktopHost:
+	default:
+		return fmt.Errorf("unknown recovery actor %q", e.Actor)
+	}
+	switch e.Phase {
+	case PhaseAny, PhaseSetup, PhaseRunning:
+	default:
+		return fmt.Errorf("unknown recovery phase %q", e.Phase)
+	}
+	switch e.Kind {
+	case RecoveryRoute, RecoverySignIn:
+		if e.Route == "" {
+			return fmt.Errorf("%s entry needs a route", e.Kind)
+		}
+	case RecoveryHostAction:
+		if e.HostAction == "" || e.Route == "" {
+			return fmt.Errorf("host_action entry needs a host action kind and the route it starts from")
+		}
+	case RecoveryRetry, RecoveryOperator, RecoveryNone:
+		if e.Route != "" || e.HostAction != "" {
+			return fmt.Errorf("%s entry names no route or host action", e.Kind)
+		}
+	default:
+		return fmt.Errorf("unknown recovery kind %q", e.Kind)
+	}
+	return nil
 }
 
 // Extension documents one bounded, type-specific public member.
@@ -220,7 +381,22 @@ func mustRegistry(descriptors ...Descriptor) map[string]Descriptor {
 		if _, exists := result[item.Type]; exists {
 			panic("duplicate Problem descriptor: " + item.Type)
 		}
+		entry, ok := recoveryEntries[item.Type]
+		if !ok {
+			panic("Problem type without a recovery entry: " + item.Type)
+		}
+		if err := entry.Validate(); err != nil {
+			panic("Problem type " + item.Type + " has an invalid recovery entry: " + err.Error())
+		}
+		item.Entry = entry
 		result[item.Type] = item
+	}
+	if len(recoveryEntries) != len(result) {
+		for problemType := range recoveryEntries {
+			if _, ok := result[problemType]; !ok {
+				panic("recovery entry for an unregistered Problem type: " + problemType)
+			}
+		}
 	}
 	return result
 }

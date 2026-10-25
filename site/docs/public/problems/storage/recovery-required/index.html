@@ -14,6 +14,7 @@
     <dt>Normal HTTP status</dt><dd>409</dd>
     <dt>Definition</dt><dd>An interrupted storage operation left the journal of this Repository open; conflicting commands are refused until journal recovery completes.</dd>
     <dt>Recovery</dt><dd>Let the Server finish journal recovery (it runs at startup and on the maintenance pass), review the recovery inventory of the Repository on the Storage page, then retry.</dd>
+    <dt>Recovery entry</dt><dd>actor <code>admin</code>, phase <code>running</code>, kind <code>route</code>, route <code>/storage</code></dd>
   </dl>
   <h2>Extension members</h2>
   <p>This Problem type defines no extension members.</p>

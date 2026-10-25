@@ -107,9 +107,6 @@ func (h *RepositoryScanHandler) storageDiagnostics(ctx context.Context, redact b
 		item.Kind = string(storageLocation.Kind)
 		item.RegisteredMountFingerprint = storageLocation.MountFingerprint
 		item.MountFingerprintChanged = storageLocation.MountFingerprint != "" && info.MountFingerprint != "" && storageLocation.MountFingerprint != info.MountFingerprint
-		if item.MountFingerprintChanged {
-			item.RiskWarnings = append(item.RiskWarnings, "mount_fingerprint_changed")
-		}
 		items = append(items, item)
 	}
 	for _, repository := range repositories {
@@ -157,7 +154,7 @@ func storageDiagnosticDTO(targetType, targetID, parentTargetID, name, path, reac
 		LockHolder: lockInfo.Holder, LastCoordination: lastCoordination,
 		MarkerUUID: markerUUID, MountFingerprint: info.MountFingerprint,
 		NetworkFilesystem: info.NetworkFilesystem, RemovableLikely: info.RemovableLikely,
-		CloudSyncProvider: info.CloudSyncProvider, RiskWarnings: info.RiskWarnings,
+		CloudSyncProvider: info.CloudSyncProvider,
 	}
 }
 
@@ -521,14 +518,10 @@ func (h *RepositoryScanHandler) AdoptPrimaryRepository(c *gin.Context) {
 	api.JSONOK(c, dto.ToAdoptPrimaryRepositoryResponseDTO(result, toRepositoryDTO(result.Repository)))
 }
 
-// writeRepositoryCreateFailure maps every provisioning and assessment error of
-// the create commands to its registered Problem. Typed storage refusals and
-// the consent gate come first; Repository conflicts keep their stable
-// conflict_type vocabulary.
-func writeRepositoryCreateFailure(c *gin.Context, err error) {
-	var conflict *storage.RepositoryConflictError
-	var existing *storage.ExistingRepositoryFoundError
-	var invalidMarker *storage.RepositoryMarkerInvalidError
+// writeStorageAssessmentRefusal maps the one classifier's refusals and the
+// consent gate's answers, shared by every command that is admitted by a
+// create-target assessment (create, setup, candidate open and resolve).
+func writeStorageAssessmentRefusal(c *gin.Context, err error) bool {
 	var consent *storage.StorageRiskConfirmationError
 	switch {
 	case errors.As(err, &consent):
@@ -543,10 +536,28 @@ func writeRepositoryCreateFailure(c *gin.Context, err error) {
 		api.WriteProblem(c, api.KnownProblem(problem.StorageNotMountedVolume, err))
 	case errors.Is(err, storage.ErrStoragePermissionDenied):
 		api.WriteProblem(c, api.KnownProblem(problem.StoragePermissionDenied, err))
-	case errors.Is(err, storage.ErrStorageMaterializationRequired):
+	case errors.Is(err, storage.ErrStorageMaterializationRequired), errors.Is(err, storage.ErrUnavailableCloudPlaceholder):
+		// The bounded review and the command's deep preflight name the same
+		// refusal: files that must be downloaded before Lumilio uses the tree.
 		api.WriteProblem(c, api.KnownProblem(problem.StorageMaterializationRequired, err))
 	case errors.Is(err, storage.ErrStorageObservationUnknown):
 		api.WriteProblem(c, api.KnownProblem(problem.StorageObservationUnknown, err))
+	default:
+		return false
+	}
+	return true
+}
+
+// writeRepositoryCreateFailure maps every provisioning and assessment error of
+// the create commands to its registered Problem. Typed storage refusals and
+// the consent gate come first; Repository conflicts keep their stable
+// conflict_type vocabulary.
+func writeRepositoryCreateFailure(c *gin.Context, err error) {
+	var conflict *storage.RepositoryConflictError
+	var existing *storage.ExistingRepositoryFoundError
+	var invalidMarker *storage.RepositoryMarkerInvalidError
+	switch {
+	case writeStorageAssessmentRefusal(c, err):
 	case errors.Is(err, storage.ErrPrimaryRepositoryExists):
 		writeRepositoryConflict(c, err, "primary_exists")
 	case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
@@ -572,9 +583,9 @@ func writeRepositoryCreateFailure(c *gin.Context, err error) {
 	case errors.As(err, &conflict):
 		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
 	case errors.As(err, &existing):
-		api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, existing.Actions()))
 	case errors.As(err, &invalidMarker):
-		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", invalidMarker.Actions()))
 	default:
 		api.WriteProblem(c, api.BadRequest(err))
 	}
@@ -638,10 +649,9 @@ func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 			RepositoryID: candidate.RepositoryID, Name: candidate.Name,
 			Writable: candidate.Writable, MountPoint: candidate.MountPoint,
 			CanCreate: candidate.CanCreate, CanOpen: candidate.CanOpen,
-			AllowedResolutions: hostActionResolutions(candidate.Actions),
+			AllowedResolutions: storage.HostActionResolutions(candidate.Actions),
 			CapacityKnown:      candidate.CapacityKnown, TotalBytes: candidate.TotalBytes,
 			AvailableBytes: candidate.AvailableBytes, Filesystem: candidate.Filesystem,
-			RiskWarnings: candidate.RiskWarnings,
 		})
 	}
 	api.JSONOK(c, dto.ListRepositoryCandidatesResponseDTO{Candidates: items})
@@ -658,7 +668,7 @@ func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 // @Param request body dto.ResolveRepositoryCandidateRequestDTO true "Repository candidate decision"
 // @Success 200 {object} dto.RepositoryDTO
 // @Failure 400 {object} api.ProblemResponse
-// @Failure 409 {object} api.ProblemResponse
+// @Failure 409 {object} api.RepositoryCandidateProblemResponse "Confirmation required, stale assessment, typed storage refusal, Repository conflict, or a Repository command refusal"
 // @Router /api/v1/storage/candidates/resolve [post]
 func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 	var req dto.ResolveRepositoryCandidateRequestDTO
@@ -686,10 +696,13 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 	}
 	repository, err := h.repoManager.ResolveDefaultRepositoryCandidate(
 		c.Request.Context(), req.DirectoryName, req.Resolution, ownerID,
-		storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID(), RiskConfirmation: req.RiskConfirmation},
+		storage.LifecycleRequest{
+			RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID(),
+			AssessmentToken: req.AssessmentToken, AcknowledgedRisks: req.AcknowledgedRisks,
+		},
 	)
 	if err != nil {
-		if writeRepositoryCommandFailure(c, err) {
+		if writeStorageAssessmentRefusal(c, err) || writeRepositoryCommandFailure(c, err) {
 			return
 		}
 		api.WriteProblem(c, api.BadRequest(err))
@@ -709,7 +722,7 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 // @Param request body dto.OpenRepositoryCandidateRequestDTO true "Repository candidate"
 // @Success 200 {object} dto.RepositoryDTO
 // @Failure 400 {object} api.ProblemResponse
-// @Failure 409 {object} api.RepositoryConflictProblemResponse
+// @Failure 409 {object} api.RepositoryCandidateProblemResponse "Confirmation required, stale assessment, typed storage refusal, Repository conflict, or a Repository command refusal"
 // @Router /api/v1/storage/candidates/open [post]
 func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 	var req dto.OpenRepositoryCandidateRequestDTO
@@ -741,7 +754,10 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 	}
 	repository, err := h.repoManager.OpenDefaultRepositoryCandidate(
 		c.Request.Context(), req.DirectoryName, ownerID,
-		storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID(), RiskConfirmation: req.RiskConfirmation},
+		storage.LifecycleRequest{
+			RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID(),
+			AssessmentToken: req.AssessmentToken, AcknowledgedRisks: req.AcknowledgedRisks,
+		},
 	)
 	if err != nil {
 		var conflict *storage.RepositoryConflictError
@@ -749,7 +765,7 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
 			return
 		}
-		if writeRepositoryCommandFailure(c, err) {
+		if writeStorageAssessmentRefusal(c, err) || writeRepositoryCommandFailure(c, err) {
 			return
 		}
 		api.WriteProblem(c, api.BadRequest(err))

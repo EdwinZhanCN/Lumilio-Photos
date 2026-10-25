@@ -442,6 +442,49 @@ export function localizeStorageActionBlockers(
   return localizeStorageActionUnavailable(blockers, t);
 }
 
+/**
+ * Localized sentence for the legal entries the Server lists instead of a
+ * withheld action (`alternatives` of storage/action-unavailable and of the
+ * storage view's withheld entries). Every alternative code the policy emits
+ * has a literal case here; an empty list reads as nothing.
+ */
+export function localizeStorageActionAlternatives(
+  alternatives: readonly string[] | undefined,
+  t: TFunction,
+): string {
+  return (alternatives ?? [])
+    .map((alternative) => localizeStorageActionAlternative(alternative, t))
+    .filter(Boolean)
+    .join(" ");
+}
+
+function localizeStorageActionAlternative(alternative: string, t: TFunction): string {
+  switch (alternative) {
+    case "default_configuration":
+      return t(
+        "apiErrors.storage.alternatives.defaultConfiguration",
+        "Change the Default Storage Location through the storage configuration.",
+      );
+    case "recover_operation":
+      return t(
+        "apiErrors.storage.alternatives.recoverOperation",
+        "Let the interrupted operation recover, then try again.",
+      );
+    case "wait_for_idle":
+      return t(
+        "apiErrors.storage.alternatives.waitForIdle",
+        "Wait for the current work to finish, then try again.",
+      );
+    case "check_access":
+      return t(
+        "apiErrors.storage.alternatives.checkAccess",
+        "Check access to the registered location, then try again.",
+      );
+    default:
+      return "";
+  }
+}
+
 function localizeStorageActionUnavailable(
   blockers: readonly string[] | undefined,
   t: TFunction,

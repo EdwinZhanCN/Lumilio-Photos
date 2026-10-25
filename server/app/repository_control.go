@@ -20,7 +20,7 @@ import (
 // shared HTTP API.
 type RepositoryControl interface {
 	ListStorageLocations(ctx context.Context) ([]StorageLocationInfo, error)
-	AddStorageLocation(ctx context.Context, requestID, path, name string) (StorageLocationInfo, []string, error)
+	AddStorageLocation(ctx context.Context, requestID, path, name string) (StorageLocationInfo, error)
 	ResolveStorageLocationConflict(ctx context.Context, storageLocationID, path string) (StorageLocationInfo, error)
 	RemoveStorageLocation(ctx context.Context, id string) error
 	AttachRepository(ctx context.Context, path string) (RepositoryInfo, error)
@@ -117,23 +117,23 @@ func (c *repositoryControl) ListStorageLocations(ctx context.Context) ([]Storage
 	return items, nil
 }
 
-func (c *repositoryControl) AddStorageLocation(ctx context.Context, requestID, path, name string) (StorageLocationInfo, []string, error) {
+func (c *repositoryControl) AddStorageLocation(ctx context.Context, requestID, path, name string) (StorageLocationInfo, error) {
 	storageLocation, err := c.manager.AddStorageLocation(ctx, path, name, desktopLifecycleRequest(requestID, "native_directory_selection", false))
 	if err != nil {
 		var conflict *storage.StorageLocationConflictError
 		if errors.As(err, &conflict) {
-			return StorageLocationInfo{}, nil, &StorageLocationIdentityConflict{
+			return StorageLocationInfo{}, &StorageLocationIdentityConflict{
 				StorageLocationID: conflict.StorageLocationID, RegisteredPath: conflict.RegisteredPath,
 				RequestedPath: conflict.RequestedPath, Actions: conflict.Actions,
 			}
 		}
-		return StorageLocationInfo{}, nil, err
+		return StorageLocationInfo{}, err
 	}
 	impact, err := c.manager.PreviewStorageLocationRemoval(ctx, storageLocation.StorageLocationID.String())
 	if err != nil {
-		return StorageLocationInfo{}, nil, err
+		return StorageLocationInfo{}, err
 	}
-	return storageLocationInfo(*storageLocation, impact), storage.StorageLocationWarnings(storageLocation.Path), nil
+	return storageLocationInfo(*storageLocation, impact), nil
 }
 
 func (c *repositoryControl) ResolveStorageLocationConflict(ctx context.Context, storageLocationID, path string) (StorageLocationInfo, error) {

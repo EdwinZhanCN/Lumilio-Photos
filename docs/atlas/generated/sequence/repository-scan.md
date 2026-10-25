@@ -50,7 +50,7 @@ sequenceDiagram
 | --- | --- |
 | Administrator (Web) | `ts:features/repositories#useRepositoryScan` [`web/src/features/repositories/api/useRepositoryScan.ts:22`](../../../../web/src/features/repositories/api/useRepositoryScan.ts#L22) |
 | Filesystem watcher | `go:scan.Watcher` [`server/internal/storage/scan/watcher.go:27`](../../../../server/internal/storage/scan/watcher.go#L27) |
-| RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go:254`](../../../../server/internal/api/handler/repository_scan_handler.go#L254) |
+| RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go:251`](../../../../server/internal/api/handler/repository_scan_handler.go#L251) |
 | Scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go:118`](../../../../server/internal/storage/scan/scanner.go#L118) |
 | repository_scans / repository_entries | `sql:repository_entries` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |

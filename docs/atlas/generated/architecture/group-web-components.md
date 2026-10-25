@@ -17,6 +17,7 @@ flowchart LR
         n_web_src_components_assistant["components/assistant"]
         n_web_src_components_breadcrumbs["components/breadcrumbs"]
         n_web_src_components_collection["components/collection"]
+        n_web_src_components_problem["components/problem"]
         n_web_src_components_ui["components/ui"]
     end
     subgraph n_g_Depends_on["Depends on"]
@@ -39,5 +40,6 @@ flowchart LR
 | components/assistant |  | `mod:web/src/components/assistant` |
 | components/breadcrumbs |  | `mod:web/src/components/breadcrumbs` |
 | components/collection |  | `mod:web/src/components/collection` |
+| components/problem |  | `mod:web/src/components/problem` |
 | components/ui |  | `mod:web/src/components/ui` |
 | Web lib |  | `group:web-lib` |

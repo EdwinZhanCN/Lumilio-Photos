@@ -291,7 +291,6 @@
     "riskMountChanged": "Mounted filesystem changed",
     "riskNetwork": "Network filesystem",
     "riskNonDefault": "Outside the Default Storage Location",
-    "riskPlaceholder": "Files must be downloaded first",
     "riskRemovable": "Removable storage",
     "startServerHint": "Start the Server before adding another Storage Location.",
     "title": "Storage",
