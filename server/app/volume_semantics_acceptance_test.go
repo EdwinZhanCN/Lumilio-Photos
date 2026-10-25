@@ -108,7 +108,9 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 			if status := h.assetStatus(assets[0].AssetID); status != http.StatusOK {
 				t.Fatalf("asset after reconnect = %d", status)
 			}
-			if after := originalHashes(t, canonicalDestination); !sameHashes(before, after) {
+			// The volume may re-spell a name (HFS+ and macOS ExFAT return Café
+			// decomposed), so the two listings are compared under its rule.
+			if after := originalHashes(t, canonicalDestination); !sameHashes(keyedUnder(t, before, fixture.Expected), keyedUnder(t, after, fixture.Expected)) {
 				t.Fatalf("reconnect changed original bytes: before=%v after=%v", before, after)
 			}
 
@@ -186,6 +188,21 @@ type indexedEntry struct {
 	PathKey  string
 	State    string
 	Revision int64
+}
+
+// keyedUnder re-keys a listing of relative paths by the volume rule, so two
+// listings of the same files agree whatever spelling each volume reports.
+func keyedUnder(tb testing.TB, hashes map[string]string, rule pathsemantics.Semantics) map[string]string {
+	tb.Helper()
+	keyed := make(map[string]string, len(hashes))
+	for relative, sum := range hashes {
+		key, err := rule.PathKey(relative)
+		if err != nil {
+			tb.Fatal(err)
+		}
+		keyed[key] = sum
+	}
+	return keyed
 }
 
 // byEntryID re-keys an index by row identity, for comparisons across a volume
