@@ -13,9 +13,10 @@ Storage Location reconnect journeys, the positively-unavailable rule, the
 Reconnect wording) merged as PR #260 (session S6a, 2026-10-25); P6b
 (per-repository volume semantics, collision preflight and bounded rekey on
 reconnect, the Linux and macOS filesystem-image CI jobs, the Desktop Apply
-crash evidence) lands in this PR (session S6b). P2 delivered (session S2):
-the create contract and
-shared risk review, closing #242. P7–P8 remain outstanding. Each fixing PR lands
+crash evidence) merged as PR #261 (session S6b, 2026-10-25). P7 (competing
+paths removed, architecture checks, the executable recovery registry) lands
+in this PR (session S7). P2 delivered (session S2): the create contract and
+shared risk review, closing #242. P8 remains outstanding. Each fixing PR lands
 its regression tests and updates this Status and the evidence tables.
 Child of [release-hardening.md](release-hardening.md); its session order
 (S2–S8, one phase per session, P3 and P6 may split) is the schedule.
@@ -465,7 +466,7 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
 - **Deviations.** The Web keeps the "Locate on disk" label for the native
   reconnect entry until P6 renames it with its prerequisites; the entry is
   now shown only for a positively unavailable regular Repository. Blocked
-  actions are not yet explained in the Inspector (P7 presenters).
+  actions are not yet explained in the Inspector (P7 presenters; delivered).
 
 ### P3b delivered (2026-10-18)
 
@@ -483,7 +484,7 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   anything is written, and no decision can confirm past it; a folder that is
   gone by the time the task runs is unavailable, never created. The legacy
   `inspectHostActionStoragePath` warnings are removed from the native path
-  (candidates keep theirs until P6/P7).
+  (candidates kept theirs until P7).
 - **Risks are acknowledged by code, bound to the facts.** A `storage_risk`
   decision carries the P1 risk codes and a fingerprint digest of the facts
   (task, path, risk set, classification, marker and mount facts; capacity
@@ -546,9 +547,9 @@ file.” P2 wires the typed code into DTO/Problem and en/zh UI contracts.
   a withheld reconnect rendered with its blocker copy.
 - **Deviations.** Docker/standalone candidates (`/storage/candidates`) still
   use the legacy warnings and `risk_confirmation`; they cut over with the
-  native/Location journeys (P6) and the classifier removal (P7). The Desktop
-  ticket still lists risks as a joined line rather than the shared review
-  component (P7 presenters).
+  native/Location journeys (P6) and the classifier removal (P7, delivered).
+  The Desktop ticket still lists risks as a joined line rather than the
+  shared review component (P7 presenters, delivered).
 
 ### P4 — Private preservation and recovery
 
@@ -858,7 +859,7 @@ schedule allows.
   starts `locate_storage_location`), `RepositoryRowActions.test.tsx`.
 - **Deviations.** Docker/standalone candidates still reach
   `ReconnectRepository` through the legacy `risk_confirmation` gate (P7 with
-  the classifier removal). `DeleteStorageLocation` keeps its legacy checks;
+  the classifier removal; delivered). `DeleteStorageLocation` keeps its legacy checks;
   the policy's detach verdict agrees with them through `Is`.
 
 ### P6b — Volume semantics and default Apply evidence (remaining P6)
@@ -986,6 +987,72 @@ schedule allows.
   candidates. Each new check catches a deliberate violation. R10 recovery
   reachability and exhaustive en/zh action/risk/Problem presenters pass.
 - Edwin: PR review only. No alternate policy retained as a fallback.
+
+### P7 delivered (2026-10-25)
+
+- **One classifier.** The candidate journeys (`OpenDefaultRepositoryCandidate`,
+  `ResolveDefaultRepositoryCandidate`) no longer carry their own
+  `RiskWarnings` or the bare `risk_confirmation` flag. `admitCandidateTarget`
+  assesses the chosen direct child with `AssessStorageTarget` under the new
+  `open_repository` intent (continuity risk `mount_fingerprint_changed` when
+  the folder's mount differs from the registration) and admits it through
+  the same token-bound `admitAssessedTarget` gate the create commands use,
+  with the directory name as the audited target. `StoragePlacementWarnings`,
+  `StorageLocationWarnings`, `RepositoryCandidate.RiskWarnings` and the
+  diagnostics' `mount_fingerprint_changed` appendix are gone; the request
+  DTOs take `assessment_token` and `acknowledged_risks`, the candidate
+  endpoints answer with the `RepositoryCandidateProblemResponse` union, and
+  a cloud placeholder found by command preflight is
+  `storage/materialization-required` like everywhere else.
+- **The Desktop reads no marker.** `runtimeconfig.validateStoragePathChange`
+  asks `app.ReviewDefaultStorageMove`, which classifies the current and
+  candidate roots with the Server's marker reader and answers with typed
+  errors (`ErrDefaultStorageCandidateIsRepository`,
+  `ErrDefaultStorageMarkerUnreadable`, `ErrDefaultStorageIdentityDiffers`);
+  the Desktop's YAML marker parser and its uuid dependency are deleted.
+- **Handlers project, storage decides.** Trash rejections
+  (`trash.Rejection.Actions`), existing-repository and invalid-marker
+  conflicts (`Actions()` on the provisioning errors) and host-action
+  resolutions (`storage.HostActionResolutions`) are storage-owned
+  vocabularies; no handler builds an action list.
+- **R10 executable recovery registry.** Every registered Problem carries a
+  `problem.RecoveryEntry` (actor, phase, kind, route or host action) that
+  `mustRegistry` validates; `problemcatalog` generates
+  `web/src/lib/http-commons/problemRecovery.ts` with the same table (a
+  `verify:generated` input), `ProblemRecoveryLink` renders it on the
+  candidate, Add Repository and native host-action dialogs, and
+  `checkRecoveryReachability` proves every route exists in `routes.tsx` and
+  every host action in `host_action.go`.
+- **Architecture checks, each with a deliberate-violation test**
+  (`server/tools/architecturecheck/p7_checks.go`): no storage risk code is
+  spelled outside the classifier files (DTO examples and the generated
+  OpenAPI document excepted); no Desktop Go code names a marker file or
+  decodes YAML; no handler spells an action list; the candidate files hold
+  neither `RiskWarnings` nor the legacy `!request.RiskConfirmation` gate,
+  and the Web sends no `risk_confirmation`; every code of the closed
+  vocabularies (risk, action blocker, alternative, Repository and Location
+  action, candidate classification, recovery class and disposition) has a
+  literal entry in its Web or Desktop copy module.
+- **Presenters.** The Inspector lists every withheld action with the
+  Server's blockers and alternatives (`storageActionCopy.ts`,
+  `localizeStorageActionAlternatives`); the Desktop panel renders a native
+  task's risks from a record-backed `storageRiskCopy.ts`; the candidate
+  dialog runs one shared review per chosen action and re-reviews on
+  `storage/confirmation-required` and `storage/assessment-stale`.
+- **Evidence.** Server: `repository_candidates_test.go` (token flow, stale
+  token, audit by target, placeholder refused by preflight),
+  `host_action_resolutions_test.go`, `trash/rejection_actions_test.go`,
+  `problem_test.go` (every Problem has an executable entry),
+  `default_storage_review_test.go`, `private_recovery_acceptance_test.go`
+  (candidate opened with a review token over HTTP), architecturecheck
+  `p7_checks_test.go` and `recovery_reachability_test.go`. Desktop:
+  `runtimeconfig/store_test.go` against the Server facade. Web:
+  `RepositoryCandidateModal.test.tsx` (six cases), `RepositoryInspector.test.tsx`,
+  `ProblemRecoveryLink.test.tsx`, `StoragePanel.spec.tsx`.
+- **Deviations.** `LifecycleRequest.RiskConfirmation` remains as the
+  admitted request's record that risks were acknowledged (audited and
+  journaled); it is set only after the token-bound review and never read as
+  a gate. `DeleteStorageLocation` keeps its legacy checks (P6a note).
 
 ### P8 — Release journey wrap-up
 
@@ -1148,7 +1215,7 @@ hardware/performance gate per phase.
 
 | Risk                                             | Required mitigation                                                                                                   |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| Assessment becomes another classifier            | Cut callers over and remove old policy; P7 core architecture checks                                                   |
+| Assessment becomes another classifier            | Cut callers over and remove old policy; P7 core architecture checks (delivered)                                       |
 | Facts change after consent                       | Lease refresh, reassessment, rooted access, guarded writes; advisory locks cannot control external applications       |
 | Private bytes survive but user work stays hidden | Reachable recovery inventory/actions, content-proven Studio mapping, staging export, unresolved receipts              |
 | Adoption exposes inherited Trash to expiry       | Hold before admission; reconstruct held state even after a second catalog loss; crash tests                           |
