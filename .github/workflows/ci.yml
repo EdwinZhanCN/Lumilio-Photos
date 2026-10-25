@@ -453,7 +453,7 @@ jobs:
                   hdiutil create -size 512m -layout NONE "$volumes/exfat-darwin.dmg"
                   device="$(hdiutil attach -nomount "$volumes/exfat-darwin.dmg" | awk 'NR == 1 { print $1 }')"
                   echo "attached blank image as $device"
-                  sudo newfs_exfat -v lumilio-exfat "$device"
+                  sudo newfs_exfat -v LUMILIO "$device"
                   mkdir -p "$volumes/exfat-darwin"
                   sudo diskutil mount -mountPoint "$volumes/exfat-darwin" "$device"
                   ls -la "$volumes/exfat-darwin"
