@@ -442,12 +442,22 @@ jobs:
                       hdiutil attach -nobrowse -mountpoint "$volumes/$kind" "$volumes/$kind.dmg"
                       ls -la "$volumes/$kind"
                   }
-                  # ExFAT lives in a partition table; the Apple filesystems
-                  # take the default single-partition layout.
                   attach apfs "APFS" GPTSPUD
                   attach apfs-sensitive "Case-sensitive APFS" GPTSPUD
                   attach hfsplus "HFS+" GPTSPUD
-                  attach exfat-darwin "ExFAT" GPTSPUD
+                  # hdiutil refuses to format ExFAT itself on current macOS
+                  # ("create failed - Operation not permitted"), so the image
+                  # is created blank, attached without mounting, formatted
+                  # with newfs_exfat, and mounted at the fixture path.
+                  echo "== exfat-darwin (ExFAT via newfs_exfat)"
+                  hdiutil create -size 512m -layout NONE "$volumes/exfat-darwin.dmg"
+                  device="$(hdiutil attach -nomount "$volumes/exfat-darwin.dmg" | awk 'NR == 1 { print $1 }')"
+                  echo "attached blank image as $device"
+                  sudo newfs_exfat -v lumilio-exfat "$device"
+                  mkdir -p "$volumes/exfat-darwin"
+                  sudo diskutil mount -mountPoint "$volumes/exfat-darwin" "$device"
+                  ls -la "$volumes/exfat-darwin"
+                  touch "$volumes/exfat-darwin/.writable" && rm "$volumes/exfat-darwin/.writable"
                   mount | grep "$volumes"
                   echo "LUMILIO_VOLUME_FIXTURES=apfs=$volumes/apfs;apfs-sensitive=$volumes/apfs-sensitive;hfsplus=$volumes/hfsplus;exfat-darwin=$volumes/exfat-darwin" >> "$GITHUB_ENV"
 
