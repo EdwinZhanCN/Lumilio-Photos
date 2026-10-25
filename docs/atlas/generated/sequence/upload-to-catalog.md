@@ -56,7 +56,7 @@ sequenceDiagram
 | Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
 | River (QueueDB) | `go:queue.IngestMacroWorker` [`server/internal/queue/macro_asset_workers.go:22`](../../../../server/internal/queue/macro_asset_workers.go#L22) |
 | SourceMaterializer | `go:sourcing.SourceMaterializer` [`server/internal/sourcing/materializer.go:27`](../../../../server/internal/sourcing/materializer.go#L27) |
-| Repository scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go:120`](../../../../server/internal/storage/scan/scanner.go#L120) |
+| Repository scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go:118`](../../../../server/internal/storage/scan/scanner.go#L118) |
 | Commit coordinator | `go:commit.Coordinator` [`server/internal/commit/coordinator.go:122`](../../../../server/internal/commit/coordinator.go#L122) |
 
 ## Steps
@@ -77,7 +77,7 @@ sequenceDiagram
 | 12 | scheduler → river | insert IngestAssetArgs{CommitID, ReceiptID} | `go:jobs.IngestAssetArgs` [`server/internal/queue/jobs/macro.go:17`](../../../../server/internal/queue/jobs/macro.go#L17) |
 | 13 | river → materializer | run under the execution governor | `go:server/app.pipelineRuntime.ingest` [`server/app/pipeline_runtime.go:228`](../../../../server/app/pipeline_runtime.go#L228) |
 | 14 | materializer → staging | claim commit, verify bytes, move staging file into inbox/ | `go:sourcing.SourceMaterializer.MaterializeCommit` [`server/internal/sourcing/materializer.go:141`](../../../../server/internal/sourcing/materializer.go#L141) |
-| 15 | materializer → scanner | bind the on-disk file as known content | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:44`](../../../../server/internal/storage/scan/known.go#L44) |
+| 15 | materializer → scanner | bind the on-disk file as known content | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:45`](../../../../server/internal/storage/scan/known.go#L45) |
 | 16 | scanner → catalog | repository entry + Asset, request analyze/derivatives/transcode/enrich | `go:service.ApplyAssetActivationTx` [`server/internal/service/asset_activation.go:22`](../../../../server/internal/service/asset_activation.go#L22) |
 | 17 | river → commits | acknowledge the ingest receipt | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/commit/typed_catalog.go:93`](../../../../server/internal/commit/typed_catalog.go#L93) |
 | 18 | commits → catalog | receipt becomes terminal; wake the scheduler |  |

@@ -283,7 +283,12 @@ describe("AddRepositoryModal", () => {
     let tokens = 0;
     serveAssessment(() => {
       tokens += 1;
-      return { token: `v1.review-${tokens}`, risks: ["removable_storage"] };
+      // The second review reports the facts the refusal named, so the dialog
+      // visibly changes when it lands.
+      return {
+        token: `v1.review-${tokens}`,
+        risks: tokens === 1 ? ["removable_storage"] : ["removable_storage", "cloud_sync_directory"],
+      };
     });
     const creates: unknown[] = [];
     worker.use(
@@ -319,6 +324,12 @@ describe("AddRepositoryModal", () => {
     expect(creates[0]).toMatchObject({ assessment_token: "v1.review-1" });
     await expect.element(screen.getByRole("status")).toBeVisible();
     await vi.waitFor(() => expect(tokens).toBe(2));
+    // Acknowledge only once the new review is on screen: an acknowledgement
+    // given while the re-review is still in flight is discarded when the new
+    // token lands.
+    await expect
+      .element(screen.getByText(t("manage.repositories.risks.cloudSyncDirectory"), { exact: true }))
+      .toBeVisible();
     await expect.element(submit).toBeDisabled();
     expect(onClose).not.toHaveBeenCalled();
 
@@ -330,7 +341,7 @@ describe("AddRepositoryModal", () => {
     await vi.waitFor(() => expect(creates).toHaveLength(2));
     expect(creates[1]).toMatchObject({
       assessment_token: "v1.review-2",
-      acknowledged_risks: ["removable_storage"],
+      acknowledged_risks: ["removable_storage", "cloud_sync_directory"],
     });
     await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });

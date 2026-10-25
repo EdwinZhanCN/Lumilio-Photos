@@ -260,13 +260,17 @@ var repositoryCommandPaths = map[string]bool{
 
 // repositoryCommandProblems is the exact 409 vocabulary of the Repository
 // commands: a role-aware action refusal, a held barrier, ownership held
-// elsewhere, an identity mismatch, or an original that is still online.
+// elsewhere, an identity mismatch, an original that is still online, a
+// destination volume whose name rules could not be qualified, or indexed
+// names the destination volume cannot tell apart.
 var repositoryCommandProblems = []problem.Descriptor{
 	problem.StorageActionUnavailable,
 	problem.StorageBusy,
 	problem.StorageOwnershipUnavailable,
 	problem.StorageIdentityMismatch,
 	problem.StorageOriginalOnline,
+	problem.StorageVolumeUnqualified,
+	problem.StorageNameCollision,
 }
 
 // repositoryCreateProblems is the exact 409 vocabulary of the Repository

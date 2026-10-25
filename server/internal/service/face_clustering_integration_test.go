@@ -143,8 +143,9 @@ INSERT INTO storage_locations (
   storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'Face root', '/face', 'default', 1, 1);
 INSERT INTO repositories (
-  repo_id, name, path, created_at, updated_at, default_owner_id, role, storage_location_id
-) VALUES (?, 'Faces', '/face/repository', 1, 1, 1, 'primary', ?);`, storageLocationID, repositoryID, storageLocationID); err != nil {
+  repo_id, name, path, created_at, updated_at, default_owner_id, role, storage_location_id,
+  path_case, path_normalization
+) VALUES (?, 'Faces', '/face/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');`, storageLocationID, repositoryID, storageLocationID); err != nil {
 		t.Fatal(err)
 	}
 	return repositoryID

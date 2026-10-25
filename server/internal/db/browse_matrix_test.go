@@ -98,8 +98,8 @@ func newBrowseFixture(t *testing.T, items []fixtureItem) *browseFixture {
 		VALUES (?, 'Matrix root', '/', 'external', 1, 1)
 	`, storageLocationID)
 	f.exec(`
-		INSERT INTO repositories (repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id)
-		VALUES (?, 'Matrix', '/matrix', 'regular', 'active', 'idle', 1, 1, ?)
+		INSERT INTO repositories (repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id, path_case, path_normalization)
+		VALUES (?, 'Matrix', '/matrix', 'regular', 'active', 'idle', 1, 1, ?, 'sensitive', 'none')
 	`, f.repositoryID, storageLocationID)
 
 	for index, item := range items {

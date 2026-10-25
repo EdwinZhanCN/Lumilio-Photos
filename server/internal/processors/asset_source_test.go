@@ -69,10 +69,15 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	rule, err := pathsemantics.Probe(repositoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "moved job", Path: repositoryPath, Config: *repositoryConfig,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
 		CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID, DefaultOwnerID: &owner.UserID,
+		PathCase: rule.Case, PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +114,6 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		return observation
 	}
 	scanner, err := scan.New(catalog.ReaderQueries, catalog, files, scan.Config{
-		Semantics: pathsemantics.HostDefault(),
 		Activate: func(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
 			return service.ApplyAssetActivationTx(ctx, tx, queries, repositoryID, entryID, assetID, contentID)
 		},

@@ -44,10 +44,10 @@ INSERT INTO users(user_id,username,password,created_at,updated_at,webauthn_user_
 VALUES(1,'owner','hash',1,1,x'01');
 INSERT INTO storage_locations(storage_location_id,name,path,kind,created_at,updated_at)
 VALUES('00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000004','/events','default',1,1);
-INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,storage_location_id)
-VALUES('00000000-0000-0000-0000-000000000001','one','/events/one','active','idle',1,1,1,'00000000-0000-0000-0000-000000000004'),
-('00000000-0000-0000-0000-000000000002','two','/events/two','active','idle',1,1,1,'00000000-0000-0000-0000-000000000004'),
-('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000006','/events/audio','active','idle',1,1,1,'00000000-0000-0000-0000-000000000004');
+INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,storage_location_id,path_case,path_normalization)
+VALUES('00000000-0000-0000-0000-000000000001','one','/events/one','active','idle',1,1,1,'00000000-0000-0000-0000-000000000004','sensitive','none'),
+('00000000-0000-0000-0000-000000000002','two','/events/two','active','idle',1,1,1,'00000000-0000-0000-0000-000000000004','sensitive','none'),
+('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000006','/events/audio','active','idle',1,1,1,'00000000-0000-0000-0000-000000000004','sensitive','none');
 `); err != nil {
 		t.Fatal(err)
 	}

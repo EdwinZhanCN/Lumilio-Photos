@@ -340,6 +340,132 @@ jobs:
             - name: Run Server concurrency gate
               run: task server:test:concurrency:ci
 
+    # Volume semantics (R11): the scan index keys each Repository under the
+    # name rule of the volume that holds it. Both jobs format and mount real
+    # filesystem images, name them in LUMILIO_VOLUME_FIXTURES, and run the
+    # Server tests that measure the rule and reconnect across volumes. The
+    # image list is the supported-volume list; add an image here and its row
+    # in server/internal/storage/testfixture/volumes.go together.
+    server-volumes-linux:
+        name: server volume semantics (Linux filesystem images)
+        needs: changes
+        if: needs.changes.outputs.server == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            - name: Install libvips, libraw, SQLite headers, and filesystem tools
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev libheif-plugin-aomenc libheif-plugin-libde265 dosfstools exfatprogs e2fsprogs
+
+            # Every image is 2 GiB: the Server pauses a Repository for low
+            # space below a 512 MiB margin, so a smaller volume would refuse
+            # the test uploads. FAT32 and exFAT are mounted for the runner
+            # user; ext4 roots are handed over with chown. The case-folding ext4 image carries the
+            # feature flag, and the +F directory inside it is the tree the
+            # tests use, since ext4 folds case per directory.
+            - name: Format and mount filesystem images
+              run: |
+                  set -eu
+                  volumes="$RUNNER_TEMP/volumes"
+                  mkdir -p "$volumes"
+                  user_id="$(id -u)"
+                  group_id="$(id -g)"
+                  truncate -s 2G "$volumes/vfat.img"
+                  mkfs.vfat -F 32 "$volumes/vfat.img" >/dev/null
+                  mkdir -p "$volumes/vfat"
+                  sudo mount -o "loop,uid=$user_id,gid=$group_id" "$volumes/vfat.img" "$volumes/vfat"
+                  truncate -s 2G "$volumes/exfat.img"
+                  mkfs.exfat "$volumes/exfat.img" >/dev/null
+                  mkdir -p "$volumes/exfat"
+                  sudo mount -o "loop,uid=$user_id,gid=$group_id" "$volumes/exfat.img" "$volumes/exfat"
+                  truncate -s 2G "$volumes/ext4.img"
+                  mkfs.ext4 -q "$volumes/ext4.img"
+                  mkdir -p "$volumes/ext4"
+                  sudo mount -o loop "$volumes/ext4.img" "$volumes/ext4"
+                  sudo chown "$user_id:$group_id" "$volumes/ext4"
+                  truncate -s 2G "$volumes/casefold.img"
+                  mkfs.ext4 -q -O casefold -E encoding=utf8 "$volumes/casefold.img"
+                  mkdir -p "$volumes/casefold"
+                  sudo mount -o loop "$volumes/casefold.img" "$volumes/casefold"
+                  sudo mkdir "$volumes/casefold/tree"
+                  sudo chattr +F "$volumes/casefold/tree"
+                  sudo chown "$user_id:$group_id" "$volumes/casefold/tree"
+                  mount | grep "$volumes"
+                  echo "LUMILIO_VOLUME_FIXTURES=vfat=$volumes/vfat;exfat=$volumes/exfat;ext4=$volumes/ext4;casefold=$volumes/casefold/tree" >> "$GITHUB_ENV"
+
+            - name: Run Server volume-semantics gate
+              run: task server:test:volumes
+
+    server-volumes-macos:
+        name: server volume semantics (macOS filesystem images)
+        needs: changes
+        if: needs.changes.outputs.server == 'true'
+        runs-on: macos-15
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            - name: Install libvips and libraw
+              run: brew install vips libraw
+
+            - name: Create and attach filesystem images
+              run: |
+                  set -eu
+                  volumes="$RUNNER_TEMP/volumes"
+                  mkdir -p "$volumes"
+                  attach() {
+                      kind="$1"
+                      filesystem="$2"
+                      layout="$3"
+                      echo "== $kind ($filesystem, $layout)"
+                      hdiutil create -size 2g -fs "$filesystem" -layout "$layout" -volname "lumilio-$kind" "$volumes/$kind.dmg"
+                      mkdir -p "$volumes/$kind"
+                      hdiutil attach -nobrowse -mountpoint "$volumes/$kind" "$volumes/$kind.dmg"
+                      ls -la "$volumes/$kind"
+                  }
+                  attach apfs "APFS" GPTSPUD
+                  attach apfs-sensitive "Case-sensitive APFS" GPTSPUD
+                  attach hfsplus "HFS+" GPTSPUD
+                  # hdiutil refuses to format ExFAT itself on current macOS
+                  # ("create failed - Operation not permitted"), so the image
+                  # is created blank, attached without mounting, formatted
+                  # with newfs_exfat, and mounted at the fixture path.
+                  echo "== exfat-darwin (ExFAT via newfs_exfat)"
+                  hdiutil create -size 2g -layout NONE "$volumes/exfat-darwin.dmg"
+                  device="$(hdiutil attach -nomount "$volumes/exfat-darwin.dmg" | awk 'NR == 1 { print $1 }')"
+                  echo "attached blank image as $device"
+                  sudo newfs_exfat -v LUMILIO "$device"
+                  mkdir -p "$volumes/exfat-darwin"
+                  sudo diskutil mount -mountPoint "$volumes/exfat-darwin" "$device"
+                  ls -la "$volumes/exfat-darwin"
+                  touch "$volumes/exfat-darwin/.writable" && rm "$volumes/exfat-darwin/.writable"
+                  mount | grep "$volumes"
+                  echo "LUMILIO_VOLUME_FIXTURES=apfs=$volumes/apfs;apfs-sensitive=$volumes/apfs-sensitive;hfsplus=$volumes/hfsplus;exfat-darwin=$volumes/exfat-darwin" >> "$GITHUB_ENV"
+
+            - name: Run Server volume-semantics gate
+              run: task server:test:volumes
+
     web:
         name: web (Task)
         needs: changes
@@ -636,6 +762,8 @@ jobs:
             - architecture
             - generated
             - server-linux
+            - server-volumes-linux
+            - server-volumes-macos
             - web
             - desktop-macos
             - desktop-windows
@@ -649,6 +777,8 @@ jobs:
                   GENERATED_RESULT: ${{ needs.generated.result }}
                   SERVER_CHANGED: ${{ needs.changes.outputs.server }}
                   SERVER_RESULT: ${{ needs.server-linux.result }}
+                  SERVER_VOLUMES_LINUX_RESULT: ${{ needs.server-volumes-linux.result }}
+                  SERVER_VOLUMES_MACOS_RESULT: ${{ needs.server-volumes-macos.result }}
                   WEB_REQUIRED: ${{ needs.changes.outputs.web_job }}
                   WEB_RESULT: ${{ needs.web.result }}
                   DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
@@ -691,6 +821,8 @@ jobs:
                   }
 
                   check_job "server linux" "$SERVER_CHANGED" "$SERVER_RESULT"
+                  check_job "server volume semantics (Linux)" "$SERVER_CHANGED" "$SERVER_VOLUMES_LINUX_RESULT"
+                  check_job "server volume semantics (macOS)" "$SERVER_CHANGED" "$SERVER_VOLUMES_MACOS_RESULT"
                   check_job "web" "$WEB_REQUIRED" "$WEB_RESULT"
                   check_job "desktop macos" "$DESKTOP_CHANGED" "$DESKTOP_MACOS_RESULT"
                   check_job "desktop windows" "$DESKTOP_CHANGED" "$DESKTOP_WINDOWS_RESULT"

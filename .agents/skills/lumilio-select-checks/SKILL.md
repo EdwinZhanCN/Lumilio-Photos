@@ -28,6 +28,7 @@ Run every row the diff touches, nothing more:
 | --- | --- |
 | `server/**` Go code | `task server:test`; `gofmt` on changed files |
 | `server/**` SQL schema or queries | `task server:sqlc`, then `task server:test` |
+| `server/internal/storage/pathsemantics/**`, scan-index keys, reconnect rekey | `task server:test` locally; the real-volume rows (`^TestVolume`) run only on the CI filesystem-image jobs, which set `LUMILIO_VOLUME_FIXTURES` for `task server:test:volumes` |
 | DTO, handler annotation, endpoint | [lumilio-api-contract-change](../lumilio-api-contract-change/SKILL.md) |
 | `server/tools/fakelumen/**` or `web/e2e/compose.record.yml` | `cd server && go test ./tools/fakelumen/`; the E2E slice that records through it |
 | `web/src/**` | focused `vp test run <file>` while editing; gate with `task web:test` |

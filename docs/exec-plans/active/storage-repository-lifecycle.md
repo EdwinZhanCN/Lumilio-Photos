@@ -8,12 +8,14 @@ swappable lock/identity/watch adapters. P2 merged as PR #250 (session S2,
 P3b (native selection and review) merged as PR #256 (session S3b,
 2026-10-19). P4 (private preservation and recovery) merged as PR #257
 (session S4, 2026-10-19). P5 (setup and startup recovery) merged as PR #259 (session
-S5, 2026-10-21). P6 is split as the schedule allows: P6a (regular and
+S5, 2026-10-21). P6 was split as the schedule allows: P6a (regular and
 Storage Location reconnect journeys, the positively-unavailable rule, the
-Reconnect wording) lands in this PR (session S6a); P6b (destination volume
-semantics with CI filesystem images, default Apply crash/rollback evidence)
-is the next session. P2 delivered (session S2): the create contract and
-shared risk review, closing #242. P6b–P8 remain outstanding. Each fixing PR lands
+Reconnect wording) merged as PR #260 (session S6a, 2026-10-25); P6b
+(per-repository volume semantics, collision preflight and bounded rekey on
+reconnect, the Linux and macOS filesystem-image CI jobs, the Desktop Apply
+crash evidence) lands in this PR (session S6b). P2 delivered (session S2):
+the create contract and
+shared risk review, closing #242. P7–P8 remain outstanding. Each fixing PR lands
 its regression tests and updates this Status and the evidence tables.
 Child of [release-hardening.md](release-hardening.md); its session order
 (S2–S8, one phase per session, P3 and P6 may split) is the schedule.
@@ -197,7 +199,7 @@ approved decisions.
 | Existing empty directory             | **Resolved 2026-10-07:** retain mounted-volume constraint permanently for Linux/Docker; ordinary empty folders are ephemeral            | P1–P2          |
 | Ambiguous Studio match               | Require proven content hash/size and valid source; review/export ambiguity, never filename guessing          | P4             |
 | Inherited Trash retention            | Hold until restore/export/delete/explicit retention acceptance; new deletes use configured retention         | P4             |
-| Unsupported volume semantics         | Refuse affected transition; extend support only with CI filesystem-image evidence                            | P6b            |
+| Unsupported volume semantics         | Refuse affected transition; extend support only with CI filesystem-image evidence                            | P6b delivered: qualified images are FAT32, exFAT, ext4, case-folding ext4, APFS, case-sensitive APFS, HFS+, macOS ExFAT |
 
 ## Execution phases
 
@@ -854,14 +856,10 @@ schedule allows.
   Web: `StoragePanel.spec.tsx` (withheld Location entry with the Server's
   reason, Default Storage Location never offers it, unavailable Location
   starts `locate_storage_location`), `RepositoryRowActions.test.tsx`.
-- **Deviations / P6b.** Destination volume semantics (R11: per-volume case and
-  normalization facts, collision preflight, bounded rekey) and the Linux
-  loop-mounted / macOS `hdiutil` filesystem-image CI jobs, plus the default
-  Apply crash/rollback evidence beyond the existing Desktop integration tests,
-  are P6b. Docker/standalone candidates still reach `ReconnectRepository`
-  through the legacy `risk_confirmation` gate (P7 with the classifier
-  removal). `DeleteStorageLocation` keeps its legacy checks; the policy's
-  detach verdict agrees with them through `Is`.
+- **Deviations.** Docker/standalone candidates still reach
+  `ReconnectRepository` through the legacy `risk_confirmation` gate (P7 with
+  the classifier removal). `DeleteStorageLocation` keeps its legacy checks;
+  the policy's detach verdict agrees with them through `Is`.
 
 ### P6b — Volume semantics and default Apply evidence (remaining P6)
 
@@ -877,6 +875,105 @@ schedule allows.
   Windows NTFS are optional reference coverage.
 - Release notes: the "Relocate is now Reconnect and never moves files" line
   landed with P6a in `docs/releases/v26.1.0-rc.1.md` and `.zh-cn.md`.
+
+### P6b delivered (2026-10-25)
+
+- **The rule lives with the repository, never with the host.** `repositories`
+  carries `path_case` and `path_normalization` (no default, CHECK-bounded):
+  the name comparison rule measured on the tree when it was created, opened,
+  copied, adopted or reconnected. `pathsemantics.Probe` measures it
+  behaviorally (a hidden temporary file looked up under a case-changed and an
+  NFD/NFC-changed spelling, `os.SameFile` deciding); `pathsemantics.Qualify`
+  requires the root and its private `.lumilio/` directory to agree, so a
+  per-directory case-folding flag is `ErrMixed`, and a denied or unknown
+  lookup is `ErrUnqualified`, never "sensitive". `HostDefault` is gone; the
+  scanner, the known-content binder, Trash/Restore/Adopt commits and the
+  recovery service all key under the row's rule (`scan.SemanticsOf`,
+  `storage.RepositoryVolumeRule`). An unqualified tree is neither registered
+  nor reconnected (`storage/volume-unqualified`).
+- **Reconnect qualifies the destination, preflights, cuts over, rekeys.**
+  `planVolumeRekey` compares the registered rule with the destination's;
+  when they differ, `preflightRekey` reads the whole index in bounded pages
+  and refuses with `PathKeyCollisionError` (`storage/name-collision`, count
+  plus at most ten pairs) if two live entries would share one key, before the
+  journal opens and with no row or byte changed. Otherwise the cutover
+  transaction moves the path and the rule together
+  (`UpdateRepositoryPathSemantics`) and enters maintenance, so no scan,
+  upload or Trash command keys against a half-rebuilt index; the journal
+  phase advances to `catalog_committed`; `rekeyRepositoryEntries` rewrites
+  `path_key`/`parent_key` in revision-fenced writer transactions of at most
+  256 rows (the scan-index writer budget), idempotently, and maintenance is
+  released. Entry identities, paths, states and Asset bindings are untouched.
+  A crash or failure after the cutover leaves the operation running;
+  `recoverReconnectRepositoryOperation` and
+  `recoverSwitchDefaultStorageOperation` finish the pass
+  (`finishVolumeRekey`, `finishStorageLocationRekeys`) and release
+  maintenance. The Storage Location reconnect qualifies and preflights every
+  child before any row changes; children that need a rekey stay in
+  maintenance until theirs completes.
+- **Real volumes qualify the support list.** `task server:test:volumes` runs
+  the `^TestVolume` rows against the images a workflow mounts and names in
+  `LUMILIO_VOLUME_FIXTURES` (`testfixture.VolumeFixtures`, the documented
+  rule per image kind in `testfixture/volumes.go`). `ci.yml` adds `server
+  volume semantics (Linux filesystem images)` (loop-mounted FAT32, exFAT,
+  plain ext4, case-folding ext4 with a `+F` tree) and `server volume
+  semantics (macOS filesystem images)` (`hdiutil` APFS, case-sensitive APFS,
+  HFS+, ExFAT), both required when `server/**` changes. Adding a filesystem
+  means adding its image to a job and its row to the table, never a guess.
+- **Desktop Apply crash evidence.** `Store.Reconcile` now also reports
+  `SafeToStart`: a journal left where the previous generation is current
+  (`prepared`, `stopping_previous`, `previous_stopped` with current=previous,
+  `rollback_selected`), or where the journal already recorded the candidate
+  ready (`committing`), starts on its own and is closed by the readiness
+  promotion; a candidate selected but never proven ready (`previous_stopped`
+  with current=candidate, `candidate_selected`, `stopping_candidate`) still
+  waits for the user's Restore last known-good. `main.go` blocks the start
+  only in the second case (finding: a crash while committing a candidate
+  that had reached readiness used to force a manual restore that discarded
+  the applied configuration). Every phase keeps the previous generation as
+  the rollback target and ends with current, LKG, journal, loaded
+  configuration and the catalog's Default Storage Location in agreement.
+- **Evidence.** pathsemantics:
+  `TestProbeAgreesWithObservedBehaviorAndLeavesNoFile`,
+  `TestQualifyRequiresEveryDirectoryToAgree`,
+  `TestProbeOfAnUnwritableDirectoryIsUnqualifiedNotSensitive`,
+  `TestVolumeImageProbeMatchesTheDocumentedRule` (image jobs). Storage:
+  `TestReconnectRefusesADestinationThatCannotTellIndexedNamesApart`,
+  `TestReconnectRekeysTheIndexForTheDestinationVolume` (more than one
+  batch, identities and revisions, replay, round trip),
+  `TestInterruptedRekeyIsFinishedByRecovery`,
+  `TestReconnectRefusesAnUnqualifiedDestination` (reconnect and Open),
+  `TestStorageLocationReconnectRekeysEveryChildOnTheNewVolume`. App (R11
+  over the wired runtime and real images):
+  `TestVolumeReconnectAcrossFilesystemImages` (a Repository created on the
+  image keys under its rule; one moved onto it reconnects through the native
+  task, is rekeyed, and the scan that follows writes no absence while the
+  Asset identity and bytes stay; a pair the image cannot tell apart is
+  refused with `storage/name-collision` and nothing changes). Desktop:
+  `TestEveryApplyCrashPhaseRecoversCoherently` (every phase and pointer
+  placement), `TestRestoreLastKnownGoodWaitsForOwnershipRelease`,
+  `TestEmbeddedRuntimeCrashAfterCandidateSelectedRestoresThePreviousGeneration`,
+  `TestEmbeddedRuntimeCrashWhileCommittingKeepsTheReadyCandidate` beside the
+  existing Apply success and rollback tests.
+- **What the images found.** The first macOS run measured ExFAT as
+  normalization-insensitive, unlike the Linux exFAT driver; the table records
+  the measurement, which is why the rule is stored per Repository and never
+  derived from a format name. The first Linux run found that no derived
+  artifact could be published on FAT32 or exFAT: `WritePrivateFileImmutable`
+  gave the complete file its immutable name with a hard link, which those
+  filesystems refuse, so every thumbnail failed and enrichment waited on it
+  forever. The publish now falls back to an existence check and a rename
+  where hard links are refused, the pattern the trash and staging moves
+  already used; `TestRepositoryFSImmutablePrivateWritePublishesWhereHardLinksAreRefused`
+  stands in for the volume on the runner and the image jobs exercise the real
+  refusal. The blackbox processing waiter now names failed and retrying
+  per-file stages from the catalog when it times out, so a stage blocked
+  behind another is diagnosed from the run.
+- **Deviations.** Only the root and `.lumilio/` are probed; a case-folding
+  flag set on a deeper subdirectory after the fact is not detected at
+  registration (a per-directory check during the walk is the follow-up if a
+  fixture ever shows it). Windows NTFS and real removable disks remain
+  optional reference coverage; the image table is the support list.
 
 ### P7 — Enforce and remove competing paths
 
@@ -940,7 +1037,7 @@ Fixture self-tests below prove fixture construction only.
 | R8 — parent/child risk and continuity                                         | Go unit/integration; valid Location with independently mounted-child facts (parent local A, child B, B unchanged across samples), then missing/corrupt parent marker and healthy registered child                                                        | Child risk/support uses B; unchanged B has no mount-changed warning merely because A differs. Actual B replacement changes continuity; capacity grouping is independent. Parent fault does not deny registered child read/rename/detach, while new destination authorization still rejects invalid parent scope                                                                                                                                                                                                                                                                                                                                      | P1; rename/detach boundary P3                                    |
 | R9 — Open Existing / conflict handoff / external reconnect UI omissions       | Web flow + embedded Desktop picker-controller integration; non-default compatible marked child, actual StoragePanelFlow composition, new-create conflict, complete external Location                                                                     | Native-backed Open launches native selection for chosen Location instead of default candidates; standalone bounded candidates retain selected context. Conflict handoff reaches Open/reconnect/copy review with location/child retained. External Location menu has direct reconnect entry. Cancel/stale/expired picker retains form and returns legal restart action; task paths/nonces never leak to HTTP                                                                                                                                                                                                                                          | P2 create handoff; P3 task outcomes; P6a direct Location entry and Location task (Web spec, app acceptance) |
 | R10 — illegal protected actions / generic unreachable failures / default hint | Go policy/API table integration + Web flow/presentation tests; adversarial capabilities, primary/default and regular/offline trees, owned/busy task controls                                                                                             | Menus never invent primary rename/copy/detach/ordinary reconnect; protected default hint directs to executable config/operator recovery. Every public Problem and async reason has an actor/phase-correct descriptor whose route/host entry can actually be followed from a real failure. Domain reasons survive native transport; auth/phase guards hold, arbitrary browser host paths are rejected; exhausted enum/risk/action cases have literal en/zh copy                                                                                                                                                                                       | P3 role/task policy; P5 setup reachability delivered; P7 exhaustiveness |
-| R11 — host-default scan-key volume debt                                       | Go integration + CI filesystem-image fixtures; sensitive/insensitive and normalization-distinct names, supported cross-volume reconnect and deliberate destination collisions                                                                            | Destination semantics determine keys; reconnect/rekey preserves entry IDs and Asset bindings, suppresses false absence, detects every collision before cutover, refuses without dropping rows or overwriting bytes. Unknown/mixed/directory-specific semantics refuse affected mutation until qualified by a reproducible fixture                                                                                                                                                                                                                                                                                                                    | P6                                                               |
+| R11 — host-default scan-key volume debt                                       | Go integration + CI filesystem-image fixtures; sensitive/insensitive and normalization-distinct names, supported cross-volume reconnect and deliberate destination collisions                                                                            | Destination semantics determine keys; reconnect/rekey preserves entry IDs and Asset bindings, suppresses false absence, detects every collision before cutover, refuses without dropping rows or overwriting bytes. Unknown/mixed/directory-specific semantics refuse affected mutation until qualified by a reproducible fixture                                                                                                                                                                                                                                                                                                                    | P6b delivered (storage rekey tests on the runner's filesystem with an injected destination rule; `TestVolumeReconnectAcrossFilesystemImages` and the probe table on the Linux and macOS image jobs) |
 | R12 — marker/layout distinction and unsafe marker writes                      | Go unit/integration; all `Marker` states, `MissingPrivate`, missing inbox and required-directory file obstruction, injected marker replace/write failures                                                                                                | Compatible marker remains compatible when layout missing; explicit repair adds only allowed missing dirs and preserves UUID/originals. File obstruction/denial blocks repair; absent/denied/corrupt/unsupported markers stay distinct. Atomic-write failure leaves complete old/new marker, guarded replacement/rollback never clobbers external identity                                                                                                                                                                                                                                                                                            | P1 marker primitive; P3 command guard; P5 repair/adopt delivered |
 
 **R2 inputs / Edwin's macOS Desktop repro (2026-10-07):** clicking Relocate

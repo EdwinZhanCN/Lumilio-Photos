@@ -83,8 +83,8 @@ INSERT INTO storage_locations (
     storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
-) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization
+) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?, 'sensitive', 'none');
 `, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	for _, fixture := range []struct {

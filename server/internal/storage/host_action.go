@@ -17,6 +17,7 @@ import (
 
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
+	"server/internal/storage/pathsemantics"
 
 	"github.com/google/uuid"
 )
@@ -101,6 +102,8 @@ const (
 	hostActionCodeIdentityMismatch     = "storage/identity-mismatch"
 	hostActionCodeOwnershipUnavailable = "storage/ownership-unavailable"
 	hostActionCodeBusy                 = "storage/busy"
+	hostActionCodeVolumeUnqualified    = "storage/volume-unqualified"
+	hostActionCodeNameCollision        = "storage/name-collision"
 	hostActionCodeRepositoryConflict   = "repository/conflict"
 )
 
@@ -775,6 +778,7 @@ func (rm *DefaultRepositoryManager) failHostActionTyped(ctx context.Context, act
 	var refusal *HostActionRefusal
 	var unavailable *RepositoryActionUnavailableError
 	var locationUnavailable *StorageLocationActionUnavailableError
+	var collision *PathKeyCollisionError
 	switch {
 	case errors.As(cause, &unavailable):
 		code = hostActionCodeActionUnavailable
@@ -796,6 +800,10 @@ func (rm *DefaultRepositoryManager) failHostActionTyped(ctx context.Context, act
 		code = hostActionCodeOwnershipUnavailable
 	case errors.Is(cause, ErrRepositoryBusy):
 		code = hostActionCodeBusy
+	case errors.Is(cause, pathsemantics.ErrUnqualified):
+		code = hostActionCodeVolumeUnqualified
+	case errors.As(cause, &collision):
+		code = hostActionCodeNameCollision
 	}
 	var result *HostActionResult
 	if refusal != nil {

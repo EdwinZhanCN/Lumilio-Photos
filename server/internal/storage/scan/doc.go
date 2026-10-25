@@ -2,7 +2,12 @@
 // repository's tree in repository_entries, one row per file or directory;
 // the disk is the truth and a full scan is the authority. Entries record
 // repository-relative path, comparison path_key, parent_key, stat tuple,
-// state, and revision; files bind content and Asset IDs.
+// state, and revision; files bind content and Asset IDs. Keys are derived
+// under the name comparison rule stored on the repository row
+// ([SemanticsOf]), the rule measured on the repository's own volume at
+// registration or reconnect, never the host's default; a reconnect onto a
+// volume with another rule rekeys the index before the repository leaves
+// maintenance (storage package, R11).
 //
 // A scan is a depth-first walk in sorted name order. Each directory is one
 // unit: list it completely, diff the listing against the catalog rows whose

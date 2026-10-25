@@ -390,8 +390,8 @@ func assertBaselineSeedsAndRejections(t *testing.T, ctx context.Context, databas
 		) VALUES ('00000000-0000-0000-0000-000000000000', 999, '{bad', '[]', 1, 1)
 	`)
 	assertRejected(t, database, `
-		INSERT INTO repositories (repo_id, name, path, created_at, updated_at)
-		VALUES ('00000000-0000-0000-0000-000000000099', 'orphan', '/orphan', 1, 1)
+		INSERT INTO repositories (repo_id, name, path, created_at, updated_at, path_case, path_normalization)
+		VALUES ('00000000-0000-0000-0000-000000000099', 'orphan', '/orphan', 1, 1, 'sensitive', 'none')
 	`)
 }
 
@@ -406,10 +406,11 @@ func insertScanIndexFixtures(t *testing.T, ctx context.Context, database *sql.DB
 			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES ('00000000-0000-0000-0000-000000000001', 'root', '/media', 'default', 1, 1);
 		INSERT INTO repositories (
-			repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
+			repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id,
+			path_case, path_normalization
 		) VALUES (
 			'00000000-0000-0000-0000-000000000002', 'repo', '/media/repo',
-			1, 1, 1, '00000000-0000-0000-0000-000000000001'
+			1, 1, 1, '00000000-0000-0000-0000-000000000001', 'sensitive', 'none'
 		);
 		INSERT INTO content_objects (
 			content_id, hash_algorithm, full_hash, file_size, created_at

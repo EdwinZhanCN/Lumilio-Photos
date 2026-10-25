@@ -82,6 +82,13 @@ type reconnectRepositoryOperationPayload struct {
 	NewPath           string `json:"new_path"`
 	StorageLocationID string `json:"storage_location_id"`
 	ConfirmationType  string `json:"confirmation_type"`
+	// Rekey records that the destination volume follows another name rule
+	// than the registered one, so the cutover leaves the repository in
+	// maintenance until every entry key is rebuilt under PathCase and
+	// PathNormalization; recovery finishes that pass after a crash.
+	Rekey             bool   `json:"rekey,omitempty"`
+	PathCase          string `json:"path_case,omitempty"`
+	PathNormalization string `json:"path_normalization,omitempty"`
 }
 
 type reconnectRepositoryOperationResult struct {
@@ -174,6 +181,12 @@ func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id 
 		return nil, fmt.Errorf("%w: %s holds repository %s, not %s",
 			ErrRepositoryIDMismatch, cleanPath, config.ID, id)
 	}
+	// The destination volume's name rule decides the keys; a destination
+	// that cannot be qualified is refused before anything else is touched.
+	plan, err := rm.planVolumeRekey(*current, cleanPath)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 	storageLocationID := uuid.Nil
@@ -216,17 +229,55 @@ func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id 
 			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
 		}
 	}
+	// A rule change enters maintenance first, in its own statement, so no
+	// scan, upload or Trash command can write the index between the
+	// preflight and the cutover; the preflight then reads a frozen index.
+	// Until the cutover commits, any failure hands the barrier back.
+	rekeyMaintenance := false
+	if plan.needed() {
+		if _, err := rm.queries.BeginRepositoryMaintenance(ctx, repo.BeginRepositoryMaintenanceParams{
+			RepoID: repoUUID, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, fmt.Errorf("%w: repository has active work", ErrRepositoryBusy)
+			}
+			return nil, fmt.Errorf("enter rekey maintenance: %w", err)
+		}
+		rekeyMaintenance = true
+		previousReachability := current.Reachability
+		defer func() {
+			if !rekeyMaintenance {
+				return
+			}
+			_, _ = rm.queries.EndRepositoryMaintenance(context.Background(), repo.EndRepositoryMaintenanceParams{
+				RepoID: repoUUID, Reachability: previousReachability,
+				Activity: dbtypes.RepositoryActivityIdle, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+			})
+		}()
+	}
+	// Every live key must stay distinct under the destination rule; a
+	// collision refuses the whole reconnect under the lease, with the pairs
+	// named and nothing changed.
+	if err := rm.preflightRekey(ctx, repoUUID, plan); err != nil {
+		return nil, err
+	}
 	confirmation := strings.TrimSpace(request.ConfirmationType)
 	if confirmation == "" {
 		confirmation = "update_location"
 	}
+	payload := reconnectRepositoryOperationPayload{
+		RepositoryID: id, OldPath: current.Path, NewPath: cleanPath,
+		StorageLocationID: storageLocationID.String(), ConfirmationType: confirmation,
+	}
+	if plan.needed() {
+		payload.Rekey = true
+		payload.PathCase = string(plan.To.Case)
+		payload.PathNormalization = string(plan.To.Normalization)
+	}
 	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
 		RequestID: request.RequestID, Kind: lifecycleKindReconnectRepository,
-		Payload: reconnectRepositoryOperationPayload{
-			RepositoryID: id, OldPath: current.Path, NewPath: cleanPath,
-			StorageLocationID: storageLocationID.String(), ConfirmationType: confirmation,
-		},
-		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
+		Payload: payload,
+		Actor:   request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
 		TargetType: "repository", TargetID: &id,
 	})
 	if err != nil {
@@ -254,13 +305,29 @@ func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id 
 		return failPrepared(cause)
 	}
 	queries := rm.queries.WithTx(tx.Raw())
-	dbRepo, err := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID:            repoUUID,
-		Path:              cleanPath,
-		StorageLocationID: storageLocationID,
-		Reachability:      dbtypes.RepositoryReachabilityActive,
-		UpdatedAt:         dbtypes.NewTimestamp(now),
-	})
+	var dbRepo repo.Repository
+	if plan.needed() {
+		// The path and the rule change together while the repository stays
+		// in maintenance: no scan, upload, or Trash command can key against
+		// the index until every row follows the new rule.
+		dbRepo, err = queries.UpdateRepositoryPathSemantics(ctx, repo.UpdateRepositoryPathSemanticsParams{
+			RepoID:            repoUUID,
+			Path:              cleanPath,
+			StorageLocationID: storageLocationID,
+			Reachability:      dbtypes.RepositoryReachabilityMaintenance,
+			PathCase:          plan.To.Case,
+			PathNormalization: plan.To.Normalization,
+			UpdatedAt:         dbtypes.NewTimestamp(now),
+		})
+	} else {
+		dbRepo, err = queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
+			RepoID:            repoUUID,
+			Path:              cleanPath,
+			StorageLocationID: storageLocationID,
+			Reachability:      dbtypes.RepositoryReachabilityActive,
+			UpdatedAt:         dbtypes.NewTimestamp(now),
+		})
+	}
 	if err != nil {
 		if isUniquePathViolation(err) {
 			rm.repoAudit(cleanPath).Error("repository.reconnect", err, zap.String("repository_id", id))
@@ -284,6 +351,24 @@ func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id 
 	}
 	if err := tx.Commit(); err != nil {
 		return failInTx(fmt.Errorf("commit repository reconnect: %w", err))
+	}
+	if plan.needed() {
+		// The cutover is durable and the journal owns the barrier from here:
+		// the rekey runs in bounded batches outside the cutover transaction,
+		// and a crash or failure leaves the repository in maintenance with
+		// the operation running, which startup recovery finishes.
+		rekeyMaintenance = false
+		if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseCatalogCommitted, nil); err != nil {
+			return nil, fmt.Errorf("%w: repository reconnected but its journal phase could not be recorded: %v", ErrLifecycleRecoveryRequired, err)
+		}
+		if err := rm.finishVolumeRekey(ctx, repoUUID); err != nil {
+			return nil, fmt.Errorf("%w: repository reconnected at %s but its index is still being rebuilt for the volume: %v", ErrLifecycleRecoveryRequired, cleanPath, err)
+		}
+		refreshed, err := rm.queries.GetRepository(ctx, repoUUID)
+		if err != nil {
+			return nil, fmt.Errorf("read rekeyed repository: %w", err)
+		}
+		dbRepo = refreshed
 	}
 	if err := rm.completeLifecycleOperation(ctx, operation.OperationID, reconnectRepositoryOperationResult{
 		RepositoryID: id, StorageLocationID: storageLocationID.String(), FilesPreserved: true,

@@ -76,7 +76,7 @@ steps:
         anchor: go:scan.Scanner.RunTurn
       - from: scanner
         to: disk
-        label: list one directory completely (sorted, stat cache)
+        label: list one directory completely (sorted, stat cache); key names under the repository's own volume rule
         anchor: go:scan.walkTurn.processDirectory
       - from: scanner
         to: writer

@@ -15,6 +15,30 @@ ORDER BY path_key, entry_id;
 SELECT * FROM repository_entries
 WHERE entry_id = ?1;
 
+-- name: ListRepositoryEntriesForRekey :many
+-- One entry_id-ordered page of every row of a repository, whatever its
+-- state, for the volume-semantics preflight and rekey. Keyset pagination
+-- keeps each read bounded; the rekey itself writes at most one batch per
+-- transaction.
+SELECT entry_id, path, path_key, parent_key, kind, state, revision
+FROM repository_entries
+WHERE repository_id = sqlc.arg(repository_id)
+  AND entry_id > sqlc.arg(after_entry_id)
+ORDER BY entry_id
+LIMIT sqlc.arg(page_size);
+
+-- name: RekeyRepositoryEntryCAS :execrows
+-- Rewrites the comparison keys of one row under the repository's new volume
+-- rule. The path is unchanged; the revision fence refuses a row something
+-- else wrote since the preflight read it.
+UPDATE repository_entries
+SET path_key = sqlc.arg(path_key),
+    parent_key = sqlc.arg(parent_key),
+    revision = revision + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE entry_id = sqlc.arg(entry_id)
+  AND revision = sqlc.arg(expected_revision);
+
 -- name: InsertRepositoryEntry :one
 INSERT INTO repository_entries (
     entry_id, repository_id, path, path_key, parent_key, kind,

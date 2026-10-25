@@ -37,7 +37,7 @@ func TestCleanerKeepsTranscodesOfAssetsThatStillExist(t *testing.T) {
 	}{
 		{`INSERT INTO users (user_id, username, password, created_at, updated_at, webauthn_user_handle) VALUES (1, 'owner', 'hash', 1, 1, x'01')`, nil},
 		{`INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at) VALUES (?, 'root', '/media', 'default', 1, 1)`, []any{location}},
-		{`INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id) VALUES (?, 'videos', '/media/videos', 1, 1, 1, ?)`, []any{repositoryID, location}},
+		{`INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization) VALUES (?, 'videos', '/media/videos', 1, 1, 1, ?, 'sensitive', 'none')`, []any{repositoryID, location}},
 	} {
 		if _, err := database.SQL.ExecContext(ctx, statement.query, statement.args...); err != nil {
 			t.Fatal(err)

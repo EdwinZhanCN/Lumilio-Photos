@@ -115,9 +115,17 @@ func main() {
 		configLoadRecovery = true
 	}
 	configReconcile, configReconcileErr := configStore.Reconcile()
-	configRecovery := configLoadRecovery || configReconcileErr != nil || configReconcile.NeedsResume || configReconcile.NeedsRollback
+	// An open Apply journal blocks the start only when the current pointer
+	// names a candidate that was never proven ready; a journal left at a
+	// phase where the previous generation, or a candidate the journal
+	// recorded as ready, is current starts normally and is closed by the
+	// readiness promotion (OnReady below).
+	configRecovery := configLoadRecovery || configReconcileErr != nil || configReconcile.NeedsRollback ||
+		(configReconcile.NeedsResume && !configReconcile.SafeToStart)
 	if configReconcileErr != nil {
 		log.Printf("Desktop runtime journal requires recovery: %v", configReconcileErr)
+	} else if configReconcile.NeedsResume && configReconcile.SafeToStart {
+		log.Printf("Desktop runtime journal left at %q resumes through the readiness promotion", configReconcile.Journal.Phase)
 	}
 	configured = configured && resourceErr == nil && !configRecovery
 	lumenInstalled := false

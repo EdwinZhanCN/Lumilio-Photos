@@ -942,6 +942,7 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblemReference",
                         "https://lumilio.org/problems/storage/layout-obstructed": "#/components/schemas/api.StorageLayoutObstructedProblemReference",
                         "https://lumilio.org/problems/storage/materialization-required": "#/components/schemas/api.StorageMaterializationRequiredProblemReference",
+                        "https://lumilio.org/problems/storage/name-collision": "#/components/schemas/api.StorageNameCollisionProblemReference",
                         "https://lumilio.org/problems/storage/not-a-mounted-volume": "#/components/schemas/api.StorageNotAMountedVolumeProblemReference",
                         "https://lumilio.org/problems/storage/observation-unknown": "#/components/schemas/api.StorageObservationUnknownProblemReference",
                         "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblemReference",
@@ -949,6 +950,7 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblemReference",
                         "https://lumilio.org/problems/storage/recovery-required": "#/components/schemas/api.StorageRecoveryRequiredProblemReference",
                         "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblemReference",
+                        "https://lumilio.org/problems/storage/volume-unqualified": "#/components/schemas/api.StorageVolumeUnqualifiedProblemReference",
                         "https://lumilio.org/problems/upload/processing-failed": "#/components/schemas/api.UploadProcessingFailedProblemReference"
                     },
                     "propertyName": "type"
@@ -1051,6 +1053,9 @@ const docTemplate = `{
                         "$ref": "#/components/schemas/api.StorageMaterializationRequiredProblemReference"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageNameCollisionProblemReference"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageNotAMountedVolumeProblemReference"
                     },
                     {
@@ -1070,6 +1075,9 @@ const docTemplate = `{
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageUnsupportedFilesystemProblemReference"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageVolumeUnqualifiedProblemReference"
                     },
                     {
                         "$ref": "#/components/schemas/api.UploadProcessingFailedProblemReference"
@@ -1112,6 +1120,7 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblem",
                         "https://lumilio.org/problems/storage/layout-obstructed": "#/components/schemas/api.StorageLayoutObstructedProblem",
                         "https://lumilio.org/problems/storage/materialization-required": "#/components/schemas/api.StorageMaterializationRequiredProblem",
+                        "https://lumilio.org/problems/storage/name-collision": "#/components/schemas/api.StorageNameCollisionProblem",
                         "https://lumilio.org/problems/storage/not-a-mounted-volume": "#/components/schemas/api.StorageNotAMountedVolumeProblem",
                         "https://lumilio.org/problems/storage/observation-unknown": "#/components/schemas/api.StorageObservationUnknownProblem",
                         "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblem",
@@ -1119,6 +1128,7 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/permission-denied": "#/components/schemas/api.StoragePermissionDeniedProblem",
                         "https://lumilio.org/problems/storage/recovery-required": "#/components/schemas/api.StorageRecoveryRequiredProblem",
                         "https://lumilio.org/problems/storage/unsupported-filesystem": "#/components/schemas/api.StorageUnsupportedFilesystemProblem",
+                        "https://lumilio.org/problems/storage/volume-unqualified": "#/components/schemas/api.StorageVolumeUnqualifiedProblem",
                         "https://lumilio.org/problems/upload/processing-failed": "#/components/schemas/api.UploadProcessingFailedProblem"
                     },
                     "propertyName": "type"
@@ -1224,6 +1234,9 @@ const docTemplate = `{
                         "$ref": "#/components/schemas/api.StorageMaterializationRequiredProblem"
                     },
                     {
+                        "$ref": "#/components/schemas/api.StorageNameCollisionProblem"
+                    },
+                    {
                         "$ref": "#/components/schemas/api.StorageNotAMountedVolumeProblem"
                     },
                     {
@@ -1243,6 +1256,9 @@ const docTemplate = `{
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageUnsupportedFilesystemProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageVolumeUnqualifiedProblem"
                     },
                     {
                         "$ref": "#/components/schemas/api.UploadProcessingFailedProblem"
@@ -1285,8 +1301,10 @@ const docTemplate = `{
                         "https://lumilio.org/problems/storage/action-unavailable": "#/components/schemas/api.StorageActionUnavailableProblem",
                         "https://lumilio.org/problems/storage/busy": "#/components/schemas/api.StorageBusyProblem",
                         "https://lumilio.org/problems/storage/identity-mismatch": "#/components/schemas/api.StorageIdentityMismatchProblem",
+                        "https://lumilio.org/problems/storage/name-collision": "#/components/schemas/api.StorageNameCollisionProblem",
                         "https://lumilio.org/problems/storage/original-online": "#/components/schemas/api.StorageOriginalOnlineProblem",
-                        "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblem"
+                        "https://lumilio.org/problems/storage/ownership-unavailable": "#/components/schemas/api.StorageOwnershipUnavailableProblem",
+                        "https://lumilio.org/problems/storage/volume-unqualified": "#/components/schemas/api.StorageVolumeUnqualifiedProblem"
                     },
                     "propertyName": "type"
                 },
@@ -1305,6 +1323,12 @@ const docTemplate = `{
                     },
                     {
                         "$ref": "#/components/schemas/api.StorageOriginalOnlineProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageVolumeUnqualifiedProblem"
+                    },
+                    {
+                        "$ref": "#/components/schemas/api.StorageNameCollisionProblem"
                     }
                 ]
             },
@@ -2177,6 +2201,70 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "api.StorageNameCollisionProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "collision_count": {
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "collisions": {
+                        "type": "string"
+                    },
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/name-collision",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "collision_count",
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageNameCollisionProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "collision_count": {
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "collisions": {
+                        "type": "string"
+                    },
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/name-collision",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "collision_count",
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
             "api.StorageNotAMountedVolumeProblem": {
                 "additionalProperties": false,
                 "properties": {
@@ -2503,6 +2591,54 @@ const docTemplate = `{
                     },
                     "type": {
                         "const": "https://lumilio.org/problems/storage/unsupported-filesystem",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageVolumeUnqualifiedProblem": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "const": 409,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/volume-unqualified",
+                        "format": "uri",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "instance",
+                    "status",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "api.StorageVolumeUnqualifiedProblemReference": {
+                "additionalProperties": false,
+                "properties": {
+                    "instance": {
+                        "format": "uri",
+                        "pattern": "^urn:lumilio:problem:[0-9a-f]{32}$",
+                        "type": "string"
+                    },
+                    "retryable": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "const": "https://lumilio.org/problems/storage/volume-unqualified",
                         "format": "uri",
                         "type": "string"
                     }

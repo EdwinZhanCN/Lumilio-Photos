@@ -396,10 +396,23 @@ func (r *RepositoryFS) WritePrivateFileAtomic(repositoryPath RepositoryPath, rea
 	return written, syncRootDirectory(root, path.Dir(repositoryPath.String()))
 }
 
+// linkImmutable gives the complete temporary file its immutable name as a
+// second hard link, which the filesystem refuses when the name exists. Tests
+// replace it to stand in for a volume without hard links; the filesystem-image
+// jobs exercise the real refusal on FAT32 and exFAT.
+var linkImmutable = func(root *os.Root, oldname, newname string) error {
+	return root.Link(oldname, newname)
+}
+
 // WritePrivateFileImmutable publishes a private-workspace file without ever
 // replacing an existing destination. A retry may reuse an existing regular
 // file only when its complete content is byte-for-byte identical; a different
 // file at the immutable path is a conflict and remains untouched.
+//
+// FAT32 and exFAT have no hard links, so there the name is published by a
+// rename after an existence check, the way the trash and staging moves are.
+// The asset work fence admits one publisher per artifact identity, so nothing
+// can appear at the name between the check and the rename.
 func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, reader io.Reader, perm fs.FileMode) (int64, error) {
 	if !repositoryPath.isPrivate() {
 		return 0, ErrRepositoryPathNamespace
@@ -451,9 +464,25 @@ func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, 
 		return written, err
 	}
 
-	if err := root.Link(temporary, destination); err != nil {
+	if err := linkImmutable(root, temporary, destination); err != nil {
 		if !errors.Is(err, fs.ErrExist) {
-			return written, err
+			_, statErr := root.Lstat(destination)
+			switch {
+			case errors.Is(statErr, fs.ErrNotExist):
+				// No hard links on this volume: the name is free, so the
+				// complete file takes it by rename.
+				if renameErr := root.Rename(temporary, destination); renameErr != nil {
+					return written, fmt.Errorf("publish immutable file by rename: %w (link: %v)", renameErr, err)
+				}
+				cleanup = false
+				if err := syncRootDirectory(root, path.Dir(repositoryPath.String())); err != nil {
+					return written, err
+				}
+				return written, nil
+			case statErr != nil:
+				return written, statErr
+			}
+			// The name is taken: adopt it only when its content is identical.
 		}
 		existingSize, existingDigest, compareErr := hashRootRegularFile(root, destination)
 		if compareErr != nil {

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Destination volume cannot tell indexed names apart · Lumilio API Problem</title>
+  <style>body{max-width:52rem;margin:4rem auto;padding:0 1.5rem;font:16px/1.6 system-ui,sans-serif;color:#202124}code{background:#f3f4f6;padding:.15rem .35rem;border-radius:.25rem}dt{font-weight:700;margin-top:1rem}dd{margin-left:0}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #ddd;padding:.6rem}</style>
+</head>
+<body>
+  <p><a href="/problems/">Lumilio API Problems</a></p>
+  <h1>Destination volume cannot tell indexed names apart</h1>
+  <dl>
+    <dt>Type</dt><dd><code>https://lumilio.org/problems/storage/name-collision</code></dd>
+    <dt>Normal HTTP status</dt><dd>409</dd>
+    <dt>Definition</dt><dd>Under the case or normalization rule of the destination volume, indexed paths of the Repository would share one name, so the reconnect was refused before any row or byte changed.</dd>
+    <dt>Recovery</dt><dd>Rename one of each named pair on the original volume, or reconnect to a volume that distinguishes them; the index was not changed.</dd>
+  </dl>
+  <h2>Extension members</h2>
+  <table><thead><tr><th>Name</th><th>Schema</th><th>Meaning</th></tr></thead><tbody><tr><td><code>collision_count</code></td><td>integer</td><td>How many live entries would share another entry&#39;s name on the destination.</td></tr><tr><td><code>collisions</code></td><td>array[object]</td><td>At most ten of the colliding pairs, each with first and second repository-relative paths.</td></tr></tbody></table>
+  <p>Runtime clients identify this condition by <code>type</code>; they do not dereference this page automatically.</p>
+</body>
+</html>

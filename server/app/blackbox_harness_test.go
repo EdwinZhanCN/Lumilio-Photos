@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -286,8 +287,44 @@ func (s *blackboxServer) waitProcessingSettled() {
 		return busy == ""
 	})
 	if !settled {
-		s.t.Fatalf("processing stages still busy:%s", busy)
+		s.t.Fatalf("processing stages still busy:%s%s", busy, s.pipelineFailureReport())
 	}
+}
+
+// pipelineFailureReport names every per-file stage the catalog recorded as
+// failed or retrying, straight from the catalog file (a read-only second
+// connection), because the processing API keeps terminal errors private and a
+// stage that waits on a failed one only ever shows as queued.
+func (s *blackboxServer) pipelineFailureReport() string {
+	catalogPath := filepath.Join(s.root, "state", "library.sqlite3")
+	catalog, err := sql.Open("sqlite3", "file:"+catalogPath+"?mode=ro")
+	if err != nil {
+		return fmt.Sprintf("\n(catalog unreadable: %v)", err)
+	}
+	defer catalog.Close()
+	rows, err := catalog.QueryContext(context.Background(), `
+ SELECT s.asset_id, s.stage, COALESCE(s.terminal_error, ''), COALESCE(f.failure_code, ''), COALESCE(f.failure_count, 0)
+ FROM asset_pipeline_state s
+ LEFT JOIN asset_pipeline_failures f ON f.asset_id = s.asset_id AND f.stage = s.stage
+ WHERE s.terminal_error IS NOT NULL OR f.asset_id IS NOT NULL
+ ORDER BY s.asset_id, s.stage`)
+	if err != nil {
+		return fmt.Sprintf("\n(catalog unreadable: %v)", err)
+	}
+	defer rows.Close()
+	report := ""
+	for rows.Next() {
+		var assetID, stage, terminal, code string
+		var count int64
+		if err := rows.Scan(&assetID, &stage, &terminal, &code, &count); err != nil {
+			return report + fmt.Sprintf("\n(catalog unreadable: %v)", err)
+		}
+		report += fmt.Sprintf("\n  asset %s stage %s: terminal=%q failure_code=%q failures=%d", assetID, stage, terminal, code, count)
+	}
+	if report == "" {
+		return "\n  (no per-file stage is failed or retrying)"
+	}
+	return report
 }
 
 // waitIdle waits until a repository's lifecycle activity is idle, which

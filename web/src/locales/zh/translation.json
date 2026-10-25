@@ -76,13 +76,15 @@
       "identityMismatch": "该文件夹中的资源库与你选择的不同。未做任何更改。",
       "layoutObstructed": "本应是资源库文件夹的位置被一个文件或无法访问的文件夹占据，因此未修复布局。请把它移开后重新检查；未做任何更改。",
       "materializationRequired": "此文件夹中的文件需要先下载到本地才能使用。请将文件夹设为离线可用后重试。",
+      "nameCollision": "此磁盘无法区分资源库中的部分文件名（它们仅在大小写或重音拼写形式上不同），因此在任何更改发生前已拒绝重新连接。请在原磁盘上重命名每对中的一个文件，或选择能够区分它们的磁盘。",
       "notMountedVolume": "此文件夹不是挂载的卷；存放在这里的数据会在容器重建时丢失。请在 compose 文件中挂载主机目录。",
       "observationUnknown": "无法检查存储目标。请检查挂载和访问权限后重试。",
       "originalOnline": "该资源库仍在其登记位置可用，无需重新连接。",
       "ownershipUnavailable": "另一个 Lumilio 进程占用着此资源库文件夹。请先停止它，然后重试。",
       "permissionDenied": "Lumilio 无权访问该存储目标。请授予访问权限或选择其他文件夹。",
       "recoveryRequired": "此资源库上有一项被中断的存储操作需要先完成恢复。请在存储页面查看其恢复清单，然后重试。",
-      "unsupportedFilesystem": "本版本的存储位置和资源库不支持网络存储（NFS、SMB、AFP、SSHFS、WebDAV 或网络驱动器）。请选择本地磁盘。"
+      "unsupportedFilesystem": "本版本的存储位置和资源库不支持网络存储（NFS、SMB、AFP、SSHFS、WebDAV 或网络驱动器）。请选择本地磁盘。",
+      "volumeUnqualified": "Lumilio 无法确定此磁盘比较文件名的规则，或该目录树内的文件夹遵循不同的规则，因此未将资源库放置于此。未做任何更改。"
     },
     "upload": {
       "processingFailed": "无法处理此上传。"

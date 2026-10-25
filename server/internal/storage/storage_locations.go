@@ -685,6 +685,10 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 		repository repo.Repository
 		path       string
 		config     *repocfg.RepositoryConfig
+		// rekey is the rule change the destination volume imposes on this
+		// child's index; a child that needs one stays in maintenance after
+		// the path transaction until its keys are rebuilt.
+		rekey volumeRekey
 	}
 	repositories, err := rm.queries.ListRepositories(ctx)
 	if err != nil {
@@ -715,10 +719,17 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 		} else if findErr != nil && !errors.Is(findErr, sql.ErrNoRows) {
 			return nil, fmt.Errorf("check repository destination: %w", findErr)
 		}
+		// The destination volume's name rule is qualified per child; an
+		// unqualified destination refuses the whole Location reconnect.
+		rekey, planErr := rm.planVolumeRekey(repository, requestedRepositoryPath)
+		if planErr != nil {
+			return nil, planErr
+		}
 		moves = append(moves, repositoryMove{
 			repository: repository,
 			path:       requestedRepositoryPath,
 			config:     repositoryConfig,
+			rekey:      rekey,
 		})
 		if err := rm.claimRuntimeStoragePath(ctx, "repository", requestedRepositoryPath); err != nil {
 			return nil, err
@@ -780,6 +791,15 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 		}
 	}()
 
+	// Under the barrier every child's live keys must stay distinct under its
+	// destination rule before any row changes; one collision refuses the
+	// whole reconnect and the deferred release hands the barrier back.
+	for _, move := range moves {
+		if err := rm.preflightRekey(ctx, move.repository.RepoID, move.rekey); err != nil {
+			return nil, err
+		}
+	}
+
 	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationStorageLocationRelocate, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin Storage Location relocate: %w", err)
@@ -788,10 +808,22 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 	queries := rm.queries.WithTx(tx.Raw())
 	now = dbtypes.NewTimestamp(time.Now().UTC())
 	for _, move := range moves {
-		updated, updateErr := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-			RepoID: move.repository.RepoID, Path: move.path, StorageLocationID: storageLocationID,
-			Reachability: dbtypes.RepositoryReachabilityMaintenance, UpdatedAt: now,
-		})
+		var updated repo.Repository
+		var updateErr error
+		if move.rekey.needed() {
+			// The child's path and name rule change together; it stays in
+			// maintenance until its keys are rebuilt below.
+			updated, updateErr = queries.UpdateRepositoryPathSemantics(ctx, repo.UpdateRepositoryPathSemanticsParams{
+				RepoID: move.repository.RepoID, Path: move.path, StorageLocationID: storageLocationID,
+				Reachability: dbtypes.RepositoryReachabilityMaintenance,
+				PathCase:     move.rekey.To.Case, PathNormalization: move.rekey.To.Normalization, UpdatedAt: now,
+			})
+		} else {
+			updated, updateErr = queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
+				RepoID: move.repository.RepoID, Path: move.path, StorageLocationID: storageLocationID,
+				Reachability: dbtypes.RepositoryReachabilityMaintenance, UpdatedAt: now,
+			})
+		}
 		if updateErr != nil {
 			return nil, fmt.Errorf("relocate repository with Storage Location: %w", updateErr)
 		}
@@ -803,6 +835,9 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 		}
 		if updateErr := invalidateRepositoryObservationAfterRelocation(ctx, tx, move.repository.RepoID, move.path, now); updateErr != nil {
 			return nil, updateErr
+		}
+		if move.rekey.needed() {
+			continue
 		}
 		if _, updateErr := queries.EndRepositoryMaintenance(ctx, repo.EndRepositoryMaintenanceParams{
 			RepoID: updated.RepoID, Reachability: dbtypes.RepositoryReachabilityActive,
@@ -830,6 +865,18 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 		return nil, fmt.Errorf("commit Storage Location relocate: %w", err)
 	}
 	maintenanceCommitted = false
+	// The cutover is durable; children on a volume with another name rule
+	// now have their index rebuilt in bounded batches and leave maintenance
+	// one by one. A failure here leaves the journal running for recovery.
+	for _, move := range moves {
+		if !move.rekey.needed() {
+			continue
+		}
+		if err := rm.finishVolumeRekey(ctx, move.repository.RepoID); err != nil {
+			return nil, fmt.Errorf("%w: Storage Location reconnected at %s but repository %s is still being rekeyed for its volume: %v",
+				ErrLifecycleRecoveryRequired, cleanPath, move.repository.Name, err)
+		}
+	}
 	return &storageLocation, nil
 }
 

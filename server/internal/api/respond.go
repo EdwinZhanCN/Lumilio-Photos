@@ -18,11 +18,13 @@ type RateLimitedProblemResponse = problem.RateLimitedDetails
 type RepositoryConflictProblemResponse = problem.RepositoryConflictDetails
 type StorageConfirmationRequiredProblemResponse = problem.StorageConfirmationRequiredDetails
 type StorageActionUnavailableProblemResponse = problem.StorageActionUnavailableDetails
+type StorageNameCollisionProblemResponse = problem.StorageNameCollisionDetails
 
 // RepositoryCommandProblemResponse is the OpenAPI placeholder for the 409
 // union of the Repository commands (rename, detach, candidate reconnect):
 // openapinormalize replaces its schema with the exact oneOf of the typed
-// action refusal, busy, ownership, identity, and original-online Problems.
+// action refusal, busy, ownership, identity, original-online, volume
+// qualification, and name-collision Problems.
 type RepositoryCommandProblemResponse = problem.Details
 
 // RepositoryCreateProblemResponse is the OpenAPI placeholder for the create

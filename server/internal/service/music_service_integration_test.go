@@ -30,7 +30,7 @@ func musicTestCatalog(t *testing.T) (*db.DB, *musicService, uuid.UUID) {
  INSERT INTO users (user_id, username, password, created_at, updated_at, display_name, role, webauthn_user_handle)
  VALUES (1, 'music-owner', 'unused', 1, 1, 'Owner', 'admin', x'01'), (2, 'other-owner', 'unused', 1, 1, 'Other', 'user', x'02');
  INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at) VALUES (?, 'Root', '/music', 'default', 1, 1);
- INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, role, storage_location_id) VALUES (?, 'Music', '/music/library', 1, 1, 1, 'primary', ?);`, storageLocationID, repositoryID, storageLocationID)
+ INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization) VALUES (?, 'Music', '/music/library', 1, 1, 1, 'primary', ?, 'sensitive', 'none');`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	return catalog, NewMusicService(catalog.Queries, catalog.Queries, catalog.Writer).(*musicService), repositoryID
 }

@@ -12,6 +12,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 
@@ -54,10 +55,15 @@ func newPersistentSessionFixture(t *testing.T) (*db.DB, repo.Repository, *storag
 	}); err != nil {
 		t.Fatal(err)
 	}
+	rule, err := pathsemantics.Probe(repositoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "upload session", Path: repositoryPath, Config: *repositoryConfig,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
 		CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID,
+		PathCase: rule.Case, PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		t.Fatal(err)

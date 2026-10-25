@@ -75,7 +75,7 @@ func newFixture(t *testing.T) *fixture {
 		t: t, ctx: ctx, database: database, files: storage.NewRepositoryFSFactory(nil, database.Queries),
 		owner: owner.UserID, root: root, location: location,
 	}
-	f.scanner, err = scan.New(database.ReaderQueries, database, f.files, scan.Config{Semantics: pathsemantics.HostDefault()})
+	f.scanner, err = scan.New(database.ReaderQueries, database, f.files, scan.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,11 +98,16 @@ func (f *fixture) addRepository(name string) repo.Repository {
 	if err := repositoryConfig.SaveConfigToFile(path); err != nil {
 		f.t.Fatal(err)
 	}
+	rule, err := pathsemantics.Probe(path)
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	repository, err := f.database.Queries.CreateRepository(f.ctx, repo.CreateRepositoryParams{
 		RepoID: id, Name: name, Path: path, Config: *repositoryConfig, Role: dbtypes.RepoRoleRegular,
 		Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
 		DefaultOwnerID: &f.owner, CreatedAt: now, UpdatedAt: now, StorageLocationID: f.location,
+		PathCase: rule.Case, PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		f.t.Fatal(err)

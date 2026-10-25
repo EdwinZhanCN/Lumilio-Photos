@@ -661,6 +661,11 @@ type Querier interface {
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryCloudBinding, error)
 	// Every file entry of the selected Assets, for Delete's preflight.
 	ListRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error)
+	// One entry_id-ordered page of every row of a repository, whatever its
+	// state, for the volume-semantics preflight and rekey. Keyset pagination
+	// keeps each read bounded; the rekey itself writes at most one batch per
+	// transaction.
+	ListRepositoryEntriesForRekey(ctx context.Context, arg ListRepositoryEntriesForRekeyParams) ([]ListRepositoryEntriesForRekeyRow, error)
 	// Repository scan index (#222): entries mirror the tree, scans record runs.
 	// Every entry write is a compare-and-swap on revision, and nothing here
 	// counts a whole repository inside a writer transaction.
@@ -728,6 +733,10 @@ type Querier interface {
 	// is a no-op when the stored relation already matches, so retries stay
 	// idempotent.
 	ReconcileMediaItemComponentRelation(ctx context.Context, arg ReconcileMediaItemComponentRelationParams) error
+	// Rewrites the comparison keys of one row under the repository's new volume
+	// rule. The path is unchanged; the revision fence refuses a row something
+	// else wrote since the preflight read it.
+	RekeyRepositoryEntryCAS(ctx context.Context, arg RekeyRepositoryEntryCASParams) (int64, error)
 	ReleaseAgentThreadRefs(ctx context.Context, arg ReleaseAgentThreadRefsParams) error
 	// The user accepted ordinary retention for a held file: the hold is lifted
 	// and the retention clock starts at the acceptance, not at the original
@@ -842,6 +851,11 @@ type Querier interface {
 	UpdateRepositoryEntryObservedCAS(ctx context.Context, arg UpdateRepositoryEntryObservedCASParams) (int64, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error)
+	// A reconnect onto a volume with another name rule: the path moves and the
+	// rule changes in one statement, so no row ever pairs a path with the rule of
+	// a volume it does not live on. The caller leaves reachability in maintenance
+	// until every entry key agrees with the new rule.
+	UpdateRepositoryPathSemantics(ctx context.Context, arg UpdateRepositoryPathSemanticsParams) (Repository, error)
 	UpdateRepositoryReachability(ctx context.Context, arg UpdateRepositoryReachabilityParams) (Repository, error)
 	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
 	UpdateStackCover(ctx context.Context, arg UpdateStackCoverParams) error

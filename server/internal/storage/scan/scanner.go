@@ -107,8 +107,6 @@ type Config struct {
 	// Settle defers files modified more recently than this and schedules a
 	// follow-up scan for them (repository_scan.settle_seconds).
 	Settle time.Duration
-	// Semantics are the volume's path comparison rules.
-	Semantics pathsemantics.Semantics
 	// TurnFiles and TurnDuration bound one walk turn; a turn always finishes
 	// the directory it started.
 	TurnFiles    int
@@ -129,9 +127,6 @@ func New(reader *repo.Queries, writer Writer, files *storage.RepositoryFSFactory
 	if reader == nil || writer == nil || files == nil {
 		return nil, errors.New("scan requires a reader, a writer, and a repository filesystem factory")
 	}
-	if err := config.Semantics.Validate(); err != nil {
-		return nil, err
-	}
 	if config.Settle < 0 {
 		return nil, errors.New("settle window must not be negative")
 	}
@@ -148,25 +143,43 @@ func New(reader *repo.Queries, writer Writer, files *storage.RepositoryFSFactory
 }
 
 // PathKey maps a repository-relative path to the comparison key the index
-// stores for it, under this scanner's volume semantics. Lookups by path
-// outside the scanner (the recovery service proving a Studio record's
+// stores for it, under the rule persisted on the repository row. Lookups by
+// path outside the scanner (the recovery service proving a Studio record's
 // source) must key the same way.
-func (s *Scanner) PathKey(relative string) (string, error) { return s.pathKey(relative) }
+func (s *Scanner) PathKey(ctx context.Context, repositoryID uuid.UUID, relative string) (string, error) {
+	semantics, err := repositorySemantics(ctx, s.reader, repositoryID)
+	if err != nil {
+		return "", err
+	}
+	return pathKey(semantics, relative)
+}
 
-// pathKey maps a relative path to its comparison key, component by component.
-func (s *Scanner) pathKey(relative string) (string, error) {
-	if relative == "" {
-		return "", nil
+// repositoryReader is the one catalog read key derivation needs; *repo.Queries
+// satisfies it inside and outside a transaction.
+type repositoryReader interface {
+	GetRepository(ctx context.Context, repoID uuid.UUID) (repo.Repository, error)
+}
+
+// repositorySemantics reads the name comparison rule the repository's entries
+// are keyed under. It is the rule measured on the repository's volume when it
+// was registered or reconnected, never the host's default: a case-insensitive
+// disk on Linux and a case-sensitive one on macOS key by their own rules.
+func repositorySemantics(ctx context.Context, reader repositoryReader, repositoryID uuid.UUID) (pathsemantics.Semantics, error) {
+	repository, err := reader.GetRepository(ctx, repositoryID)
+	if err != nil {
+		return pathsemantics.Semantics{}, fmt.Errorf("read repository volume rule: %w", err)
 	}
-	components := strings.Split(relative, "/")
-	for index, component := range components {
-		key, err := s.config.Semantics.NameKey(component)
-		if err != nil {
-			return "", err
-		}
-		components[index] = key
-	}
-	return strings.Join(components, "/"), nil
+	return SemanticsOf(repository), nil
+}
+
+// SemanticsOf is the rule a repository row's entries are keyed under.
+func SemanticsOf(repository repo.Repository) pathsemantics.Semantics {
+	return storage.RepositoryVolumeRule(repository)
+}
+
+// pathKey maps a relative path to its comparison key under one rule.
+func pathKey(semantics pathsemantics.Semantics, relative string) (string, error) {
+	return semantics.PathKey(relative)
 }
 
 func parentOf(relative string) string {

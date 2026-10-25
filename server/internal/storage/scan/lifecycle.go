@@ -15,6 +15,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/pathsemantics"
 	fileutil "server/internal/utils/file"
 )
 
@@ -39,6 +40,7 @@ type TrashedFile struct {
 func (s *Scanner) CommitTrash(ctx context.Context, files []TrashedFile, trashedAt time.Time, also func(*sql.Tx, *repo.Queries) error) error {
 	return s.writer.WithTx(ctx, catalogtx.OperationAssetDelete, func(tx *sql.Tx, queries *repo.Queries) error {
 		stamp := dbtypes.NewTimestamp(trashedAt)
+		rules := semanticsCache{reader: queries}
 		for _, file := range files {
 			updated, err := queries.TrashRepositoryEntry(ctx, repo.TrashRepositoryEntryParams{
 				TrashID: uuid.NullUUID{UUID: file.TrashID, Valid: true}, TrashedAt: stamp, UpdatedAt: stamp,
@@ -50,11 +52,15 @@ func (s *Scanner) CommitTrash(ctx context.Context, files []TrashedFile, trashedA
 			if updated == 1 {
 				continue
 			}
-			key, err := s.pathKey(file.Path)
+			semantics, err := rules.get(ctx, file.RepositoryID)
 			if err != nil {
 				return err
 			}
-			parentKey, err := s.pathKey(parentOf(file.Path))
+			key, err := pathKey(semantics, file.Path)
+			if err != nil {
+				return err
+			}
+			parentKey, err := pathKey(semantics, parentOf(file.Path))
 			if err != nil {
 				return err
 			}
@@ -95,11 +101,16 @@ type RestoredFile struct {
 func (s *Scanner) CommitRestore(ctx context.Context, files []RestoredFile, also func(*sql.Tx, *repo.Queries) error) error {
 	return s.writer.WithTx(ctx, catalogtx.OperationAssetRestore, func(tx *sql.Tx, queries *repo.Queries) error {
 		now := s.config.Now()
+		rules := semanticsCache{reader: queries}
 		for _, file := range files {
-			if err := s.ensureDirectoriesTx(ctx, queries, file.RepositoryID, parentOf(file.Path)); err != nil {
+			semantics, err := rules.get(ctx, file.RepositoryID)
+			if err != nil {
 				return err
 			}
-			key, err := s.pathKey(file.Path)
+			if err := s.ensureDirectoriesTx(ctx, queries, semantics, file.RepositoryID, parentOf(file.Path)); err != nil {
+				return err
+			}
+			key, err := pathKey(semantics, file.Path)
 			if err != nil {
 				return err
 			}
@@ -113,7 +124,7 @@ func (s *Scanner) CommitRestore(ctx context.Context, files []RestoredFile, also 
 			} else if !errors.Is(err, sql.ErrNoRows) {
 				return err
 			}
-			parentKey, err := s.pathKey(parentOf(file.Path))
+			parentKey, err := pathKey(semantics, parentOf(file.Path))
 			if err != nil {
 				return err
 			}
@@ -183,6 +194,10 @@ func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner 
 	adopted := 0
 	err := s.writer.WithTx(ctx, catalogtx.OperationAssetDelete, func(_ *sql.Tx, queries *repo.Queries) error {
 		adopted = 0
+		semantics, err := repositorySemantics(ctx, queries, repositoryID)
+		if err != nil {
+			return err
+		}
 		for _, record := range records {
 			known, err := queries.CountRepositoryEntriesWithTrashID(ctx, uuid.NullUUID{UUID: record.TrashID, Valid: true})
 			if err != nil {
@@ -242,11 +257,11 @@ func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner 
 			default:
 				return err
 			}
-			key, err := s.pathKey(record.OriginalPath)
+			key, err := pathKey(semantics, record.OriginalPath)
 			if err != nil {
 				return err
 			}
-			parentKey, err := s.pathKey(parentOf(record.OriginalPath))
+			parentKey, err := pathKey(semantics, parentOf(record.OriginalPath))
 			if err != nil {
 				return err
 			}
@@ -277,4 +292,26 @@ func (s *Scanner) AdoptTrash(ctx context.Context, repositoryID uuid.UUID, owner 
 		return nil
 	})
 	return adopted, err
+}
+
+// semanticsCache reads each repository's volume rule once per transaction
+// body, for commits that span repositories.
+type semanticsCache struct {
+	reader repositoryReader
+	rules  map[uuid.UUID]pathsemantics.Semantics
+}
+
+func (c *semanticsCache) get(ctx context.Context, repositoryID uuid.UUID) (pathsemantics.Semantics, error) {
+	if rule, ok := c.rules[repositoryID]; ok {
+		return rule, nil
+	}
+	rule, err := repositorySemantics(ctx, c.reader, repositoryID)
+	if err != nil {
+		return pathsemantics.Semantics{}, err
+	}
+	if c.rules == nil {
+		c.rules = map[uuid.UUID]pathsemantics.Semantics{}
+	}
+	c.rules[repositoryID] = rule
+	return rule, nil
 }

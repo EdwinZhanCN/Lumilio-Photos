@@ -14,6 +14,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/pathsemantics"
 )
 
 // TurnResult reports one bounded walk turn.
@@ -107,8 +108,8 @@ func (s *Scanner) RunTurn(ctx context.Context, repositoryID uuid.UUID) (TurnResu
 	}
 	defer fsys.Close()
 
-	turn := &walkTurn{scanner: s, scan: scan, fsys: fsys, started: s.config.Now()}
-	scope, err := s.resolveScope(ctx, repositoryID, scan.ScopePath)
+	turn := &walkTurn{scanner: s, scan: scan, fsys: fsys, started: s.config.Now(), semantics: SemanticsOf(repository)}
+	scope, err := s.resolveScope(ctx, turn.semantics, repositoryID, scan.ScopePath)
 	if err != nil {
 		return result, err
 	}
@@ -139,9 +140,9 @@ func (s *Scanner) RunTurn(ctx context.Context, repositoryID uuid.UUID) (TurnResu
 
 // resolveScope narrows a subtree scope to a directory the catalog already
 // knows, so every walked directory has catalog ancestors; the empty scope always works.
-func (s *Scanner) resolveScope(ctx context.Context, repositoryID uuid.UUID, scope string) (string, error) {
+func (s *Scanner) resolveScope(ctx context.Context, semantics pathsemantics.Semantics, repositoryID uuid.UUID, scope string) (string, error) {
 	for scope != "" {
-		key, err := s.pathKey(scope)
+		key, err := pathKey(semantics, scope)
 		if err != nil {
 			return "", err
 		}
@@ -205,9 +206,12 @@ type walkTurn struct {
 	scanner *Scanner
 	scan    repo.RepositoryScan
 	fsys    *storage.RepositoryFS
-	scope   string
-	started time.Time
-	files   int
+	// semantics is the repository's persisted volume rule; every key this
+	// turn derives uses it.
+	semantics pathsemantics.Semantics
+	scope     string
+	started   time.Time
+	files     int
 	// The walk is depth-first pre-order: a directory's diff commits before
 	// any of its subdirectories.
 	stack        []frame
@@ -368,7 +372,7 @@ func (t *walkTurn) processDirectory(ctx context.Context, directory string) error
 		t.pending.errors++
 		return t.markCursor(directory)
 	}
-	directoryKey, err := s.pathKey(directory)
+	directoryKey, err := pathKey(t.semantics, directory)
 	if err != nil {
 		return err
 	}
@@ -395,7 +399,7 @@ func (t *walkTurn) processDirectory(ctx context.Context, directory string) error
 	onDisk := make(map[string]bool)
 	issues := make(map[string]storage.WalkIssue, len(listing.Issues))
 	for _, issue := range listing.Issues {
-		if key, keyErr := s.pathKey(issue.Path); keyErr == nil {
+		if key, keyErr := pathKey(t.semantics, issue.Path); keyErr == nil {
 			issues[key] = issue
 		}
 		// Unsupported entries and nested repositories are expected; anything
@@ -409,7 +413,7 @@ func (t *walkTurn) processDirectory(ctx context.Context, directory string) error
 	subdirectories := make([]string, 0, len(listing.Directories))
 	for _, observation := range observations {
 		relative := observation.Path.String()
-		key, keyErr := s.pathKey(relative)
+		key, keyErr := pathKey(t.semantics, relative)
 		if keyErr != nil || onDisk[key] {
 			// Two names that compare equal on this volume cannot both be
 			// indexed; the second is reported, not guessed at.
@@ -526,7 +530,7 @@ func (t *walkTurn) processDirectory(ctx context.Context, directory string) error
 }
 
 func (t *walkTurn) knownDirectory(ctx context.Context, directory string) (bool, error) {
-	key, err := t.scanner.pathKey(directory)
+	key, err := pathKey(t.semantics, directory)
 	if err != nil {
 		return false, err
 	}
@@ -572,7 +576,7 @@ func (t *walkTurn) vanishedDirectory(ctx context.Context, directory string) (boo
 	if !gone {
 		return false, nil
 	}
-	key, err := t.scanner.pathKey(directory)
+	key, err := pathKey(t.semantics, directory)
 	if err != nil {
 		return false, err
 	}

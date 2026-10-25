@@ -21,6 +21,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/scan"
 
 	"github.com/gin-gonic/gin"
@@ -765,7 +766,16 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 func writeRepositoryCommandFailure(c *gin.Context, err error) bool {
 	var unavailable *storage.RepositoryActionUnavailableError
 	var locationUnavailable *storage.StorageLocationActionUnavailableError
+	var collision *storage.PathKeyCollisionError
 	switch {
+	case errors.As(err, &collision):
+		pairs := make([]problem.StorageNameCollisionPair, 0, len(collision.Examples))
+		for _, pair := range collision.Examples {
+			pairs = append(pairs, problem.StorageNameCollisionPair{First: pair.First, Second: pair.Second})
+		}
+		api.WriteProblem(c, problem.NewStorageNameCollision(err, collision.Count, pairs))
+	case errors.Is(err, pathsemantics.ErrUnqualified):
+		api.WriteProblem(c, api.KnownProblem(problem.StorageVolumeUnqualified, err))
 	case errors.As(err, &unavailable):
 		api.WriteProblem(c, problem.NewStorageActionUnavailable(err, string(unavailable.Action),
 			storage.BlockerCodes(unavailable.Blockers), storage.AlternativeCodes(unavailable.Alternatives)))

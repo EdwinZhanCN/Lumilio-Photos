@@ -29,8 +29,8 @@ func TestRepositoryCloudBindingsAllowMultipleScopedSources(t *testing.T) {
 		VALUES (1, 'owner', 'hash', 1, 1, 'admin', x'01');
 		INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at)
 		VALUES (?, 'Default', '/storage', 'default', 1, 1);
-		INSERT INTO repositories (repo_id, name, path, created_at, updated_at, storage_location_id)
-		VALUES (?, 'Photos', '/storage/photos', 1, 1, ?);
+		INSERT INTO repositories (repo_id, name, path, created_at, updated_at, storage_location_id, path_case, path_normalization)
+		VALUES (?, 'Photos', '/storage/photos', 1, 1, ?, 'sensitive', 'none');
 		INSERT INTO cloud_credentials (
 			credential_id, provider, display_name, identity_hash, masked_identity,
 			owner_id, created_at, updated_at

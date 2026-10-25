@@ -13,6 +13,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/pathsemantics"
 )
 
 // KnownContent is a file Lumilio committed into a repository itself, from an
@@ -59,17 +60,21 @@ func (s *Scanner) BindKnownContent(ctx context.Context, known KnownContent) (Kno
 	observation.ContentHash = &fullHash
 	now := s.config.Now()
 	err = s.writer.WithTx(ctx, catalogtx.OperationRepositoryScanHashCommit, func(tx *sql.Tx, queries *repo.Queries) error {
-		if err := s.ensureDirectoriesTx(ctx, queries, known.RepositoryID, parentOf(relative)); err != nil {
+		semantics, err := repositorySemantics(ctx, queries, known.RepositoryID)
+		if err != nil {
 			return err
 		}
-		key, err := s.pathKey(relative)
+		if err := s.ensureDirectoriesTx(ctx, queries, semantics, known.RepositoryID, parentOf(relative)); err != nil {
+			return err
+		}
+		key, err := pathKey(semantics, relative)
 		if err != nil {
 			return err
 		}
 		row, err := queries.GetLiveRepositoryEntryByKey(ctx, repo.GetLiveRepositoryEntryByKeyParams{RepositoryID: known.RepositoryID, PathKey: key})
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			parentKey, keyErr := s.pathKey(parentOf(relative))
+			parentKey, keyErr := pathKey(semantics, parentOf(relative))
 			if keyErr != nil {
 				return keyErr
 			}
@@ -120,14 +125,14 @@ func (s *Scanner) BindKnownContent(ctx context.Context, known KnownContent) (Kno
 // ensureDirectoriesTx gives every ancestor of a committed file a live
 // directory entry, so the walk reaches it. The rows carry no stat tuple yet;
 // the next walk records one.
-func (s *Scanner) ensureDirectoriesTx(ctx context.Context, queries *repo.Queries, repositoryID uuid.UUID, directory string) error {
+func (s *Scanner) ensureDirectoriesTx(ctx context.Context, queries *repo.Queries, semantics pathsemantics.Semantics, repositoryID uuid.UUID, directory string) error {
 	if directory == "" {
 		return nil
 	}
-	if err := s.ensureDirectoriesTx(ctx, queries, repositoryID, parentOf(directory)); err != nil {
+	if err := s.ensureDirectoriesTx(ctx, queries, semantics, repositoryID, parentOf(directory)); err != nil {
 		return err
 	}
-	key, err := s.pathKey(directory)
+	key, err := pathKey(semantics, directory)
 	if err != nil {
 		return err
 	}
@@ -136,7 +141,7 @@ func (s *Scanner) ensureDirectoriesTx(ctx context.Context, queries *repo.Queries
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	parentKey, err := s.pathKey(parentOf(directory))
+	parentKey, err := pathKey(semantics, parentOf(directory))
 	if err != nil {
 		return err
 	}

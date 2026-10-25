@@ -61,8 +61,18 @@ type ReconcileResult struct {
 	Journal       Journal
 	Current       Pointer
 	LastKnownGood Pointer
+	// NeedsResume: the journal is open at a phase whose remaining work is
+	// bookkeeping; NeedsRollback: the candidate was selected but never
+	// proven ready, so the previous generation must be restored.
 	NeedsResume   bool
 	NeedsRollback bool
+	// SafeToStart reports that the current pointer names a generation the
+	// Desktop may start without a decision from the user: the previous
+	// generation, which the interrupted Apply never replaced, or a
+	// candidate the journal recorded as ready (committing). Starting it
+	// finishes the journal through the readiness promotion; nothing is
+	// inferred about a candidate that never reached readiness.
+	SafeToStart bool
 }
 
 type Store struct {
@@ -635,19 +645,51 @@ func (s *Store) Reconcile() (ReconcileResult, error) {
 	result := ReconcileResult{Journal: journal, Current: current, LastKnownGood: lkg}
 	switch journal.Phase {
 	case PhasePrepared, PhaseStoppingPrevious:
+		// The candidate was never selected; the previous generation is
+		// current and starts as it would have without the Apply.
 		if current.Fingerprint != journal.PreviousFingerprint {
 			return ReconcileResult{}, fmt.Errorf("phase %q requires current pointer to remain previous", journal.Phase)
 		}
 		result.NeedsResume = true
+		result.SafeToStart = true
 	case PhasePreviousStopped:
-		if current.Fingerprint != journal.PreviousFingerprint && current.Fingerprint != journal.CandidateFingerprint {
+		// The pointer write to the candidate may or may not have landed. A
+		// candidate that was never started is not a rollback target and is
+		// not proven; only the previous generation starts on its own.
+		switch current.Fingerprint {
+		case journal.PreviousFingerprint:
+			result.NeedsResume = true
+			result.SafeToStart = true
+		case journal.CandidateFingerprint:
+			result.NeedsRollback = true
+		default:
 			return ReconcileResult{}, fmt.Errorf("phase %q has an unknown current pointer", journal.Phase)
 		}
-		result.NeedsResume = true
 	case PhaseCandidateSelected, PhaseStoppingCandidate:
+		// The candidate was selected and never proven ready (or failed):
+		// the user restores the last known-good generation.
+		if current.Fingerprint != journal.CandidateFingerprint && current.Fingerprint != journal.PreviousFingerprint {
+			return ReconcileResult{}, fmt.Errorf("phase %q has an unknown current pointer", journal.Phase)
+		}
 		result.NeedsRollback = true
-	case PhaseRollbackSelected, PhaseCommitting:
+	case PhaseRollbackSelected:
+		// The previous generation is current again; starting it is the
+		// rollback the journal asked for.
+		if current.Fingerprint != journal.PreviousFingerprint {
+			return ReconcileResult{}, fmt.Errorf("phase %q requires current pointer to be previous", journal.Phase)
+		}
 		result.NeedsResume = true
+		result.SafeToStart = true
+	case PhaseCommitting:
+		// The candidate reached readiness before the crash; only its
+		// promotion to last known-good is missing, which the next readiness
+		// boundary performs. Until then the previous generation stays the
+		// rollback target.
+		if current.Fingerprint != journal.CandidateFingerprint {
+			return ReconcileResult{}, fmt.Errorf("phase %q requires current pointer to be the candidate", journal.Phase)
+		}
+		result.NeedsResume = true
+		result.SafeToStart = true
 	default:
 		return ReconcileResult{}, fmt.Errorf("unsupported runtime apply phase %q", journal.Phase)
 	}
