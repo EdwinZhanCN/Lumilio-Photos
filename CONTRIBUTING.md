@@ -79,6 +79,7 @@ daemon.
 | `task web:dev` | Start only the Web development server |
 | `task test` | Run the repository architecture, Server, and Web gates |
 | `task server:test` | Run the Go Server tests |
+| `task server:test:volumes` | Volume-semantics tests on mounted filesystem images (CI sets `LUMILIO_VOLUME_FIXTURES`) |
 | `task web:test` | Run frontend type, lint, boundary, and unit checks |
 | `task desktop:test` | Run the Wails desktop race-test gate |
 | `task compose:test` | Validate production and E2E Compose files |

@@ -21,6 +21,7 @@ import (
 	"server/internal/lifecycle"
 	"server/internal/logging"
 	"server/internal/storage/marker"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
@@ -241,6 +242,34 @@ type DefaultRepositoryManager struct {
 	ownershipMu    sync.Mutex
 	ownershipOn    bool
 	ownership      map[string]runtimeOwnership
+	// volumeQualifier measures the name comparison rule of a repository tree
+	// at registration and reconnect; nil means pathsemantics.Qualify over the
+	// root and its private directory. Tests inject foreign-volume rules on an
+	// ordinary temporary directory through SetVolumeQualifier.
+	volumeQualifier func(root string) (pathsemantics.Semantics, error)
+}
+
+// SetVolumeQualifier replaces the behavioral volume probe. Like the other
+// backends it is installed before serving.
+func (rm *DefaultRepositoryManager) SetVolumeQualifier(qualify func(root string) (pathsemantics.Semantics, error)) {
+	rm.volumeQualifier = qualify
+}
+
+// qualifyRepositoryVolume measures the rule the repository's entries will be
+// keyed under: the root and, once it exists, the private directory must
+// agree (a per-directory case-folding flag makes a tree unkeyable). A rule
+// that cannot be measured refuses the registration or reconnect; nothing is
+// ever assumed from the host's default filesystem.
+func (rm *DefaultRepositoryManager) qualifyRepositoryVolume(root string) (pathsemantics.Semantics, error) {
+	if rm.volumeQualifier != nil {
+		return rm.volumeQualifier(root)
+	}
+	dirs := []string{root}
+	private := filepath.Join(root, ".lumilio")
+	if info, err := os.Stat(private); err == nil && info.IsDir() {
+		dirs = append(dirs, private)
+	}
+	return pathsemantics.Qualify(dirs...)
 }
 
 // SetMarkerFiles installs the filesystem the manager's guarded marker writes
@@ -418,6 +447,11 @@ func (rm *DefaultRepositoryManager) addRepository(ctx context.Context, path stri
 	defer releaseStorageLocation()
 	defer releaseMutation()
 
+	rule, err := rm.qualifyRepositoryVolume(cleanPath)
+	if err != nil {
+		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_id", config.ID))
+		return nil, fmt.Errorf("qualify repository volume: %w", err)
+	}
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID:            repoUUID,
@@ -431,6 +465,8 @@ func (rm *DefaultRepositoryManager) addRepository(ctx context.Context, path stri
 		CreatedAt:         dbtypes.NewTimestamp(config.CreatedAt),
 		UpdatedAt:         dbtypes.NewTimestamp(now),
 		StorageLocationID: associatedStorageLocationID,
+		PathCase:          rule.Case,
+		PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_id", config.ID))
@@ -720,6 +756,13 @@ func (rm *DefaultRepositoryManager) initializeRepository(
 		}
 	}
 
+	// The tree now has its private directory; the volume rule is measured
+	// on the tree itself before the row that will key under it exists.
+	rule, err := rm.qualifyRepositoryVolume(cleanPath)
+	if err != nil {
+		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_id", config.ID), zap.String("repository_name", config.Name))
+		return nil, rollback(fmt.Errorf("qualify repository volume: %w", err))
+	}
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID:            repoUUID,
@@ -733,6 +776,8 @@ func (rm *DefaultRepositoryManager) initializeRepository(
 		CreatedAt:         dbtypes.NewTimestamp(config.CreatedAt),
 		UpdatedAt:         dbtypes.NewTimestamp(now),
 		StorageLocationID: associatedStorageLocationID,
+		PathCase:          rule.Case,
+		PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_id", config.ID), zap.String("repository_name", config.Name))

@@ -73,6 +73,18 @@
 // afterwards it must prove the moved identity. [DefaultRepositoryManager.AssessDefaultStorageLocation]
 // names the state of storage.path read-only for setup and startup.
 //
+// Volume semantics (storage plan P6b, R11): repositories.path_case and
+// path_normalization hold the name comparison rule measured on the tree by
+// [server/internal/storage/pathsemantics.Qualify] when a Repository is
+// created, opened, copied, adopted or reconnected; [RepositoryVolumeRule]
+// reads it and the scan index keys under it. A reconnect whose destination
+// follows another rule proves every live key distinct first
+// ([PathKeyCollisionError] otherwise), cuts the path and the rule over
+// together into maintenance, rebuilds path_key/parent_key in bounded,
+// revision-fenced batches, and releases maintenance; journal recovery
+// finishes an interrupted rebuild. A tree whose rule cannot be qualified is
+// neither registered nor reconnected.
+//
 // [StorageObserver] supplies only read/stat/mount facts to
 // [ObserveStorageTarget] and [AssessStorageTarget]. [ClassifyStorage] and
 // [DeriveStorageCapabilities] are pure; mutation capabilities remain conditional

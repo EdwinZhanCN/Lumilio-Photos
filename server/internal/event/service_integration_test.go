@@ -35,9 +35,9 @@ INSERT INTO users(user_id,username,password,created_at,updated_at,webauthn_user_
 VALUES(1,'owner','hash',1,1,x'01');
 INSERT INTO storage_locations(storage_location_id,name,path,kind,created_at,updated_at)
 VALUES('00000000-0000-0000-0000-000000000001','root','/events','default',1,1);
-INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,storage_location_id)
+INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,storage_location_id,path_case,path_normalization)
 VALUES('00000000-0000-0000-0000-000000000002','repo','/events/repo','active','idle',1,1,1,
-       '00000000-0000-0000-0000-000000000001');
+       '00000000-0000-0000-0000-000000000001','sensitive','none');
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -147,9 +147,9 @@ INSERT INTO users(user_id,username,password,created_at,updated_at,webauthn_user_
 VALUES(1,'owner','hash',1,1,x'01');
 INSERT INTO storage_locations(storage_location_id,name,path,kind,created_at,updated_at)
 VALUES('00000000-0000-0000-0000-000000000001','root','/events','default',1,1);
-INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,storage_location_id)
+INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,storage_location_id,path_case,path_normalization)
 VALUES('00000000-0000-0000-0000-000000000002','repo','/events/repo','active','idle',1,1,1,
-       '00000000-0000-0000-0000-000000000001');
+       '00000000-0000-0000-0000-000000000001','sensitive','none');
 `); err != nil {
 		t.Fatal(err)
 	}

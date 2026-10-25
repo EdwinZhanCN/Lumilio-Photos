@@ -43,7 +43,6 @@ import (
 	"server/internal/sourcing"
 	"server/internal/storage"
 	"server/internal/storage/locations"
-	"server/internal/storage/pathsemantics"
 	"server/internal/storage/recovery"
 	"server/internal/storage/scan"
 	"server/internal/storage/trash"
@@ -631,8 +630,7 @@ func run(
 	// Upload/cloud staging and filesystem scans converge on the same scan
 	// index binding, written through the commit coordinator.
 	repositoryScanner, err := scan.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, scan.Config{
-		Settle:    time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
-		Semantics: pathsemantics.HostDefault(),
+		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
 		Activate: func(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
 			return service.ApplyAssetActivationTx(ctx, tx, queries, repositoryID, entryID, assetID, contentID)
 		},

@@ -73,6 +73,7 @@ const (
 	OperationRepositoryReobserveNode
 	OperationRepositoryAssetActivate
 	OperationRepositoryRelocate
+	OperationRepositoryRekey
 	OperationRepositoryRemove
 	OperationStorageLocationRelocateMaintenance
 	OperationStorageLocationRelocate
@@ -298,6 +299,11 @@ var operationCatalog = [operationCount]OperationDescriptor{
 	OperationRepositoryRelocate: {
 		Operation: OperationRepositoryRelocate,
 		Name:      "repository.relocate",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryRekey: {
+		Operation: OperationRepositoryRekey,
+		Name:      "repository.rekey",
 		Role:      RoleWriter,
 	},
 	OperationRepositoryRemove: {

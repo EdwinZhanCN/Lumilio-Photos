@@ -417,7 +417,7 @@ func (s *Service) reassociate(ctx context.Context, files *storage.RepositoryFS, 
 	// A different file at the record's source path means the source was
 	// replaced; the record is not applied to whatever stands there now.
 	if _, err := storage.ParseUserMediaPath(record.Source.StoragePath); err == nil {
-		if key, keyErr := s.scanner.PathKey(record.Source.StoragePath); keyErr == nil {
+		if key, keyErr := s.scanner.PathKey(ctx, repositoryID, record.Source.StoragePath); keyErr == nil {
 			if live, err := s.reader.GetLiveRepositoryEntryByKey(ctx, repo.GetLiveRepositoryEntryByKeyParams{RepositoryID: repositoryID, PathKey: key}); err == nil {
 				if live.Kind == scan.KindFile && live.AssetID.Valid && live.AssetID.UUID != assetID {
 					return s.settle(item, storage.DispositionAmbiguous, "", "the file at the record's source path has different content"), nil

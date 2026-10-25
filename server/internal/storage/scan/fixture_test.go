@@ -161,8 +161,6 @@ type fixture struct {
 	hashBaseline uint64
 }
 
-func hostSemantics() pathsemantics.Semantics { return pathsemantics.HostDefault() }
-
 func newFixture(tb testing.TB, settle time.Duration) *fixture {
 	tb.Helper()
 	ctx := context.Background()
@@ -207,7 +205,7 @@ func newFixture(tb testing.TB, settle time.Duration) *fixture {
 		owner: owner.UserID, rootPath: rootPath, location: location, repos: map[uuid.UUID]string{},
 	}
 	f.scanner, err = New(database.ReaderQueries, f.writer, f.files, Config{
-		Settle: settle, Semantics: hostSemantics(), Now: f.clock.now,
+		Settle: settle, Now: f.clock.now,
 	})
 	if err != nil {
 		tb.Fatal(err)
@@ -275,6 +273,12 @@ func (f *fixture) addRepository(name string) repo.Repository {
 	if err := repositoryConfig.SaveConfigToFile(repositoryPath); err != nil {
 		f.t.Fatal(err)
 	}
+	// The fixture keys under the rule of the temporary directory's own
+	// filesystem, as a registered repository would.
+	rule, err := pathsemantics.Probe(repositoryPath)
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	repository, err := f.database.Queries.CreateRepository(f.ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: name, Path: repositoryPath,
@@ -282,6 +286,7 @@ func (f *fixture) addRepository(name string) repo.Repository {
 		Reachability: dbtypes.RepositoryReachabilityActive,
 		Activity:     dbtypes.RepositoryActivityIdle, DefaultOwnerID: &f.owner,
 		CreatedAt: now, UpdatedAt: now, StorageLocationID: f.location,
+		PathCase: rule.Case, PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		f.t.Fatal(err)

@@ -61,7 +61,7 @@ flowchart LR
 | HTTP API + SPA | Auth, origin, setup, and rate-limit boundaries; RFC 9457 Problems. | `go:api.NewRouter` [`server/internal/api/router.go:382`](../../../../server/internal/api/router.go#L382) |
 | Services |  | `mod:server/internal/service` [`server/internal/service/doc.go`](../../../../server/internal/service/doc.go) |
 | Scheduler, River workers, commit coordinator |  | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
-| server/app.Run | The only composition root; owns startup and graceful shutdown. | `go:server/app.Run` [`server/app/app.go:108`](../../../../server/app/app.go#L108) |
+| server/app.Run | The only composition root; owns startup and graceful shutdown. | `go:server/app.Run` [`server/app/app.go:107`](../../../../server/app/app.go#L107) |
 | Catalog (SQLite + FTS5 + Vec1) | Product truth. One writer, bounded query-only readers. | `go:db.DB` [`server/internal/db/db.go:47`](../../../../server/internal/db/db.go#L47) |
 | QueueDB (River) | Disposable delivery state; may be recreated. | `go:db.QueueDB` [`server/internal/db/queue.go:35`](../../../../server/internal/db/queue.go#L35) |
 | Bleve OCR index | Rebuildable sidecar fed by a catalog outbox. | `go:bleveocr.Index` [`server/internal/search/bleveocr/index.go:32`](../../../../server/internal/search/bleveocr/index.go#L32) |

@@ -249,6 +249,12 @@ sql:
                     go_type: { import: "server/internal/db/dbtypes", type: "SpecificMetadata" }
                   - column: "repositories.config"
                     go_type: { import: "server/internal/storage/repocfg", type: "RepositoryConfig" }
+                  # The repository's measured volume name rule, typed so no
+                  # caller can store a string the scan index does not key by.
+                  - column: "repositories.path_case"
+                    go_type: { import: "server/internal/storage/pathsemantics", type: "CaseMode" }
+                  - column: "repositories.path_normalization"
+                    go_type: { import: "server/internal/storage/pathsemantics", type: "Normalization" }
                   - column: "*.asset_ids"
                     go_type: { import: "server/internal/db/dbtypes", type: "UUIDs" }
                   - column: "*.membership_snapshot"

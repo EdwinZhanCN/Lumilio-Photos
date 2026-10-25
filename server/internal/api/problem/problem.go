@@ -108,6 +108,20 @@ var (
 		"Repository identity mismatch", "The marker at the path carries a different Repository identity than the registration the command targets.")
 	StorageOriginalOnline = descriptor("storage/original-online", http.StatusConflict,
 		"Original Repository still online", "The registered Repository is still present at its original path, so there is nothing to reconnect.")
+	StorageVolumeUnqualified = Descriptor{
+		Type: Namespace + "storage/volume-unqualified", Status: http.StatusConflict,
+		Title: "Volume name rules unqualified", Definition: "The name comparison rule of the volume holding the target folder could not be measured, or directories of the tree follow different rules, so the Repository was not registered or reconnected there.",
+		Recovery: "Check that the folder is writable and that no per-directory case-folding flag differs inside the tree, then try again; a volume Lumilio cannot qualify is not used.",
+	}
+	StorageNameCollision = Descriptor{
+		Type: Namespace + "storage/name-collision", Status: http.StatusConflict,
+		Title: "Destination volume cannot tell indexed names apart", Definition: "Under the case or normalization rule of the destination volume, indexed paths of the Repository would share one name, so the reconnect was refused before any row or byte changed.",
+		Recovery: "Rename one of each named pair on the original volume, or reconnect to a volume that distinguishes them; the index was not changed.",
+		Extensions: []Extension{
+			{Name: "collision_count", Schema: "integer", Description: "How many live entries would share another entry's name on the destination."},
+			{Name: "collisions", Schema: "array[object]", Description: "At most ten of the colliding pairs, each with first and second repository-relative paths."},
+		},
+	}
 	StorageLayoutObstructed = Descriptor{
 		Type: Namespace + "storage/layout-obstructed", Status: http.StatusConflict,
 		Title: "Repository layout repair obstructed", Definition: "The Repository at the target is missing part of its layout, and a file or a denied directory sits where the missing directory belongs, so the bounded repair was not run.",
@@ -172,6 +186,8 @@ var registry = mustRegistry(
 	StorageOwnershipUnavailable,
 	StorageIdentityMismatch,
 	StorageOriginalOnline,
+	StorageVolumeUnqualified,
+	StorageNameCollision,
 	StorageLayoutObstructed,
 	StorageRecoveryRequired,
 	ServiceUnavailable,
@@ -264,6 +280,21 @@ type StorageActionUnavailableDetails struct {
 	Alternatives []string `json:"alternatives,omitempty" example:"default_configuration"`
 }
 
+// StorageNameCollision is one pair of repository-relative paths the
+// destination volume reads as a single name.
+type StorageNameCollisionPair struct {
+	First  string `json:"first" binding:"required" example:"2024/Photo.jpg"`
+	Second string `json:"second" binding:"required" example:"2024/photo.jpg"`
+}
+
+// StorageNameCollisionDetails carries how many live entries collide under
+// the destination rule and a bounded sample of the pairs.
+type StorageNameCollisionDetails struct {
+	Details
+	CollisionCount int                        `json:"collision_count" binding:"required" example:"1"`
+	Collisions     []StorageNameCollisionPair `json:"collisions" binding:"required"`
+}
+
 // Reference is the transport-neutral equivalent used by streams and
 // persisted asynchronous operation DTOs. It intentionally has no HTTP status.
 type Reference struct {
@@ -321,6 +352,7 @@ const (
 	repositoryConflictBody
 	storageConfirmationRequiredBody
 	storageActionUnavailableBody
+	storageNameCollisionBody
 )
 
 // Failure pairs one safe public descriptor with its private diagnostic cause.
@@ -339,6 +371,8 @@ type Failure struct {
 	action            string
 	blockers          []string
 	alternatives      []string
+	collisionCount    int
+	collisions        []StorageNameCollisionPair
 }
 
 // About creates a generic about:blank failure for a status whose meaning and
@@ -395,6 +429,15 @@ func NewStorageActionUnavailable(cause error, action string, blockers, alternati
 	}
 }
 
+// NewStorageNameCollision creates the typed refusal of a reconnect whose
+// destination volume cannot tell indexed names apart.
+func NewStorageNameCollision(cause error, count int, pairs []StorageNameCollisionPair) Failure {
+	return Failure{
+		descriptor: StorageNameCollision, status: StorageNameCollision.Status, cause: cause,
+		kind: storageNameCollisionBody, collisionCount: count, collisions: append([]StorageNameCollisionPair{}, pairs...),
+	}
+}
+
 func (f Failure) Status() int            { return f.status }
 func (f Failure) Type() string           { return f.descriptor.Type }
 func (f Failure) Cause() error           { return f.cause }
@@ -419,6 +462,10 @@ func (f Failure) Body(instance string) any {
 	case storageActionUnavailableBody:
 		return StorageActionUnavailableDetails{
 			Details: base, Action: f.action, Blockers: append([]string{}, f.blockers...), Alternatives: append([]string(nil), f.alternatives...),
+		}
+	case storageNameCollisionBody:
+		return StorageNameCollisionDetails{
+			Details: base, CollisionCount: f.collisionCount, Collisions: append([]StorageNameCollisionPair{}, f.collisions...),
 		}
 	default:
 		return base

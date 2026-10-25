@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 )
 
@@ -22,7 +23,7 @@ SET
 WHERE repo_id = ?1
   AND reachability = 'active'
   AND activity = 'idle'
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type BeginRepositoryActivityParams struct {
@@ -48,6 +49,8 @@ func (q *Queries) BeginRepositoryActivity(ctx context.Context, arg BeginReposito
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -61,7 +64,7 @@ SET reachability = 'maintenance',
 WHERE repo_id = ?1
   AND reachability <> 'maintenance'
   AND activity = 'idle'
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type BeginRepositoryMaintenanceParams struct {
@@ -86,6 +89,8 @@ func (q *Queries) BeginRepositoryMaintenance(ctx context.Context, arg BeginRepos
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -137,10 +142,12 @@ INSERT INTO repositories (
     default_owner_id,
     created_at,
     updated_at,
-    storage_location_id
+    storage_location_id,
+    path_case,
+    path_normalization
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
-) RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13
+) RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type CreateRepositoryParams struct {
@@ -155,6 +162,8 @@ type CreateRepositoryParams struct {
 	CreatedAt         dbtypes.Timestamp              `db:"created_at" json:"created_at"`
 	UpdatedAt         dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
 	StorageLocationID uuid.UUID                      `db:"storage_location_id" json:"storage_location_id"`
+	PathCase          pathsemantics.CaseMode         `db:"path_case" json:"path_case"`
+	PathNormalization pathsemantics.Normalization    `db:"path_normalization" json:"path_normalization"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
@@ -170,6 +179,8 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.StorageLocationID,
+		arg.PathCase,
+		arg.PathNormalization,
 	)
 	var i Repository
 	err := row.Scan(
@@ -186,6 +197,8 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -229,7 +242,7 @@ SET reachability = ?2,
 WHERE repo_id = ?1
   AND reachability = 'maintenance'
   AND activity = 'paused'
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type EndRepositoryMaintenanceParams struct {
@@ -261,6 +274,8 @@ func (q *Queries) EndRepositoryMaintenance(ctx context.Context, arg EndRepositor
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -317,7 +332,7 @@ func (q *Queries) GetHostOwnerID(ctx context.Context) (int32, error) {
 }
 
 const getPrimaryRepository = `-- name: GetPrimaryRepository :one
-SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization FROM repositories
 WHERE role = 'primary'
   AND reachability = 'active'
 `
@@ -339,12 +354,14 @@ func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) 
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
 
 const getPrimaryRepositoryRecord = `-- name: GetPrimaryRepositoryRecord :one
-SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization FROM repositories
 WHERE role = 'primary'
 `
 
@@ -365,12 +382,14 @@ func (q *Queries) GetPrimaryRepositoryRecord(ctx context.Context) (Repository, e
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
 
 const getRepository = `-- name: GetRepository :one
-SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization FROM repositories
 WHERE repo_id = ?1
 `
 
@@ -391,12 +410,14 @@ func (q *Queries) GetRepository(ctx context.Context, repoID uuid.UUID) (Reposito
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
 
 const getRepositoryByPath = `-- name: GetRepositoryByPath :one
-SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization FROM repositories
 WHERE path = ?1
 `
 
@@ -417,12 +438,14 @@ func (q *Queries) GetRepositoryByPath(ctx context.Context, path string) (Reposit
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
 
 const listActiveRepositories = `-- name: ListActiveRepositories :many
-SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization FROM repositories
 WHERE reachability = 'active'
 ORDER BY created_at DESC
 `
@@ -450,6 +473,8 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 			&i.DefaultOwnerID,
 			&i.Role,
 			&i.StorageLocationID,
+			&i.PathCase,
+			&i.PathNormalization,
 		); err != nil {
 			return nil, err
 		}
@@ -465,7 +490,7 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 }
 
 const listRepositories = `-- name: ListRepositories :many
-SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization FROM repositories
 ORDER BY created_at DESC
 `
 
@@ -492,6 +517,8 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 			&i.DefaultOwnerID,
 			&i.Role,
 			&i.StorageLocationID,
+			&i.PathCase,
+			&i.PathNormalization,
 		); err != nil {
 			return nil, err
 		}
@@ -514,7 +541,7 @@ SET activity = 'paused',
 WHERE repo_id = ?1
   AND reachability = 'active'
   AND (activity <> 'paused' OR pause_reason = 'low_space')
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type PauseRepositoryForLowSpaceParams struct {
@@ -539,6 +566,8 @@ func (q *Queries) PauseRepositoryForLowSpace(ctx context.Context, arg PauseRepos
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -588,7 +617,7 @@ WHERE repo_id = ?1
   AND reachability = 'active'
   AND activity = 'paused'
   AND pause_reason = 'low_space'
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type ResumeRepositoryAfterLowSpaceParams struct {
@@ -613,6 +642,8 @@ func (q *Queries) ResumeRepositoryAfterLowSpace(ctx context.Context, arg ResumeR
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -638,7 +669,7 @@ SET
     default_owner_id = ?4,
     updated_at = ?5
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type UpdateRepositoryParams struct {
@@ -675,6 +706,8 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -686,7 +719,7 @@ SET
     pause_reason = CASE WHEN ?2 = 'paused' THEN 'manual' ELSE '' END,
     updated_at = ?3
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type UpdateRepositoryActivityParams struct {
@@ -712,6 +745,8 @@ func (q *Queries) UpdateRepositoryActivity(ctx context.Context, arg UpdateReposi
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -722,7 +757,7 @@ SET
     last_sync = ?2,
     updated_at = ?3
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type UpdateRepositoryLastSyncParams struct {
@@ -748,6 +783,8 @@ func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateReposi
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -760,7 +797,7 @@ SET
     reachability = ?4,
     updated_at = ?5
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type UpdateRepositoryPathParams struct {
@@ -794,6 +831,66 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
+	)
+	return i, err
+}
+
+const updateRepositoryPathSemantics = `-- name: UpdateRepositoryPathSemantics :one
+UPDATE repositories
+SET
+    path = ?2,
+    storage_location_id = ?3,
+    reachability = ?4,
+    path_case = ?5,
+    path_normalization = ?6,
+    updated_at = ?7
+WHERE repo_id = ?1
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
+`
+
+type UpdateRepositoryPathSemanticsParams struct {
+	RepoID            uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Path              string                         `db:"path" json:"path"`
+	StorageLocationID uuid.UUID                      `db:"storage_location_id" json:"storage_location_id"`
+	Reachability      dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	PathCase          pathsemantics.CaseMode         `db:"path_case" json:"path_case"`
+	PathNormalization pathsemantics.Normalization    `db:"path_normalization" json:"path_normalization"`
+	UpdatedAt         dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
+}
+
+// A reconnect onto a volume with another name rule: the path moves and the
+// rule changes in one statement, so no row ever pairs a path with the rule of
+// a volume it does not live on. The caller leaves reachability in maintenance
+// until every entry key agrees with the new rule.
+func (q *Queries) UpdateRepositoryPathSemantics(ctx context.Context, arg UpdateRepositoryPathSemanticsParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, updateRepositoryPathSemantics,
+		arg.RepoID,
+		arg.Path,
+		arg.StorageLocationID,
+		arg.Reachability,
+		arg.PathCase,
+		arg.PathNormalization,
+		arg.UpdatedAt,
+	)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }
@@ -804,7 +901,7 @@ SET
     reachability = ?2,
     updated_at = ?3
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, storage_location_id, path_case, path_normalization
 `
 
 type UpdateRepositoryReachabilityParams struct {
@@ -830,6 +927,8 @@ func (q *Queries) UpdateRepositoryReachability(ctx context.Context, arg UpdateRe
 		&i.DefaultOwnerID,
 		&i.Role,
 		&i.StorageLocationID,
+		&i.PathCase,
+		&i.PathNormalization,
 	)
 	return i, err
 }

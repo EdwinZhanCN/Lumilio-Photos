@@ -1043,7 +1043,15 @@ CREATE TABLE repositories (
     updated_at INTEGER NOT NULL,
     default_owner_id INTEGER REFERENCES users(user_id),
     role TEXT NOT NULL DEFAULT 'regular' CHECK (role IN ('primary', 'regular')),
-    storage_location_id TEXT NOT NULL REFERENCES storage_locations(storage_location_id) ON DELETE RESTRICT
+    storage_location_id TEXT NOT NULL REFERENCES storage_locations(storage_location_id) ON DELETE RESTRICT,
+    -- The name comparison rule of the volume that holds this repository, as
+    -- measured on the tree when it was registered or reconnected; never the
+    -- host's default. repository_entries.path_key is built under it, so a
+    -- reconnect onto a volume with another rule rekeys the index before the
+    -- repository leaves maintenance. There is no default on purpose: a
+    -- repository whose rule was never qualified cannot be registered.
+    path_case TEXT NOT NULL CHECK (path_case IN ('sensitive', 'insensitive')),
+    path_normalization TEXT NOT NULL CHECK (path_normalization IN ('none', 'nfc', 'nfd'))
 ) STRICT;
 
 CREATE TABLE repository_cloud_bindings (

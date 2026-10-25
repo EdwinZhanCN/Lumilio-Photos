@@ -1518,6 +1518,66 @@ func (q *Queries) ListRepositoryEntriesForAssets(ctx context.Context, assetIds [
 	return items, nil
 }
 
+const listRepositoryEntriesForRekey = `-- name: ListRepositoryEntriesForRekey :many
+SELECT entry_id, path, path_key, parent_key, kind, state, revision
+FROM repository_entries
+WHERE repository_id = ?1
+  AND entry_id > ?2
+ORDER BY entry_id
+LIMIT ?3
+`
+
+type ListRepositoryEntriesForRekeyParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	AfterEntryID uuid.UUID `db:"after_entry_id" json:"after_entry_id"`
+	PageSize     int64     `db:"page_size" json:"page_size"`
+}
+
+type ListRepositoryEntriesForRekeyRow struct {
+	EntryID   uuid.UUID `db:"entry_id" json:"entry_id"`
+	Path      string    `db:"path" json:"path"`
+	PathKey   string    `db:"path_key" json:"path_key"`
+	ParentKey string    `db:"parent_key" json:"parent_key"`
+	Kind      string    `db:"kind" json:"kind"`
+	State     string    `db:"state" json:"state"`
+	Revision  int64     `db:"revision" json:"revision"`
+}
+
+// One entry_id-ordered page of every row of a repository, whatever its
+// state, for the volume-semantics preflight and rekey. Keyset pagination
+// keeps each read bounded; the rekey itself writes at most one batch per
+// transaction.
+func (q *Queries) ListRepositoryEntriesForRekey(ctx context.Context, arg ListRepositoryEntriesForRekeyParams) ([]ListRepositoryEntriesForRekeyRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRepositoryEntriesForRekey, arg.RepositoryID, arg.AfterEntryID, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRepositoryEntriesForRekeyRow
+	for rows.Next() {
+		var i ListRepositoryEntriesForRekeyRow
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.State,
+			&i.Revision,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRepositoryEntryChildren = `-- name: ListRepositoryEntryChildren :many
 
 SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, trash_hold, updated_at FROM repository_entries
@@ -1788,6 +1848,41 @@ type MarkRepositoryEntryMissingCASParams struct {
 func (q *Queries) MarkRepositoryEntryMissingCAS(ctx context.Context, arg MarkRepositoryEntryMissingCASParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, markRepositoryEntryMissingCAS,
 		arg.MissingSince,
+		arg.UpdatedAt,
+		arg.EntryID,
+		arg.ExpectedRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const rekeyRepositoryEntryCAS = `-- name: RekeyRepositoryEntryCAS :execrows
+UPDATE repository_entries
+SET path_key = ?1,
+    parent_key = ?2,
+    revision = revision + 1,
+    updated_at = ?3
+WHERE entry_id = ?4
+  AND revision = ?5
+`
+
+type RekeyRepositoryEntryCASParams struct {
+	PathKey          string            `db:"path_key" json:"path_key"`
+	ParentKey        string            `db:"parent_key" json:"parent_key"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EntryID          uuid.UUID         `db:"entry_id" json:"entry_id"`
+	ExpectedRevision int64             `db:"expected_revision" json:"expected_revision"`
+}
+
+// Rewrites the comparison keys of one row under the repository's new volume
+// rule. The path is unchanged; the revision fence refuses a row something
+// else wrote since the preflight read it.
+func (q *Queries) RekeyRepositoryEntryCAS(ctx context.Context, arg RekeyRepositoryEntryCASParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, rekeyRepositoryEntryCAS,
+		arg.PathKey,
+		arg.ParentKey,
 		arg.UpdatedAt,
 		arg.EntryID,
 		arg.ExpectedRevision,

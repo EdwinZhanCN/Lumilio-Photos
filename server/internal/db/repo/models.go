@@ -7,6 +7,7 @@ package repo
 import (
 	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 )
 
@@ -937,6 +938,8 @@ type Repository struct {
 	DefaultOwnerID    *int32                         `db:"default_owner_id" json:"default_owner_id"`
 	Role              dbtypes.RepoRole               `db:"role" json:"role"`
 	StorageLocationID uuid.UUID                      `db:"storage_location_id" json:"storage_location_id"`
+	PathCase          pathsemantics.CaseMode         `db:"path_case" json:"path_case"`
+	PathNormalization pathsemantics.Normalization    `db:"path_normalization" json:"path_normalization"`
 }
 
 type RepositoryCloudBinding struct {

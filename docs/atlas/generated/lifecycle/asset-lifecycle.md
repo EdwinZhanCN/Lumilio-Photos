@@ -33,9 +33,9 @@ stateDiagram-v2
 
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
-| [*] | active | a hashed file or bound upload creates the Asset | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:44`](../../../../server/internal/storage/scan/known.go#L44) |
-| active | missing | scan proves the last present file vanished | `go:scan.removeEntryTx` [`server/internal/storage/scan/walk.go:735`](../../../../server/internal/storage/scan/walk.go#L735) |
-| missing | active | the file returns, or the same content is re-uploaded | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:66`](../../../../server/internal/storage/scan/walk.go#L66) |
+| [*] | active | a hashed file or bound upload creates the Asset | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:45`](../../../../server/internal/storage/scan/known.go#L45) |
+| active | missing | scan proves the last present file vanished | `go:scan.removeEntryTx` [`server/internal/storage/scan/walk.go:739`](../../../../server/internal/storage/scan/walk.go#L739) |
+| missing | active | the file returns, or the same content is re-uploaded | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:67`](../../../../server/internal/storage/scan/walk.go#L67) |
 | active | trashed | user Delete moves every file into the repository trash | `go:trash.Service.Delete` [`server/internal/storage/trash/delete.go:62`](../../../../server/internal/storage/trash/delete.go#L62) |
 | trashed | active | Restore, or a new present copy appears | `go:trash.Service.Restore` [`server/internal/storage/trash/restore.go:61`](../../../../server/internal/storage/trash/restore.go#L61) |
 | missing | [*] | purge (repository removal or confirmed Remove missing items) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go:41`](../../../../server/internal/lifecycle/purge.go#L41) |

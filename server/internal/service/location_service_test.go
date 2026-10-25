@@ -166,8 +166,9 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, storage_location_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');
 	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
@@ -242,8 +243,9 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, storage_location_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');
 	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
@@ -373,8 +375,9 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, storage_location_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');
 	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 

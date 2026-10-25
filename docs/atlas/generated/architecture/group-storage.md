@@ -40,6 +40,7 @@ flowchart LR
     n_in_runtime -.-> n_g_Storage
     n_in_service -.-> n_g_Storage
     n_server_internal_artifact --> n_server_internal_storage
+    n_server_internal_storage --> n_server_internal_storage_pathsemantics
     n_server_internal_storage --> n_server_internal_storage_repocfg
     n_server_internal_storage --> n_server_internal_storage_rootcfg
     n_server_internal_storage_locations --> n_server_internal_storage
@@ -47,7 +48,6 @@ flowchart LR
     n_server_internal_storage_repocfg --> n_server_internal_storage_marker
     n_server_internal_storage_rootcfg --> n_server_internal_storage_marker
     n_server_internal_storage_scan --> n_server_internal_storage
-    n_server_internal_storage_scan --> n_server_internal_storage_pathsemantics
     n_server_internal_storage_testfixture --> n_server_internal_storage
     n_server_internal_storage_trash --> n_server_internal_storage_scan
     n_g_Storage -.-> n_out_catalog

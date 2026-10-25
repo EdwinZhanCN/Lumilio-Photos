@@ -248,3 +248,11 @@ exceptions:
       sqlc maps the repositories.config column to repocfg.RepositoryConfig so
       the catalog stores a typed per-repository configuration. repocfg is
       dependency-free, so this cannot create a cycle.
+  - from: server/internal/db/repo
+    to: server/internal/storage/pathsemantics
+    reason: >-
+      sqlc maps repositories.path_case and path_normalization to the
+      pathsemantics CaseMode and Normalization types so the catalog stores the
+      measured volume name rule the scan index keys under, never a free
+      string. pathsemantics depends only on the standard library and
+      x/text, so this cannot create a cycle.

@@ -116,10 +116,10 @@ INSERT INTO storage_locations (
     storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization
 ) VALUES
-    (?, 'repo-a', '/media/a', 1, 1, 1, ?),
-    (?, 'repo-b', '/media/b', 1, 1, 1, ?);
+    (?, 'repo-a', '/media/a', 1, 1, 1, ?, 'sensitive', 'none'),
+    (?, 'repo-b', '/media/b', 1, 1, 1, ?, 'sensitive', 'none');
 `, storageLocationID, repositoryA, storageLocationID, repositoryB, storageLocationID)
 	require.NoError(t, err)
 }

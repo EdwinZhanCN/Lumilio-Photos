@@ -54,11 +54,12 @@ func TestEmbeddingRetrieverUsesVec1FiltersAndExactReranking(t *testing.T) {
 			'root', '/media', 'default', 1, 1
 		);
 		INSERT INTO repositories (
-			repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
+			repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id,
+			path_case, path_normalization
 		) VALUES (
 			'00000000-0000-0000-0000-000000000002',
 			'repo', '/media/repo', 1, 1, 1,
-			'00000000-0000-0000-0000-000000000001'
+			'00000000-0000-0000-0000-000000000001', 'sensitive', 'none'
 		);
 		INSERT INTO embedding_spaces (
 			id, embedding_type, model_id, dimensions, distance_metric,

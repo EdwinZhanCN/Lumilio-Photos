@@ -21,7 +21,7 @@ flowchart TB
     n_runtime["Server runtime"]
     n_agent -->|"5"| n_domain
     n_catalog -->|"1"| n_media
-    n_catalog -.->|"1"| n_storage
+    n_catalog -.->|"2"| n_storage
     n_domain -->|"1"| n_work
     n_http -->|"2"| n_ingest
     n_ingest -->|"2"| n_service
@@ -61,7 +61,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `agent` → `media`: 1 package import(s), declared
 - `catalog` → `foundation`: 7 package import(s), declared
 - `catalog` → `media`: 1 package import(s), declared
-- `catalog` → `storage`: 1 package import(s), reviewed exception
+- `catalog` → `storage`: 2 package import(s), reviewed exception
 - `domain` → `catalog`: 5 package import(s), declared
 - `domain` → `foundation`: 3 package import(s), declared
 - `domain` → `work`: 1 package import(s), declared
@@ -72,7 +72,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `http` → `ingest`: 2 package import(s), declared
 - `http` → `media`: 4 package import(s), declared
 - `http` → `service`: 2 package import(s), declared
-- `http` → `storage`: 7 package import(s), declared
+- `http` → `storage`: 8 package import(s), declared
 - `http` → `work`: 2 package import(s), declared
 - `ingest` → `catalog`: 8 package import(s), declared
 - `ingest` → `domain`: 1 package import(s), declared
@@ -90,7 +90,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `runtime` → `ingest`: 5 package import(s), declared
 - `runtime` → `media`: 1 package import(s), declared
 - `runtime` → `service`: 1 package import(s), declared
-- `runtime` → `storage`: 7 package import(s), declared
+- `runtime` → `storage`: 6 package import(s), declared
 - `runtime` → `work`: 3 package import(s), declared
 - `service` → `agent`: 1 package import(s), declared
 - `service` → `catalog`: 4 package import(s), declared

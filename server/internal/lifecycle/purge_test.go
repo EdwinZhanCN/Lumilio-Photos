@@ -38,8 +38,8 @@ func openPurgeTestDatabase(t *testing.T) (*db.DB, uuid.UUID, uuid.UUID) {
 		`INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at)
 		 VALUES (?, 'root', '/media', 'default', 1, 1)`, location)
 	exec(t, database,
-		`INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id)
-		 VALUES (?, 'first', '/media/first', 1, 1, 1, ?), (?, 'second', '/media/second', 1, 1, 1, ?)`,
+		`INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization)
+		 VALUES (?, 'first', '/media/first', 1, 1, 1, ?, 'sensitive', 'none'), (?, 'second', '/media/second', 1, 1, 1, ?, 'sensitive', 'none')`,
 		first, location, second, location)
 	return database, first, second
 }

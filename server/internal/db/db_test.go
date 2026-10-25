@@ -774,8 +774,9 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO repositories (
-			repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id
-		) VALUES (?, 'Test', '/test', 'regular', 'active', 'idle', 1, 1, ?)
+			repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Test', '/test', 'regular', 'active', 'idle', 1, 1, ?, 'sensitive', 'none')
 	`, repositoryID, storageLocationID); err != nil {
 		t.Fatalf("insert repository: %v", err)
 	}

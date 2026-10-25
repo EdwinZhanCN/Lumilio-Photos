@@ -41,6 +41,7 @@ const KNOWN_TYPES = {
   "https://lumilio.org/problems/storage/identity-mismatch": true,
   "https://lumilio.org/problems/storage/layout-obstructed": true,
   "https://lumilio.org/problems/storage/materialization-required": true,
+  "https://lumilio.org/problems/storage/name-collision": true,
   "https://lumilio.org/problems/storage/not-a-mounted-volume": true,
   "https://lumilio.org/problems/storage/observation-unknown": true,
   "https://lumilio.org/problems/storage/original-online": true,
@@ -48,6 +49,7 @@ const KNOWN_TYPES = {
   "https://lumilio.org/problems/storage/ownership-unavailable": true,
   "https://lumilio.org/problems/storage/permission-denied": true,
   "https://lumilio.org/problems/storage/unsupported-filesystem": true,
+  "https://lumilio.org/problems/storage/volume-unqualified": true,
   "https://lumilio.org/problems/upload/processing-failed": true,
 } as const satisfies Record<KnownProblemType, true>;
 
@@ -333,6 +335,16 @@ function localizeKnownProblem(
       return t(
         "apiErrors.storage.originalOnline",
         "This Repository is still available at its registered location, so there is nothing to reconnect.",
+      );
+    case "https://lumilio.org/problems/storage/volume-unqualified":
+      return t(
+        "apiErrors.storage.volumeUnqualified",
+        "Lumilio could not determine how this disk compares file names, or folders inside the tree follow different rules, so the Repository was not placed there. Nothing was changed.",
+      );
+    case "https://lumilio.org/problems/storage/name-collision":
+      return t(
+        "apiErrors.storage.nameCollision",
+        "This disk cannot tell some of the Repository's file names apart (they differ only by case or accent form), so the reconnect was refused before anything changed. Rename one of each pair on the original disk, or choose a disk that distinguishes them.",
       );
     case "https://lumilio.org/problems/storage/unsupported-filesystem":
       return t(

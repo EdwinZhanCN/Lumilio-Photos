@@ -695,6 +695,15 @@ func (rm *DefaultRepositoryManager) recoverReconnectRepositoryOperation(ctx cont
 	}
 	switch current.Path {
 	case payload.NewPath:
+		// The cutover committed. A reconnect onto a volume with another name
+		// rule may have been interrupted while rebuilding the index; the
+		// pass is idempotent, so it is simply run to completion before the
+		// repository leaves maintenance.
+		if payload.Rekey {
+			if err := rm.finishVolumeRekey(ctx, repositoryID); err != nil {
+				return fmt.Errorf("%w: finish reconnect rekey: %v", ErrLifecycleRecoveryRequired, err)
+			}
+		}
 		return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID, reconnectRepositoryOperationResult{
 			RepositoryID: payload.RepositoryID, StorageLocationID: payload.StorageLocationID, FilesPreserved: true,
 		})
@@ -797,6 +806,12 @@ func (rm *DefaultRepositoryManager) recoverSwitchDefaultStorageOperation(ctx con
 		}
 	} else if storageLocation.Path != payload.NewPath {
 		return fmt.Errorf("%w: default Storage Location path changed outside the operation", ErrLifecycleRecoveryRequired)
+	}
+	// Children whose destination volume follows another name rule stay in
+	// maintenance until their index is rebuilt; an interrupted rebuild is
+	// finished here, idempotently, before the operation completes.
+	if err := rm.finishStorageLocationRekeys(ctx, storageLocationID); err != nil {
+		return fmt.Errorf("%w: finish Storage Location rekeys: %v", ErrLifecycleRecoveryRequired, err)
 	}
 	return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID,
 		createStorageLocationOperationResult{StorageLocationID: storageLocationID.String()})

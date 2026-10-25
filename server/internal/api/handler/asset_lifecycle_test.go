@@ -110,7 +110,7 @@ func TestAssetAvailabilityUsesAllCopiesAndAuthorizesBeforeState(t *testing.T) {
 	assetID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `INSERT INTO users(user_id,username,password,created_at,updated_at,webauthn_user_handle) VALUES(1,'owner','hash',1,1,x'01');
  INSERT INTO storage_locations(storage_location_id,name,path,kind,created_at,updated_at) VALUES(?,'location','/media','external',1,1);
- INSERT INTO repositories(repo_id,name,path,created_at,updated_at,reachability,storage_location_id) VALUES(?,'first','/first',1,1,'offline',?),(?,'second','/second',1,1,'offline',?);`, location, first, location, second, location)
+ INSERT INTO repositories(repo_id,name,path,created_at,updated_at,reachability,storage_location_id, path_case, path_normalization) VALUES(?,'first','/first',1,1,'offline',?, 'sensitive', 'none'),(?,'second','/second',1,1,'offline',?, 'sensitive', 'none');`, location, first, location, second, location)
 	require.NoError(t, err)
 	seed, err := testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{AssetID: assetID, RepositoryID: first, OwnerID: 1})
 	require.NoError(t, err)

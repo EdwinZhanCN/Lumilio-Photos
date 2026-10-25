@@ -21,7 +21,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-	"server/internal/storage/pathsemantics"
 	"server/internal/storage/scan"
 	"server/internal/storage/testfixture"
 	"server/internal/storage/trash"
@@ -68,7 +67,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scanner, err := scan.New(database.ReaderQueries, database, files, scan.Config{Semantics: pathsemantics.HostDefault()})
+	scanner, err := scan.New(database.ReaderQueries, database, files, scan.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

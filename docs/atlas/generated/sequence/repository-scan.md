@@ -30,7 +30,7 @@ sequenceDiagram
     n_scheduler->>n_worker: one unique ScanRepositoryBatchArgs per repository
     loop walk turns, up to the delivery budget
         n_worker->>n_scanner: RunTurn
-        n_scanner->>n_disk: list one directory completely (sorted, stat cache)
+        n_scanner->>n_disk: list one directory completely (sorted, stat cache)#59; key names under the repository's own volume rule
         n_scanner->>n_writer: write only the diff — new, changed (pending_hash), restored, missing
         n_writer->>n_catalog: one bounded transaction per batch (≤ 256 rows)
     end
@@ -50,8 +50,8 @@ sequenceDiagram
 | --- | --- |
 | Administrator (Web) | `ts:features/repositories#useRepositoryScan` [`web/src/features/repositories/api/useRepositoryScan.ts:22`](../../../../web/src/features/repositories/api/useRepositoryScan.ts#L22) |
 | Filesystem watcher | `go:scan.Watcher` [`server/internal/storage/scan/watcher.go:27`](../../../../server/internal/storage/scan/watcher.go#L27) |
-| RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go:253`](../../../../server/internal/api/handler/repository_scan_handler.go#L253) |
-| Scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go:120`](../../../../server/internal/storage/scan/scanner.go#L120) |
+| RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go:254`](../../../../server/internal/api/handler/repository_scan_handler.go#L254) |
+| Scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go:118`](../../../../server/internal/storage/scan/scanner.go#L118) |
 | repository_scans / repository_entries | `sql:repository_entries` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
 | ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/queue/macro_boundary_workers.go:40`](../../../../server/internal/queue/macro_boundary_workers.go#L40) |
@@ -68,9 +68,9 @@ sequenceDiagram
 | 4 | scanner → scanner | _else periodic timer (jittered)_ — RequestAllPeriodic | `go:scan.Scanner.RequestAllPeriodic` [`server/internal/storage/scan/commands.go:47`](../../../../server/internal/storage/scan/commands.go#L47) |
 | 5 | scanner → catalog | insert or coalesce a queued scan |  |
 | 6 | scheduler → worker | one unique ScanRepositoryBatchArgs per repository | `go:jobs.ScanRepositoryBatchArgs` [`server/internal/queue/jobs/macro.go:68`](../../../../server/internal/queue/jobs/macro.go#L68) |
-| 7 | worker → scanner | _loop walk turns, up to the delivery budget_ — RunTurn | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:66`](../../../../server/internal/storage/scan/walk.go#L66) |
-| 8 | scanner → disk | _loop walk turns, up to the delivery budget_ — list one directory completely (sorted, stat cache) | `go:scan.walkTurn.processDirectory` [`server/internal/storage/scan/walk.go:339`](../../../../server/internal/storage/scan/walk.go#L339) |
-| 9 | scanner → writer | _loop walk turns, up to the delivery budget_ — write only the diff — new, changed (pending_hash), restored, missing | `go:scan.walkTurn.flush` [`server/internal/storage/scan/walk.go:672`](../../../../server/internal/storage/scan/walk.go#L672) |
+| 7 | worker → scanner | _loop walk turns, up to the delivery budget_ — RunTurn | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:67`](../../../../server/internal/storage/scan/walk.go#L67) |
+| 8 | scanner → disk | _loop walk turns, up to the delivery budget_ — list one directory completely (sorted, stat cache); key names under the repository's own volume rule | `go:scan.walkTurn.processDirectory` [`server/internal/storage/scan/walk.go:343`](../../../../server/internal/storage/scan/walk.go#L343) |
+| 9 | scanner → writer | _loop walk turns, up to the delivery budget_ — write only the diff — new, changed (pending_hash), restored, missing | `go:scan.walkTurn.flush` [`server/internal/storage/scan/walk.go:676`](../../../../server/internal/storage/scan/walk.go#L676) |
 | 10 | writer → catalog | _loop walk turns, up to the delivery budget_ — one bounded transaction per batch (≤ 256 rows) |  |
 | 11 | worker → scanner | _loop hash turns, when no walk is due_ — HashTurn (32 pending_hash entries) | `go:scan.Scanner.HashTurn` [`server/internal/storage/scan/hash.go:37`](../../../../server/internal/storage/scan/hash.go#L37) |
 | 12 | scanner → disk | _loop hash turns, when no walk is due_ — hash outside any transaction |  |

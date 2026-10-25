@@ -16,6 +16,7 @@ import (
 	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 	"server/internal/utils/hash"
@@ -274,10 +275,15 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	rule, err := pathsemantics.Probe(filepath.Dir(stale.Path))
+	if err != nil {
+		t.Fatal(err)
+	}
 	stale, err = catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: stale.RepoID, Name: "relocated", Path: stale.Path, Config: stale.Config,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive,
 		Activity: dbtypes.RepositoryActivityIdle, CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID,
+		PathCase: rule.Case, PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		t.Fatal(err)

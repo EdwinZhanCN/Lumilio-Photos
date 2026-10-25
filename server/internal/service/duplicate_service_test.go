@@ -46,8 +46,9 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, storage_location_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?)
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none')
 	`, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `

@@ -257,6 +257,16 @@ describe("storage consent Problems", () => {
         "A file or a denied folder sits where a Repository folder belongs, so the layout was not repaired. Move it out of the way and review again; nothing was changed.",
         "本应是资源库文件夹的位置被一个文件或无法访问的文件夹占据，因此未修复布局。请把它移开后重新检查；未做任何更改。",
       ],
+      [
+        "https://lumilio.org/problems/storage/volume-unqualified",
+        "Lumilio could not determine how this disk compares file names, or folders inside the tree follow different rules, so the Repository was not placed there. Nothing was changed.",
+        "Lumilio 无法确定此磁盘比较文件名的规则，或该目录树内的文件夹遵循不同的规则，因此未将资源库放置于此。未做任何更改。",
+      ],
+      [
+        "https://lumilio.org/problems/storage/name-collision",
+        "This disk cannot tell some of the Repository's file names apart (they differ only by case or accent form), so the reconnect was refused before anything changed. Rename one of each pair on the original disk, or choose a disk that distinguishes them.",
+        "此磁盘无法区分资源库中的部分文件名（它们仅在大小写或重音拼写形式上不同），因此在任何更改发生前已拒绝重新连接。请在原磁盘上重命名每对中的一个文件，或选择能够区分它们的磁盘。",
+      ],
     ];
     for (const [type, en, zh] of cases) {
       const value = normalizeProblem({

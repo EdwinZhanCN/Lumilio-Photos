@@ -66,8 +66,9 @@ INSERT INTO storage_locations (
     storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
-) VALUES (?, 'counted', '/media/counted', 1, 1, 1, ?), (?, 'other', '/media/other', 1, 1, 1, ?);
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id,
+    path_case, path_normalization
+) VALUES (?, 'counted', '/media/counted', 1, 1, 1, ?, 'sensitive', 'none'), (?, 'other', '/media/other', 1, 1, 1, ?, 'sensitive', 'none');
 `, storageLocationID, repositoryID, storageLocationID, otherRepositoryID, storageLocationID)
 	require.NoError(t, err)
 
