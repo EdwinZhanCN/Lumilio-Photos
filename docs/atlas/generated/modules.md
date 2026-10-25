@@ -309,6 +309,7 @@ Uses: `web-lib`
 | `web/src/components/assistant` |  |  |
 | `web/src/components/breadcrumbs` |  |  |
 | `web/src/components/collection` |  |  |
+| `web/src/components/problem` |  |  |
 | `web/src/components/ui` |  |  |
 
 ### Web lib (`web-lib`)

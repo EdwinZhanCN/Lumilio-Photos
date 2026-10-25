@@ -15,9 +15,9 @@ flowchart TB
     n_web_features["Web features"]
     n_web_app["Web app shell"]
     n_web_app -->|"16"| n_web_features
-    n_web_components -->|"8"| n_web_lib
+    n_web_components -->|"10"| n_web_lib
     n_web_contexts -->|"1"| n_web_workers
-    n_web_features -->|"26"| n_web_components
+    n_web_features -->|"27"| n_web_components
     n_web_features -->|"6"| n_web_contexts
     n_web_workers -->|"2"| n_web_lib
     classDef external stroke-dasharray:4 3
@@ -42,10 +42,10 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `web-app` → `web-contexts`: 1 package import(s), declared
 - `web-app` → `web-features`: 16 package import(s), declared
 - `web-app` → `web-lib`: 4 package import(s), declared
-- `web-components` → `web-lib`: 8 package import(s), declared
+- `web-components` → `web-lib`: 10 package import(s), declared
 - `web-contexts` → `web-lib`: 1 package import(s), declared
 - `web-contexts` → `web-workers`: 1 package import(s), declared
-- `web-features` → `web-components`: 26 package import(s), declared
+- `web-features` → `web-components`: 27 package import(s), declared
 - `web-features` → `web-contexts`: 6 package import(s), declared
 - `web-features` → `web-lib`: 81 package import(s), declared
 - `web-features` → `web-workers`: 1 package import(s), declared
