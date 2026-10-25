@@ -35,11 +35,14 @@ var expectedVolumeSemantics = map[string]pathsemantics.Semantics{
 	"exfat":    {Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNone},
 	"ext4":     {Case: pathsemantics.CaseSensitive, Normalization: pathsemantics.NormalizationNone},
 	"casefold": {Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNFC},
-	// macOS hdiutil images.
+	// macOS hdiutil images. Unlike the Linux driver, macOS treats canonically
+	// equivalent spellings on ExFAT as one name (the first image run measured
+	// it), so the same on-disk format carries a different rule per host and
+	// the rule is stored per repository, never derived from the format name.
 	"apfs":           {Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNFC},
 	"apfs-sensitive": {Case: pathsemantics.CaseSensitive, Normalization: pathsemantics.NormalizationNFC},
 	"hfsplus":        {Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNFC},
-	"exfat-darwin":   {Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNone},
+	"exfat-darwin":   {Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNFC},
 }
 
 // ExpectedVolumeSemantics returns the documented rule of an image kind.
