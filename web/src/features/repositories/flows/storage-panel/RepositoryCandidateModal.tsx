@@ -419,6 +419,7 @@ function candidateLabel(
       return t("manage.repositories.candidates.invalidMarker", "Invalid Repository marker");
     case "identity_error":
       return t("manage.repositories.candidates.identityError", "Identity already registered");
+    case "unavailable":
     default:
       return t("manage.repositories.candidates.unavailableStatus", "Unavailable");
   }

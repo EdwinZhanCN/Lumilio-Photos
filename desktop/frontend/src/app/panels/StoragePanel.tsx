@@ -14,6 +14,7 @@ import { Button, StatefulButton } from "@/components/motion/button";
 import { PageHeading, SettingRow, SettingsSection } from "@/components/settings/setting-layout";
 import { type SettingsDraftController } from "@/features/settings/use-settings-draft";
 import { errorCodeOf, errorMessage } from "@/lib/desktop/errors";
+import { storageRiskLabel } from "@/features/storage/storageRiskCopy";
 import { ActionNotice, RowActions, useTrackedOperation } from "../shared";
 
 export function StoragePanel({
@@ -163,9 +164,11 @@ export function StoragePanel({
                       "Confirm storage risks before continuing",
                     )}
                   </strong>
-                  <div className="mt-1">
-                    {action.riskWarnings.map((warning) => hostActionRiskLabel(warning, t)).join(" · ")}
-                  </div>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {action.riskWarnings.map((warning) => (
+                      <li key={warning}>{storageRiskLabel(warning, t)}</li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
               <RowActions>
@@ -305,23 +308,6 @@ function hostActionLabel(kind: string, t: ReturnType<typeof useTranslation>["t"]
     return t("storage.hostActionLocateRepository", "Reconnect Repository");
   }
   return t("storage.hostAction", "Storage request");
-}
-
-function hostActionRiskLabel(
-  warning: string,
-  t: ReturnType<typeof useTranslation>["t"],
-): string {
-  if (warning === "network_filesystem") return t("storage.riskNetwork", "Network filesystem");
-  if (warning === "removable_storage") return t("storage.riskRemovable", "Removable storage");
-  if (warning === "non_default_location")
-    return t("storage.riskNonDefault", "Outside the Default Storage Location");
-  if (warning === "cloud_sync_directory")
-    return t("storage.riskCloudSync", "Cloud-sync managed folder");
-  if (warning === "mount_fingerprint_changed")
-    return t("storage.riskMountChanged", "Mounted filesystem changed");
-  if (warning === "unavailable_cloud_placeholder")
-    return t("storage.riskPlaceholder", "Files must be downloaded first");
-  return warning;
 }
 
 function storageLocationDescription(

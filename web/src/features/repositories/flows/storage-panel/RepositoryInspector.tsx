@@ -4,6 +4,11 @@ import { formatBytes } from "@/lib/utils/formatters";
 import { useStorageDiagnostics } from "../../api/useStorageDiagnostics";
 import type { RepositoryRow } from "./storageViewModel";
 import { storageStateLabel, verificationLabel } from "./storageStateCopy";
+import { storageActionLabel } from "../../model/storageActionCopy";
+import {
+  localizeStorageActionAlternatives,
+  localizeStorageActionBlockers,
+} from "@/lib/http-commons/problem";
 
 type Props = {
   repository: RepositoryRow;
@@ -82,6 +87,22 @@ export default function RepositoryInspector({ repository, displayName }: Props) 
       ]
         .filter(Boolean)
         .join(" · "),
+    });
+  }
+
+  // Withheld actions are explained with the Server's own blockers and the
+  // legal alternatives, the same copy the refused command would show.
+  for (const block of repository.unavailableActions) {
+    facts.push({
+      term: t("storagePanel.inspector.withheld", "{{action}} withheld", {
+        action: storageActionLabel(block.action, t),
+      }),
+      value: [
+        localizeStorageActionBlockers(block.blockers, t),
+        localizeStorageActionAlternatives(block.alternatives, t),
+      ]
+        .filter(Boolean)
+        .join(" "),
     });
   }
 

@@ -68,6 +68,12 @@
         "repositoryBusy": "该资源库正忙于扫描或导入。请等待其完成后重试。",
         "repositoryOffline": "该资源库已离线。请改为重新连接或从 Lumilio 中移除它。"
       },
+      "alternatives": {
+        "checkAccess": "请检查已登记位置的访问权限，然后重试。",
+        "defaultConfiguration": "请通过存储配置更改默认存储位置。",
+        "recoverOperation": "请等待被中断的操作恢复完成，然后重试。",
+        "waitForIdle": "请等待当前工作完成，然后重试。"
+      },
       "assessmentStale": "存储目标在审查后发生了变化。请重新审查后再继续。",
       "busy": "另一项存储命令仍在处理此资源库。请等待其完成后重试。",
       "confirmationRequired": "请先查看并确认存储风险，然后再继续。",
@@ -1623,7 +1629,6 @@
         "unavailable": "该目标目前无法用于资源库。"
       },
       "risks": {
-        "cloudPlaceholder": "部分文件是云端占位文件，需要先下载。",
         "cloudSyncDirectory": "由云同步软件管理：同步客户端可能会清除原件或产生重复文件。",
         "mountChanged": "挂载的文件系统自该位置注册以来已发生变化。",
         "networkFilesystem": "网络文件系统：不受支持。",
@@ -2784,6 +2789,12 @@
       "supportBundle": "下载支持包",
       "verificationHistory": "扫描历史"
     },
+    "actionName": {
+      "detach": "从 Lumilio 移除",
+      "reconnect": "重新连接",
+      "rename": "重命名",
+      "verify": "扫描"
+    },
     "actionsFor": "{{name}} 的操作",
     "audit": {
       "action": "操作",
@@ -2822,7 +2833,8 @@
       "repository": "资源库",
       "state": "状态",
       "storage": "存储",
-      "verification": "扫描"
+      "verification": "扫描",
+      "withheld": "{{action}}已被暂停"
     },
     "kind": {
       "external": "外部"

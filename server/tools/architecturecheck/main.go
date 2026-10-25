@@ -90,6 +90,31 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("Recovery reachability checks passed")
+
+	if err := checkStorageClassifierBoundary(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Storage classifier boundary checks passed")
+
+	if err := checkDesktopMarkerParsing(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Desktop marker checks passed")
+
+	if err := checkHandlerActionLists(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Handler action-list checks passed")
+
+	if err := checkCandidateCreateRisks(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Candidate risk checks passed")
+
+	if err := checkContractEnumCoverage(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Contract enum coverage checks passed")
 }
 
 func fail(err error) {

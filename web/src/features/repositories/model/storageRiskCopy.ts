@@ -12,8 +12,7 @@ export type StorageRiskCode =
   | "non_default_location"
   | "cloud_sync_directory"
   | "network_filesystem"
-  | "mount_fingerprint_changed"
-  | "unavailable_cloud_placeholder";
+  | "mount_fingerprint_changed";
 
 const RISK_LABELS: Record<StorageRiskCode, (t: TFunction) => string> = {
   removable_storage: (t) =>
@@ -37,11 +36,6 @@ const RISK_LABELS: Record<StorageRiskCode, (t: TFunction) => string> = {
     t(
       "manage.repositories.risks.mountChanged",
       "The mounted filesystem changed since this location was registered.",
-    ),
-  unavailable_cloud_placeholder: (t) =>
-    t(
-      "manage.repositories.risks.cloudPlaceholder",
-      "Some files are cloud placeholders that must be downloaded first.",
     ),
 };
 
