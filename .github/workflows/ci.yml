@@ -435,14 +435,19 @@ jobs:
                   attach() {
                       kind="$1"
                       filesystem="$2"
-                      hdiutil create -quiet -size 512m -fs "$filesystem" -volname "lumilio-$kind" "$volumes/$kind.dmg"
+                      layout="$3"
+                      echo "== $kind ($filesystem, $layout)"
+                      hdiutil create -size 512m -fs "$filesystem" -layout "$layout" -volname "lumilio-$kind" "$volumes/$kind.dmg"
                       mkdir -p "$volumes/$kind"
-                      hdiutil attach -quiet -nobrowse -mountpoint "$volumes/$kind" "$volumes/$kind.dmg"
+                      hdiutil attach -nobrowse -mountpoint "$volumes/$kind" "$volumes/$kind.dmg"
+                      ls -la "$volumes/$kind"
                   }
-                  attach apfs "APFS"
-                  attach apfs-sensitive "Case-sensitive APFS"
-                  attach hfsplus "HFS+"
-                  attach exfat-darwin "ExFAT"
+                  # ExFAT lives in a partition table; the Apple filesystems
+                  # take the default single-partition layout.
+                  attach apfs "APFS" GPTSPUD
+                  attach apfs-sensitive "Case-sensitive APFS" GPTSPUD
+                  attach hfsplus "HFS+" GPTSPUD
+                  attach exfat-darwin "ExFAT" GPTSPUD
                   mount | grep "$volumes"
                   echo "LUMILIO_VOLUME_FIXTURES=apfs=$volumes/apfs;apfs-sensitive=$volumes/apfs-sensitive;hfsplus=$volumes/hfsplus;exfat-darwin=$volumes/exfat-darwin" >> "$GITHUB_ENV"
 
