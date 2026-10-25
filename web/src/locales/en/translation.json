@@ -1520,7 +1520,7 @@
         "registered": "Registered",
         "relocated": "Repository location updated.",
         "resolveFailed": "Repository decision could not be applied.",
-        "riskConfirmation": "I understand this location may be network-backed, removable, managed by cloud-sync software, mounted differently than when it was registered, or contain files that must be downloaded first.",
+        "reviewTitle": "Folder review",
         "title": "Open Existing Repository",
         "unavailable": "Repository candidates are unavailable.",
         "unavailableStatus": "Unavailable"

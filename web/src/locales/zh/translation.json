@@ -1502,7 +1502,7 @@
         "registered": "已注册",
         "relocated": "已更新资源库位置。",
         "resolveFailed": "无法应用资源库处理决定。",
-        "riskConfirmation": "我了解此位置可能位于网络、可移动设备或云同步目录中，也可能已挂载为与注册时不同的卷，或包含必须先下载的文件。",
+        "reviewTitle": "文件夹审核",
         "title": "打开现有资源库",
         "unavailable": "资源库候选目录不可用。",
         "unavailableStatus": "不可用"

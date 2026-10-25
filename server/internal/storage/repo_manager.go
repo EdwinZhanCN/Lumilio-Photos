@@ -74,7 +74,6 @@ type RepositoryCandidate struct {
 	TotalBytes     uint64
 	AvailableBytes uint64
 	Filesystem     string
-	RiskWarnings   []string
 }
 
 // RepositoryManager is the consumer-facing contract for the repository

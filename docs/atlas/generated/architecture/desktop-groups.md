@@ -20,7 +20,7 @@ flowchart TB
     n_desktop_runtime -->|"18"| n_desktop_control
     n_desktop_runtime -->|"4"| n_desktop_platform
     n_desktop_runtime -->|"2"| n_foundation
-    n_desktop_runtime -->|"1"| n_runtime
+    n_desktop_runtime -->|"2"| n_runtime
     n_desktop_services -->|"8"| n_desktop_control
     n_desktop_services -->|"4"| n_desktop_platform
     classDef external stroke-dasharray:4 3
@@ -50,6 +50,6 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `desktop-runtime` → `desktop-control`: 18 package import(s), declared
 - `desktop-runtime` → `desktop-platform`: 4 package import(s), declared
 - `desktop-runtime` → `foundation`: 2 package import(s), declared
-- `desktop-runtime` → `runtime`: 1 package import(s), declared
+- `desktop-runtime` → `runtime`: 2 package import(s), declared
 - `desktop-services` → `desktop-control`: 8 package import(s), declared
 - `desktop-services` → `desktop-platform`: 4 package import(s), declared

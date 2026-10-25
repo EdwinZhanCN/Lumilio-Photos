@@ -165,8 +165,11 @@ func problemSchemaRef(path string, status int) string {
 	if status == 409 && (path == "/api/v1/storage/repositories" || path == "/api/v1/setup/primary-repository") {
 		return "#/components/schemas/api.RepositoryCreateProblemResponse"
 	}
-	if status == 409 && (path == "/api/v1/storage/candidates/open" || path == "/api/v1/storage/assessments") {
+	if status == 409 && path == "/api/v1/storage/assessments" {
 		return "#/components/schemas/api.RepositoryConflictProblemResponse"
+	}
+	if status == 409 && repositoryCandidatePaths[path] {
+		return "#/components/schemas/api.RepositoryCandidateProblemResponse"
 	}
 	if status == 409 && repositoryCommandPaths[path] {
 		return "#/components/schemas/api.RepositoryCommandProblemResponse"
@@ -248,6 +251,44 @@ func installProblemSchemas(schemas *yaml.Node) {
 			"mapping":      commandDiscriminator,
 		},
 	}))
+	candidateUnion := make([]any, 0, len(repositoryCandidateProblems()))
+	candidateDiscriminator := make(map[string]any, len(repositoryCandidateProblems()))
+	for _, descriptor := range repositoryCandidateProblems() {
+		ref := "#/components/schemas/api." + schemaName(descriptor.Type) + "Problem"
+		candidateUnion = append(candidateUnion, map[string]any{"$ref": ref})
+		candidateDiscriminator[descriptor.Type] = ref
+	}
+	setMappingValue(schemas, "api.RepositoryCandidateProblemResponse", node(map[string]any{
+		"oneOf": candidateUnion,
+		"discriminator": map[string]any{
+			"propertyName": "type",
+			"mapping":      candidateDiscriminator,
+		},
+	}))
+}
+
+// repositoryCandidatePaths are the Docker and standalone candidate commands:
+// admitted by the create-target assessment and executed as Repository
+// commands, so their 409 is the union of both vocabularies.
+var repositoryCandidatePaths = map[string]bool{
+	"/api/v1/storage/candidates/open":    true,
+	"/api/v1/storage/candidates/resolve": true,
+}
+
+// repositoryCandidateProblems is the exact 409 vocabulary of the candidate
+// commands: every create refusal (the consent gate and the typed storage
+// refusals, a Repository conflict) and every Repository command refusal.
+func repositoryCandidateProblems() []problem.Descriptor {
+	seen := make(map[string]bool, len(repositoryCreateProblems)+len(repositoryCommandProblems))
+	union := make([]problem.Descriptor, 0, len(repositoryCreateProblems)+len(repositoryCommandProblems))
+	for _, descriptor := range append(append([]problem.Descriptor(nil), repositoryCreateProblems...), repositoryCommandProblems...) {
+		if seen[descriptor.Type] {
+			continue
+		}
+		seen[descriptor.Type] = true
+		union = append(union, descriptor)
+	}
+	return union
 }
 
 // repositoryCommandPaths are the Repository commands whose 409 is the exact
@@ -255,7 +296,6 @@ func installProblemSchemas(schemas *yaml.Node) {
 var repositoryCommandPaths = map[string]bool{
 	"/api/v1/storage/repositories/{id}/rename": true,
 	"/api/v1/storage/repositories/{id}/detach": true,
-	"/api/v1/storage/candidates/resolve":       true,
 }
 
 // repositoryCommandProblems is the exact 409 vocabulary of the Repository

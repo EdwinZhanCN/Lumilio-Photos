@@ -261,11 +261,14 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 // risk, so a command that binds to an identity (adoption) cannot run on a
 // review it never saw.
 type consentAdmission struct {
-	Actor             string
-	ActorUserID       *int32
-	HostInstanceID    string
-	RequestID         string
-	Action            string
+	Actor          string
+	ActorUserID    *int32
+	HostInstanceID string
+	RequestID      string
+	Action         string
+	// TargetID names the target in the refusal audit when the command has
+	// one before it runs (a candidate's folder name); create has none yet.
+	TargetID          string
 	AssessmentToken   string
 	AcknowledgedRisks []string
 	TokenRequired     bool
@@ -290,7 +293,7 @@ func (rm *DefaultRepositoryManager) admitAssessedTarget(ctx context.Context, adm
 	audit := func(stage string, details map[string]any) error {
 		_, err := rm.RecordLifecycleAudit(ctx, LifecycleAuditInput{
 			Actor: admission.Actor, ActorUserID: admission.ActorUserID, HostInstanceID: admission.HostInstanceID,
-			RequestID: admission.RequestID, Action: admission.Action, TargetType: "repository",
+			RequestID: admission.RequestID, Action: admission.Action, TargetType: "repository", TargetID: admission.TargetID,
 			Source: auditSourceForActor(admission.Actor), ConfirmationType: "none", NewPath: target.Path,
 			Result: AuditResultRejected, FailureStage: stage, Details: details,
 		})

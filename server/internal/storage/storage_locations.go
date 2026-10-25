@@ -1236,15 +1236,3 @@ func relocatedRepositoryPath(oldRoot, newRoot, repositoryPath string) (string, e
 	}
 	return filepath.Join(newRoot, relative), nil
 }
-
-// StorageLocationWarnings returns non-fatal placement risks for the Desktop
-// Control Panel to surface immediately after a native directory grant.
-func StorageLocationWarnings(path string) []string {
-	provider := cloudSyncProvider(path)
-	if provider == "" {
-		return nil
-	}
-	return []string{fmt.Sprintf(
-		"%s is inside %s. Sync clients may evict originals or duplicate files.", path, provider,
-	)}
-}

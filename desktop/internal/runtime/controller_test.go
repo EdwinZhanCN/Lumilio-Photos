@@ -20,8 +20,8 @@ func (fakeRepositoryControl) ListStorageLocations(context.Context) ([]app.Storag
 	return nil, nil
 }
 
-func (fakeRepositoryControl) AddStorageLocation(context.Context, string, string, string) (app.StorageLocationInfo, []string, error) {
-	return app.StorageLocationInfo{}, nil, nil
+func (fakeRepositoryControl) AddStorageLocation(context.Context, string, string, string) (app.StorageLocationInfo, error) {
+	return app.StorageLocationInfo{}, nil
 }
 
 func (fakeRepositoryControl) ResolveStorageLocationConflict(context.Context, string, string) (app.StorageLocationInfo, error) {

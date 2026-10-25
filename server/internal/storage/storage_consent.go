@@ -27,6 +27,12 @@ type StorageIntent string
 const (
 	IntentCreateRepository StorageIntent = "create_repository"
 	IntentSetupPrimary     StorageIntent = "setup_primary"
+	// IntentOpenRepository reviews an existing direct-child Repository folder
+	// of the Default Storage Location before it is opened, re-pointed to as a
+	// moved original, or registered as a separate copy (the Docker and
+	// standalone candidate journeys). It goes through the one classifier and
+	// the one consent gate the create commands use.
+	IntentOpenRepository StorageIntent = "open_repository"
 )
 
 // Typed refusals derived from the assessment classification. Handlers map
@@ -134,7 +140,7 @@ func createIntentRole(intent StorageIntent, directoryName string) (dbtypes.RepoR
 	switch intent {
 	case IntentSetupPrimary:
 		return dbtypes.RepoRolePrimary, "primary", nil
-	case IntentCreateRepository:
+	case IntentCreateRepository, IntentOpenRepository:
 		if err := ValidateRepositoryDirectoryName(directoryName); err != nil {
 			return "", "", err
 		}
@@ -170,6 +176,15 @@ func (rm *DefaultRepositoryManager) assessResolvedCreateTarget(ctx context.Conte
 	}
 	result.Assessment = AssessStorageTarget(ctx, rm.observerOrDefault(), repoPath, nonDefault, "")
 	result.Risks = append([]StorageRisk(nil), result.Assessment.Classification.Risks...)
+	// Opening an existing folder is a continuity question as well: when the
+	// Storage Location was registered on another mount than the one that
+	// now backs it, the review carries the same risk the native reconnect
+	// task reports, and the token binds to it.
+	if intent == IntentOpenRepository && location != nil && location.MountFingerprint != "" && result.Problem() == "" {
+		if current := InspectStoragePathReadOnly(repoPath).MountFingerprint; current != "" && current != location.MountFingerprint {
+			result.Risks = append(result.Risks, RiskMountChanged)
+		}
+	}
 	result.Token = rm.consentToken(createTargetFingerprint(result))
 	return result
 }

@@ -62,7 +62,6 @@ type StoragePathInfo struct {
 	NetworkFilesystem bool
 	RemovableLikely   bool
 	CloudSyncProvider string
-	RiskWarnings      []string
 }
 
 func InspectStoragePath(path string) StoragePathInfo {
@@ -115,15 +114,6 @@ func inspectStoragePath(path string, probeMutability bool) StoragePathInfo {
 	info.CloudSyncProvider = cloudSyncProvider(info.CanonicalPath)
 	fingerprint := sha256.Sum256([]byte(strings.Join([]string{platform.MountID, platform.MountSource, platform.Device, filesystem}, "\x00")))
 	info.MountFingerprint = hex.EncodeToString(fingerprint[:])
-	if info.NetworkFilesystem {
-		info.RiskWarnings = append(info.RiskWarnings, "network_filesystem")
-	}
-	if info.RemovableLikely {
-		info.RiskWarnings = append(info.RiskWarnings, "removable_storage")
-	}
-	if info.CloudSyncProvider != "" {
-		info.RiskWarnings = append(info.RiskWarnings, "cloud_sync_directory")
-	}
 	return info
 }
 
@@ -146,16 +136,6 @@ func canonicalStoragePath(path string) string {
 // grouping is unknown. filesystem is the classification inspectVolume already
 // resolved for the same path so the key and the reported Filesystem fact never
 // disagree.
-
-// StoragePlacementWarnings returns the complete set of non-fatal placement
-// risks that require an administrator decision before a repository is created
-// at path. Keep setup/status and the create mutation on this shared contract so
-// first-run onboarding can present the same decision that Server enforces.
-func StoragePlacementWarnings(path string) []string {
-	info := InspectStoragePath(path)
-	warnings := append(StorageLocationWarnings(path), info.RiskWarnings...)
-	return uniqueStrings(warnings)
-}
 
 // filesystemFromMountInfo selects the longest mount-point match. This makes a
 // repository on a Docker child mount use that mount's filesystem identity
