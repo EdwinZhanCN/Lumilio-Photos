@@ -26,6 +26,7 @@ import {
   type RepositoryStorageStrategy,
 } from "../../components/StorageStrategyPicker";
 import { StorageRiskConfirmation } from "../../components/StorageRiskConfirmation";
+import { ProblemRecoveryLink } from "@/components/problem/ProblemRecoveryLink";
 import {
   validateRepositoryDirectoryName,
   validateRepositoryName,
@@ -89,6 +90,7 @@ export default function AddRepositoryModal({
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitProblem, setSubmitProblem] = useState<unknown>(null);
   const [step, setStep] = useState<CreateRepositoryStep>(0);
   const nameError = validateRepositoryName(name);
   const nameErrorMessage = repositoryNameErrorMessage(nameError, t);
@@ -196,6 +198,7 @@ export default function AddRepositoryModal({
       if (reviewRisks.length > 0 && !riskAcknowledged) return;
 
       setSubmitError(null);
+      setSubmitProblem(null);
       setReviewNotice(null);
       try {
         await createRepositoryMutation.createRepository({
@@ -237,6 +240,7 @@ export default function AddRepositoryModal({
           return;
         }
         setSubmitError(localizeAPIProblem(error, t, t("manage.repositories.createFailed")));
+        setSubmitProblem(error);
       }
     },
     [
@@ -652,6 +656,7 @@ export default function AddRepositoryModal({
                 {submitError ? (
                   <div role="alert" className="alert alert-error alert-soft py-2 text-sm">
                     <span>{submitError}</span>
+                    <ProblemRecoveryLink problem={submitProblem} />
                   </div>
                 ) : null}
               </section>

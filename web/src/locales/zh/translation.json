@@ -2223,6 +2223,16 @@
     "studioSource": "以可用的工作分辨率导出当前编辑结果。",
     "title": "导出照片"
   },
+  "problemRecovery": {
+    "continue": "继续",
+    "desktopApproval": "打开存储位置，并在 Desktop 上选择该文件夹",
+    "openMissing": "打开该资源库的缺失文件",
+    "openSettings": "打开设置",
+    "openSetup": "打开初始设置",
+    "openStorage": "打开存储位置",
+    "openTrash": "打开该资源库的回收站",
+    "signIn": "登录"
+  },
   "productTerms": {
     "defaultStorageLocation": "默认存储位置",
     "primaryRepository": "主资源库"

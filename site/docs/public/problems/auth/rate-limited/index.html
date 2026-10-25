@@ -14,6 +14,7 @@
     <dt>Normal HTTP status</dt><dd>429</dd>
     <dt>Definition</dt><dd>Authentication requests are temporarily rate limited.</dd>
     <dt>Recovery</dt><dd>Wait for Retry-After, then retry the authentication request.</dd>
+    <dt>Recovery entry</dt><dd>actor <code>user</code>, phase <code>any</code>, kind <code>retry</code></dd>
   </dl>
   <h2>Extension members</h2>
   <table><thead><tr><th>Name</th><th>Schema</th><th>Meaning</th></tr></thead><tbody><tr><td><code>retry_after_seconds</code></td><td>integer</td><td>Whole seconds until the request may be retried.</td></tr></tbody></table>

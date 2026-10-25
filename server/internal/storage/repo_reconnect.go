@@ -52,6 +52,27 @@ type RepositoryConflictError struct {
 	Actions        []string
 }
 
+// HostActionResolutions projects the storage-side conflict actions of a
+// candidate or native task onto the resolution codes the HTTP contract
+// exposes: relocate is the moved-original decision (update_location), copy
+// the independent-copy decision (add_separate), and confirm_risk the
+// acknowledgement of a storage_risk review. The vocabulary is closed here so
+// no handler invents a resolution the commands do not accept.
+func HostActionResolutions(actions []string) []string {
+	resolutions := make([]string, 0, len(actions))
+	for _, action := range actions {
+		switch action {
+		case "relocate":
+			resolutions = append(resolutions, "update_location")
+		case "copy":
+			resolutions = append(resolutions, "add_separate")
+		case "confirm_risk":
+			resolutions = append(resolutions, "confirm_risk")
+		}
+	}
+	return resolutions
+}
+
 func repositoryConflictActions(registeredPath, repositoryID string) []string {
 	if marker, err := (LocalRepositoryIdentityDetector{}).LoadRepository(registeredPath); err == nil && marker.ID == repositoryID {
 		return []string{"copy"}

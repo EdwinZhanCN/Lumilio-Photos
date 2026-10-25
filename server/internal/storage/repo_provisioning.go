@@ -75,6 +75,10 @@ func (e *ExistingRepositoryFoundError) Error() string {
 	return fmt.Sprintf("existing repository %s found at %s", e.RepositoryID, e.RequestedPath)
 }
 
+// Actions is the follow-up the Web may offer: the explicit Open Existing
+// Repository task. Create never opens an existing identity implicitly.
+func (e *ExistingRepositoryFoundError) Actions() []string { return []string{"open"} }
+
 // RepositoryMarkerInvalidError reports a Create target with a .lumiliorepo
 // that cannot be parsed or validated. It is a recovery candidate, not an empty
 // directory that Create may overwrite.
@@ -86,6 +90,10 @@ type RepositoryMarkerInvalidError struct {
 func (e *RepositoryMarkerInvalidError) Error() string {
 	return fmt.Sprintf("invalid repository marker at %s: %v", e.RequestedPath, e.Cause)
 }
+
+// Actions is the follow-up the Web may offer: diagnose the folder. A marker
+// this build cannot read is never repaired or replaced by a create.
+func (e *RepositoryMarkerInvalidError) Actions() []string { return []string{"diagnose"} }
 
 func (e *RepositoryMarkerInvalidError) Unwrap() error { return e.Cause }
 

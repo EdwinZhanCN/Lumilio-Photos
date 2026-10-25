@@ -48,6 +48,21 @@ type Rejection struct {
 	Cause        error
 }
 
+// Actions is the closed list of follow-up actions the Web may offer for this
+// rejection. The vocabulary belongs here, with the reasons, so no transport
+// layer invents one: an offline Repository is reconnected, a changed file is
+// rescanned, and every other reason has nothing to offer but the facts.
+func (r *Rejection) Actions() []string {
+	switch r.Reason {
+	case ReasonRepositoryOffline:
+		return []string{"reconnect"}
+	case ReasonFileChanged:
+		return []string{"rescan"}
+	default:
+		return []string{}
+	}
+}
+
 func (r *Rejection) Error() string {
 	message := "lifecycle request rejected: " + r.Reason
 	if r.Path != "" {

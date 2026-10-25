@@ -266,7 +266,7 @@ func toHostActionDTO(action storage.HostAction) dto.HostActionDTO {
 				Type:               conflict.Type,
 				RepositoryID:       conflict.RepositoryID,
 				StorageLocationID:  conflict.StorageLocationID,
-				AllowedResolutions: hostActionResolutions(conflict.Actions),
+				AllowedResolutions: storage.HostActionResolutions(conflict.Actions),
 				RiskWarnings:       conflict.RiskWarnings,
 			}
 		}
@@ -310,19 +310,4 @@ func hostActionFailureDescriptor(code string) problem.Descriptor {
 		return descriptor
 	}
 	return problem.HostActionFailed
-}
-
-func hostActionResolutions(actions []string) []string {
-	resolutions := make([]string, 0, len(actions))
-	for _, action := range actions {
-		switch action {
-		case "relocate":
-			resolutions = append(resolutions, "update_location")
-		case "copy":
-			resolutions = append(resolutions, "add_separate")
-		case "confirm_risk":
-			resolutions = append(resolutions, "confirm_risk")
-		}
-	}
-	return resolutions
 }

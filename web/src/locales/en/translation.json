@@ -2259,6 +2259,16 @@
     "studioSource": "Exports your current edits at the available working resolution.",
     "title": "Export photo"
   },
+  "problemRecovery": {
+    "continue": "Continue",
+    "desktopApproval": "Open Storage and choose the folder on the Desktop",
+    "openMissing": "Open the Repository's missing files",
+    "openSettings": "Open Settings",
+    "openSetup": "Open setup",
+    "openStorage": "Open Storage",
+    "openTrash": "Open the Repository's Trash",
+    "signIn": "Sign in"
+  },
   "productTerms": {
     "defaultStorageLocation": "Default Storage Location",
     "primaryRepository": "Primary Repository"

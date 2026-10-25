@@ -15,6 +15,7 @@ import {
 } from "../../api/useRepositoryCandidates";
 import { useStorageAssessment } from "../../api/useStorageAssessment";
 import { StorageRiskConfirmation } from "../../components/StorageRiskConfirmation";
+import { ProblemRecoveryLink } from "@/components/problem/ProblemRecoveryLink";
 
 type CandidateAction = "open" | "update_location" | "add_separate";
 
@@ -330,9 +331,12 @@ export default function RepositoryCandidateModal({
                           </button>
                         </div>
                       ) : null}
-                      {reviewProblem ? (
+                      {reviewProblem && review?.problem ? (
                         <div role="alert" className="alert alert-error alert-soft py-2 text-sm">
                           <span>{reviewProblem}</span>
+                          <ProblemRecoveryLink
+                            problem={{ type: `https://lumilio.org/problems/${review.problem}` }}
+                          />
                         </div>
                       ) : null}
                       {reviewNotice ? (

@@ -583,9 +583,9 @@ func writeRepositoryCreateFailure(c *gin.Context, err error) {
 	case errors.As(err, &conflict):
 		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
 	case errors.As(err, &existing):
-		api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, existing.Actions()))
 	case errors.As(err, &invalidMarker):
-		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
+		api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", invalidMarker.Actions()))
 	default:
 		api.WriteProblem(c, api.BadRequest(err))
 	}
@@ -649,7 +649,7 @@ func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 			RepositoryID: candidate.RepositoryID, Name: candidate.Name,
 			Writable: candidate.Writable, MountPoint: candidate.MountPoint,
 			CanCreate: candidate.CanCreate, CanOpen: candidate.CanOpen,
-			AllowedResolutions: hostActionResolutions(candidate.Actions),
+			AllowedResolutions: storage.HostActionResolutions(candidate.Actions),
 			CapacityKnown:      candidate.CapacityKnown, TotalBytes: candidate.TotalBytes,
 			AvailableBytes: candidate.AvailableBytes, Filesystem: candidate.Filesystem,
 		})

@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, X } from "lucide-re
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { localizeAPIProblem, localizeProblemReference } from "@/lib/http-commons/problem";
+import { ProblemRecoveryLink } from "@/components/problem/ProblemRecoveryLink";
 import { createUUID } from "@/lib/uuid";
 import {
   type HostAction,
@@ -503,6 +504,7 @@ export default function NativeHostActionModal({
                   ),
                 )}
               </span>
+              <ProblemRecoveryLink problem={action.problem} />
             </div>
             <div className="modal-action">
               <button type="button" className="btn btn-ghost" onClick={onClose}>

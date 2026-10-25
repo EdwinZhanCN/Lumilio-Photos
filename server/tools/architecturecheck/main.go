@@ -85,6 +85,11 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("Scan index writer budget checks passed")
+
+	if err := checkRecoveryReachability(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Recovery reachability checks passed")
 }
 
 func fail(err error) {
