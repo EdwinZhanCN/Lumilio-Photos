@@ -82,11 +82,21 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 			h.waitIdle(blackboxRepository{ID: moved.ID, Name: moved.Name, Path: canonicalDestination})
 			h.waitProcessingSettled()
 			h.assertIndexKeyedUnder(moved.ID, fixture.Expected)
-			entriesAfter := h.entries(moved.ID)
+			// Rows are compared by identity: HFS+ and macOS ExFAT return a
+			// decomposed spelling of Café, and the scanner keeps the row, its
+			// state and its binding under the spelling the disk reports.
+			entriesAfter := byEntryID(h.entries(moved.ID))
 			for path, entry := range entriesBefore {
-				current, ok := entriesAfter[path]
-				if !ok || current.EntryID != entry.EntryID || current.State != entry.State {
+				current, ok := entriesAfter[entry.EntryID]
+				if !ok || current.State != entry.State {
 					t.Fatalf("the scan after the reconnect changed %s: before=%+v after=%+v", path, entry, current)
+				}
+				wantKey, err := fixture.Expected.PathKey(current.Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if current.PathKey != wantKey {
+					t.Fatalf("the scan after the reconnect keyed %q as %q, want %q", current.Path, current.PathKey, wantKey)
 				}
 			}
 			if len(entriesAfter) != len(entriesBefore) {
@@ -172,9 +182,20 @@ func (h *reconnectHarness) locationRule(location StorageLocationInfo) pathsemant
 
 type indexedEntry struct {
 	EntryID  uuid.UUID
+	Path     string
 	PathKey  string
 	State    string
 	Revision int64
+}
+
+// byEntryID re-keys an index by row identity, for comparisons across a volume
+// that re-spells names.
+func byEntryID(entries map[string]indexedEntry) map[uuid.UUID]indexedEntry {
+	result := make(map[uuid.UUID]indexedEntry, len(entries))
+	for _, entry := range entries {
+		result[entry.EntryID] = entry
+	}
+	return result
 }
 
 // entries reads the whole scan index of a repository by path, straight from
@@ -204,6 +225,7 @@ func (h *reconnectHarness) entries(id string) map[string]indexedEntry {
 			h.t.Fatal(err)
 		}
 		entry.EntryID = uuid.MustParse(entryID)
+		entry.Path = path
 		result[path] = entry
 	}
 	if err := rows.Err(); err != nil {
