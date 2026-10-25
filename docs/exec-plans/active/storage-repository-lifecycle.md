@@ -955,6 +955,20 @@ schedule allows.
   `TestEmbeddedRuntimeCrashAfterCandidateSelectedRestoresThePreviousGeneration`,
   `TestEmbeddedRuntimeCrashWhileCommittingKeepsTheReadyCandidate` beside the
   existing Apply success and rollback tests.
+- **What the images found.** The first macOS run measured ExFAT as
+  normalization-insensitive, unlike the Linux exFAT driver; the table records
+  the measurement, which is why the rule is stored per Repository and never
+  derived from a format name. The first Linux run found that no derived
+  artifact could be published on FAT32 or exFAT: `WritePrivateFileImmutable`
+  gave the complete file its immutable name with a hard link, which those
+  filesystems refuse, so every thumbnail failed and enrichment waited on it
+  forever. The publish now falls back to an existence check and a rename
+  where hard links are refused, the pattern the trash and staging moves
+  already used; `TestRepositoryFSImmutablePrivateWritePublishesWhereHardLinksAreRefused`
+  stands in for the volume on the runner and the image jobs exercise the real
+  refusal. The blackbox processing waiter now names failed and retrying
+  per-file stages from the catalog when it times out, so a stage blocked
+  behind another is diagnosed from the run.
 - **Deviations.** Only the root and `.lumilio/` are probed; a case-folding
   flag set on a deeper subdirectory after the fact is not detected at
   registration (a per-directory check during the walk is the follow-up if a

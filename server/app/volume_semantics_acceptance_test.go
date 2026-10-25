@@ -33,6 +33,11 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.Kind, func(t *testing.T) {
+			// The harness reports through the running subtest, so one image's
+			// failure is that image's, not the parent's.
+			parent := h.t
+			h.t = t
+			defer func() { h.t = parent }()
 			volume := h.externalDiskAt(fixture.Kind, filepath.Join(fixture.Path, "lumilio-"+fixture.Kind+"-"+uuid.NewString()[:8]))
 
 			// A Repository created on the volume is keyed under the volume's
