@@ -43,7 +43,7 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 			// A Repository created on the volume is keyed under the volume's
 			// rule from its first file.
 			native := h.createIn(volume, "Native "+fixture.Kind, "native")
-			h.upload(native, "Native.JPG", blackboxJPEG(t, 90, "native-"+fixture.Kind))
+			h.upload(native, "Native-"+fixture.Kind+".JPG", blackboxJPEG(t, 90, "native-"+fixture.Kind))
 			h.waitProcessingSettled()
 			if rule := h.repositoryRule(native.ID); !rule.Equal(fixture.Expected) {
 				t.Fatalf("repository created on %s keys under %s, want %s", fixture.Kind, rule, fixture.Expected)
@@ -53,10 +53,13 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 			// A Repository moved onto the volume from the host filesystem is
 			// reconnected and rekeyed; the next scan writes no absence.
 			moved := h.createIn(source, "Moved "+fixture.Kind, "moved-"+fixture.Kind)
-			h.upload(moved, "Beach.JPG", blackboxJPEG(t, 120, "beach-"+fixture.Kind))
-			h.upload(moved, "Café.jpg", blackboxJPEG(t, 140, "cafe-"+fixture.Kind))
+			// File names carry the image kind: the Asset listing spans every
+			// Repository, and each image runs the same journey.
+			beach := "Beach-" + fixture.Kind + ".JPG"
+			h.upload(moved, beach, blackboxJPEG(t, 120, "beach-"+fixture.Kind))
+			h.upload(moved, "Café-"+fixture.Kind+".jpg", blackboxJPEG(t, 140, "cafe-"+fixture.Kind))
 			h.waitProcessingSettled()
-			assets := h.listByFilename("Beach.JPG")
+			assets := h.listByFilename(beach)
 			if len(assets) != 1 {
 				t.Fatalf("uploaded asset = %+v", assets)
 			}
@@ -89,7 +92,7 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 			if len(entriesAfter) != len(entriesBefore) {
 				t.Fatalf("the scan after the reconnect changed the index: %d rows, want %d", len(entriesAfter), len(entriesBefore))
 			}
-			if listed := h.listByFilename("Beach.JPG"); len(listed) != 1 || listed[0].AssetID != assets[0].AssetID {
+			if listed := h.listByFilename(beach); len(listed) != 1 || listed[0].AssetID != assets[0].AssetID {
 				t.Fatalf("asset identity after reconnect = %+v, want %s", listed, assets[0].AssetID)
 			}
 			if status := h.assetStatus(assets[0].AssetID); status != http.StatusOK {
@@ -104,8 +107,8 @@ func TestVolumeReconnectAcrossFilesystemImages(t *testing.T) {
 			// are unchanged, and the bytes on the volume are untouched.
 			if sourceRule.Case == pathsemantics.CaseSensitive && fixture.Expected.Case == pathsemantics.CaseInsensitive {
 				pair := h.createIn(source, "Pair "+fixture.Kind, "pair-"+fixture.Kind)
-				h.upload(pair, "Pair.jpg", blackboxJPEG(t, 30, "pair-upper-"+fixture.Kind))
-				h.upload(pair, "pair.jpg", blackboxJPEG(t, 40, "pair-lower-"+fixture.Kind))
+				h.upload(pair, "Pair-"+fixture.Kind+".jpg", blackboxJPEG(t, 30, "pair-upper-"+fixture.Kind))
+				h.upload(pair, "pair-"+fixture.Kind+".jpg", blackboxJPEG(t, 40, "pair-lower-"+fixture.Kind))
 				h.waitProcessingSettled()
 				pairBefore := h.entries(pair.ID)
 				pairDestination := filepath.Join(volume.Path, "pair-"+fixture.Kind)
