@@ -173,6 +173,16 @@ tasks:
       - task: e2e:seed
       - vp run e2e:test --grep @backup-recovery --workers=1
 
+  test:storage-recovery:
+    desc: Run the storage lifecycle recovery regression (open a found folder, reconnect after a move, separate copy, held Trash, reinstall adopting the Primary Repository)
+    env:
+      CI: "1"
+    cmds:
+      - task: e2e:seed
+      # The reinstall scenario empties the app-state volume and re-bootstraps
+      # the instance, so this slice runs last on a disposable environment.
+      - vp run e2e:test --grep @storage-recovery --workers=1
+
   openapi-types:
     desc: Regenerate frontend OpenAPI types from the server spec
     cmds:

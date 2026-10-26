@@ -528,7 +528,7 @@ test("verifying from a row menu queues a scan for that Repository", async () => 
   await expect.poll(() => scannedRepository).toBe("repo-family");
 });
 
-// R1 of docs/exec-plans/active/storage-repository-lifecycle.md: in Desktop
+// R1 of the storage refactor (.agents/decisions/2026-10-26-storage-command-boundary.md): in Desktop
 // (native host available, no server candidates) a create on a removable
 // non-default Storage Location reaches the risk review, is refused until the
 // risks are acknowledged against the review's token, and then registers the

@@ -27,14 +27,15 @@ jobs:
         outputs:
             server: ${{ steps.filter.outputs.server }}
             web: ${{ steps.filter.outputs.web }}
-            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
-            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' || steps.filter.outputs.storage_e2e == 'true' }}
+            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' || steps.filter.outputs.storage_e2e == 'true' }}
             browser_smoke: ${{ steps.filter.outputs.browser_smoke }}
             auth_e2e: ${{ steps.filter.outputs.auth_e2e }}
             agent_e2e: ${{ steps.filter.outputs.agent_e2e }}
             video_e2e: ${{ steps.filter.outputs.video_e2e }}
             people_e2e: ${{ steps.filter.outputs.people_e2e }}
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
+            storage_e2e: ${{ steps.filter.outputs.storage_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
         steps:
@@ -231,6 +232,43 @@ jobs:
                           - 'web/e2e/specs/backup-recovery.spec.ts'
                           - 'web/src/features/settings/api/useBackups.ts'
                           - 'web/src/features/settings/flows/server/BackupSection.tsx'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
+                      # Storage lifecycle recovery: candidates, reconnect, copy,
+                      # rename, private recovery and held Trash, and a reinstall
+                      # that adopts the retained Primary Repository. The slice
+                      # drives the storage commands, the setup review and the
+                      # Trash through the Web, and it empties the app-state
+                      # volume, so it runs after every other slice.
+                      storage_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'taskfile.yml'
+                          - 'web/taskfile.yml'
+                          - 'web/e2e/compose*.yml'
+                          - 'server/Dockerfile'
+                          - 'server/docker-entrypoint.go'
+                          - 'server/app/**'
+                          - 'server/internal/api/router.go'
+                          - 'server/internal/api/handler/repository_scan_handler.go'
+                          - 'server/internal/api/handler/storage_handler.go'
+                          - 'server/internal/api/handler/setup_handler.go'
+                          - 'server/internal/api/handler/asset_lifecycle.go'
+                          - 'server/internal/api/handler/asset_trash.go'
+                          - 'server/internal/api/dto/repository_scan_dto.go'
+                          - 'server/internal/api/dto/storage_dto.go'
+                          - 'server/internal/api/dto/setup_dto.go'
+                          - 'server/internal/storage/**'
+                          - 'server/internal/service/asset_service.go'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/storage-recovery.spec.ts'
+                          - 'web/src/features/auth/flows/bootstrap/**'
+                          - 'web/src/features/auth/flows/primary-setup/**'
+                          - 'web/src/features/auth/modules/access/**'
+                          - 'web/src/features/assets/flows/lifecycle/**'
+                          - 'web/src/features/repositories/**'
+                          - 'web/src/lib/assets/**'
                           - 'web/src/lib/http-commons/**'
                           - 'web/src/locales/**'
                       desktop:
@@ -567,6 +605,12 @@ jobs:
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'
               run: task web:test:backup-recovery
+
+            # Last on purpose: its reinstall scenario empties the app-state
+            # volume and re-bootstraps the instance.
+            - name: Run storage lifecycle recovery regression
+              if: needs.changes.outputs.storage_e2e == 'true'
+              run: task web:test:storage-recovery
 
             - name: Capture E2E service logs
               if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}

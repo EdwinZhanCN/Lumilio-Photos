@@ -155,6 +155,7 @@ task web:test:auth-totp
 task web:test:auth-hardening
 task web:test:video-semantic
 task web:test:backup-recovery
+task web:test:storage-recovery
 ```
 
 The matching CI E2E jobs call the same `web:*` targets. Playwright installation

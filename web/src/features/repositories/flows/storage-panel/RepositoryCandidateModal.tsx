@@ -217,6 +217,8 @@ export default function RepositoryCandidateModal({
               return (
                 <div
                   key={candidate.directory_name}
+                  data-testid="repository-candidate"
+                  data-directory={candidate.directory_name}
                   className={`rounded-lg border px-4 py-3 ${focusDirectoryName && candidate.directory_name === focusDirectoryName ? "border-primary ring-1 ring-primary/40" : "border-base-300"}`}
                   data-focused={
                     focusDirectoryName && candidate.directory_name === focusDirectoryName

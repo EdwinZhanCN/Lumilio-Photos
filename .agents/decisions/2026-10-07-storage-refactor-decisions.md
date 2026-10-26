@@ -1,9 +1,12 @@
 # Decision: Storage refactor product decisions — per-operation consent, explicit primary adoption, preserved private state, no network storage in rc.1, Reconnect not Relocate
 
-Status: accepted, 2026-10-07 (owner). Implementation is in progress under
-[the storage repository lifecycle plan](../../docs/exec-plans/active/storage-repository-lifecycle.md);
-this record states the target behavior that plan delivers. The plan's
-remaining smaller decisions stay inside the plan until it completes.
+Status: implemented, 2026-10-26 (accepted by the owner 2026-10-07).
+Delivered by the storage repository lifecycle plan, P0–P8, between
+2026-10-14 and 2026-10-26. This record states the product behavior; how it
+is built, and the plan's smaller decisions as they were settled, live in
+[the storage command boundary](2026-10-26-storage-command-boundary.md),
+[repository volume semantics](2026-10-26-repository-volume-semantics.md) and
+[the executable recovery registry](2026-10-26-executable-recovery-registry.md).
 
 ## Problem
 

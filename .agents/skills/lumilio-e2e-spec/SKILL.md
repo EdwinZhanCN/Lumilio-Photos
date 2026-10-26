@@ -71,7 +71,7 @@ Run only the slice the spec belongs to:
 
 ```sh
 task web:e2e:up
-task web:test:browser          # or auth-hardening / auth-totp / agent-trust / video-semantic / backup-recovery
+task web:test:browser          # or auth-hardening / auth-totp / agent-trust / video-semantic / backup-recovery / storage-recovery
 task web:e2e:down
 ```
 

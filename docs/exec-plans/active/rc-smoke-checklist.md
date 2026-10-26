@@ -87,6 +87,7 @@ in [rc-release.md](rc-release.md) Phase 4.
 | Processing / Monitor | spot | Server stage catalog tests; no E2E | gap, non-blocking |
 | Agent (Lumilio) | spot | `@agent-runtime` keyless runtime (`agent-runtime.spec.ts`), `@agent-trust` | exists |
 | Backup / restore | core | `@backup-recovery` admin UI backup, download, restore, rollback (`backup-recovery.spec.ts`); Part C round trip on the published image | exists + S15 |
+| Storage lifecycle recovery | core | `@storage-recovery` (`storage-recovery.spec.ts`, S8): a removed Repository folder opened again through the shared review, reconnected after an external move, copied as a separate Repository, renamed, its inherited Trash held across a Server restart and restored from the Trash view; a reinstall over kept media (app-state volume emptied) whose first-admin ceremony adopts the retained Primary Repository with its Trash held and its originals ingested again | exists (S8) |
 | Desktop onboarding, import, tray, restart | rc.2 | macOS/Windows CI jobs and the embedded picker harness only | rc.2 |
 
 ## Execution phases
