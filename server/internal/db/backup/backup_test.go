@@ -862,3 +862,63 @@ func rewriteManifest(t *testing.T, path string, edit func(map[string]any)) {
 		t.Fatal(err)
 	}
 }
+
+// A fresh install has an app-state directory but no backups folder yet: the
+// routine scheduler must create the configured destination there instead of
+// waiting for the first manual backup to do it.
+func TestSchedulerCreatesMissingDestinationInsideExistingParent(t *testing.T) {
+	root := t.TempDir()
+	appState := filepath.Join(root, "app-state")
+	if err := os.MkdirAll(appState, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	catalog := openTestCatalog(t, filepath.Join(appState, "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+	dir := filepath.Join(appState, "backups")
+	cfg := settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 2}
+	scheduler := &Scheduler{
+		Source:   catalog.SQL,
+		Dir:      dir,
+		Metadata: SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
+		Ready:    func(context.Context) (bool, error) { return true, nil },
+		Settings: func(context.Context) (settings.Backup, error) { return cfg, nil },
+		Logf:     t.Logf,
+	}
+	if err := scheduler.Run(context.Background(), false); err != nil {
+		t.Fatalf("routine run on a fresh install: %v", err)
+	}
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("routine run did not create the backups directory: info = %v, err = %v", info, err)
+	}
+	if _, ok := LatestRoutine(dir); !ok {
+		t.Fatal("routine run on a fresh install did not create the first snapshot")
+	}
+}
+
+// A destination whose parent does not exist either is an unmounted volume,
+// not a fresh install: the routine run skips it and a forced run reports it.
+func TestSchedulerSkipsDestinationWithMissingParent(t *testing.T) {
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+	dir := filepath.Join(root, "volumes", "external", "lumilio-backups")
+	cfg := settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 2}
+	scheduler := &Scheduler{
+		Source:   catalog.SQL,
+		Dir:      dir,
+		Metadata: SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
+		Ready:    func(context.Context) (bool, error) { return true, nil },
+		Settings: func(context.Context) (settings.Backup, error) { return cfg, nil },
+		Logf:     t.Logf,
+	}
+	if err := scheduler.Run(context.Background(), false); err != nil {
+		t.Fatalf("routine run with an unreachable destination must skip, got %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("routine run must not create a destination whose parent is missing: %v", err)
+	}
+	if err := scheduler.Run(context.Background(), true); err == nil {
+		t.Fatal("forced run with an unreachable destination must report it")
+	}
+}

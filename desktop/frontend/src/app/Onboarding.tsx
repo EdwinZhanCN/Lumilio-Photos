@@ -183,6 +183,14 @@ export function Onboarding({
                 <InlineNotice tone="danger" title={t("onboarding.setupFailed")}>
                   {draft.error}
                 </InlineNotice>
+              ) : draft.validation && !draft.validation.valid ? (
+                <InlineNotice
+                  tone="danger"
+                  title={t("onboarding.settingsInvalid", "Server settings are not valid yet")}
+                >
+                  {draft.validation.issues?.[0]?.message ||
+                    t("server.settingsInvalid", "Server settings are invalid")}
+                </InlineNotice>
               ) : null}
             </>
           )}

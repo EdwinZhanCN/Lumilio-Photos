@@ -81,7 +81,10 @@ export function useSettingsDraft(
     setRuntimeDirty(firstRun);
     setPhase(firstRun ? "draft" : "saved");
     setError(null);
-    savedStoragePath.current = next.settings.storagePath;
+    // The migration confirmation belongs to a saved Default Storage Location.
+    // On the first launch the draft's path is only the wizard's proposal, so
+    // choosing another folder there is a plain choice, not a move.
+    savedStoragePath.current = firstRun ? "" : next.settings.storagePath;
   }, []);
 
   const load = useCallback(async () => {

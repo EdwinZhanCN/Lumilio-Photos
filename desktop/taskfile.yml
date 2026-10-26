@@ -95,6 +95,16 @@ tasks:
     cmds:
       - vp install --frozen-lockfile
 
+  frontend:i18n:check:
+    summary: Verifies the control panel locale files are extracted and filled
+    desc: Verifies the control panel locale files are extracted and filled
+    dir: frontend
+    cmds:
+      # extract-then-fill: the en/zh files must already hold every key the
+      # panel sources use, and every zh value must be filled.
+      - vp exec i18next-cli extract --ci
+      - vp exec i18next-cli status
+
   frontend:build:
     summary: Builds the control panel frontend for production
     desc: Builds the control panel frontend for production

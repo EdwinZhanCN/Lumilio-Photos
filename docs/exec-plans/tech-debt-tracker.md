@@ -102,3 +102,19 @@ Last aligned with the codebase: 2026-09-23.
   stack, so that journey stays the Web flow spec plus the Server
   injected-fact tests (`rc-smoke-checklist.md`, Storage admin row) and the
   native picker pass is the first rc.2 checkpoint.
+
+## Found during the Desktop correctness review (2026-10-26)
+
+- **The Desktop Storage panel raises an alert for host actions while the
+  runtime is stopped.** Owner: `desktop/frontend/src/app/panels/StoragePanel.tsx`
+  (`refreshHostActions`). Listing pending Web requests needs the in-process
+  repository control, so a stopped runtime answers
+  `repository_control_unavailable` and the panel renders it as a
+  needs-attention alert although no request can exist then; treat that code
+  as the empty state.
+- **The Desktop control panel has no component test runner.** Owner:
+  `desktop/frontend`. The panel is covered by `tsc`, the locale gate and the
+  Go tests behind its bindings only; the two wizard fixes from the S12b review
+  (first-launch storage confirmation, validation notice) landed without a
+  failing-first test because none can be written there today. Adding a
+  Vitest browser project like `web/` would close the gap.

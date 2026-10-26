@@ -3,8 +3,10 @@ package backup
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"server/internal/settings"
@@ -63,7 +65,7 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 		}
 	}
 
-	if _, err := os.Stat(s.Dir); err != nil {
+	if err := ensureDestination(s.Dir); err != nil {
 		if force {
 			return fmt.Errorf("backup destination %s unreachable: %w", s.Dir, err)
 		}
@@ -77,4 +79,29 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 		return err
 	}
 	return nil
+}
+
+// ensureDestination accepts an existing destination directory and creates a
+// missing one whose parent exists. A fresh install (Desktop app-data or a
+// container's app-state volume) has the parent but no backups folder yet, and
+// routine snapshots must not wait for the first manual backup to create it;
+// this is the same rule CreateSnapshot applies to a forced run. A destination
+// whose parent is also missing is an unmounted volume and stays unreachable,
+// so no snapshot lands on the wrong disk.
+func ensureDestination(dir string) error {
+	info, err := os.Stat(dir)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("%s is not a directory", dir)
+		}
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	parent, parentErr := os.Stat(filepath.Dir(dir))
+	if parentErr != nil || !parent.IsDir() {
+		return err
+	}
+	return os.Mkdir(dir, 0o700)
 }
