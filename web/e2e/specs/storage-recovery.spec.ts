@@ -137,8 +137,13 @@ function recoveryInventory(token: string, repositoryId: string) {
  * Playwright's own scroll-into-view can land after the menu opened, so scroll
  * first and reopen until the entry stays visible.
  */
-async function pickMenuItem(page: Page, triggerName: string, itemName: string) {
-  const trigger = page.getByRole("button", { name: triggerName, exact: true });
+async function pickMenuItem(
+  page: Page,
+  triggerName: string,
+  itemName: string,
+  scope: Locator | Page = page,
+) {
+  const trigger = scope.getByRole("button", { name: triggerName, exact: true });
   const item = page.getByRole("menuitem", { name: itemName, exact: true });
   await trigger.scrollIntoViewIfNeeded();
   await expect(async () => {
@@ -148,8 +153,20 @@ async function pickMenuItem(page: Page, triggerName: string, itemName: string) {
   await item.click();
 }
 
-function rowMenu(page: Page, repositoryName: string, actionKey: string) {
-  return pickMenuItem(page, t("storagePanel.actionsFor", { name: repositoryName }), t(actionKey));
+/**
+ * Opens one Repository row's action menu. The row is found by its id, never by
+ * its name alone: a separate copy of a Repository carries the same display name.
+ */
+function rowMenu(page: Page, repositoryId: string, repositoryName: string, actionKey: string) {
+  const row = page
+    .getByTestId("repository-row")
+    .and(page.locator(`[data-repository-id=${JSON.stringify(repositoryId)}]`));
+  return pickMenuItem(
+    page,
+    t("storagePanel.actionsFor", { name: repositoryName }),
+    t(actionKey),
+    row,
+  );
 }
 
 async function openCandidates(page: Page) {
@@ -255,7 +272,7 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   await expect(
     page.getByRole("heading", { name: t("storagePanel.title"), exact: true }),
   ).toBeVisible();
-  await rowMenu(page, repositoryName, "storagePanel.action.remove");
+  await rowMenu(page, repositoryId, repositoryName, "storagePanel.action.remove");
   await page
     .getByLabel(t("manage.repositories.removeConfirmationLabel", { name: repositoryName }), {
       exact: true,
@@ -348,7 +365,7 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   // Rename changes only the display name, in the catalog and in the marker.
   const renamed = `${repositoryName} renamed`;
   await page.goto("/storage");
-  await rowMenu(page, repositoryName, "storagePanel.action.rename");
+  await rowMenu(page, identity, repositoryName, "storagePanel.action.rename");
   await page.getByLabel(t("manage.repositories.renameLabel"), { exact: true }).fill(renamed);
   const renameResponse = page.waitForResponse(
     (response) =>
@@ -365,7 +382,7 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   expect(markerAfterRename).toContain(renamed);
 
   // The Recovery inventory names what the folder brought along.
-  await rowMenu(page, renamed, "storagePanel.action.recovery");
+  await rowMenu(page, identity, renamed, "storagePanel.action.recovery");
   const recoveryDialog = page.getByRole("dialog", {
     name: t("storagePanel.recovery.title"),
     exact: true,
