@@ -66,6 +66,8 @@ export default function RepositoryTable({ rows, expandedId, onToggleRow, renderA
             return (
               <Fragment key={row.id}>
                 <tr
+                  data-testid="repository-row"
+                  data-repository-id={row.id}
                   className={`cursor-pointer hover:bg-base-200/40 ${
                     expanded ? "bg-base-200/40" : ""
                   }`}
