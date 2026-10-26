@@ -311,7 +311,10 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   const inventory = await recoveryInventory(token, identity);
   expect((inventory.receipts ?? []).map((receipt) => receipt.event)).toEqual(["open"]);
   expect(await heldCount(token, identity)).toBe(1);
-  await waitForAsset(token, identity, scanFilename, "trashed");
+  // Remove from Lumilio purged the catalog rows, so the adopted Trash entry
+  // is a new Asset; that identity is the one a restore must keep.
+  const inheritedAssetId = await waitForAsset(token, identity, scanFilename, "trashed");
+  expect(inheritedAssetId).not.toBe(assetId);
   await waitUntilIdle(token, identity);
 
   // A Server restart changes nothing: the hold and the receipt are durable.
@@ -414,7 +417,8 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   expect(containerChecksum(restored)).toBe(checksum);
   expect(containerFiles(`${movedPath}/.lumilio/trash/files`)).toHaveLength(0);
   await expect.poll(() => heldCount(token, identity)).toBe(0);
-  expect(await waitForAsset(token, identity, scanFilename, "active")).toBe(assetId);
+  expect(await waitForAsset(token, identity, scanFilename, "active")).toBe(inheritedAssetId);
+  expect((await listAssets(token, identity, scanFilename, "trashed")).items ?? []).toHaveLength(0);
 });
 
 /**
