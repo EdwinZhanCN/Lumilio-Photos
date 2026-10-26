@@ -381,7 +381,9 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   expect(markerIdentity(markerAfterRename)).toBe(identity);
   expect(markerAfterRename).toContain(renamed);
 
-  // The Recovery inventory names what the folder brought along.
+  // The Recovery inventory names what the folder brought along. A fresh load
+  // reads the renamed row from the Server rather than from the mutation cache.
+  await page.goto("/storage");
   await rowMenu(page, identity, renamed, "storagePanel.action.recovery");
   const recoveryDialog = page.getByRole("dialog", {
     name: t("storagePanel.recovery.title"),
@@ -412,7 +414,7 @@ test("@storage-recovery a found folder is opened through the shared review, reco
   expect(containerChecksum(restored)).toBe(checksum);
   expect(containerFiles(`${movedPath}/.lumilio/trash/files`)).toHaveLength(0);
   await expect.poll(() => heldCount(token, identity)).toBe(0);
-  await expect.poll(() => waitForAsset(token, identity, scanFilename, "active")).toBe(assetId);
+  expect(await waitForAsset(token, identity, scanFilename, "active")).toBe(assetId);
 });
 
 /**
