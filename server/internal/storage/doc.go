@@ -61,7 +61,7 @@
 // [LifecycleReceipt] a retry with the same request receives again; a withheld
 // action is a [RepositoryActionUnavailableError] with stable blocker codes.
 //
-// Setup recovery (storage plan P5): [DefaultRepositoryManager.AssessSetupPrimaryTarget] reviews the
+// Setup recovery: [DefaultRepositoryManager.AssessSetupPrimaryTarget] reviews the
 // fixed <default>/primary target into a closed [SetupPrimaryState] with the
 // one legal transition per state, and [DefaultRepositoryManager.AdoptPrimaryRepository] registers a
 // compatible, unregistered Repository found there as the Primary Repository,
@@ -73,7 +73,7 @@
 // afterwards it must prove the moved identity. [DefaultRepositoryManager.AssessDefaultStorageLocation]
 // names the state of storage.path read-only for setup and startup.
 //
-// Volume semantics (storage plan P6b, R11): repositories.path_case and
+// Volume semantics (decision 2026-10-26-repository-volume-semantics): repositories.path_case and
 // path_normalization hold the name comparison rule measured on the tree by
 // [server/internal/storage/pathsemantics.Qualify] when a Repository is
 // created, opened, copied, adopted or reconnected; [RepositoryVolumeRule]

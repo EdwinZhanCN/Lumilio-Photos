@@ -12,7 +12,8 @@ Three rc.1 items still depended on a person at a machine: the tag-time
 smoke on "any Docker host and Edwin's Mac"
 (`docs/exec-plans/active/rc-smoke-checklist.md`), the single pre-tag
 native picker pass that closes the storage refactor
-(`docs/exec-plans/active/storage-repository-lifecycle.md`, P8), and the
+(the storage repository lifecycle plan's P8, completed 2026-10-26; see
+[its decision records](2026-10-26-storage-command-boundary.md)), and the
 post-tag published Desktop install. The owner cannot run any of them, and
 the schedule has already slipped past its original 2026-09-29 target. A
 cloud session has Go, Node, Task, and GitHub Actions, but no Docker daemon

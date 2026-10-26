@@ -338,7 +338,7 @@ func writePortableStorageIdentity(t *testing.T, rootPath, storageLocationID, pri
 	}
 }
 
-// Fresh default during setup (storage plan P5): before the Primary Repository
+// Fresh default during setup: before the Primary Repository
 // exists the person may point the Default Storage Location at a folder with
 // no Primary Repository in it; the Desktop pre-check lets the candidate
 // through and the Server decides at the controlled restart (a refusal rolls

@@ -72,6 +72,16 @@ async function ensureAttemptAdmin(index: number, adminToken: string) {
   return username;
 }
 
+/**
+ * A session for the bootstrap administrator the seed created, completing its
+ * TOTP challenge from the saved hand-off when the first-admin regression
+ * enabled one. Specs that must act before any attempt workspace exists (or
+ * after a reinstall) start from here.
+ */
+export async function bootstrapSession(): Promise<{ token: string }> {
+  return loginBootstrap();
+}
+
 async function loginBootstrap(): Promise<{ token: string }> {
   const login = await api<Auth>("/api/v1/auth/login", {
     method: "POST",

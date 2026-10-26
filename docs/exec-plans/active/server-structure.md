@@ -56,16 +56,17 @@ catalog schema, and persisted formats stay as they are.
   `web/scripts/check-source-boundaries.ts` keep governing the Web.
 - Whether Agent tools should read through capability APIs instead of raw
   queries (owner scope). It is a separate design question for the owner.
-- The storage lifecycle work in
-  [storage-repository-lifecycle.md](storage-repository-lifecycle.md);
-  restructuring the storage root waits for that plan to complete.
+- The storage lifecycle work (completed 2026-10-26; decisions
+  [command boundary](../../../.agents/decisions/2026-10-26-storage-command-boundary.md), [volume semantics](../../../.agents/decisions/2026-10-26-repository-volume-semantics.md), [recovery registry](../../../.agents/decisions/2026-10-26-executable-recovery-registry.md));
+  restructuring the storage root was deferred until it completed and now
+  waits only for the rc.1 tag.
 - Replacing gin. Huma runs on the existing engine through `humagin`; moving
   to the standard library router (`humago`) is a separate later decision.
 
 ## Fixed contracts
 
-- **Timing.** Phase B starts only after `v26.1.0-rc.1` is tagged and
-  storage-repository-lifecycle.md is complete. Import-path churn conflicts
+- **Timing.** Phase B starts only after `v26.1.0-rc.1` is tagged (the
+  storage lifecycle plan completed on 2026-10-26). Import-path churn conflicts
   with every open storage branch and would bury the promotion diff of #210.
 - **One session, one PR into `dev`**, branched from the latest `dev`, with
   `task test` and `task verify:generated` green and the narrowest extra checks

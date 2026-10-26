@@ -74,3 +74,31 @@ Last aligned with the codebase: 2026-09-23.
   repository row, so a 100k-file repository holds the writer far past the
   25 ms budget. It was the same before the scan index (a cascade); purging in
   pages of 256 under a maintenance state would bound it.
+
+## Found during the storage refactor (2026-10-26)
+
+- **`DeleteStorageLocation` keeps its pre-refactor checks.** Owner:
+  `server/internal/storage/repo_manager.go` (`DeleteStorageLocation`). The
+  Location action policy's detach verdict agrees with those checks through
+  `errors.Is`, but unlike every Repository command and the Location
+  reconnect, the command does not re-derive the policy on the row it holds
+  under its lease. A Location detached while a child registration or a
+  pending mutation appears in between would be caught by the old checks, not
+  by the policy; route it through `admitStorageLocationAction` when the
+  Location commands are next touched.
+- **`LifecycleRequest.RiskConfirmation` is a record, not a gate.** Owner:
+  `server/internal/storage/lifecycle_operation.go` and
+  `repository_candidates.go` (`admitCandidateTarget`). The flag is set only
+  after the token-bound review and is journaled in the reconnect payload as
+  `risk_confirmation`; `architecturecheck` forbids the legacy
+  `!request.RiskConfirmation` comparison. Rename it to `RisksAcknowledged`
+  when the lifecycle journal payload is next versioned, so a reader cannot
+  mistake it for consent.
+- **The Docker E2E stack exposes one filesystem.** Owner:
+  `web/e2e/compose.yml`. The `@storage-recovery` slice proves open,
+  reconnect, copy, rename, private recovery, held Trash and the reinstall
+  adoption on the Default Storage Location only; a removable or non-default
+  Storage Location on its own volume cannot be mounted into the Compose
+  stack, so that journey stays the Web flow spec plus the Server
+  injected-fact tests (`rc-smoke-checklist.md`, Storage admin row) and the
+  native picker pass is the first rc.2 checkpoint.

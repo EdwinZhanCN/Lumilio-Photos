@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// consentHarness is the R1 Server evidence of the storage plan: a real catalog
+// consentHarness is the R1 Server evidence of the storage refactor (#242): a real catalog
 // manager with a default and an external Storage Location, whose target facts
 // are injected through the P1 observer so removable and network storage are
 // reproduced without hardware.
