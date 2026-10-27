@@ -180,6 +180,7 @@
     "regionDescription": "Used for regional defaults and services.",
     "selected": "Selected",
     "server": "Server",
+    "settingsInvalid": "Server settings are not valid yet",
     "setupFailed": "Setup could not be completed",
     "step": "Step {{current}} of {{total}}",
     "storage": "Storage",
@@ -255,8 +256,6 @@
   },
   "storage": {
     "additional": "Additional Storage Locations",
-    "capacityAvailable": "{{available}} of {{total}} available",
-    "capacityUnknown": "Capacity unavailable",
     "chooseDefaultLocation": "Choose Default Storage Location",
     "confirmRiskAndContinue": "Confirm risks and continue",
     "defaultLocation": "Default Storage Location",
@@ -275,6 +274,7 @@
     "hostActionLocateRepository": "Reconnect Repository",
     "hostActionOpenRepository": "Open Existing Repository",
     "hostActionRequestedBy": "{{purpose}} · Requested by {{actor}}",
+    "hostActionResolveInWeb": "Resolve in Web Storage admin",
     "hostActionRiskTitle": "Confirm storage risks before continuing",
     "locateDefaultLocation": "Locate Default Storage Location",
     "location": "Storage Location",
@@ -283,7 +283,6 @@
     "noDefault": "The Default Storage Location has not been selected.",
     "noWebRequests": "No pending Web requests",
     "noWebRequestsHint": "Native folder requests from the Web app will appear here for local approval.",
-    "readOnly": "Read-only",
     "repositoryCount_one": "{{count}} Repository",
     "repositoryCount_other": "{{count}} Repositories",
     "reviewAndChoose": "Review and choose folder",
@@ -294,8 +293,7 @@
     "riskRemovable": "Removable storage",
     "startServerHint": "Start the Server before adding another Storage Location.",
     "title": "Storage",
-    "webRequests": "Requests from Web",
-    "writable": "Writable"
+    "webRequests": "Requests from Web"
   },
   "toast": {
     "openFailed": "Lumilio Photos could not be opened",

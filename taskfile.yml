@@ -382,9 +382,10 @@ tasks:
       - task: site:build:atlas
 
   ci:desktop:panel:
-    desc: Install and build the Desktop control panel frontend
+    desc: Install, check the locale files of, and build the Desktop control panel frontend
     cmds:
       - task: desktop:frontend:install:ci
+      - task: desktop:frontend:i18n:check
       - task: desktop:frontend:build
 
   ci:desktop:native:
