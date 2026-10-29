@@ -90,6 +90,12 @@ is now final.
 | Inherited Trash retention | Held until restore, export, delete or explicit acceptance of normal retention; new deletes follow the configured retention |
 | Unsupported volume semantics | The affected transition is refused; support grows only with CI filesystem-image evidence |
 
+The owner is revising "Lost catalog metadata" (2026-10-28). Rating, liked, and
+user tags become portable through per-entry sidecars in the Repository; see
+[portable asset sidecars](../../docs/exec-plans/active/portable-asset-sidecars.md).
+Until that plan completes and its record supersedes the row, the row
+describes shipped behavior.
+
 ## Alternatives considered
 
 - **Per-journey classifiers with a shared helper.** Rejected: #242 was the
