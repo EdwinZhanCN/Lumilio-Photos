@@ -2,7 +2,10 @@
 
 Status: active, created 2026-10-28. Nothing has landed. The owner decided the
 format, the location, and the first-phase scope on 2026-10-28 (see
-Decisions). This plan revises one row of the
+Decisions). This plan starts after
+[repository layout v2](repository-layout.md) Phases 0–3, which create the
+`user/assets/` class and the only path constructors. It lands before the
+rc.1 tag ([rc-release.md](rc-release.md)). This plan revises one row of the
 [storage command boundary](../../../.agents/decisions/2026-10-26-storage-command-boundary.md)
 record. That row says lost catalog metadata returns only from a compatible
 backup and that Lumilio promises nothing portable. After this plan, rating,
@@ -42,9 +45,9 @@ not a second source of truth.
   entry and holds no user facts for that asset. Once the asset exists, the
   catalog wins, and the next drain overwrites the sidecar.
 - **Layout.** Each file entry has one sidecar,
-  `.lumilio/sidecars/<entry path>.lumilio.json`, which mirrors the entry's
-  repository-relative path. Studio's existing top-level
-  `.lumilio/sidecars/<assetID>.lumilio-sidecar` files are unchanged.
+  `.lumilio/user/assets/<entry path>.json`, which mirrors the entry's
+  repository-relative path. It is built only by `layout.AssetSidecar`. Studio
+  records live beside it in `user/studio/`.
 - **Content is bound to bytes.** A sidecar records the entry's `content_id`.
   A reader applies it only when the content hash proves the match, the same
   rule as "proven content hash, size and source or nothing" for Studio in
@@ -64,7 +67,8 @@ not a second source of truth.
 ## Decisions (frozen 2026-10-28; extract at completion)
 
 - **Format and location (owner):** Lumilio JSON in a path mirror under
-  `.lumilio/sidecars/`. Rejected alternatives:
+  `.lumilio/user/assets/`, the `user` class of
+  [layout v2](repository-layout.md). Rejected alternatives:
   - *Standard XMP next to the original.* It writes into the user's folders
     and collides with other software's sidecars (Lightroom writes
     `IMG.xmp`, darktable writes `IMG.jpg.xmp`). It needs Lightroom-style
@@ -110,13 +114,12 @@ not a second source of truth.
 - Add a storage test: open a Repository into a fresh catalog, and its assets
   lose rating, liked, and user tags. It records today's behavior, and Phase 3
   inverts it into the acceptance test.
-- Private recovery accepts only top-level `*.lumilio-sidecar` files under
-  `.lumilio/sidecars/` (`private_recovery.go`). Nested mirror files need their
-  own private class, so that recovery, reconnect, and register-copy preserve
-  them and never misclassify them. Record the rule before Phase 1 writes the
-  first file.
-- Path limits: the mirror adds a `.lumilio/sidecars/` prefix and a
-  `.lumilio.json` suffix. Check this against the volume rules
+- Classification is settled by layout v2. Everything under `user/` is the
+  `user` class: kept in place and reassociated only on proven content.
+  Recovery, reconnect, and register-copy therefore preserve the mirror
+  without a rule of their own.
+- Path limits: the mirror adds a `.lumilio/user/assets/` prefix and a
+  `.json` suffix. Check this against the volume rules
   ([volume semantics](../../../.agents/decisions/2026-10-26-repository-volume-semantics.md)):
   the 255-byte name limit and Windows path length. Decide the behavior when a
   mirror path cannot exist: skip the entry with a recorded reason, never

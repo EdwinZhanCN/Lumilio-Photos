@@ -4,9 +4,11 @@ Status: active, created 2026-10-28. Nothing in this plan has landed. The
 mitigation for [postmortem 0004](../../../.agents/postmortems/0004-repository-lease-deadlocks.md)
 breaks the four cycles found on 2026-10-28 and bounds every lease wait to
 `RepositoryLeaseWait` (30 s). Any cycle that is still possible now fails one
-operation with `ErrRepositoryBusy`; it no longer wedges the Repository. The
-owner will decide whether this plan lands before or after rc.1. Until it
-lands, the mitigation is what ships.
+operation with `ErrRepositoryBusy`; it no longer wedges the Repository. This
+plan lands before the rc.1 tag, under the "fix what is found" contract in
+[rc-release.md](rc-release.md). Phase 3 publishes face crops through
+[layout v2](repository-layout.md)'s `cache/artifacts/`, so it starts after
+that plan's Phase 3.
 
 Goal: an ordinary media handle never waits for a Repository. It is either
 granted at once or refused with `ErrRepositoryBusy`. The few lifecycle
@@ -195,8 +197,9 @@ parallel, and asserts that nothing ever blocks past its deadline.
 
 ### Phase 3 — Nothing waits inside the catalog transaction
 
-- Cut face crops before `ApplyFaceResultsTx` and pass in the prepared bytes.
-  Remove the `RepositoryFS` open inside the transaction.
+- Publish face crops as `faces` artifacts through `artifact.Store` before
+  `ApplyFaceResultsTx`. The transaction records only their identities, and
+  the `RepositoryFS` open inside it is removed.
 - Replace `clusterRebuildMu`, which is held while waiting for the writer,
   with ordering that SQLite's writer enforces. For example, the rebuild runs
   as writer transactions, and apply checks a rebuild generation.
