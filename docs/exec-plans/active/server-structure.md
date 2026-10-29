@@ -4,10 +4,17 @@ Status: active, created 2026-10-19; nothing has landed. Owner decisions
 (2026-10-19): the cleanest structure wins over a move-only refactor, so code,
 Go type names, and OpenAPI schema names may change; Atlas replaces
 `server/tools/architecturecheck`; Huma replaces swag, so the HTTP contract is
-generated from Go types (B9–B11). Phase A ([atlas-rules.md](atlas-rules.md))
-touches only tools, tests, docs, and `atlas.yaml` and may run between rc.1
-sessions. Phase B waits for the rc.1 tag (Fixed contracts). The session order
-is the table under "Execution phases".
+generated from Go types (B9–B11). Revised 2026-10-28 (owner review): a
+database boundary keeps the SQLite engine inside `catalog` and generated rows
+out of `api/` and capability APIs (Fixed contracts; B2, B11, B13); gin is
+confined to the `api` root package, `api/httpx`, and `server/app`;
+`server/platform` moves under `internal`. Phase A
+([atlas-rules.md](atlas-rules.md)) touches only tools, tests, docs, and
+`atlas.yaml` and may run between rc.1 sessions. Owner decision 2026-10-28:
+Phase B also lands before the rc.1 tag, under the fix-before-release rule in
+[rc-release.md](rc-release.md); its order relative to the open storage plans
+is still to be agreed with the owner (Fixed contracts, Timing). The session
+order is the table under "Execution phases".
 
 Goal: the Server tree reads as eight layers — `foundation`, `media`,
 `catalog`, `work`, business capabilities, `ingest`, `api`, `app` — where each
@@ -15,8 +22,11 @@ business capability is one package (or a small tree) that owns its rules, its
 transactional writes, and its read API, and every architecture rule is a
 type-resolved Atlas rule or a registered behaviour test that has been seen to
 fail, and the OpenAPI contract is generated from the Go types of the
-transport packages. This is not a feature change: product behaviour, the
-catalog schema, and persisted formats stay as they are.
+transport packages. SQLite is an implementation detail of `catalog`: no
+package above it imports an engine driver, and no generated row type crosses
+a capability's public API or reaches the transport. This is not a feature
+change: product behaviour, the catalog schema, and persisted formats stay as
+they are.
 
 ## Why (measured 2026-10-19 on `dev` `551595db`)
 
@@ -44,6 +54,17 @@ catalog schema, and persisted formats stay as they are.
   that the compiler never checks. swag v2 is still a release candidate
   (`v2.0.0-rc5`), and `tools/openapinormalize` rewrites its output afterwards,
   choosing each Problem vocabulary from hard-coded path tables.
+- Generated rows reach every layer (measured 2026-10-28 on the working tree
+  at `781515c7`). Non-test references to `repo.*` outside `internal/db`:
+  `service` 849, `storage` 512, `api/handler` 200, `agent` 160, `cloud` 95.
+  Five handlers hold `*repo.Queries` directly (`asset`, `asset_lifecycle`,
+  `album`, `duplicate`, `share_link`), and `api/dto` converts generated rows
+  (`ToAssetDTO(repo.Asset)`, `ToAssetDetailDTO(repo.GetAssetWithRelationsRow)`,
+  `ToShareLinkDTO(repo.ShareLink)`), so a query change is an API change.
+  About 250 hand-written SQL call sites through `catalogtx` live outside
+  `internal/db` (`event` 65, `storage` 31, `commit` 30, `service` 28,
+  `pipeline` 18, `api/handler` 18, `processing` 13, `queue` 11, …), and
+  `internal/queue` builds the `riversqlite` River driver itself.
 
 ## Non-goals
 
@@ -52,6 +73,16 @@ catalog schema, and persisted formats stay as they are.
   found a bug or a design question: stop and take it to the owner.
 - Splitting the sqlc package. `catalog/repo` stays one generated package;
   the Atlas table-ownership rule replaces per-capability query packages.
+- A database engine abstraction. SQLite stays the only engine: the baseline
+  has 91 STRICT tables and FTS5 and vec1 virtual tables; the 69 query files
+  use `unixepoch` 156 times, `RETURNING` 111, and `json_extract` or
+  `json_each` 103; River runs on `riversqlite`; backups use the SQLite online
+  backup API; and the `catalogtx` single-writer model is SQLite's.
+  `v1.0.0-beta` was the PostgreSQL server and was left on purpose. The
+  database boundary confines the engine; it does not abstract it.
+- Repository interfaces in front of sqlc. A capability calls its queries
+  directly; an interface with one implementation is a seam with no consumer,
+  and tests already run on real SQLite.
 - Web and Desktop structure. `web/ARCHITECTURE.md` and
   `web/scripts/check-source-boundaries.ts` keep governing the Web.
 - Whether Agent tools should read through capability APIs instead of raw
@@ -65,9 +96,16 @@ catalog schema, and persisted formats stay as they are.
 
 ## Fixed contracts
 
-- **Timing.** Phase B starts only after `v26.1.0-rc.1` is tagged (the
-  storage lifecycle plan completed on 2026-10-26). Import-path churn conflicts
-  with every open storage branch and would bury the promotion diff of #210.
+- **Timing (owner decision 2026-10-28, replacing "Phase B after rc.1" of
+  2026-10-19).** Every session of this plan lands before `v26.1.0-rc.1` is
+  tagged, under the fix-before-release rule in [rc-release.md](rc-release.md).
+  The order of Phase B relative to the open storage plans
+  ([repository-layout.md](repository-layout.md),
+  [repository-access-simplification.md](repository-access-simplification.md),
+  [portable-asset-sidecars.md](portable-asset-sidecars.md)) is agreed with the
+  owner before B1 starts, because import-path churn conflicts with every open
+  storage branch; the agreed order goes into the session order of
+  [release-hardening.md](release-hardening.md).
 - **One session, one PR into `dev`**, branched from the latest `dev`, with
   `task test` and `task verify:generated` green and the narrowest extra checks
   from `lumilio-select-checks` (Desktop compiles the Server in-process, so a
@@ -97,6 +135,27 @@ catalog schema, and persisted formats stay as they are.
   change.
 - **No shims.** No type aliases, forwarding functions, or re-export packages
   are left behind; every caller moves in the same PR.
+- **Database boundary (2026-10-28).** Each rule is a type-resolved Atlas rule
+  from the session named:
+  1. Engine drivers (`github.com/mattn/go-sqlite3`, `riversqlite`) and
+     `*sql.DB` appear only under `catalog/`; `catalog` builds the River
+     driver and hands it to `ingest/queue` (B2).
+  2. Nothing under `api/` and nothing in `server/app` imports `catalog/repo`
+     or calls a `catalogtx` SQL method; transport maps capability types only
+     (each B11 session for its capability; all of `api/` at B11h).
+  3. No exported function, method, field, or type in a capability's root
+     package names a `catalog/repo` type; rows become capability types in
+     unexported mappers inside the capability (B13). Until a capability's
+     B13 session lands, its count of such exported mentions is a ceiling in
+     `atlas.yaml` that may only fall.
+  4. Hand-written SQL through `catalogtx` is allowed only in `catalog`,
+     `work`, capabilities, and `ingest`, on tables they own; its call-site
+     count per package is a ceiling recorded at B2 that may only fall. New
+     SQL is a sqlc query unless it is dynamic (for example
+     `search/filter_sql.go`).
+  5. `catalog/repo` imports only `catalog/dbtypes` and leaf packages that
+     import no other `server` package; this one rule replaces the
+     per-package `exceptions` in `atlas.yaml` (B13).
 - **Directory is group.** From B1 on, a Server package's Atlas group is
   derived from its path; `//atlas:group` directives are removed in A1.
 - **Docs travel with code.** A moved package keeps its `doc.go`; Atlas view
@@ -104,18 +163,19 @@ catalog schema, and persisted formats stay as they are.
   that name moved paths are updated in the same PR. Stale views are re-read
   before `task atlas:lock`.
 
-## Target structure (frozen 2026-10-19; the owner may rename in review)
+## Target structure (frozen 2026-10-19, revised 2026-10-28; the owner may rename in review)
 
 ```
 server/
-├─ cmd/ app/ config/ migrations/ platform/   unchanged
+├─ cmd/ app/ config/ migrations/   unchanged (Desktop imports only app and config)
 └─ internal/
-   ├─ foundation/  logging version secretbox settings memory sysproc testutil
+   ├─ foundation/  logging version secretbox settings memory sysproc fsprivacy testutil
    ├─ media/       exif raw imaging imagesource hash phash geohash file   ← utils/*
-   ├─ catalog/     (root: was db) catalogtx repo dbtypes backup vectorindex vec1ext sqlitespike
+   ├─ catalog/     (root: was db; builds the River driver) catalogtx repo dbtypes backup
+   │               vectorindex vec1ext sqliteuri conformance   ← db/*, platform/sqliteuri, sqlitespike
    ├─ work/        pipeline jobs execution processing qos   ← pipeline queue/jobs execution processing workqos
    │
-   │  business capabilities (declared DAG; never import ingest, api, or net/http)
+   │  business capabilities (declared DAG; never import ingest, api, net/http, or an engine driver)
    ├─ assets/      assets, browse, albums, folder tags, featured, asset search
    ├─ stacks/      ← service/stack_service
    ├─ duplicates/  ← service/duplicate_service
@@ -132,9 +192,11 @@ server/
    ├─ event/ lifecycle/ agent/ llm/   unchanged
    │
    ├─ ingest/      queue processors commit sourcing upload cloud
-   └─ api/         router, httpx/ (Huma config, Problem mapping, principal, body limits),
-                   problem, ratelimit, origin, transport, and one transport package per
-                   capability (Huma operations + their request/response types) after B11
+   └─ api/         router, middleware chain, and SPA fallback (root); httpx/ (Huma config,
+                   Problem mapping, principal, body limits, stream helpers); problem,
+                   ratelimit, origin, transport; and one transport package per capability
+                   (Huma operations + their request/response types, importing huma, never
+                   gin) after B11
 ```
 
 Layers, lowest first: `foundation` → `media` → `catalog` → `work` →
@@ -142,7 +204,9 @@ capabilities → `ingest` → `api` → `app`. A capability's root package is it
 public API: a `Service` type without stutter (`people.Service`, not
 `people.FaceService`), its domain types and errors, and the `…Tx` writers
 the commit coordinator calls. Private parts go under `<capability>/internal/`
-so the Go compiler, not a tool, enforces the boundary. Expected capability
+so the Go compiler, not a tool, enforces the boundary. Generated rows stay
+inside: the capability maps them to its own types in unexported functions
+(B13), so its exported API never names a `catalog/repo` type. Expected capability
 edges from today's code: `system → auth`; `places → system`;
 `search → lumen, system`; `assets → search, music, lumen, system, storage`;
 `stacks → duplicates`; `sharing → assets, agent`;
@@ -160,6 +224,10 @@ the real graph; an edge outside this list is reviewed, not assumed.
 | Read/write separation | Typed handles: constructors take `catalogtx.Reader` or `catalogtx.Writer` (both exist today), never `*sql.DB` | Snippet checks on `app.go` wiring (today): bypassed by a renamed variable; behaviour tests alone catch it only at runtime |
 | Query layer | One sqlc package plus Atlas table ownership | sqlc per capability: duplicates shared types and generated helpers for no gain |
 | Migration style | Incremental sessions with no compatibility shims | Big-bang move: unreviewable diff; shims: dead seams that outlive the move |
+| Database engine (2026-10-28) | SQLite only, confined to `catalog` by the database boundary | A dialect layer for SQLite and PostgreSQL: lowest-common-denominator SQL in place of FTS5, vec1, JSON functions, and `RETURNING`, plus a second River driver and backup path, for an engine the product left in `v1.0.0-beta` |
+| Generated rows (2026-10-28) | Mapped to capability types inside the owning capability; never in an exported capability API or under `api/` | Status quo: transport binds to generated rows, so a query change is an API change. Repository interfaces per capability: one implementation each, and tests already run on real SQLite. One domain-type pass over every capability: unreviewable; ceilings that only fall let it land one capability at a time |
+| Reach of gin (2026-10-28) | The `api` root package, `api/httpx`, and `server/app` | All of `internal/api`: every transport package would bind to gin, so a later move to `humago` would touch each one |
+| `dbtypes` (2026-10-28) | Split at B13: column codecs (`Timestamp`, `JSON`, `UUIDs`, `Strings`, `Vector`) stay in `catalog/dbtypes`; product vocabulary (`AssetType`, per-type metadata, `StackKind`, `RepoRole`, storage enums, ML payloads) moves to leaf packages named by the owning capability, as `storage/repocfg` is today | One package mixing SQL codecs with product vocabulary. Vocabulary in capability root packages: `catalog/repo` would import them, and they import `catalog/repo`, a cycle |
 
 ## HTTP layer on Huma (frozen 2026-10-19; checked against the Huma v2.39.1 source)
 
@@ -167,7 +235,10 @@ the real graph; an edge outside this list is reviewed, not assumed.
   middleware (authentication, origin policy, rate limits, the initialization
   and agent gates) keeps running in front of every operation. B10 adds
   `github.com/danielgtaylor/huma/v2` v2.39.1 and moves gin from v1.10.0 to
-  v1.12.0, which `humagin` requires; the Desktop module follows.
+  v1.12.0, which `humagin` requires; the Desktop module follows. Only the
+  `api` root package (engine, middleware chain, SPA fallback), `api/httpx`,
+  and `server/app` import gin or `humagin`; `api/<capability>` packages
+  import huma only, so moving to `humago` later changes those three places.
 - **Config.** `huma.DefaultConfig` without its create hook, which would add
   a `$schema` field and a `Link` header to every response. `OpenAPIPath`,
   `DocsPath`, and `SchemasPath` stay empty until B11h.
@@ -193,7 +264,8 @@ the real graph; an edge outside this list is reviewed, not assumed.
 - **Streams.** SSE (agent, uploads), multipart uploads, the backup stream, and
   Range responses through `http.ServeContent` are Huma operations with
   hand-written request and response documentation and a `huma.StreamResponse`
-  body (`humagin.Unwrap` gives the gin writer), so they stay in the spec. The
+  body, so they stay in the spec. Only `httpx` calls `humagin.Unwrap`; its
+  stream helpers hand transport packages the request and writer. The
   SPA fallback (`api/spa.go`) stays a plain gin route.
 - **Spec export.** `task server:openapi` runs `go run ./tools/openapi`, which
   builds the router in registration-only mode (a transport package's
@@ -261,8 +333,8 @@ post-plan code before choosing the cut.
 | # | Session | Plan |
 | --- | --- | --- |
 | A1–A4 | Atlas becomes the only architecture gate | [atlas-rules.md](atlas-rules.md) |
-| B1 | Infrastructure moves: `utils/*` → `media/` (`memory`, `sysproc` → `foundation/`, `upload` → `ingest/`); `db/*` → `catalog/` (`db` root becomes package `catalog`); work packages → `work/` (`workqos` → `work/qos`); `queue` `processors` `commit` `sourcing` `cloud` → `ingest/`; `httporigin` `servertransport` → `api/`; `artifact` → `storage/artifact`; `logging` `version` `secretbox` `settings` `testutil` → `foundation/`. Import paths only, apart from the `catalog` and `qos` package renames. Groups match paths in `atlas.yaml` | this plan |
-| B2 | Typed catalog handles: `catalogtx.Reader` and `catalogtx.Writer` in every constructor that takes `*sql.DB` today; the wiring snippet checks left after A3 become compile errors and are deleted | this plan |
+| B1 | Infrastructure moves: `utils/*` → `media/` (`memory`, `sysproc` → `foundation/`, `upload` → `ingest/`); `db/*` → `catalog/` (`db` root becomes package `catalog`, `sqlitespike` becomes `conformance`); work packages → `work/` (`workqos` → `work/qos`); `queue` `processors` `commit` `sourcing` `cloud` → `ingest/`; `httporigin` `servertransport` → `api/`; `artifact` → `storage/artifact`; `logging` `version` `secretbox` `settings` `testutil` → `foundation/`; `platform/fsprivacy` → `foundation/`, `platform/sqliteuri` → `catalog/` (only `db` imports it), and `server/platform` is gone. Import paths only, apart from the `catalog`, `conformance`, and `qos` package renames. Groups match paths in `atlas.yaml` | this plan |
+| B2 | Typed catalog handles: `catalogtx.Reader` and `catalogtx.Writer` in every constructor that takes `*sql.DB` today; the wiring snippet checks left after A3 become compile errors and are deleted. `catalog` builds the River driver that `queue_setup.go` builds today. Database boundary rule 1 becomes an Atlas rule, and the rule 4 call-site ceilings are recorded | this plan |
 | B3 | `music`, `species` out of `service` | this plan |
 | B4 | `auth` | this plan |
 | B5 | `system`, `lumen` | this plan |
@@ -270,11 +342,12 @@ post-plan code before choosing the cut.
 | B7 | `search/indexing` (moves `ErrSemanticSearchUnavailable`; merges `classify`) | this plan |
 | B8 | `duplicates`, `stacks`, `sharing`; the remainder becomes `assets`; `internal/service` is deleted | this plan |
 | B9 | OpenAPI schema names and the spec tool: `tools/openapi` replaces `tools/openapinormalize` (same Problem schemas), drops the package prefix from every schema name, fails on a collision, and gains `diff --base <ref>`, a semantic contract diff that proves this PR renames only. One Web codemod over the 228 hand-written `components["schemas"]["pkg.Name"]` references | this plan |
-| B10 | Huma foundation ("HTTP layer on Huma"): `api/httpx` (Huma config, Problem mapping, principal, body limits, Problem response declarations, session cookies, pagination parsing); the spec tool merges Huma operations into the swag document; router split by capability; an Atlas rule confines Huma and gin imports to `internal/api` and `server/app`. Pilot, 11 operations: `api/system` (health, setup, settings, capabilities), `api/species`, `api/places` | this plan |
+| B10 | Huma foundation ("HTTP layer on Huma"): `api/httpx` (Huma config, Problem mapping, principal, body limits, Problem response declarations, session cookies, pagination parsing); the spec tool merges Huma operations into the swag document; router split by capability; Atlas rules confine Huma imports to `internal/api` and `server/app`, and gin and `humagin` imports to the `api` root package, `api/httpx`, and `server/app`. Pilot, 11 operations: `api/system` (health, setup, settings, capabilities), `api/species`, `api/places` | this plan |
 | B11a–g | One transport package per capability on Huma (operations and their request/response types), one PR each: (a) `auth` with users, MFA, passkeys, sessions, 28 operations; (b) `music`, `sharing`, 40; (c) `people`, `stacks`, `duplicates`, `search` (indexing, classifier), 29; (d) `assets` JSON operations (assets, albums, metadata, lifecycle, stats), 40; (e) `assets` streams (query, media Range, upload with SSE), 25; (f) `storage` (repositories, scans, host actions) and backup into `api/system`, 34; (g) `cloud`, `event`, `agent` (SSE, pins), queue into `api/system`, 50 | this plan |
-| B11h | swag is deleted: `swaggo/swag`, `gin-swagger`, `swaggo/files`, `server/docs/docs.go`, the general-info annotations in `cmd/main.go`, the `tools:swag` target, and the merge step. `api/handler` and `api/dto` are gone. Huma serves the live spec and docs in place of `/swagger/*any`. `CLAUDE.md`, `CONTRIBUTING.md`, `lumilio-api-contract-change`, and the developer OpenAPI page in `site/docs` describe the Huma workflow | this plan |
+| B11h | swag is deleted: `swaggo/swag`, `gin-swagger`, `swaggo/files`, `server/docs/docs.go`, the general-info annotations in `cmd/main.go`, the `tools:swag` target, and the merge step. `api/handler` and `api/dto` are gone. Huma serves the live spec and docs in place of `/swagger/*any`. Database boundary rule 2 holds for all of `api/` and `server/app`. `CLAUDE.md`, `CONTRIBUTING.md`, `lumilio-api-contract-change`, and the developer OpenAPI page in `site/docs` describe the Huma workflow | this plan |
 | B12 | Storage root split, cut chosen from `atlas split-report` (host filesystem facts first) | this plan |
-| B13 | Tighten size ceilings to the new reality; extract decisions; complete both plans | this plan |
+| B13 | Generated rows leave capability APIs (database boundary rule 3), one PR per capability, after B9 and, for `storage`, after B12: domain types and unexported row mappers in the capability, every importer updated, its ceiling set to zero. The first PR splits `dbtypes` (codecs stay in `catalog/dbtypes`, vocabulary moves to capability-named leaf packages) and replaces the `atlas.yaml` exceptions with rule 5 | this plan |
+| B14 | Tighten size ceilings to the new reality; extract decisions; complete both plans | this plan |
 
 Recipe for each `service` session (B3–B8):
 
@@ -297,7 +370,10 @@ Recipe for each transport session (B10–B11g):
    schema names.
 2. Rewrite each handler as `func(ctx, *Input) (*Output, error)`, delete its
    swag annotations, and declare its Problems, body limits, and security
-   through `httpx`.
+   through `httpx`. The handler calls its capability, never `catalog/repo` or
+   a `catalogtx` SQL method; the capability's `api/dto` converters from
+   generated rows are deleted, and response types map from capability types
+   (database boundary rule 2).
 3. Rewrite the capability's `gin.CreateTestContext` tests to drive the
    router or `humatest`.
 4. Run `task dto`. Put the `tools/openapi diff --base origin/dev` output in
@@ -307,9 +383,17 @@ Recipe for each transport session (B10–B11g):
 ## Validation boundaries
 
 - `internal/service`, `internal/utils`, `internal/db`, `internal/api/handler`,
-  `internal/api/dto`, `server/tools/architecturecheck`,
+  `internal/api/dto`, `server/platform`, `server/tools/architecturecheck`,
   `server/tools/openapinormalize`, and `server/docs/docs.go` no longer exist;
   no swag annotation or `swaggo` module remains.
+- The database boundary holds: no package outside `catalog` imports an
+  engine driver or holds `*sql.DB`; nothing under `api/` and nothing in
+  `server/app` imports `catalog/repo`; every B13 ceiling is zero;
+  `catalog/repo` imports only `catalog/dbtypes` and leaf packages, and
+  `atlas.yaml` has no `exceptions`; no package's hand-written SQL call sites
+  exceed its B2 ceiling.
+- Only the `api` root package, `api/httpx`, and `server/app` import gin or
+  `humagin`.
 - Every Server package's Atlas group is its path. The layer graph is the
   eight layers above plus a declared, acyclic capability graph, with every
   edge used.
