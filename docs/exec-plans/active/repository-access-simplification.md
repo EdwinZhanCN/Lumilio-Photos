@@ -71,7 +71,10 @@ storage lifecycle semantics, the catalog, or the execution governor.
   [storage command boundary](../../../.agents/decisions/2026-10-26-storage-command-boundary.md).
 - Portable user facts. Writing ratings, albums, or people into Repository
   sidecars would revise the settled answer "promise nothing portable" in that
-  record. That is a separate decision for the owner.
+  record. That is a separate decision for the owner. If it is made, a sidecar
+  assumes a writable Repository: a failed write is retried and is never
+  redirected
+  ([writable storage](../../../.agents/decisions/2026-10-28-repositories-require-writable-storage.md)).
 - A catalog per Repository (see Decisions).
 - Execution governor capacity and demand
   ([execution budget](../../../.agents/decisions/2026-08-31-execution-budget-demand.md)).
