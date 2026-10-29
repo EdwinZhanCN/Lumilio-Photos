@@ -92,12 +92,21 @@ func (f *RepositoryFSFactory) AccessCoordinator() *RepositoryAccessCoordinator {
 	return f.access
 }
 
+// RepositoryLeaseWait bounds how long Open waits for the repository lease
+// behind a lifecycle mutation. Leases are not reentrant, and a holder may
+// itself be waiting for SQLite's writer, a governor slot, or a second lease;
+// an unbounded wait turns any such cycle into a server-wide wedge, while a
+// bounded one fails one retryable operation with ErrRepositoryBusy.
+const RepositoryLeaseWait = 30 * time.Second
+
 // Open verifies catalog reachability and the portable repository marker before
 // returning any media capability. A Storage Location is an authorization scope,
 // not an I/O health gate: the opened repository's own path and marker decide
 // access, and parent registration state never participates.
 func (f *RepositoryFSFactory) Open(repository repo.Repository) (*RepositoryFS, error) {
-	return f.OpenContext(context.Background(), repository)
+	ctx, cancel := context.WithTimeout(context.Background(), RepositoryLeaseWait)
+	defer cancel()
+	return f.OpenContext(ctx, repository)
 }
 
 // OpenContext is Open with a bounded wait for the in-process repository lease.

@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -54,6 +56,33 @@ func faceMembership(t *testing.T, ctx context.Context, database *db.DB, faceID i
 		return 0, false, false
 	}
 	return clusterID, manual, true
+}
+
+// A cluster rebuild holds clusterRebuildMu while it waits for SQLite's writer,
+// which the commit coordinator holds while applying face results. Waiting for
+// the lock inside that transaction would deadlock both.
+func TestApplyFaceResultsTxRefusesDuringClusterRebuild(t *testing.T) {
+	ctx := context.Background()
+	database := openFaceClusteringDatabase(t, ctx)
+	service := &faceService{queries: database.Queries}
+	tx, err := database.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	service.clusterRebuildMu.Lock()
+	defer service.clusterRebuildMu.Unlock()
+	applied := make(chan error, 1)
+	go func() { applied <- service.ApplyFaceResultsTx(ctx, tx, uuid.New(), nil, nil, 0) }()
+	select {
+	case err := <-applied:
+		if !errors.Is(err, ErrFaceClusterRebuildInProgress) {
+			t.Fatalf("ApplyFaceResultsTx during rebuild = %v, want ErrFaceClusterRebuildInProgress", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ApplyFaceResultsTx waited for the rebuild lock inside the catalog transaction")
+	}
 }
 
 // A re-detection after an in-place edit re-applies a manual person

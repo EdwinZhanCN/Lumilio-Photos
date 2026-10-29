@@ -107,6 +107,21 @@ func (sm *DefaultStagingManager) OpenStagingFile(repository repo.Repository, sta
 	return newRepositoryFile(opened, repositoryFS), nil
 }
 
+// OpenStagingSibling opens another staging file of the same repository for
+// reading through the root this file already holds. Leases are not reentrant:
+// opening it with OpenStagingFile would wait behind any lifecycle mutation
+// queued since this file was opened, and that mutation waits for this file.
+func (f *RepositoryFile) OpenStagingSibling(repository repo.Repository, stagingFile *StagingFile) (*os.File, error) {
+	repositoryPath, err := validateStagingHandle(repository, stagingFile)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.repositoryFS == nil || f.repositoryFS.RepositoryID() != repository.RepoID {
+		return nil, errors.New("staging sibling belongs to a different repository handle")
+	}
+	return f.repositoryFS.OpenPrivateFile(repositoryPath, os.O_RDONLY, 0)
+}
+
 func (sm *DefaultStagingManager) RemoveStagingFile(repository repo.Repository, stagingFile *StagingFile) error {
 	repositoryPath, err := validateStagingHandle(repository, stagingFile)
 	if err != nil {
