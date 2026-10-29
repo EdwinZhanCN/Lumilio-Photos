@@ -1,9 +1,14 @@
-# Repository layout v2: one class per directory, owned by one package
+# Repository layout: one class per directory, owned by one package
 
 Status: active. Created 2026-10-28; nothing has landed yet. The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
-"fix what is found" contract in [rc-release.md](rc-release.md). Order across
-plans:
+"fix what is found" contract in [rc-release.md](rc-release.md).
+
+This is the first layout, not a second version. There is no production
+install, so no code upgrades, migrates, or reads the current tree. Dev and
+demo environments are rebuilt (owner, 2026-10-28).
+
+Order across plans:
 
 1. This plan, Phases 0–3.
 2. [portable asset sidecars](portable-asset-sidecars.md). It writes into
@@ -15,9 +20,9 @@ Goal: every path under a Repository's `.lumilio/` belongs to exactly one
 class. The first path segment decides the class. Each class has one policy
 for creation, permission, recovery, cleanup, and backup. One package
 (`server/internal/storage/layout`) builds every private path, classifies
-every private path, and initializes, validates, and upgrades the tree. No
-other code spells a `.lumilio` path. The catalog stores identities, not
-private paths, so a later layout change never rewrites catalog rows.
+every private path, and initializes and validates the tree. No other code
+spells a `.lumilio` path. The catalog stores identities, not private paths,
+so the private tree can be rearranged without touching catalog rows.
 
 ## Why (measured 2026-10-28 on `dev` `ab1c3a45`)
 
@@ -60,7 +65,7 @@ private paths, so a later layout change never rewrites catalog rows.
   the irreplaceable data in `.lumilio/` from the rebuildable data. Repository
   audit logs are never rotated.
 
-## Layout v2 (frozen 2026-10-28)
+## Layout (frozen 2026-10-28)
 
 ```text
 <Repository>/
@@ -69,7 +74,6 @@ private paths, so a later layout change never rewrites catalog rows.
 ├── inbox/                       managed uploads land here (unchanged)
 ├── <user folders>/              originals
 └── .lumilio/
-    ├── layout.json              {"version": 2}; written last, the commit point
     ├── user/                    authored by people; irreplaceable; never rebuilt
     │   ├── studio/<assetID>.lumilio-sidecar
     │   └── assets/<entry path>.json            (portable asset sidecars)
@@ -125,7 +129,7 @@ watcher, and recovery ignore with one rule.
 - **Class names describe ownership and lifetime, not mechanism.** The names
   are `user`, `trash`, `cache`, `work`, `quarantine`, and `logs`. Rejected
   alternatives:
-  - *Keep v1 and only register it.* That would leave two homes for derived
+  - *Keep today's tree and only register it.* That would leave two homes for derived
     data, session manifests mixed with in-flight bytes, and `sidecars/`
     meaning two things.
   - *One directory per feature* (`studio/`, `faces/`, `thumbnails/` at top
@@ -134,13 +138,13 @@ watcher, and recovery ignore with one rule.
 - **Face crops become artifacts.** They are published through
   `artifact.Store` under the `faces` stage, so they get fences, immutability,
   and the cleaner. A separate face directory was rejected, because a second
-  derived-data contract is how v1 diverged.
+  derived-data contract is how the current tree diverged.
 - **The catalog stores identities.**
   - `thumbnails` and `face_items` store the artifact identity: source fence,
     stage, pipeline version, and name. They do not store a private path; the
     layout package resolves the path.
-  - Rejected: keeping private paths and rewriting rows on each upgrade. That
-    couples every layout change to a catalog migration, and it is the reason
+  - Rejected: keeping private paths in rows. That couples every layout
+    change to a catalog rewrite, and it is the reason
     a moved directory breaks thumbnails.
 - **Each upload session is one directory.**
   `work/uploads/<session>/` holds `session.json`, the chunks, and the merged
@@ -148,20 +152,17 @@ watcher, and recovery ignore with one rule.
   directory. A failed session moves whole to `quarantine/uploads/`. Rejected:
   fixing only `DeleteSession`. Manifests and bytes would still be classified
   apart, and recovery would still split a session.
-- **The tree records its own version.** `.lumilio/layout.json` records it.
-  The marker is not used: marker writes are identity changes with guarded
-  replace, and coupling layout upgrades to them would widen that critical
-  section.
-- **One upgrader, run before admission.**
-  - Startup upgrades every reachable Repository before workers or HTTP
-    admission start, so no handle is open. Open, adopt, and register-copy
-    upgrade inside their own lifecycle operation.
-  - Each move is idempotent. `layout.json` is written last, so a crash simply
-    reruns the upgrade.
-  - Unknown entries are left in place and disclosed.
-  - Rejected: *accept v1 and v2 paths forever.* Every reader would carry two
-    layouts, and the "pre-release marker `1.0` stays openable" contract is
-    kept by upgrading instead.
+- **No upgrade path (owner).** The tree has no version file, no upgrader,
+  and no reader for old paths. A tree in the current shape gets no code of
+  its own. Its old directories fall under the ordinary "anything else" rule:
+  they are preserved unchanged and disclosed as unknown. Dev and demo
+  environments are rebuilt and re-seeded. Rejected alternatives:
+  - *A `layout.json` version file with an idempotent upgrader.*
+  - *Reading both the old and the new paths.*
+
+  Both are compatibility code for installs that do not exist. When the first
+  public release ships and the layout later has to change, that change brings
+  its own forward step.
 
 ## Execution phases
 
@@ -193,7 +194,7 @@ storage Atlas group:
   `UploadSession(id)`, `QuarantineUpload(id)`, `RecoveryReceipt(id)`,
   `Log(name)`, and `Temp()`;
 - `Classify(privatePath)` and `IsReserved(rootRelative)`;
-- `Init`, `Validate`, and `Upgrade`;
+- `Init` and `Validate`;
 - `CACHEDIR.TAG` handling;
 - the `.lumilio-tmp-` prefix.
 
@@ -224,25 +225,15 @@ Move these callers onto the constructors:
 Delete `DefaultStructure`, `repoDirs`, and the per-package root constants.
 Then turn the Phase 0 architecture test to failing mode.
 
-### Phase 3 — Catalog identities and the upgrader
+### Phase 3 — Catalog identities
 
 - Edit the catalog baseline in place before rc.1, following the
   [rc compatibility baseline](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md):
   `thumbnails` and `face_items` store the artifact identity.
-- `Upgrade` turns v1 into v2:
-  - `sidecars/*.lumilio-sidecar` moves to `user/studio/`;
-  - `artifacts/` moves to `cache/artifacts/`;
-  - `assets/faces/*` is republished as `faces` artifacts. They are re-cropped
-    from the stored face boxes, and Phase 0 confirms that the boxes are
-    enough to do this;
-  - completed session manifests are deleted;
-  - other `staging/incoming/*` entries move to
-    `quarantine/recovery/<receipt>/`;
-  - `staging/failed/*` moves to `quarantine/uploads/`;
-  - `recovery/*` moves to `quarantine/recovery/`;
-  - `layout.json` is written last.
-- Test the upgrade on the testfixture v1 tree and on the dev primary's
-  shape, crash-resume included.
+- Face crops are published as `faces` artifacts at the point where they are
+  cut today.
+- Rebuild `.local/dev`, then re-seed the demo with `task web:demo:seed`.
+  Nothing converts an existing tree.
 
 ### Phase 4 — Policies
 
@@ -267,13 +258,9 @@ Then turn the Phase 0 architecture test to failing mode.
 
 - No production code outside `storage/layout` spells a `.lumilio` path. The
   architecture test enforces this.
-- A fresh Repository has exactly the v2 tree, and `.lumilio/layout.json`
-  says version 2.
-- The upgrade of a v1 tree has three properties:
-  - It is idempotent under a crash at every step.
-  - It preserves every `user`, `trash`, and `quarantine` byte.
-  - It leaves thumbnails working without rederivation, because the catalog
-    holds identities.
+- A fresh Repository has exactly the tree above, and `Validate` accepts it.
+- No upgrade, migration, version file, or old-path reader exists for the
+  private tree.
 - A chunked upload leaves nothing in `work/` after it completes, fails, or
   expires.
 - Deleting `cache/` loses nothing that cannot be rederived. Deleting

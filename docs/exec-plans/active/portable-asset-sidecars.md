@@ -3,7 +3,7 @@
 Status: active, created 2026-10-28. Nothing has landed. The owner decided the
 format, the location, and the first-phase scope on 2026-10-28 (see
 Decisions). This plan starts after
-[repository layout v2](repository-layout.md) Phases 0–3, which create the
+the [repository layout](repository-layout.md) plan's Phases 0–3, which create the
 `user/assets/` class and the only path constructors. It lands before the
 rc.1 tag ([rc-release.md](rc-release.md)). This plan revises one row of the
 [storage command boundary](../../../.agents/decisions/2026-10-26-storage-command-boundary.md)
@@ -68,7 +68,7 @@ not a second source of truth.
 
 - **Format and location (owner):** Lumilio JSON in a path mirror under
   `.lumilio/user/assets/`, the `user` class of
-  [layout v2](repository-layout.md). Rejected alternatives:
+  [repository layout](repository-layout.md). Rejected alternatives:
   - *Standard XMP next to the original.* It writes into the user's folders
     and collides with other software's sidecars (Lightroom writes
     `IMG.xmp`, darktable writes `IMG.jpg.xmp`). It needs Lightroom-style
@@ -114,7 +114,7 @@ not a second source of truth.
 - Add a storage test: open a Repository into a fresh catalog, and its assets
   lose rating, liked, and user tags. It records today's behavior, and Phase 3
   inverts it into the acceptance test.
-- Classification is settled by layout v2. Everything under `user/` is the
+- Classification is settled by the repository layout. Everything under `user/` is the
   `user` class: kept in place and reassociated only on proven content.
   Recovery, reconnect, and register-copy therefore preserve the mirror
   without a rule of their own.
