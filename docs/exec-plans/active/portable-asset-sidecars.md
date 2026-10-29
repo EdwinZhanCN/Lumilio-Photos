@@ -2,9 +2,12 @@
 
 Status: active, created 2026-10-28. Nothing has landed. The owner decided the
 format, the location, and the first-phase scope on 2026-10-28 (see
-Decisions). This plan starts after
-the [repository layout](repository-layout.md) plan's Phases 0–3, which create the
-`user/assets/` class and the only path constructors. It lands before the
+Decisions). It runs as steps SC0–SC4 of
+[rc1-sequence.md](rc1-sequence.md). These come after the
+[repository layout](repository-layout.md) plan, which creates the
+`user/assets/` class and the only path constructors, and after the
+[repository access](repository-access-simplification.md) plan, whose
+fail-fast handles the drain uses. It lands before the
 rc.1 tag ([rc-release.md](rc-release.md)). This plan revises one row of the
 [storage command boundary](../../../.agents/decisions/2026-10-26-storage-command-boundary.md)
 record. That row says lost catalog metadata returns only from a compatible

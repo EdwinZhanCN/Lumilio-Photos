@@ -13,7 +13,8 @@ confined to the `api` root package, `api/httpx`, and `server/app`;
 `atlas.yaml` and may run between rc.1 sessions. Owner decision 2026-10-28:
 Phase B also lands before the rc.1 tag, under the fix-before-release rule in
 [rc-release.md](rc-release.md); its order relative to the open storage plans
-is still to be agreed with the owner (Fixed contracts, Timing). The session
+is fixed in [rc1-sequence.md](rc1-sequence.md) (2026-10-28): B1–B2 run after
+Phase A and before the storage plans, B3–B14 after them. The session
 order is the table under "Execution phases".
 
 Goal: the Server tree reads as eight layers — `foundation`, `media`,
@@ -102,10 +103,10 @@ they are.
   The order of Phase B relative to the open storage plans
   ([repository-layout.md](repository-layout.md),
   [repository-access-simplification.md](repository-access-simplification.md),
-  [portable-asset-sidecars.md](portable-asset-sidecars.md)) is agreed with the
-  owner before B1 starts, because import-path churn conflicts with every open
-  storage branch; the agreed order goes into the session order of
-  [release-hardening.md](release-hardening.md).
+  [portable-asset-sidecars.md](portable-asset-sidecars.md)) is fixed in
+  [rc1-sequence.md](rc1-sequence.md), because import-path churn conflicts
+  with every open storage branch: sessions run strictly one after another,
+  B1–B2 before the storage plans and B3–B14 after them.
 - **One session, one PR into `dev`**, branched from the latest `dev`, with
   `task test` and `task verify:generated` green and the narrowest extra checks
   from `lumilio-select-checks` (Desktop compiles the Server in-process, so a

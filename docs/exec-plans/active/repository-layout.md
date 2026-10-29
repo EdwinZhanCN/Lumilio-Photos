@@ -8,13 +8,11 @@ This is the first layout, not a second version. There is no production
 install, so no code upgrades, migrates, or reads the current tree. Dev and
 demo environments are rebuilt (owner, 2026-10-28).
 
-Order across plans:
-
-1. This plan, Phases 0–3.
-2. [portable asset sidecars](portable-asset-sidecars.md). It writes into
-   `user/assets/`.
-3. [repository access](repository-access-simplification.md), Phase 3. It
-   publishes face crops as artifacts and reuses this plan's Phase 4.
+The order across plans is recorded in [rc1-sequence.md](rc1-sequence.md)
+(steps RL0–RL4, after server-structure B2). The
+[repository access](repository-access-simplification.md) plan's Phase 3 and
+the [portable asset sidecars](portable-asset-sidecars.md) plan both build on
+this plan's `cache/artifacts/` and `user/`.
 
 Goal: every path under a Repository's `.lumilio/` belongs to exactly one
 class. The first path segment decides the class. Each class has one policy

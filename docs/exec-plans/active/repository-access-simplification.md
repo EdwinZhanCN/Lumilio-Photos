@@ -6,7 +6,8 @@ breaks the four cycles found on 2026-10-28 and bounds every lease wait to
 `RepositoryLeaseWait` (30 s). Any cycle that is still possible now fails one
 operation with `ErrRepositoryBusy`; it no longer wedges the Repository. This
 plan lands before the rc.1 tag, under the "fix what is found" contract in
-[rc-release.md](rc-release.md). Phase 3 publishes face crops through
+[rc-release.md](rc-release.md), as steps RA0–RA4 of
+[rc1-sequence.md](rc1-sequence.md). Phase 3 publishes face crops through
 the [repository layout](repository-layout.md)'s `cache/artifacts/`, so it starts after
 that plan's Phase 3.
 

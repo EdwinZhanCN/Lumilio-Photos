@@ -144,6 +144,10 @@ S12b runs after S8 and before S13. S9 and S10 touch `storage/scan`, `lifecycle`,
 so they can run between any two storage sessions; S11 and S12 can run any
 time after S2 (S11 needs the P2 evidence names). S2–S8 are strictly ordered.
 S13–S15 wait for everything before them and for an empty milestone.
+From 2026-10-28 the sessions before S13 (Atlas Phase A, server-structure
+Phase B, and the repository layout, repository access, and portable asset
+sidecar plans) run in the order recorded in
+[rc1-sequence.md](rc1-sequence.md); S13 resumes after its last step.
 
 ## Execution phases
 
