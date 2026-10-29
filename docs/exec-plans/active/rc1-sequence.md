@@ -2,7 +2,8 @@
 
 Status: active, created 2026-10-28. The owner asked for one recorded order
 across all open plans after the fix-before-release rule moved the storage
-plans and server-structure Phase B in front of rc.1. Next step: **Q0**.
+plans and server-structure Phase B in front of rc.1. Q0 done 2026-10-29
+(#267). Next step: **A1**.
 Update the row of each step in the PR that lands it.
 
 Goal: every open plan lands on `dev` in the order below, then the
@@ -53,7 +54,7 @@ the plan it names.
 
 | Step | Session | Plan | Waits for | Why here |
 | --- | --- | --- | --- | --- |
-| Q0 | Merge #267: lease mitigation, postmortem 0004, the storage and sequence plans, and the owner's server-structure revision | — | — | Every later step reads these plans from `dev` |
+| Q0 | **Done 2026-10-29 (#267).** Merge #267: lease mitigation, postmortem 0004, the storage and sequence plans, and the owner's server-structure revision | — | — | Every later step reads these plans from `dev` |
 | A1 | Typed facts and path-based groups | [atlas-rules.md](atlas-rules.md) | Q0 | Tools only; starts the rule engine |
 | A2 | Static rules: `calls`, `constructs`, `forbid-types`, `forbid-imports`, `tables`, `tx-purity`, `budgets` | [atlas-rules.md](atlas-rules.md) | A1 | `tx-purity` and `calls`/`constructs` are the guardrails RA and RL need |
 | A3 | Behaviour tests, relocated lints, switch; `architecturecheck` deleted | [atlas-rules.md](atlas-rules.md) | A2 | Leaves one gate before any code moves |
