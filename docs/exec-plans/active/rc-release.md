@@ -36,6 +36,15 @@ the promotion commit, with bilingual release notes, smoked once.
 - Evidence is CI- or checkout-reproducible only (2026-10-13). A step that
   used to say "on any Docker host" or "on Edwin's Mac" now names a workflow
   run or is an rc.2 checkpoint; nothing is ticked from memory.
+- **Fix what is found before the release (owner rule, 2026-10-28).** If a
+  problem found before the tag can be fixed, it is fixed before the tag. This
+  covers bugs, structural faults, and design debt surfaced by an incident or
+  a review. "After rc.1", "rc.2", or "not a blocker" is never a reason to
+  defer. A session that proposes deferring an item must name why it cannot
+  be fixed now, and the owner must agree to that item explicitly. Record the
+  item in the owning plan or the tech-debt tracker. The blocker milestone
+  below is still a hard stop, but it is the minimum bar, not the list of what
+  gets fixed.
 - **RC blocker gate (hard stop).** The GitHub milestone
   [`v26.1.0-rc.1`](https://github.com/EdwinZhanCN/Lumilio-Photos/milestone/1)
   admits only bugs meeting the blocker definition in release-hardening.md:

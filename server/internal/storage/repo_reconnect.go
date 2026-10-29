@@ -518,14 +518,24 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return rm.GetRepository(*operation.TargetID)
 	}
 	newID = *operation.TargetID
+	newUUID, err := uuid.Parse(newID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid register-copy target: %w", err)
+	}
 	releaseStorageLocation := rm.acquireStorageLocationRead(storageLocationID)
 	releaseMutation := rm.acquireRepositoryMutation(previousUUID)
+	// The new identity is unregistered, so no other holder can order it
+	// against previousUUID. Holding it here lets addRepository run with
+	// locksHeld: leases are not reentrant, and its own Storage Location read
+	// would wait behind a Location mutation that waits for ours.
+	releaseNewMutation := rm.acquireRepositoryMutation(newUUID)
 	locksReleased := false
 	releaseLocks := func() {
 		if locksReleased {
 			return
 		}
 		locksReleased = true
+		releaseNewMutation()
 		releaseMutation()
 		releaseStorageLocation()
 	}
@@ -566,7 +576,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return nil, rollback(fmt.Errorf("persist register-copy filesystem phase: %w", err))
 	}
 
-	dbRepo, err := rm.AddRepository(cleanPath, defaultOwnerID, role, storageLocationID)
+	dbRepo, err := rm.addRepository(context.Background(), cleanPath, defaultOwnerID, role, true, storageLocationID)
 	if err != nil {
 		return nil, rollback(err)
 	}

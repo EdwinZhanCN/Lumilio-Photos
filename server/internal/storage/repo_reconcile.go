@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -45,15 +47,38 @@ func (rm *DefaultRepositoryManager) ReconcileAll(ctx context.Context) error {
 	return nil
 }
 
+// reconcileWait bounds one repository's reconciliation. The pass is a
+// background backstop that retries on the next tick, so it gives up on a busy
+// repository instead of holding its lifecycle lease while it waits for
+// SQLite's writer, which may itself be waiting for a media handle.
+const reconcileWait = 10 * time.Second
+
 func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, current repo.Repository) error {
-	releaseMutation := rm.acquireRepositoryMutation(current.RepoID)
-	defer releaseMutation()
 	if current.Reachability == dbtypes.RepositoryReachabilityMaintenance {
 		return nil
 	}
+	// The steady state changes nothing, so it is decided without the lifecycle
+	// lease. Taking that exclusive lease on every tick queued a writer ahead of
+	// every new media handle, and deadlocked against a handle that needed a
+	// second lease or SQLite's writer before it could close.
+	reachability, config, known := rm.inspectRepositoryOnDisk(current)
+	if !known {
+		rm.logUnreadableRepository(current)
+		return nil
+	}
+	if rm.reconcileLeavesRowUnchanged(current, reachability, config) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, reconcileWait)
+	defer cancel()
+	releaseMutation, err := rm.acquireRepositoryMutationContext(ctx, current.RepoID)
+	if err != nil {
+		return fmt.Errorf("repository is busy; retrying on the next pass: %w", err)
+	}
+	defer releaseMutation()
 	// Re-read after acquiring the lifecycle lease: a relocation may have
 	// committed while this pass waited for an earlier media handle.
-	current, err := rm.readerQueries.GetRepository(ctx, current.RepoID)
+	current, err = rm.readerQueries.GetRepository(ctx, current.RepoID)
 	if err != nil {
 		return err
 	}
@@ -61,13 +86,9 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 		return nil
 	}
 
-	reachability, config, known := rm.inspectRepositoryOnDisk(current)
+	reachability, config, known = rm.inspectRepositoryOnDisk(current)
 	if !known {
-		// Denied or unknown is not absence: the row keeps its reachability
-		// until the path can be read again (R6, no false Missing).
-		rm.logger.Warn("repository path could not be read; reachability left unchanged",
-			zap.String("operation", "repository.reconcile"),
-			zap.String("repository_path", current.Path))
+		rm.logUnreadableRepository(current)
 		return nil
 	}
 
@@ -100,6 +121,42 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 		zap.String("to", string(reachability)),
 	)
 	return nil
+}
+
+// Denied or unknown is not absence: the row keeps its reachability until the
+// path can be read again (R6, no false Missing).
+func (rm *DefaultRepositoryManager) logUnreadableRepository(current repo.Repository) {
+	rm.logger.Warn("repository path could not be read; reachability left unchanged",
+		zap.String("operation", "repository.reconcile"),
+		zap.String("repository_path", current.Path))
+}
+
+// reconcileLeavesRowUnchanged reports whether reconciliation would write
+// nothing: the disk agrees with the row's reachability, the config cache is
+// current, and this process already owns an active repository.
+func (rm *DefaultRepositoryManager) reconcileLeavesRowUnchanged(current repo.Repository, reachability dbtypes.RepositoryReachability, config *repocfg.RepositoryConfig) bool {
+	if reachability != current.Reachability {
+		return false
+	}
+	if reachability != dbtypes.RepositoryReachabilityActive || config == nil {
+		return true
+	}
+	return repositoryConfigCacheCurrent(current, config) && rm.holdsRuntimeOwnership("repository", current.Path)
+}
+
+func repositoryConfigCacheCurrent(current repo.Repository, config *repocfg.RepositoryConfig) bool {
+	if current.Name != config.Name {
+		return false
+	}
+	cached, err := json.Marshal(current.Config)
+	if err != nil {
+		return false
+	}
+	onDisk, err := json.Marshal(config)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(cached, onDisk)
 }
 
 // inspectRepositoryOnDisk decides a repository's reachability from its recorded

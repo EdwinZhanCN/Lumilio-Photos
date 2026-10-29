@@ -55,7 +55,7 @@ sequenceDiagram
 | repository_scans / repository_entries | `sql:repository_entries` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
 | ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/queue/macro_boundary_workers.go:40`](../../../../server/internal/queue/macro_boundary_workers.go#L40) |
-| Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:181`](../../../../server/internal/storage/repository_fs.go#L181) |
+| Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:190`](../../../../server/internal/storage/repository_fs.go#L190) |
 | ScanWriter (commit coordinator) | `go:commit.ScanWriter` [`server/internal/commit/scan_writer.go:14`](../../../../server/internal/commit/scan_writer.go#L14) |
 
 ## Steps

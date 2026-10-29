@@ -1517,6 +1517,13 @@ func (rm *DefaultRepositoryManager) acquireRepositoryMutation(repositoryID uuid.
 	return rm.files.AccessCoordinator().AcquireMutation(repositoryID)
 }
 
+func (rm *DefaultRepositoryManager) acquireRepositoryMutationContext(ctx context.Context, repositoryID uuid.UUID) (func(), error) {
+	if rm == nil || rm.files == nil || rm.files.AccessCoordinator() == nil {
+		return func() {}, nil
+	}
+	return rm.files.AccessCoordinator().AcquireMutationsContext(ctx, []uuid.UUID{repositoryID})
+}
+
 func (rm *DefaultRepositoryManager) acquireStorageLocationRead(storageLocationID uuid.UUID) func() {
 	if rm == nil || rm.files == nil || rm.files.AccessCoordinator() == nil {
 		return func() {}

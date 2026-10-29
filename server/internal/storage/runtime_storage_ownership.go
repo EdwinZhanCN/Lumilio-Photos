@@ -75,6 +75,18 @@ func (rm *DefaultRepositoryManager) tryClaimRuntimeRepository(ctx context.Contex
 	return true, nil
 }
 
+// holdsRuntimeOwnership reports whether claiming path would be a no-op: this
+// process already holds its lock, or runtime ownership is not enforced.
+func (rm *DefaultRepositoryManager) holdsRuntimeOwnership(kind, path string) bool {
+	rm.ownershipMu.Lock()
+	defer rm.ownershipMu.Unlock()
+	if !rm.ownershipOn {
+		return true
+	}
+	_, held := rm.ownership[kind+":"+path]
+	return held
+}
+
 func existingDirectory(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
