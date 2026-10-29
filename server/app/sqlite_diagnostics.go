@@ -92,12 +92,12 @@ WITH pipeline_state(pending, runnable, terminal, lag, applied_in_interval) AS (
          applied_version >= desired_version AND updated_at >= ?1 AND updated_at < ?2
   FROM asset_pipeline_state
   UNION ALL
-  SELECT desired_epoch > applied_epoch OR full_verification_required = 1,
-         (desired_epoch > applied_epoch OR full_verification_required = 1) AND terminal_error IS NULL,
-         (desired_epoch > applied_epoch OR full_verification_required = 1) AND terminal_error IS NOT NULL,
-         max(desired_epoch - applied_epoch, full_verification_required),
-         desired_epoch > 0 AND applied_epoch >= desired_epoch AND full_verification_required = 0 AND updated_at >= ?1 AND updated_at < ?2
-  FROM repository_observation_state
+  SELECT pending,
+         pending,
+         0,
+         pending,
+         NOT pending AND completed_at >= ?1 AND completed_at < ?2
+  FROM repository_scan_state
   UNION ALL
   SELECT source_revision > applied_revision,
          source_revision > applied_revision AND terminal_error IS NULL,

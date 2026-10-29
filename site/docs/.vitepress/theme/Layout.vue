@@ -3,6 +3,12 @@ import DefaultTheme from 'vitepress/theme'
 import { useData, inBrowser } from 'vitepress'
 import { watchEffect } from 'vue'
 import ChineseLanding from '../components/ChineseLanding.vue'
+import { defineAsyncComponent } from 'vue'
+
+// The Atlas is a full-screen internal tool, built only when LUMILIO_ATLAS=1
+// (`task atlas`); see docs/atlas/README.md in the repository.
+declare const __LUMILIO_ATLAS__: boolean
+const AtlasApp = __LUMILIO_ATLAS__ ? defineAsyncComponent(() => import('../atlas/AtlasApp.vue')) : null
 
 const { lang, frontmatter } = useData()
 watchEffect(() => {
@@ -13,6 +19,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChineseLanding v-if="frontmatter.landing === 'lumilio-zh'" />
+  <ClientOnly v-if="AtlasApp && frontmatter.atlas"><AtlasApp /></ClientOnly>
+  <ChineseLanding v-else-if="frontmatter.landing === 'lumilio-zh'" />
   <DefaultTheme.Layout v-else />
 </template>

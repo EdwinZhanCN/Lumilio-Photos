@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 )
 
 // The pinned release version and per-profile artifact catalog live in
@@ -207,8 +208,11 @@ func ReconcileOfficialReleaseInstall(root string) error {
 	if err := decoder.Decode(&journal); err != nil {
 		return fmt.Errorf("decode Lumen install journal: %w", err)
 	}
+	if err := stateversion.Check("Lumen install journal", journal.SchemaVersion, InstallSchemaVersion); err != nil {
+		return err
+	}
 	artifact, ok := officialReleaseArtifacts[journal.Profile]
-	if journal.SchemaVersion != InstallSchemaVersion || !ok || journal.Version != artifact.Version || !strings.EqualFold(journal.TargetHash, artifact.SHA256) {
+	if !ok || journal.Version != artifact.Version || !strings.EqualFold(journal.TargetHash, artifact.SHA256) {
 		return errors.New("Lumen install journal does not match the pinned release catalog")
 	}
 	targetName := safeVersionName(artifact.Version) + "-" + safeVersionName(artifact.Profile)

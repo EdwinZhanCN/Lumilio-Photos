@@ -10,9 +10,11 @@ INSERT INTO repositories (
     default_owner_id,
     created_at,
     updated_at,
-    root_id
+    storage_location_id,
+    path_case,
+    path_normalization
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13
 ) RETURNING *;
 
 -- name: GetRepository :one
@@ -81,9 +83,25 @@ RETURNING *;
 UPDATE repositories
 SET
     path = ?2,
-    root_id = ?3,
+    storage_location_id = ?3,
     reachability = ?4,
     updated_at = ?5
+WHERE repo_id = ?1
+RETURNING *;
+
+-- name: UpdateRepositoryPathSemantics :one
+-- A reconnect onto a volume with another name rule: the path moves and the
+-- rule changes in one statement, so no row ever pairs a path with the rule of
+-- a volume it does not live on. The caller leaves reachability in maintenance
+-- until every entry key agrees with the new rule.
+UPDATE repositories
+SET
+    path = ?2,
+    storage_location_id = ?3,
+    reachability = ?4,
+    path_case = ?5,
+    path_normalization = ?6,
+    updated_at = ?7
 WHERE repo_id = ?1
 RETURNING *;
 

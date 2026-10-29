@@ -29,14 +29,11 @@ const (
 )
 
 func (rm *DefaultRepositoryManager) ListDefaultRepositoryCandidates(ctx context.Context) ([]RepositoryCandidate, error) {
-	root, err := rm.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := rm.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load default Storage Location: %w", err)
 	}
-	if root.Status != dbtypes.RepositoryRootStatusActive {
-		return nil, ErrRepositoryRootOffline
-	}
-	entries, err := os.ReadDir(root.Path)
+	entries, err := os.ReadDir(storageLocation.Path)
 	if err != nil {
 		return nil, fmt.Errorf("list default Storage Location: %w", err)
 	}
@@ -57,8 +54,8 @@ func (rm *DefaultRepositoryManager) ListDefaultRepositoryCandidates(ctx context.
 			continue
 		}
 		candidate := RepositoryCandidate{DirectoryName: entry.Name()}
-		path, pathErr := CanonicalizeRepositoryPath(filepath.Join(root.Path, entry.Name()))
-		if pathErr != nil || !pathIsDirectChild(root.Path, path) {
+		path, pathErr := CanonicalizeRepositoryPath(filepath.Join(storageLocation.Path, entry.Name()))
+		if pathErr != nil || !pathIsDirectChild(storageLocation.Path, path) {
 			candidate.Classification = RepositoryCandidateUnavailable
 			candidates = append(candidates, candidate)
 			continue
@@ -69,7 +66,6 @@ func (rm *DefaultRepositoryManager) ListDefaultRepositoryCandidates(ctx context.
 		candidate.TotalBytes = pathInfo.TotalBytes
 		candidate.AvailableBytes = pathInfo.AvailableBytes
 		candidate.Filesystem = pathInfo.Filesystem
-		candidate.RiskWarnings = repositoryCandidateRiskWarnings(root, path, pathInfo)
 		if registered, ok := byPath[filepath.Clean(path)]; ok {
 			candidate.Classification = RepositoryCandidateRegistered
 			candidate.RepositoryID = registered.RepoID.String()
@@ -132,21 +128,39 @@ func (rm *DefaultRepositoryManager) OpenDefaultRepositoryCandidate(
 	if err := ValidateRepositoryDirectoryName(directoryName); err != nil {
 		return nil, err
 	}
-	root, err := rm.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := rm.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load default Storage Location: %w", err)
 	}
-	if root.Status != dbtypes.RepositoryRootStatusActive {
-		return nil, ErrRepositoryRootOffline
-	}
-	path, err := resolveRepositoryCreatePath(root.Path, directoryName, dbtypes.RepoRoleRegular)
+	path, err := resolveRepositoryCreatePath(storageLocation.Path, directoryName, dbtypes.RepoRoleRegular)
 	if err != nil {
 		return nil, err
 	}
-	if warnings := repositoryCandidateRiskWarnings(root, path, InspectStoragePath(path)); len(warnings) > 0 && !request.RiskConfirmation {
-		return nil, rm.rejectRepositoryCandidateRisk(ctx, request, lifecycleKindOpenRepository, directoryName, path, warnings)
+	request, err = rm.admitCandidateTarget(ctx, request, lifecycleKindOpenRepository, &storageLocation, directoryName, path)
+	if err != nil {
+		return nil, err
 	}
 	return rm.OpenRepository(ctx, path, defaultOwnerID, dbtypes.RepoRoleRegular, request)
+}
+
+// admitCandidateTarget is the candidate journeys' consent gate: the same
+// classifier and the same token-bound acknowledgement the create commands
+// use, applied to an existing direct child of the Default Storage Location.
+// An unsupported or unobservable folder is refused before any consent; a
+// risky one needs the acknowledgement of a review of exactly these facts.
+// The admitted request records that its risks were acknowledged.
+func (rm *DefaultRepositoryManager) admitCandidateTarget(ctx context.Context, request LifecycleRequest, action string, location *repo.StorageLocation, directoryName, path string) (LifecycleRequest, error) {
+	target := rm.assessResolvedCreateTarget(ctx, IntentOpenRepository, location, directoryName, path)
+	acknowledged, err := rm.admitAssessedTarget(ctx, consentAdmission{
+		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
+		RequestID: request.RequestID, Action: action, TargetID: directoryName,
+		AssessmentToken: request.AssessmentToken, AcknowledgedRisks: request.AcknowledgedRisks,
+	}, target)
+	if err != nil {
+		return request, err
+	}
+	request.RiskConfirmation = len(acknowledged) > 0
+	return request, nil
 }
 
 func (rm *DefaultRepositoryManager) ResolveDefaultRepositoryCandidate(
@@ -159,23 +173,21 @@ func (rm *DefaultRepositoryManager) ResolveDefaultRepositoryCandidate(
 	if err := ValidateRepositoryDirectoryName(directoryName); err != nil {
 		return nil, err
 	}
-	root, err := rm.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := rm.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load default Storage Location: %w", err)
 	}
-	if root.Status != dbtypes.RepositoryRootStatusActive {
-		return nil, ErrRepositoryRootOffline
-	}
-	path, err := resolveRepositoryCreatePath(root.Path, directoryName, dbtypes.RepoRoleRegular)
+	path, err := resolveRepositoryCreatePath(storageLocation.Path, directoryName, dbtypes.RepoRoleRegular)
 	if err != nil {
 		return nil, err
 	}
-	if warnings := repositoryCandidateRiskWarnings(root, path, InspectStoragePath(path)); len(warnings) > 0 && !request.RiskConfirmation {
-		action := "update_repository_location"
-		if strings.TrimSpace(resolution) == "add_separate" {
-			action = lifecycleKindRegisterRepositoryCopy
-		}
-		return nil, rm.rejectRepositoryCandidateRisk(ctx, request, action, directoryName, path, warnings)
+	action := "update_repository_location"
+	if strings.TrimSpace(resolution) == "add_separate" {
+		action = lifecycleKindRegisterRepositoryCopy
+	}
+	request, err = rm.admitCandidateTarget(ctx, request, action, &storageLocation, directoryName, path)
+	if err != nil {
+		return nil, err
 	}
 	config, err := repocfg.LoadConfigFromFile(path)
 	if err != nil {
@@ -188,7 +200,7 @@ func (rm *DefaultRepositoryManager) ResolveDefaultRepositoryCandidate(
 	switch strings.TrimSpace(resolution) {
 	case "update_location":
 		request.ConfirmationType = "update_location"
-		updated, relocateErr := rm.RelocateRepository(ctx, registered.RepoID.String(), path, request)
+		updated, relocateErr := rm.ReconnectRepository(ctx, registered.RepoID.String(), path, request)
 		if relocateErr != nil {
 			return nil, relocateErr
 		}
@@ -198,43 +210,6 @@ func (rm *DefaultRepositoryManager) ResolveDefaultRepositoryCandidate(
 	default:
 		return nil, fmt.Errorf("unsupported repository candidate resolution %q", resolution)
 	}
-}
-
-func (rm *DefaultRepositoryManager) rejectRepositoryCandidateRisk(
-	ctx context.Context,
-	request LifecycleRequest,
-	action string,
-	directoryName string,
-	path string,
-	warnings []string,
-) error {
-	_, err := rm.RecordLifecycleAudit(ctx, LifecycleAuditInput{
-		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
-		RequestID: request.RequestID, Action: action, TargetType: "repository", TargetID: directoryName,
-		Source: auditSourceForActor(request.Actor), ConfirmationType: "none", NewPath: path,
-		Result: AuditResultRejected, FailureStage: "risk_confirmation",
-		Details: map[string]any{"risk_confirmation": false, "risk_warnings": warnings},
-	})
-	if err != nil {
-		return fmt.Errorf("%w: persist rejected repository candidate decision: %v", ErrRepositoryRiskConfirmationRequired, err)
-	}
-	return fmt.Errorf("%w: %s", ErrRepositoryRiskConfirmationRequired, strings.Join(warnings, ", "))
-}
-
-func repositoryCandidateRiskWarnings(root repo.RepositoryRoot, path string, info StoragePathInfo) []string {
-	warnings := append([]string(nil), info.RiskWarnings...)
-	if err := requireMaterializableRepository(path); errors.Is(err, ErrUnavailableCloudPlaceholder) {
-		warnings = append(warnings, "unavailable_cloud_placeholder")
-	}
-	if root.MountFingerprint != "" && info.MountFingerprint != "" && root.MountFingerprint != info.MountFingerprint {
-		for _, warning := range warnings {
-			if warning == "mount_fingerprint_changed" {
-				return warnings
-			}
-		}
-		warnings = append(warnings, "mount_fingerprint_changed")
-	}
-	return warnings
 }
 
 func isLinuxMountPoint(path string) (bool, error) {

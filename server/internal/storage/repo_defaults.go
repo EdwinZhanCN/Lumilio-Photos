@@ -8,7 +8,7 @@ import (
 )
 
 // RepoDefaults is the storage-owned, runtime-mutable behaviour applied to newly
-// created repositories. The default root is the immutable storage root (config),
+// created repositories. The Default Storage Location path is immutable config,
 // so it is not part of these defaults.
 type RepoDefaults struct {
 	Strategy          string

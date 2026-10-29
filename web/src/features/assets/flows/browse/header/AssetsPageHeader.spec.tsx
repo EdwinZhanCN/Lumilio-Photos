@@ -22,8 +22,18 @@ const browseItems: BrowseItem[] = [
 
 function serveHeaderBootstrap() {
   worker.use(
-    http.get("*/api/v1/assets/indexing/repositories", () =>
-      HttpResponse.json({ repositories: [{ id: "repo-1", name: "Repo 1" }] }),
+    http.get("*/api/v1/storage/targets", () =>
+      HttpResponse.json({
+        targets: [
+          {
+            id: "repo-1",
+            name: "Repo 1",
+            role: "regular",
+            read: { allowed: true, reasons: [] },
+            upload: { allowed: true, reasons: [] },
+          },
+        ],
+      }),
     ),
     http.get("*/api/v1/albums", () => HttpResponse.json({ albums: [] })),
   );

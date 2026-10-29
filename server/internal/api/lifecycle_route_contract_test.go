@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestLifecycleAuditDiagnosticsAndSupportBundleRemainAdminOnly(t *testing.T) {
+func TestStorageDiagnosticsSupportBundleAndAuditRemainAdminOnly(t *testing.T) {
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("resolve test source path")
@@ -19,13 +19,13 @@ func TestLifecycleAuditDiagnosticsAndSupportBundleRemainAdminOnly(t *testing.T) 
 	}
 	text := string(source)
 	for _, contract := range []string{
-		`repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin())`,
-		`repositories.GET("/lifecycle-audit", appInitializedMiddleware, repositoryScanController.ListLifecycleAudit)`,
-		`repositories.GET("/storage-diagnostics", appInitializedMiddleware, repositoryScanController.GetStorageDiagnostics)`,
-		`repositories.GET("/storage-support-bundle", appInitializedMiddleware, repositoryScanController.DownloadStorageSupportBundle)`,
+		`storageAdmin.Use(authController.RequireAdmin())`,
+		`storageAdmin.GET("/diagnostics", appInitializedMiddleware, repositoryScanController.GetStorageDiagnostics)`,
+		`storageAdmin.GET("/support-bundle", appInitializedMiddleware, repositoryScanController.DownloadStorageSupportBundle)`,
+		`storageAdmin.GET("/audit", appInitializedMiddleware, repositoryScanController.ListLifecycleAudit)`,
 	} {
 		if !strings.Contains(text, contract) {
-			t.Fatalf("administrator lifecycle route contract is missing %q", contract)
+			t.Fatalf("administrator storage route contract is missing %q", contract)
 		}
 	}
 }

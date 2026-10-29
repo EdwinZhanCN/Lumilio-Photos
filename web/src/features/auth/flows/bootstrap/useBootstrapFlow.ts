@@ -1,15 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  useCreateRepository,
-  validateRepositoryName,
-  type RepositoryStorageStrategy,
-} from "@/features/repositories";
-import { useI18n } from "@/lib/i18n.tsx";
-import { localizeProblem } from "@/lib/http-commons/problem";
+import type { RepositoryStorageStrategy } from "@/features/repositories";
 import { usePreference } from "@/lib/preferences/preferences";
-import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
 import { useRegistrationFlow } from "../registration/useRegistrationFlow.ts";
 
 const FLOW_INDEX: Record<string, number> = {
@@ -22,76 +14,26 @@ const FLOW_INDEX: Record<string, number> = {
 export function buildBootstrapPrimaryRepositoryRequest(
   name: string,
   storageStrategy: RepositoryStorageStrategy,
-  riskConfirmation?: boolean,
+  assessmentToken?: string,
+  acknowledgedRisks?: readonly string[],
 ) {
-  return { name, role: "primary" as const, storageStrategy, riskConfirmation };
+  return { name, storageStrategy, assessmentToken, acknowledgedRisks };
 }
 
+/**
+ * Composes first-admin registration with the Primary Repository setup step.
+ * The storage step itself is the shared primary-setup flow, which reads the
+ * Server's review of the target and creates or adopts accordingly.
+ */
 export function useBootstrapFlow() {
-  const { t } = useI18n();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const setupQuery = useSetupStatus();
-  const createRepositoryMutation = useCreateRepository();
-
   const [welcomed, setWelcomed] = useState(false);
   const [mfaComplete, setMfaComplete] = useState(false);
   const [language, setLanguage] = usePreference("language");
   const [region, setRegion] = usePreference("region");
-  const defaults = setupQuery.data?.repository_defaults;
-  const [repoName, setRepoName] = useState("Primary Storage");
-  const [repoRoot, setRepoRoot] = useState("");
-  const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
-  const [riskConfirmation, setRiskConfirmation] = useState(false);
-  const placementRisks = defaults?.risk_warnings ?? [];
-
-  useEffect(() => {
-    if (!defaults) return;
-    setRepoRoot((current) => current || defaults.default_root || "");
-  }, [defaults]);
 
   const registration = useRegistrationFlow({ onComplete: () => setMfaComplete(true) });
   const current = mfaComplete ? 5 : welcomed ? (FLOW_INDEX[registration.step] ?? 1) : 0;
-  const repoNameError = validateRepositoryName(repoName);
-  const canSubmitRepo = useMemo(
-    () =>
-      repoNameError === null &&
-      repoRoot.trim() !== "" &&
-      (placementRisks.length === 0 || riskConfirmation) &&
-      !createRepositoryMutation.isPending,
-    [
-      createRepositoryMutation.isPending,
-      placementRisks.length,
-      repoNameError,
-      repoRoot,
-      riskConfirmation,
-    ],
-  );
-
-  const submitRepo = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!canSubmitRepo) return;
-
-    await createRepositoryMutation.createRepository(
-      buildBootstrapPrimaryRepositoryRequest(
-        repoName,
-        storageStrategy,
-        placementRisks.length > 0 ? riskConfirmation : undefined,
-      ),
-    );
-    await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
-    void navigate("/", { replace: true });
-  };
-
-  const repoError = createRepositoryMutation.error
-    ? localizeProblem(
-        createRepositoryMutation.error,
-        t,
-        t("auth.primaryRepository.error", {
-          defaultValue: "Failed to create the Primary Repository.",
-        }),
-      )
-    : null;
 
   return {
     ...registration,
@@ -101,18 +43,6 @@ export function useBootstrapFlow() {
     setLanguage,
     region,
     setRegion,
-    repoName,
-    setRepoName,
-    repoNameError,
-    repoRoot,
-    storageStrategy,
-    setStorageStrategy,
-    placementRisks,
-    riskConfirmation,
-    setRiskConfirmation,
-    canSubmitRepo,
-    submitRepo,
-    repoError,
-    isCreatingRepository: createRepositoryMutation.isPending,
+    openDashboard: () => void navigate("/", { replace: true }),
   };
 }

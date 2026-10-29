@@ -62,12 +62,12 @@ The primary repository is the exception: first-run setup creates it in the non-r
 
 ## Opening is only for an existing repository
 
-**Open Existing Repository** registers a Lumilio Repository that already exists on disk. The selected directory must contain a valid `.lumiliorepo`; an empty directory or an ordinary folder of photos is not initialized automatically. Before registration, Lumilio moves old `.lumilio/` private state under `.lumilio/recovery/reopened-…`, creates a fresh private workspace, and queues an authoritative initial observation. Original media and `.lumiliorepo` stay in place.
+**Open Existing Repository** registers a Lumilio Repository that already exists on disk. The selected directory must contain a valid `.lumiliorepo`; an empty directory or an ordinary folder of photos is not initialized automatically. Before registration, Lumilio records what the Repository's `.lumilio/` private workspace already holds in a recovery receipt and preserves it by class: the Trash stays and is listed as held (it never expires on its own until you decide), Studio edits are attached to their photos again once a scan has proven the content, unfinished uploads and unknown files are kept for export or explicit deletion in the Repository's **Recovery inventory** on the Storage page. It then queues an authoritative initial observation. Original media and `.lumiliorepo` stay in place.
 
 If that repository identity is already registered at another path, Desktop asks you to decide explicitly:
 
-- **Use as moved original** when the repository moved to another disk, mount point, or Windows drive letter. Relocation is refused while the registered original is still online.
-- **Add as separate repository** when this directory is an independent copy that needs a new identity. Lumilio isolates copied private state, mints a fresh repository UUID, and requires explicit confirmation.
+- **Use as moved original** when the repository moved to another disk, mount point, or Windows drive letter. This is a Reconnect: it re-points the registration and never moves files. It is refused while the registered original is still online, and a registered folder that Lumilio cannot read is never treated as gone.
+- **Add as separate repository** when this directory is an independent copy that needs a new identity. Lumilio preserves the copied private state the same way, mints a fresh repository UUID, and requires explicit confirmation.
 
 Lumilio does not guess whether a directory moved or was copied based on whether its old path is currently online.
 
@@ -75,7 +75,9 @@ Lumilio does not guess whether a directory moved or was copied based on whether 
 
 When an external drive or network volume disconnects, its Storage Location and Repositories become offline. Lumilio preserves their identity, browsing records, and valid Locations, but refuses writes and absence finalization until they reconnect. It does not silently create a replacement directory on another disk.
 
-If the same `.lumilioroot` appears at a new mount path or drive letter, choose **Reconnect Storage Location** in Web and approve the local Desktop request. Child repository paths are updated while preserving their relative layout.
+If the same `.lumilioroot` appears at a new mount path or drive letter, choose **Reconnect Storage Location** from that Storage Location's menu on the Web Storage page (offered on a Desktop host; while the registered folder is still there the entry is disabled with the reason) and approve the local Desktop request. Every child Repository must be where the Location layout says it is, carrying its own identity; then the Location and all its children are re-pointed together, and nothing is moved. A single moved Repository uses **Reconnect** in its own row menu the same way.
+
+Each Repository follows the file-name rules of the disk that holds it (whether `Photo.jpg` and `photo.jpg` are one file, whether two accent spellings are one name), measured on the folder when the Repository is created, opened or reconnected. Reconnecting onto a disk with different rules, such as an exFAT or FAT32 drive or a case-sensitive volume, first checks that no two indexed files would share one name on the new disk and then rebuilds the index while the Repository is briefly in maintenance; nothing is moved and the next scan reports nothing missing. Two files the new disk cannot tell apart, or a disk whose rules cannot be measured, are refused with the reason. The supported disks are the ones Lumilio's own tests qualify on real images: FAT32, exFAT, ext4 (plain and case-folding), APFS (case-insensitive and case-sensitive), HFS+ and macOS ExFAT.
 
 Removing an unused external Storage Location only removes its registration. It does not delete its directory, marker, or media. A location still referenced by registered repositories cannot be removed.
 
@@ -83,7 +85,7 @@ Removing a regular repository from Lumilio is also registration-only. The confir
 
 ## Docker and standalone Server candidates
 
-Docker and standalone Server have one configured default Storage Location. Web can inspect only its direct child directories and classifies each as registered, ready to open, empty and writable, non-empty without a marker, invalid marker, or identity conflict. An identity conflict offers the same explicit **Use as moved original** and **Add as separate repository** decisions as Desktop; relocation remains unavailable while the registered original is online. The API accepts a portable directory name, never an arbitrary server path.
+Docker and standalone Server have one configured default Storage Location. Web can inspect only its direct child directories and classifies each as registered, ready to open, empty and writable, non-empty without a marker, invalid marker, or identity conflict. An identity conflict offers the same explicit **Use as moved original** and **Add as separate repository** decisions as Desktop; Reconnect remains unavailable while the registered original is online. Opening or resolving a found folder runs the same review as **Add Repository**: the folder's risks are listed and acknowledged first (a folder on another disk than its registration recorded is called out), and the command carries that review's token, so a folder that changed in between is reviewed again. The API accepts a portable directory name, never an arbitrary server path.
 
 Use Compose long syntax for host directories and disable automatic source creation:
 

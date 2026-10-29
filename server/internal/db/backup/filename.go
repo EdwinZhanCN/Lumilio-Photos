@@ -12,11 +12,16 @@ const (
 	// RestorePointPrefix marks the snapshot taken after the runtime has drained
 	// but before a staged restore replaces the active catalog.
 	RestorePointPrefix = "restore-point-"
+	// PreUpgradePrefix marks the snapshot taken before catalog upgrade steps
+	// run. Like a restore point it is protected from retention.
+	PreUpgradePrefix = "pre-upgrade-"
 	// TmpSuffix marks an artifact that has not passed validation and atomic
 	// finalization yet.
 	TmpSuffix  = ".tmp"
 	timeLayout = "20060102T150405.000000Z"
 )
+
+var protectedPrefixes = []string{RestorePointPrefix, PreUpgradePrefix}
 
 var nameRe = regexp.MustCompile(`^(\d{8}T\d{6}\.\d{6}Z)-library\.sqlite3$`)
 
@@ -59,11 +64,11 @@ func IsRoutineName(name string) bool {
 	return ok
 }
 
-// ParseSnapshotName accepts routine snapshots and protected restore points
+// ParseSnapshotName accepts routine snapshots and protected snapshots
 // while preserving the timestamp encoded by the common base name.
 func ParseSnapshotName(name string) (Info, bool) {
 	base := name
-	for _, prefix := range []string{RestorePointPrefix} {
+	for _, prefix := range protectedPrefixes {
 		if value, ok := strings.CutPrefix(name, prefix); ok {
 			base = value
 			break
@@ -73,7 +78,7 @@ func ParseSnapshotName(name string) (Info, bool) {
 }
 
 func IsProtectedSnapshotName(name string) bool {
-	for _, prefix := range []string{RestorePointPrefix} {
+	for _, prefix := range protectedPrefixes {
 		if base, ok := strings.CutPrefix(name, prefix); ok {
 			_, valid := ParseName(base)
 			return valid

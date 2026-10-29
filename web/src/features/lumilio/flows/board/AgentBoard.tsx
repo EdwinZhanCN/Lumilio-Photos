@@ -167,6 +167,16 @@ export function AgentBoard() {
     [pins],
   );
   const serializedLayout = useMemo(() => serializeLayout(layout), [layout]);
+  // The narrow column follows the desktop reading order (row, then column), so
+  // a phone shows tiles in the same sequence the canonical layout presents.
+  const readingOrderPins = useMemo(
+    () =>
+      [...pins].sort(
+        (a, b) =>
+          (a.layout?.y ?? 0) - (b.layout?.y ?? 0) || (a.layout?.x ?? 0) - (b.layout?.x ?? 0),
+      ),
+    [pins],
+  );
   const lastSerialized = useRef("");
   useEffect(() => {
     lastSerialized.current = serializedLayout;
@@ -403,7 +413,7 @@ export function AgentBoard() {
 
       {isNarrow ? (
         <div className="grid grid-cols-1 gap-3">
-          {pins.map((pin) => (
+          {readingOrderPins.map((pin) => (
             <div key={pin.pin_id} className="h-[22rem] min-h-72">
               {renderTile(pin)}
             </div>

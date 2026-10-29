@@ -8,7 +8,7 @@ description: Use when adding a test in Lumilio Photos (web/ or server/) —
 # Write A Test In The Right Layer
 
 The frontend layer table is a contract owned by
-[FRONTEND.md](../../../docs/FRONTEND.md). The rationale is the
+[web/ARCHITECTURE.md](../../../web/ARCHITECTURE.md#test-layers). The rationale is the
 [test-layer assignment decision](../../decisions/2026-08-14-frontend-test-layer-assignment.md).
 This skill is the selection, placement, and verification procedure. Do not
 invent other file conventions.
@@ -78,6 +78,13 @@ macOS). Direct `go test` is acceptable only when you preserve the same
 environment: `cd server && go test -tags=sqlite_fts5 ./...`. Run `gofmt` on
 changed Go files.
 
+Asynchronous tests wait for a state the operation owns: an entered hook, queue
+depth, receipt, repository fact, or a manually released gate. Do not sleep so
+another goroutine can reach a presumed state. Commit-coordinator backpressure
+cancels only after `BlockedSubmitters` shows the submission entered the
+full-queue wait. Race evidence uses `task server:test:concurrency:ci`, not
+`-race` on the whole module.
+
 Generated config examples are protected by a golden test — change
 `server/config/profiles.go` and run `task config:examples`, never hand-edit.
 Reproduce the CI Server gate with `task server:test:ci` (clean caches).
@@ -90,12 +97,15 @@ gate.
 
 ## Prove the guard
 
-A regression test must be able to fail for its mechanism:
+A regression test should be able to fail for its mechanism. When practical:
 
 1. Introduce the regression.
 2. Watch the test go red.
 3. Revert the regression, keep the test.
 4. State that red run in the PR.
+
+Red-run materials are guidance; their absence does not block merges.
+Required correctness assertions and checks still apply.
 
 Assert external state (re-read the file, re-query the API, re-render the
 page), not the implementation's self-report. A timeout or a keyword probe on

@@ -39,6 +39,26 @@ tasks:
       - go clean -cache -testcache
       - go test -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./...
 
+  test:volumes:
+    desc: Volume-semantics evidence on mounted filesystem images (LUMILIO_VOLUME_FIXTURES="kind=path;...")
+    env:
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    preconditions:
+      # The workflow owns the images: it formats, mounts and names them. The
+      # tests skip without the variable, so running this target without it
+      # would prove nothing.
+      - sh: test -n "$LUMILIO_VOLUME_FIXTURES"
+        msg: 'LUMILIO_VOLUME_FIXTURES must name the mounted filesystem images as "kind=path;kind=path"'
+    cmds:
+      - >-
+        go test
+        -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}}
+        -count=1
+        -run '^TestVolume'
+        ./internal/storage/pathsemantics
+        ./app
+
   test:concurrency:ci:
     desc: Race, shuffle, and repeat concurrency-sensitive Server packages
     env:

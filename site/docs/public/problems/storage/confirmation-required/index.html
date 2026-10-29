@@ -12,11 +12,12 @@
   <dl>
     <dt>Type</dt><dd><code>https://lumilio.org/problems/storage/confirmation-required</code></dd>
     <dt>Normal HTTP status</dt><dd>409</dd>
-    <dt>Definition</dt><dd>The storage operation requires explicit administrator risk confirmation.</dd>
-    <dt>Recovery</dt><dd>Correct the documented condition, then retry the operation.</dd>
+    <dt>Definition</dt><dd>The storage target carries placement risks that the administrator has not acknowledged for this command.</dd>
+    <dt>Recovery</dt><dd>Review the listed risks, then retry the same command with the assessment token and every risk code acknowledged.</dd>
+    <dt>Recovery entry</dt><dd>actor <code>admin</code>, phase <code>any</code>, kind <code>retry</code></dd>
   </dl>
   <h2>Extension members</h2>
-  <p>This Problem type defines no extension members.</p>
+  <table><thead><tr><th>Name</th><th>Schema</th><th>Meaning</th></tr></thead><tbody><tr><td><code>risks</code></td><td>array[string]</td><td>Stable risk codes the command requires acknowledged.</td></tr><tr><td><code>assessment_token</code></td><td>string</td><td>Opaque token binding an acknowledgement to the assessed target facts.</td></tr></tbody></table>
   <p>Runtime clients identify this condition by <code>type</code>; they do not dereference this page automatically.</p>
 </body>
 </html>

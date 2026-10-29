@@ -30,18 +30,19 @@ type Filter struct {
 	FilenameOperator *string
 	DateFrom         *time.Time
 	DateTo           *time.Time
-	IsDeleted        *bool
-	Rating           *int
-	Liked            *bool
-	CameraModel      *string
-	LensModel        *string
-	TagName          *string
-	TagSource        *string
-	TagNames         []string
-	LocationNorth    *float64
-	LocationSouth    *float64
-	LocationEast     *float64
-	LocationWest     *float64
+	// LifecycleState selects Assets in one lifecycle state; nil means active.
+	LifecycleState *string
+	Rating         *int
+	Liked          *bool
+	CameraModel    *string
+	LensModel      *string
+	TagName        *string
+	TagSource      *string
+	TagNames       []string
+	LocationNorth  *float64
+	LocationSouth  *float64
+	LocationEast   *float64
+	LocationWest   *float64
 }
 
 type Request struct {
@@ -109,3 +110,14 @@ type QueryEmbedding struct {
 
 type EmbedQueryFunc func(ctx context.Context, query string, fast bool) (QueryEmbedding, error)
 type ResolveEmbeddingSpaceFunc func(ctx context.Context, model string, dimensions int) (repo.EmbeddingSpace, error)
+
+// LifecycleActive is the lifecycle state that browse and search show by
+// default; "missing" and "trashed" Assets are listed only when asked for.
+const LifecycleActive = "active"
+
+func (f Filter) lifecycleState() string {
+	if f.LifecycleState == nil || *f.LifecycleState == "" {
+		return LifecycleActive
+	}
+	return *f.LifecycleState
+}

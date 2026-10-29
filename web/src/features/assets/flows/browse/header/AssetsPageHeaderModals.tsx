@@ -1,3 +1,4 @@
+import { AssetDeleteImpact } from "../../../components/AssetDeleteImpact";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import { AlertTriangle, FolderPlus, Heart, Plus, Star, Tags, Trash2, X } from "lucide-react";
@@ -21,6 +22,10 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
     isDeleteConfirmOpen,
     setIsDeleteConfirmOpen,
     confirmDelete,
+    resolvedSelectedAssetIds,
+    deletePreviewReady,
+    setDeletePreviewReady,
+    isDeleting,
     isAlbumModalOpen,
     setIsAlbumModalOpen,
     albums,
@@ -162,11 +167,23 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
                 </span>
               )}
             </p>
+            <AssetDeleteImpact
+              assetIds={resolvedSelectedAssetIds}
+              onReady={setDeletePreviewReady}
+            />
             <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
+              <button
+                disabled={isDeleting}
+                className="btn btn-ghost"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+              >
                 {t("assets.assetsPageHeader.deleteConfirmModal.cancelButton")}
               </button>
-              <button className="btn btn-error gap-2" onClick={confirmDelete}>
+              <button
+                disabled={!deletePreviewReady || isDeleting}
+                className="btn btn-error gap-2"
+                onClick={confirmDelete}
+              >
                 <Trash2 size={18} />
                 {t("assets.assetsPageHeader.deleteConfirmModal.deleteButton")}
               </button>

@@ -5,13 +5,13 @@ page_id: "admin/external-storage"
 audience: "管理员"
 platform: "Desktop、Server"
 baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-22"
+last_verified: "2026-10-18"
 verification_status: "verified"
 ---
 
 <!--
 code-evidence:
-- server/internal/storage/repository_roots.go
+- server/internal/storage/storage_locations.go
 - server/internal/storage/roe/controller/controller.go
 - server/internal/storage/roe/changefeed
 - server/docker-entrypoint.go
@@ -28,7 +28,7 @@ code-evidence:
 
 ## Docker
 
-把宿主机存储显式挂载到 `/data/storage` 或其规划子目录。对 NFS/CIFS 等网络文件系统，确认容器 UID `10001` 的读写语义、原子重命名、文件锁和断连行为。
+把宿主机存储显式挂载到 `/data/storage` 或其规划子目录。`v26.1.0-rc.1` 不支持网络文件系统：NFS、SMB/CIFS、AFP、sshfs、WebDAV 上的存储位置和资源库会被拒绝，并且不能通过确认启用（跟踪于 [#245](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/245)）。把媒体放在流明集所在主机的本地磁盘上。
 
 ## 扫描与断连
 

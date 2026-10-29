@@ -168,6 +168,8 @@ func (s *fixtureServer) serveChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch scenario.Name {
+	case "music":
+		s.serveMusic(w, request)
 	case "plain":
 		if len(toolResults(request.Messages)) != 0 {
 			s.protocolError(w, http.StatusUnprocessableEntity, "plain scenario received tool results")
@@ -549,4 +551,71 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+// serveMusic exercises real music tools on every turn; only model decisions are deterministic.
+func (s *fixtureServer) serveMusic(w http.ResponseWriter, request ollamaRequest) {
+	const prefix = "UNTRUSTED_CONTEXT_DATA_JSON:\n"
+	latest := ""
+	start := 0
+	attached := ""
+	for i, message := range request.Messages {
+		if message.Role != "user" {
+			continue
+		}
+		if strings.HasPrefix(message.Content, prefix) {
+			var payload struct {
+				AttachedRefs []struct {
+					RefID string `json:"ref_id"`
+				} `json:"attached_refs"`
+			}
+			if json.Unmarshal([]byte(strings.TrimPrefix(message.Content, prefix)), &payload) == nil && len(payload.AttachedRefs) > 0 {
+				attached = payload.AttachedRefs[len(payload.AttachedRefs)-1].RefID
+			}
+		} else {
+			latest = message.Content
+			start = i + 1
+		}
+	}
+	results := toolResults(request.Messages[start:])
+	if strings.Contains(latest, "Create a music playlist named") {
+		if len(results) == 0 {
+			parts := strings.Split(latest, "“")
+			if len(parts) < 2 || attached == "" {
+				s.protocolError(w, 422, "music save requires title and attached ref")
+				return
+			}
+			title := strings.Split(parts[1], "”")[0]
+			writeToolCall(w, "save_music_playlist", map[string]any{"ref_id": attached, "title": title, "skip_existing": false})
+			return
+		}
+		writeTextStream(w, "Music playlist confirmation processed.")
+		return
+	}
+	switch len(results) {
+	case 0:
+		args := map[string]any{"limit": 100}
+		if attached != "" {
+			args["ref_id"] = attached
+		}
+		if strings.Contains(latest, "only Light") {
+			args["query"] = "Light"
+		}
+		writeToolCall(w, "search_music", args)
+	case 1:
+		var result struct {
+			Receipt struct {
+				RefID string `json:"ref_id"`
+			} `json:"receipt"`
+		}
+		err := json.Unmarshal([]byte(results[0].content), &result)
+		id := result.Receipt.RefID
+		if err != nil {
+			s.protocolError(w, 422, err.Error())
+			return
+		}
+		writeToolCall(w, "show_music", map[string]any{"ref_id": id, "title": "Music fixture"})
+	default:
+		writeTextStream(w, "Music selection ready.")
+	}
 }

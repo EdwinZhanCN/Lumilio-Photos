@@ -28,6 +28,7 @@ Run every row the diff touches, nothing more:
 | --- | --- |
 | `server/**` Go code | `task server:test`; `gofmt` on changed files |
 | `server/**` SQL schema or queries | `task server:sqlc`, then `task server:test` |
+| `server/internal/storage/pathsemantics/**`, scan-index keys, reconnect rekey | `task server:test` locally; the real-volume rows (`^TestVolume`) run only on the CI filesystem-image jobs, which set `LUMILIO_VOLUME_FIXTURES` for `task server:test:volumes` |
 | DTO, handler annotation, endpoint | [lumilio-api-contract-change](../lumilio-api-contract-change/SKILL.md) |
 | `server/tools/fakelumen/**` or `web/e2e/compose.record.yml` | `cd server && go test ./tools/fakelumen/`; the E2E slice that records through it |
 | `web/src/**` | focused `vp test run <file>` while editing; gate with `task web:test` |
@@ -37,18 +38,20 @@ Run every row the diff touches, nothing more:
 | `desktop/**` | `task desktop:test` |
 | `deploy/**` or any compose file | `task compose:test` |
 | Module boundaries, cross-module wiring | `task architecture:check` |
+| Any Go import between packages, a `doc.go`, `docs/atlas/**`, or code an Atlas view anchors | `task atlas:check`; on a stale view follow [lumilio-atlas](../lumilio-atlas/SKILL.md) |
 | `site/**` docs | `task ci:site` |
+| `site/docs/.vitepress/atlas/**` (Atlas explorer UI) | `task site:build:atlas`, then look at it with `task atlas` |
 | `assets.lock.json` / `lumen.lock.json` | [lumilio-pin-reconcile](../lumilio-pin-reconcile/SKILL.md) |
 | Generated artifacts (`schema.d.ts`, OpenAPI, `doc.md`, config examples) | `task verify:generated` |
 | Taskfiles or workflows | [lumilio-add-task-target](../lumilio-add-task-target/SKILL.md); path filters update in the same PR |
 
 Browser E2E slices (`task web:test:browser`, `web:test:auth-hardening`,
 `web:test:auth-totp`, `web:test:agent-trust`, `web:test:agent-runtime`,
-`web:test:video-semantic`, `web:test:backup-recovery`) need Docker and the E2E stack
+`web:test:video-semantic`, `web:test:backup-recovery`, `web:test:storage-recovery`) need Docker and the E2E stack
 ([lumilio-e2e-environment](../lumilio-e2e-environment/SKILL.md)). Run only the
 slice whose behavior the diff reaches; CI runs the matching slices.
 
-`task test` (architecture + Server + Web) is for genuinely cross-cutting
+`task test` (architecture + Atlas + Server + Web) is for genuinely cross-cutting
 changes, not a default. Reproduce a CI Server failure with
 `task server:test:ci`.
 

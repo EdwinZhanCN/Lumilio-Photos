@@ -2,7 +2,7 @@
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -13,7 +13,7 @@ WHERE a.type = 'PHOTO'
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM search_embeddings se
@@ -30,7 +30,7 @@ WHERE a.type = 'PHOTO'
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM ocr_results o
@@ -49,7 +49,7 @@ JOIN albums al ON al.album_id = aa.album_id
 JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -63,7 +63,7 @@ JOIN albums al ON al.album_id = aa.album_id
 JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM species_predictions sp
@@ -79,7 +79,7 @@ WHERE al.album_type = 'bio'
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM face_results f
@@ -98,7 +98,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -120,7 +120,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM search_embeddings se
@@ -148,7 +148,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM ocr_results o
@@ -175,7 +175,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM face_results f
@@ -199,7 +199,7 @@ ORDER BY p.sort_time DESC, p.asset_id DESC;
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -210,7 +210,7 @@ WHERE a.type = 'VIDEO'
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM search_embeddings se
@@ -230,7 +230,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'VIDEO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -252,7 +252,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'VIDEO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM search_embeddings se

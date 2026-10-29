@@ -45,13 +45,13 @@ func TestRepositoryWorkGateSerializesReprocessAndRemoval(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "work-gate-create", Actor: "test", Name: "Work Gate", DirectoryName: "work-gate",
-		Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestRepositoryWorkGateSerializesReprocessAndRemoval(t *testing.T) {
 	if err != nil || visible.Activity != dbtypes.RepositoryActivityProcessing {
 		t.Fatalf("persistent work gate = %+v, error = %v", visible, err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("removal during repository work = %v, want ErrRepositoryBusy", err)
 	}
 	blockedCtx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
@@ -90,13 +90,13 @@ func TestRepositoryEnqueueGateDoesNotWaitForOpenMediaLease(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "enqueue-gate-create", Actor: "test", Name: "Enqueue Gate", DirectoryName: "enqueue-gate",
-		Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func TestRepositoryEnqueueGateDoesNotWaitForOpenMediaLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enqueue gate waited for an open media lease: %v", err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
 		_ = release()
 		t.Fatalf("removal crossed durable enqueue gate: %v", err)
 	}
@@ -124,15 +124,21 @@ func TestRepositoryEnqueueGateDoesNotWaitForOpenMediaLease(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	releaseRootMutation, err := manager.files.AccessCoordinator().AcquireRootMutationContext(ctx, root.RootID)
+	releaseStorageLocationMutation, err := manager.files.AccessCoordinator().AcquireStorageLocationMutationContext(ctx, storageLocation.StorageLocationID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockedCtx, cancelBlocked := context.WithTimeout(ctx, 20*time.Millisecond)
-	defer cancelBlocked()
-	if _, _, err := manager.BeginRepositoryWork(blockedCtx, created.Repository.RepoID.String(), dbtypes.RepositoryActivityProcessing); !errors.Is(err, ErrRepositoryBusy) {
-		releaseRootMutation()
-		t.Fatalf("enqueue crossed a Storage Location identity mutation: %v", err)
+	defer releaseStorageLocationMutation()
+	started, releaseDuringRootMutation, err := manager.BeginRepositoryWork(
+		ctx, created.Repository.RepoID.String(), dbtypes.RepositoryActivityProcessing,
+	)
+	if err != nil {
+		t.Fatalf("enqueue denied by Storage Location mutation lease: %v", err)
 	}
-	releaseRootMutation()
+	if started.Activity != dbtypes.RepositoryActivityProcessing {
+		t.Fatalf("enqueue during storageLocation mutation = %+v", started)
+	}
+	if err := releaseDuringRootMutation(); err != nil {
+		t.Fatal(err)
+	}
 }

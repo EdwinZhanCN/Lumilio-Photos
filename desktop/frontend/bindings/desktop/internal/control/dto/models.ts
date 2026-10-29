@@ -111,6 +111,24 @@ export enum ErrorCode {
     ErrorLumenNotInstalled = "lumen_not_installed",
     ErrorLumenOwnerBusy = "lumen_owner_busy",
     ErrorRecoveryRequired = "recovery_required",
+
+    /**
+     * ErrorSelectionCancelled is the normal outcome of a native directory
+     * picker the person dismissed; the request it was answering stays pending.
+     */
+    ErrorSelectionCancelled = "selection_cancelled",
+
+    /**
+     * Startup failures the Server classifies (server/app.ClassifyStartupFailure);
+     * Desktop presents them and never works around them. The catalog or the
+     * manifest came from a pre-release or a newer build, the configured
+     * storage folder does not prove the registered default's identity, or a
+     * first run could not create its default storage at all.
+     */
+    ErrorCatalogIncompatible = "catalog_incompatible",
+    ErrorConfigurationIncompatible = "configuration_incompatible",
+    ErrorStorageMigrationRejected = "storage_migration_rejected",
+    ErrorStorageUnavailable = "storage_unavailable",
 };
 
 export interface HostActionTicket {
@@ -351,11 +369,6 @@ export interface StorageShortcut {
     "canRemove": boolean;
     "removalBlockedBy"?: string;
     "filesPreserved": boolean;
-    "writable": boolean;
-    "capacityKnown": boolean;
-    "totalBytes"?: number;
-    "availableBytes"?: number;
-    "filesystem"?: string;
 }
 
 export interface StorageSummary {

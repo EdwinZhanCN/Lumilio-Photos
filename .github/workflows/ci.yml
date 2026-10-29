@@ -27,13 +27,15 @@ jobs:
         outputs:
             server: ${{ steps.filter.outputs.server }}
             web: ${{ steps.filter.outputs.web }}
-            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
-            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' || steps.filter.outputs.storage_e2e == 'true' }}
+            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' || steps.filter.outputs.storage_e2e == 'true' }}
             browser_smoke: ${{ steps.filter.outputs.browser_smoke }}
             auth_e2e: ${{ steps.filter.outputs.auth_e2e }}
             agent_e2e: ${{ steps.filter.outputs.agent_e2e }}
             video_e2e: ${{ steps.filter.outputs.video_e2e }}
+            people_e2e: ${{ steps.filter.outputs.people_e2e }}
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
+            storage_e2e: ${{ steps.filter.outputs.storage_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
         steps:
@@ -67,6 +69,9 @@ jobs:
                           - 'server/internal/api/handler/album_handler.go'
                           - 'server/internal/api/handler/asset_handler*.go'
                           - 'server/internal/api/handler/repository_scan_handler*.go'
+                          - 'server/internal/api/handler/share_link_handler*.go'
+                          - 'server/internal/api/handler/storage_handler*.go'
+                          - 'server/internal/db/repo/queries/assets_*.sql'
                           - 'server/internal/processors/asset_*.go'
                           - 'server/internal/processors/discover_task*.go'
                           - 'server/internal/processors/ingest_task*.go'
@@ -81,6 +86,7 @@ jobs:
                           - 'server/internal/queue/jobs/**'
                           - 'server/internal/service/album_service*.go'
                           - 'server/internal/service/asset_service*.go'
+                          - 'server/internal/service/share_link_service*.go'
                           - 'server/internal/sourcing/**'
                           - 'server/internal/storage/**'
                           - 'web/playwright.config.ts'
@@ -90,8 +96,11 @@ jobs:
                           - 'web/e2e/pages/**'
                           - 'web/e2e/support/**'
                           - 'web/e2e/specs/capabilities.spec.ts'
+                          - 'web/e2e/specs/language-switch.spec.ts'
                           - 'web/e2e/specs/login.spec.ts'
                           - 'web/e2e/specs/scan.spec.ts'
+                          - 'web/e2e/specs/share-links.spec.ts'
+                          - 'web/e2e/specs/storage-admin.spec.ts'
                           - 'web/e2e/specs/upload.spec.ts'
                           - 'web/src/app/**'
                           - 'web/src/contexts/WorkerProvider.tsx'
@@ -99,9 +108,14 @@ jobs:
                           - 'web/src/features/collections/**'
                           - 'web/src/features/manage/**'
                           - 'web/src/features/repositories/**'
+                          - 'web/src/features/share/**'
                           - 'web/src/features/upload/**'
                           - 'web/src/lib/assets/**'
                           - 'web/src/lib/http-commons/**'
+                          - 'web/src/lib/i18n.tsx'
+                          - 'web/src/lib/preferences/**'
+                          - 'web/src/locales/**'
+                          - 'web/src/features/settings/flows/appearance/**'
                       auth_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
@@ -116,6 +130,7 @@ jobs:
                           - 'server/internal/service/webauthn*.go'
                           - 'web/e2e/specs/auth-session.spec.ts'
                           - 'web/e2e/specs/auth-totp-bootstrap.spec.ts'
+                          - 'web/e2e/support/server.e2e.toml'
                           - 'web/e2e/support/totp.ts'
                           - 'web/src/features/auth/**'
                           - 'web/src/lib/http-commons/auth.ts'
@@ -169,6 +184,38 @@ jobs:
                           - 'web/src/features/assets/model/browseItems.ts'
                           - 'web/src/features/monitor/api/useAssetIndexing.ts'
                           - 'web/src/features/settings/flows/ai/**'
+                      # Replays recorded Hub face recognition for the demo
+                      # profile portraits; the slice also syncs that profile.
+                      people_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'taskfile.yml'
+                          - 'web/taskfile.yml'
+                          - 'assets.lock.json'
+                          - 'server/Dockerfile'
+                          - 'server/go.mod'
+                          - 'server/go.sum'
+                          - 'server/migrations/**'
+                          - 'server/tools/fakelumen/**'
+                          - 'server/internal/api/handler/people_handler*.go'
+                          - 'server/internal/api/dto/people_dto*.go'
+                          - 'server/internal/db/repo/queries/face*.sql'
+                          - 'server/internal/queue/enrichment_*.go'
+                          - 'server/internal/service/face_*.go'
+                          - 'server/internal/service/lumen_service.go'
+                          - 'web/playwright.config.ts'
+                          - 'web/package.json'
+                          - 'web/pnpm-lock.yaml'
+                          - 'web/scripts/assets-sync.ts'
+                          - 'web/e2e/compose*.yml'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/people-*.spec.ts'
+                          - 'web/src/components/collection/**'
+                          - 'web/src/components/ui/Modal.tsx'
+                          - 'web/src/features/people/**'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
                       recovery_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
@@ -185,6 +232,43 @@ jobs:
                           - 'web/e2e/specs/backup-recovery.spec.ts'
                           - 'web/src/features/settings/api/useBackups.ts'
                           - 'web/src/features/settings/flows/server/BackupSection.tsx'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
+                      # Storage lifecycle recovery: candidates, reconnect, copy,
+                      # rename, private recovery and held Trash, and a reinstall
+                      # that adopts the retained Primary Repository. The slice
+                      # drives the storage commands, the setup review and the
+                      # Trash through the Web, and it empties the app-state
+                      # volume, so it runs after every other slice.
+                      storage_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'taskfile.yml'
+                          - 'web/taskfile.yml'
+                          - 'web/e2e/compose*.yml'
+                          - 'server/Dockerfile'
+                          - 'server/docker-entrypoint.go'
+                          - 'server/app/**'
+                          - 'server/internal/api/router.go'
+                          - 'server/internal/api/handler/repository_scan_handler.go'
+                          - 'server/internal/api/handler/storage_handler.go'
+                          - 'server/internal/api/handler/setup_handler.go'
+                          - 'server/internal/api/handler/asset_lifecycle.go'
+                          - 'server/internal/api/handler/asset_trash.go'
+                          - 'server/internal/api/dto/repository_scan_dto.go'
+                          - 'server/internal/api/dto/storage_dto.go'
+                          - 'server/internal/api/dto/setup_dto.go'
+                          - 'server/internal/storage/**'
+                          - 'server/internal/service/asset_service.go'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/storage-recovery.spec.ts'
+                          - 'web/src/features/auth/flows/bootstrap/**'
+                          - 'web/src/features/auth/flows/primary-setup/**'
+                          - 'web/src/features/auth/modules/access/**'
+                          - 'web/src/features/assets/flows/lifecycle/**'
+                          - 'web/src/features/repositories/**'
+                          - 'web/src/lib/assets/**'
                           - 'web/src/lib/http-commons/**'
                           - 'web/src/locales/**'
                       desktop:
@@ -243,12 +327,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
-
-            - name: Authenticate GitHub Packages
-              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Install generators
               run: |
@@ -293,11 +378,140 @@ jobs:
             - name: Run Server concurrency gate
               run: task server:test:concurrency:ci
 
+    # Volume semantics (R11): the scan index keys each Repository under the
+    # name rule of the volume that holds it. Both jobs format and mount real
+    # filesystem images, name them in LUMILIO_VOLUME_FIXTURES, and run the
+    # Server tests that measure the rule and reconnect across volumes. The
+    # image list is the supported-volume list; add an image here and its row
+    # in server/internal/storage/testfixture/volumes.go together.
+    server-volumes-linux:
+        name: server volume semantics (Linux filesystem images)
+        needs: changes
+        if: needs.changes.outputs.server == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            - name: Install libvips, libraw, SQLite headers, and filesystem tools
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev libheif-plugin-aomenc libheif-plugin-libde265 dosfstools exfatprogs e2fsprogs
+
+            # Every image is 2 GiB: the Server pauses a Repository for low
+            # space below a 512 MiB margin, so a smaller volume would refuse
+            # the test uploads. FAT32 and exFAT are mounted for the runner
+            # user; ext4 roots are handed over with chown. The case-folding ext4 image carries the
+            # feature flag, and the +F directory inside it is the tree the
+            # tests use, since ext4 folds case per directory.
+            - name: Format and mount filesystem images
+              run: |
+                  set -eu
+                  volumes="$RUNNER_TEMP/volumes"
+                  mkdir -p "$volumes"
+                  user_id="$(id -u)"
+                  group_id="$(id -g)"
+                  truncate -s 2G "$volumes/vfat.img"
+                  mkfs.vfat -F 32 "$volumes/vfat.img" >/dev/null
+                  mkdir -p "$volumes/vfat"
+                  sudo mount -o "loop,uid=$user_id,gid=$group_id" "$volumes/vfat.img" "$volumes/vfat"
+                  truncate -s 2G "$volumes/exfat.img"
+                  mkfs.exfat "$volumes/exfat.img" >/dev/null
+                  mkdir -p "$volumes/exfat"
+                  sudo mount -o "loop,uid=$user_id,gid=$group_id" "$volumes/exfat.img" "$volumes/exfat"
+                  truncate -s 2G "$volumes/ext4.img"
+                  mkfs.ext4 -q "$volumes/ext4.img"
+                  mkdir -p "$volumes/ext4"
+                  sudo mount -o loop "$volumes/ext4.img" "$volumes/ext4"
+                  sudo chown "$user_id:$group_id" "$volumes/ext4"
+                  truncate -s 2G "$volumes/casefold.img"
+                  mkfs.ext4 -q -O casefold -E encoding=utf8 "$volumes/casefold.img"
+                  mkdir -p "$volumes/casefold"
+                  sudo mount -o loop "$volumes/casefold.img" "$volumes/casefold"
+                  sudo mkdir "$volumes/casefold/tree"
+                  sudo chattr +F "$volumes/casefold/tree"
+                  sudo chown "$user_id:$group_id" "$volumes/casefold/tree"
+                  mount | grep "$volumes"
+                  echo "LUMILIO_VOLUME_FIXTURES=vfat=$volumes/vfat;exfat=$volumes/exfat;ext4=$volumes/ext4;casefold=$volumes/casefold/tree" >> "$GITHUB_ENV"
+
+            - name: Run Server volume-semantics gate
+              run: task server:test:volumes
+
+    server-volumes-macos:
+        name: server volume semantics (macOS filesystem images)
+        needs: changes
+        if: needs.changes.outputs.server == 'true'
+        runs-on: macos-15
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            - name: Install libvips and libraw
+              run: brew install vips libraw
+
+            - name: Create and attach filesystem images
+              run: |
+                  set -eu
+                  volumes="$RUNNER_TEMP/volumes"
+                  mkdir -p "$volumes"
+                  attach() {
+                      kind="$1"
+                      filesystem="$2"
+                      layout="$3"
+                      echo "== $kind ($filesystem, $layout)"
+                      hdiutil create -size 2g -fs "$filesystem" -layout "$layout" -volname "lumilio-$kind" "$volumes/$kind.dmg"
+                      mkdir -p "$volumes/$kind"
+                      hdiutil attach -nobrowse -mountpoint "$volumes/$kind" "$volumes/$kind.dmg"
+                      ls -la "$volumes/$kind"
+                  }
+                  attach apfs "APFS" GPTSPUD
+                  attach apfs-sensitive "Case-sensitive APFS" GPTSPUD
+                  attach hfsplus "HFS+" GPTSPUD
+                  # hdiutil refuses to format ExFAT itself on current macOS
+                  # ("create failed - Operation not permitted"), so the image
+                  # is created blank, attached without mounting, formatted
+                  # with newfs_exfat, and mounted at the fixture path.
+                  echo "== exfat-darwin (ExFAT via newfs_exfat)"
+                  hdiutil create -size 2g -layout NONE "$volumes/exfat-darwin.dmg"
+                  device="$(hdiutil attach -nomount "$volumes/exfat-darwin.dmg" | awk 'NR == 1 { print $1 }')"
+                  echo "attached blank image as $device"
+                  sudo newfs_exfat -v LUMILIO "$device"
+                  mkdir -p "$volumes/exfat-darwin"
+                  sudo diskutil mount -mountPoint "$volumes/exfat-darwin" "$device"
+                  ls -la "$volumes/exfat-darwin"
+                  touch "$volumes/exfat-darwin/.writable" && rm "$volumes/exfat-darwin/.writable"
+                  mount | grep "$volumes"
+                  echo "LUMILIO_VOLUME_FIXTURES=apfs=$volumes/apfs;apfs-sensitive=$volumes/apfs-sensitive;hfsplus=$volumes/hfsplus;exfat-darwin=$volumes/exfat-darwin" >> "$GITHUB_ENV"
+
+            - name: Run Server volume-semantics gate
+              run: task server:test:volumes
+
     web:
         name: web (Task)
         needs: changes
         if: needs.changes.outputs.web_job == 'true'
-        runs-on: ubuntu-latest
+        # Pinned like the release workflows: `ubuntu-latest` moved to 26.04 on
+        # 2026-10-21 and the pinned Playwright refuses to install Chromium
+        # there ("does not support chromium on ubuntu26.04-x64").
+        runs-on: ubuntu-24.04
         permissions:
             contents: read
             packages: read
@@ -312,14 +526,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
-
-            # @edwinzhancn/docts lives on GitHub Packages, which requires a
-            # token even for public packages (web/.npmrc maps the scope).
-            - name: Authenticate GitHub Packages
-              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Install dependencies
               run: task web:install:ci
@@ -385,9 +598,19 @@ jobs:
               if: needs.changes.outputs.video_e2e == 'true'
               run: task web:test:video-semantic
 
+            - name: Run People merge regression
+              if: needs.changes.outputs.people_e2e == 'true'
+              run: task web:test:people
+
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'
               run: task web:test:backup-recovery
+
+            # Last on purpose: its reinstall scenario empties the app-state
+            # volume and re-bootstraps the instance.
+            - name: Run storage lifecycle recovery regression
+              if: needs.changes.outputs.storage_e2e == 'true'
+              run: task web:test:storage-recovery
 
             - name: Capture E2E service logs
               if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}
@@ -436,13 +659,17 @@ jobs:
                       server/go.sum
 
             # `task ci:desktop:panel` builds the React control panel first,
-            # which needs `vp`. The panel's dependencies are all public, so it
-            # needs no GitHub Packages token, and `frontend:install:ci` runs
-            # `vp install` itself.
+            # which needs `vp`. `frontend:install:ci` runs `vp install` itself.
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             # CGO deps: both the complete Server suite and the Desktop module
             # compile govips/libraw. SQLite, FTS5, and Vec1 are linked into the
@@ -500,7 +727,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Build control panel
               run: task ci:desktop:panel
@@ -551,7 +784,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Install and build docs site
               run: task ci:site
@@ -567,6 +806,8 @@ jobs:
             - architecture
             - generated
             - server-linux
+            - server-volumes-linux
+            - server-volumes-macos
             - web
             - desktop-macos
             - desktop-windows
@@ -580,6 +821,8 @@ jobs:
                   GENERATED_RESULT: ${{ needs.generated.result }}
                   SERVER_CHANGED: ${{ needs.changes.outputs.server }}
                   SERVER_RESULT: ${{ needs.server-linux.result }}
+                  SERVER_VOLUMES_LINUX_RESULT: ${{ needs.server-volumes-linux.result }}
+                  SERVER_VOLUMES_MACOS_RESULT: ${{ needs.server-volumes-macos.result }}
                   WEB_REQUIRED: ${{ needs.changes.outputs.web_job }}
                   WEB_RESULT: ${{ needs.web.result }}
                   DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
@@ -622,6 +865,8 @@ jobs:
                   }
 
                   check_job "server linux" "$SERVER_CHANGED" "$SERVER_RESULT"
+                  check_job "server volume semantics (Linux)" "$SERVER_CHANGED" "$SERVER_VOLUMES_LINUX_RESULT"
+                  check_job "server volume semantics (macOS)" "$SERVER_CHANGED" "$SERVER_VOLUMES_MACOS_RESULT"
                   check_job "web" "$WEB_REQUIRED" "$WEB_RESULT"
                   check_job "desktop macos" "$DESKTOP_CHANGED" "$DESKTOP_MACOS_RESULT"
                   check_job "desktop windows" "$DESKTOP_CHANGED" "$DESKTOP_WINDOWS_RESULT"

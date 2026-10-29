@@ -6,6 +6,7 @@ import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
 import { compose, docker, repositoryRoot } from "../support/docker";
 import { t } from "../support/i18n";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
 type BackupEntry = {
   name: string;
@@ -21,9 +22,8 @@ type Repository = {
   name: string;
 };
 
-type RepositoryList = {
-  repositories?: Repository[];
-};
+type StorageTargets = components["schemas"]["dto.StorageTargetsResponseDTO"];
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
 
 type RestoreOperation = {
   id: string;
@@ -48,23 +48,24 @@ async function listBackups(token: string): Promise<BackupEntry[]> {
 }
 
 async function createRepository(token: string, name: string): Promise<Repository> {
-  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
+  const { repository } = await api<CreateRepositoryResponse>("/api/v1/storage/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
       name,
       directory_name: name,
-      role: "regular",
       storage_strategy: "flat",
-      duplicate_handling: "rename",
     }),
   });
-  return repository;
+  if (!repository?.id || !repository.name) {
+    throw new Error(`repository creation for ${name} did not return id and name`);
+  }
+  return { id: repository.id, name: repository.name };
 }
 
 async function repositoryExists(token: string, repositoryID: string): Promise<boolean> {
-  const repositories = (await api<RepositoryList>("/api/v1/repositories", { token })).repositories;
-  return repositories?.some((repository) => repository.id === repositoryID) ?? false;
+  const { targets } = await api<StorageTargets>("/api/v1/storage/targets", { token });
+  return targets?.some((target) => target.id === repositoryID) ?? false;
 }
 
 async function repositoryPresence(token: string, repositoryID: string): Promise<boolean | null> {
@@ -122,10 +123,10 @@ function installCorruptBackupFixture(): string {
     `${base}/${manifestName}`,
     `${JSON.stringify(
       {
-        format_version: 2,
+        format_version: 1,
         app_version: "e2e-corrupt",
-        config_schema_version: 4,
-        application_migration_version: 3,
+        config_schema_version: 1,
+        schema_version: 1,
         river_migration_version: 1,
         sqlite_version: "invalid-fixture",
         vec1_version: "invalid-fixture",
@@ -238,6 +239,46 @@ async function waitForRestoreTerminal(
   return terminal;
 }
 
+const DOCUMENT_MARKER = "__lumilioE2EDocumentBeforeRestore";
+
+type MarkedWindow = Window & { [DOCUMENT_MARKER]?: true };
+
+/**
+ * The backup section reloads the page on its own 750 ms after it observes a
+ * completed restore. A navigation issued while that reload is in flight is
+ * aborted by the browser, so the spec marks the current document before the
+ * restore and waits until a fresh document (without the marker) has loaded.
+ */
+async function markDocument(page: Page): Promise<void> {
+  await page.evaluate((marker) => {
+    (window as MarkedWindow)[marker as typeof DOCUMENT_MARKER] = true;
+  }, DOCUMENT_MARKER);
+}
+
+async function waitForAutomaticReload(page: Page): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(
+            (marker) => (window as MarkedWindow)[marker as typeof DOCUMENT_MARKER] !== true,
+            DOCUMENT_MARKER,
+          );
+        } catch {
+          // The execution context is torn down while the reload is in flight.
+          return false;
+        }
+      },
+      {
+        message: "the settings page should reload itself after the completed restore",
+        timeout: 30_000,
+        intervals: [250, 500, 1_000],
+      },
+    )
+    .toBe(true);
+  await page.waitForLoadState("load");
+}
+
 test("@backup-recovery admin UI proves backup, download, restore, and rollback", async ({
   page,
   workspace,
@@ -305,9 +346,11 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
   );
   expect(await repositoryExists(workspace.token, afterBackup.id)).toBe(true);
 
+  await markDocument(page);
   const successfulOperationID = await restoreFromRow(page, routineRow);
   const successfulOperation = await waitForRestoreTerminal(workspace.token, successfulOperationID);
   expect(successfulOperation.status).toBe("completed");
+  await waitForAutomaticReload(page);
   await expect
     .poll(() => repositoryPresence(workspace.token, afterBackup.id), {
       message: "successful restore should remove data created after the dump",

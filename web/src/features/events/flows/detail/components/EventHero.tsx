@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarRange, EyeOff, Plus, Share2 } from "lucide-react";
 import { CollectionHero, MetaStat } from "@/components/collection";
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -37,16 +37,28 @@ export default function EventHero({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
+
+  useEffect(() => {
+    setCoverFailed(false);
+  }, [event.cover_asset_id]);
+
   const title = eventTitle(event, t);
-  const coverUrl = event.cover_asset_id
-    ? assetUrls.getThumbnailUrl(event.cover_asset_id, "medium")
-    : null;
+  const coverUrl =
+    !coverFailed && event.cover_asset_id
+      ? assetUrls.getThumbnailUrl(event.cover_asset_id, "medium")
+      : null;
   const shareTooLarge = (event.displayable_count ?? 0) > 5000;
 
   const cover = (
     <div className="size-20 overflow-hidden rounded-[1.5rem] border border-base-300/70 bg-base-200">
       {coverUrl ? (
-        <img src={coverUrl} alt={title} className="size-full object-cover" />
+        <img
+          src={coverUrl}
+          alt={title}
+          className="size-full object-cover"
+          onError={() => setCoverFailed(true)}
+        />
       ) : (
         <div className="flex size-full items-center justify-center">
           <CalendarRange className="size-8 text-base-content/35" strokeWidth={1.5} />

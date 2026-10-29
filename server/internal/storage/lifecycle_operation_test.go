@@ -43,20 +43,35 @@ func newCatalogRepositoryManager(t *testing.T) (*db.DB, *DefaultRepositoryManage
 	return catalog, manager
 }
 
+// createAcknowledgedForTest reviews the spec's target and acknowledges every
+// reported risk, the way an administrator does through the Web review, so
+// tests that only need a Repository on a non-default Location stay focused.
+func createAcknowledgedForTest(t *testing.T, manager *DefaultRepositoryManager, spec CreateRepositorySpec) (*CreateRepositoryResult, error) {
+	t.Helper()
+	review, err := manager.AssessCreateTarget(context.Background(), AssessCreateTargetRequest{
+		Intent: createIntentForRole(spec.Role), StorageLocationID: spec.StorageLocationID, DirectoryName: spec.DirectoryName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	spec.AssessmentToken, spec.AcknowledgedRisks = review.Token, RiskCodes(review.Risks)
+	return manager.CreateRepository(context.Background(), spec)
+}
+
 func initializeDefaultStorageForTest(t *testing.T, manager *DefaultRepositoryManager, rootPath string) {
 	t.Helper()
 	ctx := context.Background()
-	root, err := manager.EnsureDefaultRepositoryRoot(ctx, rootPath)
+	storageLocation, err := manager.EnsureDefaultStorageLocation(ctx, rootPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if root.MountFingerprint == "" || root.MountFingerprint != InspectStoragePath(rootPath).MountFingerprint {
-		t.Fatalf("registered mount fingerprint = %q", root.MountFingerprint)
+	if storageLocation.MountFingerprint == "" || storageLocation.MountFingerprint != InspectStoragePath(rootPath).MountFingerprint {
+		t.Fatalf("registered mount fingerprint = %q", storageLocation.MountFingerprint)
 	}
 	if _, err := manager.CreateRepository(ctx, CreateRepositorySpec{
-		RequestID: "test-primary:" + root.RootID.String(), Actor: "test",
+		RequestID: "test-primary:" + storageLocation.StorageLocationID.String(), Actor: "test",
 		Name: "Primary", DirectoryName: "primary", Role: dbtypes.RepoRolePrimary,
-		RootID: root.RootID.String(),
+		StorageLocationID: storageLocation.StorageLocationID.String(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +116,7 @@ func TestCreateRepositoryLifecycleRequestIsDurablyIdempotent(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
-	root, err := manager.EnsureDefaultRepositoryRoot(ctx, rootPath)
+	storageLocation, err := manager.EnsureDefaultStorageLocation(ctx, rootPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +130,7 @@ func TestCreateRepositoryLifecycleRequestIsDurablyIdempotent(t *testing.T) {
 	spec := CreateRepositorySpec{
 		RequestID: "create-primary-1", Actor: "test:user:1", ActorUserID: &actor.UserID, HostInstanceID: "web-server-1",
 		Name: "Primary", DirectoryName: "primary", Role: dbtypes.RepoRolePrimary,
-		RootID: root.RootID.String(),
+		StorageLocationID: storageLocation.StorageLocationID.String(),
 	}
 	first, err := manager.CreateRepository(ctx, spec)
 	if err != nil {
@@ -168,16 +183,20 @@ func TestCreateRepositoryRequiresAndAuditsStorageRiskConfirmation(t *testing.T) 
 	if err := os.Mkdir(riskyRootPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	root, err := manager.AddRepositoryRoot(ctx, riskyRootPath, "Cloud-synced disk")
+	storageLocation, err := manager.AddStorageLocation(ctx, riskyRootPath, "Cloud-synced disk")
 	if err != nil {
 		t.Fatal(err)
 	}
 	spec := CreateRepositorySpec{
 		RequestID: "risk-confirmation-create", Actor: "web:test-admin", Name: "Risk Archive",
-		DirectoryName: "risk-archive", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "risk-archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	}
-	if _, err := manager.CreateRepository(ctx, spec); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
-		t.Fatalf("unconfirmed risky create error = %v, want ErrRepositoryRiskConfirmationRequired", err)
+	var consent *StorageRiskConfirmationError
+	if _, err := manager.CreateRepository(ctx, spec); !errors.As(err, &consent) || !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
+		t.Fatalf("unconfirmed risky create error = %v, want StorageRiskConfirmationError", err)
+	}
+	if consent.Token == "" || !acknowledgesRisks(RiskCodes(consent.Risks), []StorageRisk{RiskCloudSync, RiskNonDefault}) {
+		t.Fatalf("consent refusal = %+v, want a token and the cloud-sync and non-default risks", consent)
 	}
 	if _, err := os.Stat(filepath.Join(riskyRootPath, "risk-archive")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unconfirmed risky create mutated disk: %v", err)
@@ -197,7 +216,8 @@ func TestCreateRepositoryRequiresAndAuditsStorageRiskConfirmation(t *testing.T) 
 		rejectedRisk.FailureStage != "risk_confirmation" || rejectedRisk.ConfirmationType != "none" {
 		t.Fatalf("rejected risk audit = %#v", rejectedRisk)
 	}
-	spec.RiskConfirmation = true
+	spec.AssessmentToken = consent.Token
+	spec.AcknowledgedRisks = RiskCodes(consent.Risks)
 	created, err := manager.CreateRepository(ctx, spec)
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +251,7 @@ func TestRecoverLifecycleOperationsRollsBackUncommittedCreate(t *testing.T) {
 	operation, _, err := manager.beginLifecycleOperation(ctx, lifecycleBeginInput{
 		RequestID: "interrupted-create", Kind: lifecycleKindCreateRepository,
 		Payload: createRepositoryOperationPayload{
-			Name: "Interrupted", Path: target, RootID: uuid.NewString(), Role: dbtypes.RepoRoleRegular,
+			Name: "Interrupted", Path: target, StorageLocationID: uuid.NewString(), Role: dbtypes.RepoRoleRegular,
 			StorageStrategy: "date", DuplicateHandling: "rename",
 		},
 		Actor: "web:admin", HostInstanceID: "web-server-recovery", TargetType: "repository", TargetID: &targetID,
@@ -290,17 +310,17 @@ func TestLifecycleRecoveryClaimsEveryJournalOnlyTargetBeforeMutation(t *testing.
 		{lifecycleKindOpenRepository, "repository", func(path string) any { return openRepositoryOperationPayload{Path: path} }},
 		{lifecycleKindRegisterRepositoryCopy, "repository", func(path string) any { return registerRepositoryCopyOperationPayload{Path: path} }},
 		{lifecycleKindRenameRepository, "repository", func(path string) any { return renameRepositoryOperationPayload{Path: path} }},
-		{lifecycleKindCreateStorageLocation, "root", func(path string) any { return createStorageLocationOperationPayload{Path: path} }},
-		{lifecycleKindSwitchDefaultStorage, "root", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
-		{lifecycleKindRelocateStorage, "root", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
+		{lifecycleKindCreateStorageLocation, "storage_location", func(path string) any { return createStorageLocationOperationPayload{Path: path} }},
+		{lifecycleKindSwitchDefaultStorage, "storage_location", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
+		{lifecycleKindReconnectStorage, "storage_location", func(path string) any { return switchDefaultStorageOperationPayload{NewPath: path} }},
 	}
 	for _, test := range tests {
 		t.Run(test.kind, func(t *testing.T) {
 			target := t.TempDir()
 			var release func()
 			var lockErr error
-			if test.lockKind == "root" {
-				release, lockErr = acquireRootPathLock(ctx, target, true)
+			if test.lockKind == "storage_location" {
+				release, lockErr = acquireStorageLocationPathLock(ctx, target, true)
 			} else {
 				release, lockErr = acquireRepositoryPathLock(ctx, target, true)
 			}
@@ -335,24 +355,24 @@ func TestStorageLocationAndCopyRegistrationUseDurableJournal(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := LifecycleRequest{RequestID: "add-external-1", Actor: "test"}
-	firstRoot, err := manager.AddRepositoryRoot(ctx, externalPath, "External", request)
+	firstRoot, err := manager.AddStorageLocation(ctx, externalPath, "External", request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondRoot, err := manager.AddRepositoryRoot(ctx, externalPath, "External", request)
+	secondRoot, err := manager.AddStorageLocation(ctx, externalPath, "External", request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstRoot.RootID != secondRoot.RootID {
-		t.Fatalf("Storage Location retry returned %s, want %s", secondRoot.RootID, firstRoot.RootID)
+	if firstRoot.StorageLocationID != secondRoot.StorageLocationID {
+		t.Fatalf("Storage Location retry returned %s, want %s", secondRoot.StorageLocationID, firstRoot.StorageLocationID)
 	}
-	if _, err := manager.AddRepositoryRoot(ctx, externalPath, "Changed", request); !errors.Is(err, ErrLifecycleRequestConflict) {
+	if _, err := manager.AddStorageLocation(ctx, externalPath, "Changed", request); !errors.Is(err, ErrLifecycleRequestConflict) {
 		t.Fatalf("changed Storage Location request error = %v", err)
 	}
 
-	original, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	original, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "create-copy-source", Actor: "test", Name: "Source", DirectoryName: "source",
-		Role: dbtypes.RepoRoleRegular, RootID: firstRoot.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: firstRoot.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -415,12 +435,21 @@ func TestStorageLocationAndCopyRegistrationUseDurableJournal(t *testing.T) {
 	if len(scanned) != 2 || scanned[1] != registered.RepoID.String() {
 		t.Fatalf("durably retried copy scans = %#v", scanned)
 	}
-	recovered, err := filepath.Glob(filepath.Join(copyPath, DefaultStructure.SystemDir, "recovery", "copied-from-*", "staging", "old-state"))
+	recovered, err := filepath.Glob(filepath.Join(copyPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*", "staging", "old-state"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(recovered) != 1 {
-		t.Fatalf("isolated private-state files = %v", recovered)
+		t.Fatalf("preserved staging files = %v", recovered)
+	}
+	receiptData, err := os.ReadFile(strings.TrimSuffix(filepath.Dir(filepath.Dir(recovered[0])), string(filepath.Separator)) + ".json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := ParseRecoveryReceipt(receiptData)
+	if err != nil || receipt.Event != RecoveryEventRegisterCopy ||
+		receipt.SourceRepositoryID != original.Repository.RepoID.String() || receipt.RepositoryID != registered.RepoID.String() {
+		t.Fatalf("copy receipt = %+v, err=%v", receipt, err)
 	}
 	var completed int
 	if err := catalog.SQL.QueryRowContext(ctx, `
@@ -439,13 +468,13 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	ctx := context.Background()
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "remove-regular-create", Actor: "test", Name: "Removable Archive",
-		DirectoryName: "removable", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "removable", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -508,7 +537,7 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if !impact.PrivateStateFound || impact.PrivateStateBytes < int64(len("private-state")) {
 		t.Fatalf("private-state impact = %+v", impact)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "remove-regular", Actor: "test",
 	}); err != nil {
 		t.Fatal(err)
@@ -549,7 +578,7 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, primary.RepoID.String()); !errors.Is(err, ErrPrimaryRepositoryNotRemovable) {
+	if _, err := manager.RemoveRepository(ctx, primary.RepoID.String()); !errors.Is(err, ErrPrimaryRepositoryNotRemovable) {
 		t.Fatalf("primary removal error = %v, want ErrPrimaryRepositoryNotRemovable", err)
 	}
 }
@@ -558,7 +587,7 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,7 +595,7 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 		t.Helper()
 		result, createErr := manager.CreateRepository(ctx, CreateRepositorySpec{
 			RequestID: "create-" + directory, Actor: "test", Name: name,
-			DirectoryName: directory, Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+			DirectoryName: directory, Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 		})
 		if createErr != nil {
 			t.Fatal(createErr)
@@ -658,7 +687,7 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	if impact.AssetCount != 1 || impact.CatalogMediaBytes != 12 || impact.AlbumCount != 1 || impact.ActiveTaskCount != 0 {
 		t.Fatalf("shared-location removal impact = %+v", impact)
 	}
-	if err := manager.RemoveRepository(ctx, target.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, target.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -710,33 +739,16 @@ func seedRepositoryAssetOccurrence(
 			t.Fatal(err)
 		}
 	}
-	rootNodeID := uuid.New()
-	fileNodeID := uuid.New()
+	entryID := uuid.New()
 	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, created_at, updated_at
-		) VALUES (?, ?, NULL, '', '', 'directory', 1, 1, 1)
-	`, rootNodeID, repositoryID); err != nil {
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, revision, updated_at
+		) VALUES (?, ?, ?, lower(?), '', 'file', ?, 1, 1, 'present', ?, ?, 1, 1)
+	`, entryID, repositoryID, filename, filename, fileSize, contentID, assetID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, file_size, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, 'file', 2, ?, 1, 1)
-	`, fileNodeID, repositoryID, rootNodeID, filename, filename, fileSize); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision,
-			created_at, updated_at
-		) VALUES (?, ?, ?, 2, 1, 1)
-	`, uuid.New(), fileNodeID, assetID); err != nil {
-		t.Fatal(err)
-	}
-	return fileNodeID
+	return entryID
 }
 
 func assertStorageCount(t *testing.T, database *sql.DB, query string, want int, args ...any) {
@@ -754,28 +766,16 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "remove-context-create", Actor: "test", Name: "Context Archive",
-		DirectoryName: "context-archive", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "context-archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	rootRelease, err := manager.files.AccessCoordinator().AcquireRootMutationContext(ctx, root.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	deadlineContext, cancelDeadline := context.WithTimeout(ctx, 30*time.Millisecond)
-	err = manager.RemoveRepository(deadlineContext, created.Repository.RepoID.String())
-	cancelDeadline()
-	rootRelease()
-	if !errors.Is(err, ErrRepositoryBusy) {
-		t.Fatalf("remove behind root mutation = %v, want ErrRepositoryBusy", err)
 	}
 
 	repositoryFS, err := manager.files.Open(*created.Repository)
@@ -784,7 +784,7 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	}
 	cancelContext, cancel := context.WithCancel(ctx)
 	cancel()
-	err = manager.RemoveRepository(cancelContext, created.Repository.RepoID.String())
+	_, err = manager.RemoveRepository(cancelContext, created.Repository.RepoID.String())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("remove with cancelled context = %v, want context.Canceled", err)
 	}
@@ -797,7 +797,7 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("remove during running worker = %v, want ErrRepositoryBusy", err)
 	}
 	if _, err := manager.queries.FinishRepositoryActivity(ctx, repo.FinishRepositoryActivityParams{
@@ -808,5 +808,27 @@ func TestRemoveRepositoryHonorsContextWhileWaitingForLifecycleLeases(t *testing.
 	}
 	if _, err := manager.queries.GetRepository(ctx, created.Repository.RepoID); err != nil {
 		t.Fatalf("repository changed after cancelled removal: %v", err)
+	}
+
+	detachedDuringRootMutation, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+		RequestID: "remove-storageLocation-mutation-create", Actor: "test", Name: "Root Mutation Archive",
+		DirectoryName: "storageLocation-mutation-archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootRelease, err := manager.files.AccessCoordinator().AcquireStorageLocationMutationContext(ctx, storageLocation.StorageLocationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.RemoveRepository(ctx, detachedDuringRootMutation.Repository.RepoID.String(), LifecycleRequest{
+		RequestID: "remove-during-storageLocation-mutation", Actor: "test",
+	}); err != nil {
+		rootRelease()
+		t.Fatalf("detach blocked by Storage Location mutation lease: %v", err)
+	}
+	rootRelease()
+	if _, err := manager.queries.GetRepository(ctx, detachedDuringRootMutation.Repository.RepoID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("repository still registered after detach during storageLocation mutation: %v", err)
 	}
 }

@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/storage/directory_manager.go
 - server/internal/storage/rootcfg/root_config.go
 - server/internal/storage/repocfg/repo_config.go
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_media_handler.go
 -->
 
 # 备份媒体与资源库工作区

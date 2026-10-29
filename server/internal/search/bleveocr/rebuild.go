@@ -172,10 +172,10 @@ func rebuild(ctx context.Context, path string, queries *repo.Queries) (*Index, e
 
 func sourceFromRebuildRow(row repo.GetOCRDocumentsForRebuildRow) SourceDocument {
 	source := SourceDocument{
-		AssetID:   row.AssetID.String(),
-		AssetType: row.AssetType,
-		IsDeleted: row.IsDeleted,
-		Revision:  row.Revision,
+		AssetID:        row.AssetID.String(),
+		AssetType:      row.AssetType,
+		LifecycleState: row.LifecycleState,
+		Revision:       row.Revision,
 	}
 	if row.OwnerID != nil {
 		source.OwnerID = *row.OwnerID

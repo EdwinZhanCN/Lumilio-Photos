@@ -19,12 +19,12 @@ import (
 // fenced asset pipeline for an immutable repository publication. The caller
 // owns the transaction; this is intentionally usable by the commit coordinator
 // and by the source-materialization recovery boundary.
-func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, nodeID, assetID, contentID uuid.UUID) error {
-	if tx == nil || queries == nil || repositoryID == uuid.Nil || nodeID == uuid.Nil || assetID == uuid.Nil || contentID == uuid.Nil {
+func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
+	if tx == nil || queries == nil || repositoryID == uuid.Nil || entryID == uuid.Nil || assetID == uuid.Nil || contentID == uuid.Nil {
 		return errors.New("asset activation transaction is incomplete")
 	}
 	asset, err := queries.GetAssetByIDAny(ctx, assetID)
-	if errors.Is(err, sql.ErrNoRows) || asset.IsDeleted {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
@@ -33,27 +33,15 @@ func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queri
 	if asset.ContentID != contentID {
 		return nil
 	}
-	node, err := queries.GetRepositoryNode(ctx, repo.GetRepositoryNodeParams{RepositoryID: repositoryID, NodeID: nodeID})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		return fmt.Errorf("load materialized repository node: %w", err)
-	}
-	if node.Lifecycle != "active" {
+	entry, err := queries.GetRepositoryEntry(ctx, entryID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
-	if node.RepositoryID != repositoryID {
-		return nil
-	}
-	location, err := queries.GetActiveAssetLocationByNode(ctx, nodeID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		return fmt.Errorf("load active asset location: %w", err)
+		return fmt.Errorf("load materialized repository entry: %w", err)
 	}
-	if location.AssetID != asset.AssetID {
+	if entry.RepositoryID != repositoryID || entry.State != "present" ||
+		entry.AssetID.UUID != asset.AssetID || entry.ContentID.UUID != contentID {
 		return nil
 	}
 	if _, err := queries.GetMediaItemByAssetID(ctx, asset.AssetID); err != nil {
@@ -97,11 +85,11 @@ func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queri
 	}
 	if reset {
 		return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, stages,
-			pipeline.AssetPipelineVersion, workqos.Background, nodeID)
+			pipeline.AssetPipelineVersion, workqos.Background, entryID)
 	}
 	if len(missing) == 0 {
 		return nil
 	}
 	return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, missing,
-		pipeline.AssetPipelineVersion, workqos.Background, nodeID)
+		pipeline.AssetPipelineVersion, workqos.Background, entryID)
 }

@@ -102,7 +102,9 @@ func (cm *ChunkMerger) MergeChunks(repository repo.Repository, sessionID string,
 	var totalSize int64
 	for _, chunk := range chunks {
 		handle := &storage.StagingFile{ID: chunk.SessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath}
-		source, err := cm.staging.OpenStagingFile(repository, handle)
+		// The destination already holds this repository's lease; a second
+		// lease would deadlock behind a queued lifecycle mutation.
+		source, err := destination.OpenStagingSibling(repository, handle)
 		if err != nil {
 			return nil, fmt.Errorf("open chunk %d: %w", chunk.ChunkIndex, err)
 		}

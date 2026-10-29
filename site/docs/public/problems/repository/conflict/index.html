@@ -14,6 +14,7 @@
     <dt>Normal HTTP status</dt><dd>409</dd>
     <dt>Definition</dt><dd>Repository state requires an explicit recovery choice.</dd>
     <dt>Recovery</dt><dd>Choose one of the response&#39;s allowed recovery actions, then retry.</dd>
+    <dt>Recovery entry</dt><dd>actor <code>admin</code>, phase <code>running</code>, kind <code>route</code>, route <code>/storage</code></dd>
   </dl>
   <h2>Extension members</h2>
   <table><thead><tr><th>Name</th><th>Schema</th><th>Meaning</th></tr></thead><tbody><tr><td><code>conflict_type</code></td><td>string</td><td>Stable recovery classification.</td></tr><tr><td><code>repository_id</code></td><td>string</td><td>Safe Repository identity, when known.</td></tr><tr><td><code>actions</code></td><td>array[string]</td><td>Stable recovery actions allowed for this conflict.</td></tr></tbody></table>

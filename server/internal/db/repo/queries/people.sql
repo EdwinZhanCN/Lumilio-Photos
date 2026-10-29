@@ -12,7 +12,7 @@ WHERE (sqlc.arg('include_hidden') OR COALESCE(fc.is_hidden, false) = false)
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE fcm.cluster_id = fc.cluster_id
-      AND a.is_deleted = false
+      AND a.lifecycle_state = 'active'
       AND (
         sqlc.narg('owner_id') IS NULL
         OR a.owner_id = sqlc.narg('owner_id')
@@ -37,7 +37,7 @@ WITH page_people AS (
     JOIN face_cluster_members fcm ON fcm.cluster_id = fc.cluster_id
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE a.is_deleted = false
+    WHERE a.lifecycle_state = 'active'
       AND (sqlc.arg('include_hidden') OR COALESCE(fc.is_hidden, false) = false)
       AND (
         sqlc.narg('owner_id') IS NULL
@@ -63,7 +63,7 @@ representative_faces AS (
     SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
     FROM face_items fi
     JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE a.is_deleted = false
+    WHERE a.lifecycle_state = 'active'
       AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
@@ -87,7 +87,7 @@ ranked_faces AS (
     FROM face_cluster_members fcm
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE a.is_deleted = false
+    WHERE a.lifecycle_state = 'active'
       AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
@@ -127,7 +127,7 @@ WITH scoped AS (
     FROM face_cluster_members fcm
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE a.is_deleted = false
+    WHERE a.lifecycle_state = 'active'
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id
@@ -139,7 +139,7 @@ representative_faces AS (
     SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
     FROM face_items fi
     JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE a.is_deleted = false
+    WHERE a.lifecycle_state = 'active'
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id
@@ -162,7 +162,7 @@ ranked_faces AS (
     FROM face_cluster_members fcm
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
-    WHERE a.is_deleted = false
+    WHERE a.lifecycle_state = 'active'
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id

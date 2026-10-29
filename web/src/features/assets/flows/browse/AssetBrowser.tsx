@@ -109,7 +109,7 @@ export function AssetBrowser({
     searchEnabled &&
     (searchQuery.trim().length > 0 || similarAssetId.length > 0 || fileQuery !== null);
   const hasActiveFilters = countActiveAssetUserFilters(userFilter) > 0;
-  const isTrashView = constraint?.is_deleted === true;
+  const isTrashView = constraint?.lifecycle_state === "trashed";
   const handleViewerNavigate = useCallback(
     (nextAssetId: string) => {
       // Swiper can emit a slide change while synchronizing its initial slide
@@ -127,6 +127,14 @@ export function AssetBrowser({
         description: t("assets.all.emptySearchDescription"),
       };
     }
+    if (constraint?.lifecycle_state === "missing")
+      return {
+        title: t("assets.lifecycle.missingEmpty", "No missing assets"),
+        description: t(
+          "assets.lifecycle.missingEmptyHelp",
+          "Files found again by a scan return automatically.",
+        ),
+      };
     if (isTrashView) {
       return {
         title: t("assets.trash.emptyTitle"),
@@ -143,7 +151,7 @@ export function AssetBrowser({
       title: t("assets.all.emptyTitle"),
       description: t("assets.all.emptyDescription"),
     };
-  }, [hasActiveFilters, isSearchActive, isTrashView, t]);
+  }, [constraint?.lifecycle_state, hasActiveFilters, isSearchActive, isTrashView, t]);
   const currentLayout = assetPage.layout;
   const compactColumns = assetPage.columns;
   const GalleryComponent = currentLayout === "compact" ? SquareGallery : JustifiedGallery;

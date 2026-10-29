@@ -46,6 +46,70 @@ func createStagedContent(t *testing.T, manager *DefaultStagingManager, repositor
 	return staged
 }
 
+func waitForQueuedMutation(t *testing.T, coordinator *RepositoryAccessCoordinator, id uuid.UUID) {
+	t.Helper()
+	lock := coordinator.lockFor(id)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		lock.mu.Lock()
+		queued := len(lock.waiters) > 0
+		lock.mu.Unlock()
+		if queued {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("lifecycle mutation never queued")
+}
+
+// Merging chunks holds the destination's lease while it reads every chunk. A
+// second lease per chunk waited behind a lifecycle mutation queued in between,
+// and that mutation waited for the destination: the upload deadlock.
+func TestOpenStagingSiblingDoesNotWaitBehindQueuedMutation(t *testing.T) {
+	_, repository := newStagingTestRepository(t, "flat", "rename")
+	coordinator := NewRepositoryAccessCoordinator()
+	manager := NewStagingManager(NewRepositoryFSFactory(coordinator, nil))
+	chunk := createStagedContent(t, manager, repository, "chunk-0", "chunk")
+	_, destination, err := manager.CreateStagingFile(repository, "merged.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer destination.Close()
+
+	mutated := make(chan struct{})
+	go func() {
+		release := coordinator.AcquireMutation(repository.RepoID)
+		close(mutated)
+		release()
+	}()
+	waitForQueuedMutation(t, coordinator, repository.RepoID)
+
+	opened := make(chan error, 1)
+	go func() {
+		source, err := destination.OpenStagingSibling(repository, chunk)
+		if err == nil {
+			err = source.Close()
+		}
+		opened <- err
+	}()
+	select {
+	case err := <-opened:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("staging sibling waited behind the mutation its own handle blocks")
+	}
+	if err := destination.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-mutated:
+	case <-time.After(time.Second):
+		t.Fatal("lifecycle mutation did not acquire after the merge handle closed")
+	}
+}
+
 func TestStagingCommitUsesRelativeHandleAndNeverReplaces(t *testing.T) {
 	manager, repository := newStagingTestRepository(t, "flat", "rename")
 	staged := createStagedContent(t, manager, repository, "photo.jpg", "original")

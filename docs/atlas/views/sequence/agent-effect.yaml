@@ -1,0 +1,119 @@
+id: agent-effect
+kind: sequence
+title: Lumilio Agent run with a confirmed effect
+summary: >-
+  How the in-app assistant changes the library safely. The model only ever
+  sees references to asset sets, never asset data. A mutating tool prepares a
+  pending effect and interrupts the run; nothing changes until the user
+  approves, and the mutation and its receipt then commit in one catalog
+  transaction.
+nodes:
+  - id: user
+    label: User
+    anchor: ext:User
+    shape: actor
+  - id: web
+    label: Lumilio chat (Web)
+    anchor: ts:streamAgent
+  - id: handler
+    label: AgentHandler
+    anchor: go:handler.AgentHandler.Chat
+  - id: service
+    label: AgentService
+    anchor: go:core.AgentService
+  - id: llm
+    label: LLM provider
+    anchor: go:llm.NewChatModel
+  - id: tools
+    label: Tools (producers, effects)
+    anchor: go:tools.RegisterAll
+  - id: refs
+    label: Reference store
+    anchor: sql:agent_refs
+  - id: effects
+    label: EffectRuntime
+    anchor: go:core.EffectRuntime
+steps:
+  - from: user
+    to: web
+    label: '"Put my best beach photos from 2024 in an album"'
+  - from: web
+    to: handler
+    label: POST /agent/chat (SSE)
+    anchor: api:POST /api/v1/agent/chat
+  - from: handler
+    to: service
+    label: AskAgent(thread, mode)
+    anchor: go:core.AgentService.AskAgent
+  - from: service
+    to: llm
+    label: run with the mode's tool set, checkpointed per thread
+  - block: loop
+    label: tool calls
+    steps:
+      - from: llm
+        to: tools
+        label: call a producer (filter, lookup, combine, quality filter…)
+      - from: tools
+        to: refs
+        label: resolve against the authorized library, store an asset-set reference
+        anchor: go:core.ToolDependencies.CreateRef
+      - from: tools
+        to: llm
+        label: receipt {ref id, count} — never asset data
+        reply: true
+        anchor: go:tools.RefToolOutput
+      - from: tools
+        to: web
+        label: side-channel events (progress, widget data)
+        async: true
+        anchor: go:core.SideChannelEvent
+  - from: llm
+    to: tools
+    label: call an effect (add_to_album)
+  - from: tools
+    to: effects
+    label: Prepare pending effect (membership snapshot)
+    anchor: go:core.EffectRuntime.Prepare
+  - from: tools
+    to: web
+    label: interrupt — confirmation card with count and target
+    reply: true
+  - from: user
+    to: web
+    label: approve (or decline)
+  - from: web
+    to: handler
+    label: POST /agent/chat/resume
+    anchor: api:POST /api/v1/agent/chat/resume
+  - from: handler
+    to: service
+    label: ResumeAgent from the checkpoint
+    anchor: go:core.AgentService.ResumeAgent
+  - block: alt
+    label: approved
+    steps:
+      - from: tools
+        to: effects
+        label: Commit — mutation + receipt in one transaction
+        anchor: go:core.EffectRuntime.Commit
+    else:
+      - label: declined
+        steps:
+          - from: tools
+            to: effects
+            label: Reject
+            anchor: go:core.EffectRuntime.Reject
+  - from: tools
+    to: web
+    label: effect receipt
+    reply: true
+notes:
+  - title: Invariants
+    body: >-
+      Tools return receipts or typed recoverable errors, never asset rows.
+      Effects are bounded by the membership captured at Prepare, so the
+      library changing between the question and the approval cannot widen
+      what is mutated. A run can be cancelled and an effect receipt
+      reconciled even when inference is unavailable.
+related: [system-context]

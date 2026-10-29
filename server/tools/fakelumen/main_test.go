@@ -460,8 +460,49 @@ func TestRecordProxyPersistsAndReplays(t *testing.T) {
 	if compactJSON(t, replayed.GetResult()) != compactJSON(t, recorded.GetResult()) {
 		t.Fatalf("replayed result differs from recorded result:\n%s\n%s", replayed.GetResult(), recorded.GetResult())
 	}
+	// Only SigLIP has a recorded fixture, so only SigLIP's upstream
+	// capability is persisted; the unrecorded upstream Face service is not.
 	replayedCaps := replayStore.capabilities()
-	if len(replayedCaps) != 2 || replayedCaps[1].GetServiceName() != types.ServiceFace {
-		t.Fatalf("replay should advertise the recorded capability set, got %v", replayedCaps)
+	if len(replayedCaps) != 1 || replayedCaps[0].GetServiceName() != types.ServiceSigLIP {
+		t.Fatalf("manifest should persist only recorded services, got %v", replayedCaps)
 	}
+	advertised := newReplayServer(replayStore, false).advertisedCapabilities()
+	if got := capabilityFor(t, advertised, types.ServiceSigLIP); got != replayedCaps[0] {
+		t.Fatalf("replay should advertise the recorded SigLIP capability, got %v", got)
+	}
+	if got := capabilityFor(t, advertised, types.ServiceFace).GetModelIds(); !slices.Equal(got, []string{builtinModelID}) {
+		t.Fatalf("unrecorded Face should keep the builtin capability, got model ids %v", got)
+	}
+
+	// Recording the first Face fixture persists Face's upstream capability.
+	if _, err := infer(t, recordClient, types.TaskFaceRecognition, []byte("portrait"), "image/webp"); err != nil {
+		t.Fatalf("record face infer: %v", err)
+	}
+	reloaded, err := openFixtureDir(dir)
+	if err != nil {
+		t.Fatalf("reload store: %v", err)
+	}
+	advertised = newReplayServer(reloaded, false).advertisedCapabilities()
+	if got := capabilityFor(t, advertised, types.ServiceFace).GetModelIds(); !slices.Equal(got, []string{"upstream-face-model"}) {
+		t.Fatalf("recorded Face should advertise the upstream capability, got model ids %v", got)
+	}
+	for _, service := range []string{types.ServiceBioCLIP, types.ServiceOCR} {
+		if got := capabilityFor(t, advertised, service).GetModelIds(); !slices.Equal(got, []string{builtinModelID}) {
+			t.Fatalf("unrecorded %s should keep the builtin capability, got model ids %v", service, got)
+		}
+	}
+	if len(advertised) != 4 {
+		t.Fatalf("replay should advertise one capability per service, got %d", len(advertised))
+	}
+}
+
+func capabilityFor(t *testing.T, capabilities []*pb.Capability, service string) *pb.Capability {
+	t.Helper()
+	for _, capability := range capabilities {
+		if capability.GetServiceName() == service {
+			return capability
+		}
+	}
+	t.Fatalf("no advertised capability for %s", service)
+	return nil
 }

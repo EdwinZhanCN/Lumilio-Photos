@@ -39,12 +39,11 @@ media tools, so there is no database service to install. All downloads are on th
    offered right after and can be skipped).
 
 ::: tip Updates
-When a newer release exists, the menu-bar menu shows **Update available** —
-click it to download the new `.dmg`, then replace the app in Applications.
-Your Repositories and database are untouched. During setup (or later in the
-control panel) you can set **Download region** to Mainland China so the
-installer is fetched via a GitHub mirror; this is separate from in-app map
-region settings.
+`v26.1.0-rc.1` has no in-app update: **Settings → Updates** reports that no
+signed update provider is configured in this build. To update, download the
+new `.dmg` from the Releases page, verify it, and replace the app in
+Applications; your Repositories and database are untouched (see
+[Upgrade](./upgrade)).
 :::
 
 App data (database, secrets, logs) lives under
@@ -75,11 +74,11 @@ Uninstall from **Settings → Apps & features**; the uninstaller stops the app
 and its database, and can optionally remove the app data.
 
 ::: tip Updates
-When a newer release exists, the tray menu shows **Update available** — click
-it to download the new `setup.exe` and run it over the existing install. Your
-Repositories and database are untouched. **Download region** (Mainland China vs
-other) controls whether the installer URL uses a GitHub mirror; it is separate
-from in-app map region settings.
+`v26.1.0-rc.1` has no in-app update: **Settings → Updates** reports that no
+signed update provider is configured in this build. To update, download the
+new `setup.exe` from the Releases page, verify it, and run it over the
+existing install; your Repositories and database are untouched (see
+[Upgrade](./upgrade)).
 :::
 
 ## Desktop network access

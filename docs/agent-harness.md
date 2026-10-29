@@ -44,7 +44,9 @@ point that links everything here.
 | Content | Home |
 | --- | --- |
 | Standing orders for every session | root `AGENTS.md` |
-| Current-state contracts and maps | `docs/*.md`, `web/ARCHITECTURE.md` |
+| Cross-cutting rules, intent, and external contracts | `docs/*.md`, `web/ARCHITECTURE.md` (references gated by `task atlas:check`) |
+| What a package is for and where it sits | its `doc.go` / `doc.ts`, gated by `task atlas:check` |
+| How flows, data, and lifecycles move through the code | anchored views in `docs/atlas/views/` ([Atlas](atlas/README.md)) |
 | Large prospective work | `exec-plans/active/`, deleted at completion |
 | How to run a recurring workflow | `.agents/skills/lumilio-<name>/SKILL.md` |
 | Why a project-coupled decision stands, and what it beat | `.agents/decisions/` |
@@ -73,11 +75,12 @@ known failure modes.
 | [lumilio-e2e-spec](../.agents/skills/lumilio-e2e-spec/SKILL.md) | Playwright locator order, i18n-safe names, forbidden aria-label hooks |
 | [lumilio-frontend-i18n](../.agents/skills/lumilio-frontend-i18n/SKILL.md) | extract-then-fill workflow and canonical bilingual product terminology registry |
 | [lumilio-e2e-environment](../.agents/skills/lumilio-e2e-environment/SKILL.md) | E2E stack lifecycle, seed variants, slice selection, readiness |
-| [lumilio-remote-qualification](../.agents/skills/lumilio-remote-qualification/SKILL.md) | remote hardware qualification (Radxa X4), execution budgets, and destructive resilience |
+| [lumilio-remote-qualification](../.agents/skills/lumilio-remote-qualification/SKILL.md) | optional reference-hardware benchmarks (Radxa X4), execution budgets, and destructive resilience |
 | [lumilio-lumen-fixtures](../.agents/skills/lumilio-lumen-fixtures/SKILL.md) | record real Hub responses, replay them keyless in CI |
 | [lumilio-z-index](../.agents/skills/lumilio-z-index/SKILL.md) | three-rule stacking strategy and token scale |
 | [lumilio-add-task-target](../.agents/skills/lumilio-add-task-target/SKILL.md) | Taskfile placement, naming, when a `ci:*` orchestrator is earned |
 | [lumilio-feature-doc](../.agents/skills/lumilio-feature-doc/SKILL.md) | `doc.ts` authoring, `{@link}`/import pairing, `doc.md` regeneration |
+| [lumilio-atlas](../.agents/skills/lumilio-atlas/SKILL.md) | package `doc.go`, group dependency rules, authoring anchored views, re-verifying stale views |
 | [lumilio-pin-reconcile](../.agents/skills/lumilio-pin-reconcile/SKILL.md) | assets.lock / lumen.lock bump, verify, PR shape |
 | [lumilio-exec-plan](../.agents/skills/lumilio-exec-plan/SKILL.md) | plan creation criteria, skeleton, completion extraction |
 
@@ -111,8 +114,8 @@ Status: implemented | rejected — <one line>
 
 When to write one: a non-trivial, project-coupled change — behavior, a
 cross-module contract, an on-disk or wire format, process or tooling, a
-dependency or pin policy — records its decision in the same PR. Work driven
-by an exec plan keeps interim decisions inside the active plan; completing
+dependency or pin policy — should record its decision in the same PR. Missing
+materials do not block merges. Work driven by an exec plan keeps interim decisions inside the active plan; completing
 the plan extracts the durable ones here
 ([lumilio-exec-plan](../.agents/skills/lumilio-exec-plan/SKILL.md)).
 Mechanical or local edits are exempt.
@@ -152,6 +155,8 @@ asserts a clean tree (`git diff --exit-code`) in the `generated` CI job:
 | `web/src/lib/http-commons/schema.d.ts`, OpenAPI spec and docs | `task dto` | `verify:generated` |
 | `doc.md` siblings of feature `doc.ts` | `task web:docs` | `verify:generated` |
 | Server config schema and examples | `task config:examples` | `verify:generated` |
+| `docs/atlas/generated/**` | `task atlas:generate` | `verify:generated` (also fails on broken anchors, undeclared dependencies, and stale views) |
+| `docs/atlas/atlas.lock.json` | `task atlas:lock`, only after re-reading stale views | `atlas:check` inside `verify:generated` and `task test` |
 | `assets.lock.json`, `lumen.lock.json` | reconcile/sync tools | already gated: `assets:check`, `lumen:check` |
 | `web/src/wasm/*` bundles | `task wasm:blake3` | **exception**: Rust toolchain is not a CI baseline; PR review owns freshness |
 
@@ -167,9 +172,10 @@ Linked from `AGENTS.md`; this section is the home.
   manifest and a genuinely missing config exits non-zero; the desktop build
   compiles and launches its embedded server. Hand-assembled compositions do
   not substitute for the shipped assembly.
-- **A guard must be proven to fail.** When adding a regression test, introduce
-  the regression, watch the test go red, revert. A test that cannot fail for
-  its mechanism is a false guard; state the red run in the PR.
+- **Try proving a guard can fail.** When adding a regression test, introduce
+  the regression, watch the test go red, revert, and describe the red run in
+  the PR when practical. This is guidance; missing red-run materials do not
+  block merges.
 - **Record/replay at the expensive nondeterministic boundary.** Lumen
   inference (`siglip`, `face`, `ocr`, `bioclip`) records real Hub responses
   into reviewed fixtures and replays them keyless and GPU-less through
@@ -178,13 +184,14 @@ Linked from `AGENTS.md`; this section is the home.
   builtin embedding — same as the previous constant-vector fixture.
   Procedure: [lumilio-lumen-fixtures](../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
 
-## The obligation
+## Memory guidance
 
-The single rule that closes the loop, carried in `AGENTS.md`:
+The habit that closes the loop, carried in `AGENTS.md`:
 
-> A non-trivial change updates one memory in the same PR — the owning
+> A non-trivial change should update one memory in the same PR — the owning
 > decision record, exec plan, or postmortem — and passes the gates its diff
-> touches. Mechanical or local edits are exempt.
+> touches. Mechanical or local edits are exempt. Missing memory materials
+> do not block merges; required correctness checks still apply.
 
 ## Current state
 

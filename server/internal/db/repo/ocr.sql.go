@@ -208,7 +208,7 @@ SELECT
     a.owner_id,
     COALESCE(CAST(occurrence.repository_id AS TEXT), '') AS repository_id,
     a.type AS asset_type,
-    a.is_deleted,
+    a.lifecycle_state,
     m.revision,
     ti.text_content
 FROM ocr_results r
@@ -227,13 +227,13 @@ ORDER BY a.asset_id, ti.id
 `
 
 type GetOCRDocumentsByAssetIDsRow struct {
-	AssetID      uuid.UUID   `db:"asset_id" json:"asset_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
-	AssetType    string      `db:"asset_type" json:"asset_type"`
-	IsDeleted    bool        `db:"is_deleted" json:"is_deleted"`
-	Revision     int64       `db:"revision" json:"revision"`
-	TextContent  *string     `db:"text_content" json:"text_content"`
+	AssetID        uuid.UUID   `db:"asset_id" json:"asset_id"`
+	OwnerID        *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID   interface{} `db:"repository_id" json:"repository_id"`
+	AssetType      string      `db:"asset_type" json:"asset_type"`
+	LifecycleState string      `db:"lifecycle_state" json:"lifecycle_state"`
+	Revision       int64       `db:"revision" json:"revision"`
+	TextContent    *string     `db:"text_content" json:"text_content"`
 }
 
 func (q *Queries) GetOCRDocumentsByAssetIDs(ctx context.Context, assetIds string) ([]GetOCRDocumentsByAssetIDsRow, error) {
@@ -250,7 +250,7 @@ func (q *Queries) GetOCRDocumentsByAssetIDs(ctx context.Context, assetIds string
 			&i.OwnerID,
 			&i.RepositoryID,
 			&i.AssetType,
-			&i.IsDeleted,
+			&i.LifecycleState,
 			&i.Revision,
 			&i.TextContent,
 		); err != nil {
@@ -280,7 +280,7 @@ SELECT
     a.owner_id,
     COALESCE(CAST(occurrence.repository_id AS TEXT), '') AS repository_id,
     a.type AS asset_type,
-    a.is_deleted,
+    a.lifecycle_state,
     m.revision,
     ti.text_content
 FROM batch_assets b
@@ -302,13 +302,13 @@ type GetOCRDocumentsForRebuildParams struct {
 }
 
 type GetOCRDocumentsForRebuildRow struct {
-	AssetID      uuid.UUID   `db:"asset_id" json:"asset_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
-	AssetType    string      `db:"asset_type" json:"asset_type"`
-	IsDeleted    bool        `db:"is_deleted" json:"is_deleted"`
-	Revision     int64       `db:"revision" json:"revision"`
-	TextContent  *string     `db:"text_content" json:"text_content"`
+	AssetID        uuid.UUID   `db:"asset_id" json:"asset_id"`
+	OwnerID        *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID   interface{} `db:"repository_id" json:"repository_id"`
+	AssetType      string      `db:"asset_type" json:"asset_type"`
+	LifecycleState string      `db:"lifecycle_state" json:"lifecycle_state"`
+	Revision       int64       `db:"revision" json:"revision"`
+	TextContent    *string     `db:"text_content" json:"text_content"`
 }
 
 func (q *Queries) GetOCRDocumentsForRebuild(ctx context.Context, arg GetOCRDocumentsForRebuildParams) ([]GetOCRDocumentsForRebuildRow, error) {
@@ -325,7 +325,7 @@ func (q *Queries) GetOCRDocumentsForRebuild(ctx context.Context, arg GetOCRDocum
 			&i.OwnerID,
 			&i.RepositoryID,
 			&i.AssetType,
-			&i.IsDeleted,
+			&i.LifecycleState,
 			&i.Revision,
 			&i.TextContent,
 		); err != nil {

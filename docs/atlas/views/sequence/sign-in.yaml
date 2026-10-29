@@ -1,0 +1,105 @@
+id: sign-in
+kind: sequence
+title: Password sign-in with optional TOTP
+summary: >-
+  How a browser session is established. The refresh credential is a host-only
+  HttpOnly cookie; browser JavaScript holds only the short-lived access token
+  and a session-bound CSRF proof. TOTP, when enabled, turns the first response
+  into a one-use MFA challenge.
+nodes:
+  - id: user
+    label: User
+    anchor: ext:User
+    shape: actor
+  - id: flow
+    label: Sign-in flow (Web)
+    anchor: ts:useLoginFlow
+  - id: provider
+    label: AuthProvider
+    anchor: ts:AuthProvider
+  - id: handler
+    label: AuthHandler
+    anchor: go:handler.AuthHandler
+  - id: limiter
+    label: Rate limiter
+    anchor: go:ratelimit.Limiter
+  - id: service
+    label: AuthService
+    anchor: go:service.AuthService
+  - id: catalog
+    label: users / refresh_tokens
+    anchor: sql:refresh_tokens
+steps:
+  - from: user
+    to: flow
+    label: username, then password (or passkey)
+  - from: flow
+    to: handler
+    label: POST /auth/login
+    anchor: api:POST /api/v1/auth/login
+  - from: handler
+    to: limiter
+    label: per-network and per-username fixed windows
+    anchor: go:handler.AuthHandler.Login
+  - from: handler
+    to: service
+    label: Login(username, password)
+    anchor: go:service.AuthService.Login
+  - from: service
+    to: catalog
+    label: user lookup, bcrypt compare, MFA status
+  - block: alt
+    label: TOTP enabled
+    steps:
+      - from: service
+        to: handler
+        label: one-use MFA challenge token (no session yet)
+        reply: true
+      - from: handler
+        to: flow
+        label: mfa_required + challenge
+        reply: true
+      - from: user
+        to: flow
+        label: TOTP or recovery code
+      - from: flow
+        to: handler
+        label: POST /auth/mfa/verify
+        anchor: api:POST /api/v1/auth/mfa/verify
+      - from: handler
+        to: service
+        label: VerifyLoginMFA
+        anchor: go:service.AuthService.VerifyLoginMFA
+    else:
+      - label: password change required
+        steps:
+          - from: handler
+            to: flow
+            label: password-change challenge; session issued after POST /auth/password-change/complete
+            reply: true
+            anchor: api:POST /api/v1/auth/password-change/complete
+  - from: service
+    to: catalog
+    label: store refresh session, update last login
+  - from: handler
+    to: flow
+    label: access token + CSRF in JSON, refresh token as HttpOnly cookie
+    reply: true
+    anchor: go:handler.AuthHandler.installBrowserSession
+  - from: flow
+    to: provider
+    label: store verified user and access token
+  - note: Later requests send the access token as a Bearer header; AuthMiddleware authenticates each one. On expiry the client rotates the cookie under a cross-tab Web Lock.
+    over: provider,handler
+  - from: provider
+    to: handler
+    label: POST /auth/refresh (cookie + CSRF)
+    anchor: ts:refreshBrowserSession
+notes:
+  - title: What the browser can and cannot read
+    body: >-
+      The refresh credential never reaches JavaScript. Every session exit
+      converges on `resetSession`, which removes credentials, resets feature
+      and global state, clears user-scoped preferences, and clears the Query
+      cache before another user signs in.
+related: [bootstrap, system-context]

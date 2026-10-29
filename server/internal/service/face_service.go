@@ -66,6 +66,10 @@ type FaceService interface {
 // ownership rule), e.g. an admin merging two users' people.
 var ErrPeopleCrossOwner = errors.New("people belong to different owners")
 
+// ErrFaceClusterRebuildInProgress is returned when face results cannot be
+// applied inside a catalog transaction while a cluster rebuild runs.
+var ErrFaceClusterRebuildInProgress = errors.New("face clusters are being rebuilt")
+
 // FaceResultWithItems contains face results and detailed face items.
 type FaceResultWithItems struct {
 	Result *repo.FaceResult
@@ -196,10 +200,19 @@ func (s *faceService) ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetI
 	if tx == nil {
 		return errors.New("face result transaction is required")
 	}
-	s.clusterRebuildMu.RLock()
+	// The caller already holds SQLite's only writer, and a cluster rebuild
+	// holds this lock while it waits for that writer. Waiting here would
+	// deadlock; refuse instead so the enrichment publication is retried.
+	if !s.clusterRebuildMu.TryRLock() {
+		return ErrFaceClusterRebuildInProgress
+	}
 	defer s.clusterRebuildMu.RUnlock()
 	return s.applyFaceResultsTx(ctx, s.queries.WithTx(tx), assetID, faceV1, imageData, processingTimeMs)
 }
+
+// faceCropLeaseWait bounds the repository lease wait inside a catalog write
+// transaction, where every other catalog writer waits behind it.
+const faceCropLeaseWait = 2 * time.Second
 
 func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
 
@@ -211,17 +224,28 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 	if err != nil {
 		return err
 	}
-	repositoryFS, err := s.files.Open(repository)
+	// The caller holds SQLite's only writer, and a lifecycle mutation holding
+	// this repository's lease may be waiting for that writer. Give up quickly
+	// so the transaction rolls back and the mutation can finish; the
+	// enrichment publication is retried.
+	leaseCtx, cancelLease := context.WithTimeout(ctx, faceCropLeaseWait)
+	repositoryFS, err := s.files.OpenContext(leaseCtx, repository)
+	cancelLease()
 	if err != nil {
 		return err
 	}
 	defer repositoryFS.Close()
 
-	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID, repositoryFS)
+	// A user's manual person assignments survive a re-detection of changed
+	// content (#223 in-place carry-over): they are captured before the old
+	// faces go and re-applied to the new faces before emptied people are
+	// dissolved.
+	manualAssignments, err := captureManualFaceAssignments(ctx, queries, assetID)
 	if err != nil {
 		return err
 	}
-	if err := s.cleanupAffectedClustersWithQueries(ctx, queries, affectedClusters); err != nil {
+	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID, repositoryFS)
+	if err != nil {
 		return err
 	}
 
@@ -297,8 +321,24 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 	if err := s.recognizePendingFacesForAssetWithQueries(ctx, queries, *asset, createdItems); err != nil {
 		return fmt.Errorf("recognize pending faces: %w", err)
 	}
+	reapplied, err := reapplyManualFaceAssignments(ctx, queries, manualAssignments, createdItems)
+	if err != nil {
+		return err
+	}
+	return s.cleanupAffectedClustersWithQueries(ctx, queries, uniqueClusterIDs(append(affectedClusters, reapplied...)))
+}
 
-	return nil
+func uniqueClusterIDs(ids []int32) []int32 {
+	seen := make(map[int32]bool, len(ids))
+	out := make([]int32, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 func largestFaceIndex(faces []types.Face) int {

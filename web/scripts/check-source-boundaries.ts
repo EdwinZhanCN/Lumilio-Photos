@@ -45,17 +45,20 @@ const appImportEntrypoints = new Set(["main.tsx"]);
 // Storage identity is presentation-sensitive: feature UI consumes the
 // Repositories-owned normalized model, never transport DTOs with raw `name`.
 const storageTransportDtoPattern =
-  /dto\.(?:IndexingRepositoryListResponseDTO|IndexingRepositoryOptionDTO|ListRepositoryRootsResponseDTO|RepositoryDTO|RepositoryRootDTO|StorageDiagnosticDTO|StorageDiagnosticsResponseDTO)/;
+  /dto\.(?:StorageTargetDTO|StorageTargetsResponseDTO|StorageLocationViewDTO|StorageViewResponseDTO|RepositoryDTO|StorageDiagnosticDTO|StorageDiagnosticsResponseDTO)/;
 const storageTransportAdapterFiles = new Set([
   "features/repositories/model/storageEntities.ts",
   "features/repositories/model/repositoryOptions.ts",
   "features/repositories/types.ts",
+  "features/repositories/api/useStorageView.ts",
+  "features/repositories/flows/storage-panel/storageViewModel.ts",
 ]);
 const storagePresentationQueryPattern =
-  /\$api\.useQuery\s*\(\s*["']get["']\s*,\s*["']\/api\/v1\/(?:assets\/indexing\/repositories|repository-roots|repositories\/storage-diagnostics)["']/;
+  /\$api\.useQuery\s*\(\s*["']get["']\s*,\s*["']\/api\/v1\/(?:assets\/indexing\/repositories|storage\/view|storage\/diagnostics|storage\/targets)["']/;
 const storagePresentationQueryFiles = new Set([
   "features/repositories/api/useRepositoryOptions.ts",
-  "features/repositories/api/useRepositoryRoots.ts",
+  "features/repositories/api/useStorageLocations.ts",
+  "features/repositories/api/useStorageView.ts",
   "features/repositories/api/useStorageDiagnostics.ts",
 ]);
 

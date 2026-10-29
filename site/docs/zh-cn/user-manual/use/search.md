@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_query_handler.go
 - server/internal/search
 - server/internal/service/ocr_service.go
 - server/internal/api/handler/capabilities_handler.go

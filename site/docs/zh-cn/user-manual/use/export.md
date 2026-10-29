@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/api/router.go
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_media_handler.go
 - server/internal/api/handler/share_link_handler.go
 - server/internal/utils/imaging/process.go
 - web/src/features/studio/flows/editor/export/ExportPanel.tsx

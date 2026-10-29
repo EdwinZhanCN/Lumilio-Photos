@@ -162,8 +162,17 @@ func problemSchemaRef(path string, status int) string {
 	if status == 429 {
 		return "#/components/schemas/api.RateLimitedProblemResponse"
 	}
-	if status == 409 && (path == "/api/v1/repositories" || path == "/api/v1/repository-candidates/open") {
+	if status == 409 && (path == "/api/v1/storage/repositories" || path == "/api/v1/setup/primary-repository") {
+		return "#/components/schemas/api.RepositoryCreateProblemResponse"
+	}
+	if status == 409 && path == "/api/v1/storage/assessments" {
 		return "#/components/schemas/api.RepositoryConflictProblemResponse"
+	}
+	if status == 409 && repositoryCandidatePaths[path] {
+		return "#/components/schemas/api.RepositoryCandidateProblemResponse"
+	}
+	if status == 409 && repositoryCommandPaths[path] {
+		return "#/components/schemas/api.RepositoryCommandProblemResponse"
 	}
 	return "#/components/schemas/api.ProblemResponse"
 }
@@ -211,6 +220,110 @@ func installProblemSchemas(schemas *yaml.Node) {
 	setMappingValue(schemas, "api.RepositoryConflictProblemResponse", node(problemSchema(
 		problem.RepositoryConflict.Type, problem.RepositoryConflict.Status, problem.RepositoryConflict.Extensions,
 	)))
+	setMappingValue(schemas, "api.StorageConfirmationRequiredProblemResponse", node(problemSchema(
+		problem.StorageConfirmationRequired.Type, problem.StorageConfirmationRequired.Status, problem.StorageConfirmationRequired.Extensions,
+	)))
+	createUnion := make([]any, 0, len(repositoryCreateProblems))
+	createDiscriminator := make(map[string]any, len(repositoryCreateProblems))
+	for _, descriptor := range repositoryCreateProblems {
+		ref := "#/components/schemas/api." + schemaName(descriptor.Type) + "Problem"
+		createUnion = append(createUnion, map[string]any{"$ref": ref})
+		createDiscriminator[descriptor.Type] = ref
+	}
+	setMappingValue(schemas, "api.RepositoryCreateProblemResponse", node(map[string]any{
+		"oneOf": createUnion,
+		"discriminator": map[string]any{
+			"propertyName": "type",
+			"mapping":      createDiscriminator,
+		},
+	}))
+	commandUnion := make([]any, 0, len(repositoryCommandProblems))
+	commandDiscriminator := make(map[string]any, len(repositoryCommandProblems))
+	for _, descriptor := range repositoryCommandProblems {
+		ref := "#/components/schemas/api." + schemaName(descriptor.Type) + "Problem"
+		commandUnion = append(commandUnion, map[string]any{"$ref": ref})
+		commandDiscriminator[descriptor.Type] = ref
+	}
+	setMappingValue(schemas, "api.RepositoryCommandProblemResponse", node(map[string]any{
+		"oneOf": commandUnion,
+		"discriminator": map[string]any{
+			"propertyName": "type",
+			"mapping":      commandDiscriminator,
+		},
+	}))
+	candidateUnion := make([]any, 0, len(repositoryCandidateProblems()))
+	candidateDiscriminator := make(map[string]any, len(repositoryCandidateProblems()))
+	for _, descriptor := range repositoryCandidateProblems() {
+		ref := "#/components/schemas/api." + schemaName(descriptor.Type) + "Problem"
+		candidateUnion = append(candidateUnion, map[string]any{"$ref": ref})
+		candidateDiscriminator[descriptor.Type] = ref
+	}
+	setMappingValue(schemas, "api.RepositoryCandidateProblemResponse", node(map[string]any{
+		"oneOf": candidateUnion,
+		"discriminator": map[string]any{
+			"propertyName": "type",
+			"mapping":      candidateDiscriminator,
+		},
+	}))
+}
+
+// repositoryCandidatePaths are the Docker and standalone candidate commands:
+// admitted by the create-target assessment and executed as Repository
+// commands, so their 409 is the union of both vocabularies.
+var repositoryCandidatePaths = map[string]bool{
+	"/api/v1/storage/candidates/open":    true,
+	"/api/v1/storage/candidates/resolve": true,
+}
+
+// repositoryCandidateProblems is the exact 409 vocabulary of the candidate
+// commands: every create refusal (the consent gate and the typed storage
+// refusals, a Repository conflict) and every Repository command refusal.
+func repositoryCandidateProblems() []problem.Descriptor {
+	seen := make(map[string]bool, len(repositoryCreateProblems)+len(repositoryCommandProblems))
+	union := make([]problem.Descriptor, 0, len(repositoryCreateProblems)+len(repositoryCommandProblems))
+	for _, descriptor := range append(append([]problem.Descriptor(nil), repositoryCreateProblems...), repositoryCommandProblems...) {
+		if seen[descriptor.Type] {
+			continue
+		}
+		seen[descriptor.Type] = true
+		union = append(union, descriptor)
+	}
+	return union
+}
+
+// repositoryCommandPaths are the Repository commands whose 409 is the exact
+// command vocabulary below.
+var repositoryCommandPaths = map[string]bool{
+	"/api/v1/storage/repositories/{id}/rename": true,
+	"/api/v1/storage/repositories/{id}/detach": true,
+}
+
+// repositoryCommandProblems is the exact 409 vocabulary of the Repository
+// commands: a role-aware action refusal, a held barrier, ownership held
+// elsewhere, an identity mismatch, an original that is still online, a
+// destination volume whose name rules could not be qualified, or indexed
+// names the destination volume cannot tell apart.
+var repositoryCommandProblems = []problem.Descriptor{
+	problem.StorageActionUnavailable,
+	problem.StorageBusy,
+	problem.StorageOwnershipUnavailable,
+	problem.StorageIdentityMismatch,
+	problem.StorageOriginalOnline,
+	problem.StorageVolumeUnqualified,
+	problem.StorageNameCollision,
+}
+
+// repositoryCreateProblems is the exact 409 vocabulary of the Repository
+// create commands: a Repository conflict or one typed storage refusal.
+var repositoryCreateProblems = []problem.Descriptor{
+	problem.RepositoryConflict,
+	problem.StorageConfirmationRequired,
+	problem.StorageAssessmentStale,
+	problem.StorageUnsupportedFilesystem,
+	problem.StorageNotMountedVolume,
+	problem.StorageObservationUnknown,
+	problem.StoragePermissionDenied,
+	problem.StorageMaterializationRequired,
 }
 
 func problemSchema(problemType string, status int, extensions []problem.Extension) map[string]any {
@@ -257,15 +370,22 @@ func addExtensions(properties map[string]any, required *[]string, extensions []p
 			*required = append(*required, extension.Name)
 		case "array[string]":
 			properties[extension.Name] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+			if requiredExtensions[extension.Name] {
+				*required = append(*required, extension.Name)
+			}
 		default:
 			properties[extension.Name] = map[string]any{"type": "string"}
-			if extension.Name == "conflict_type" {
+			if requiredExtensions[extension.Name] {
 				*required = append(*required, extension.Name)
 			}
 		}
 	}
 	sort.Strings(*required)
 }
+
+// requiredExtensions are the typed members a subtype always carries; the
+// registry's wire structs mark them binding:"required" as well.
+var requiredExtensions = map[string]bool{"conflict_type": true, "risks": true, "assessment_token": true, "action": true, "blockers": true}
 
 func schemaName(problemType string) string {
 	path := strings.TrimPrefix(problemType, problem.Namespace)

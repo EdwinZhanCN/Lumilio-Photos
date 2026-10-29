@@ -10,19 +10,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
+	"server/internal/storage/pathsemantics"
 
 	"github.com/google/uuid"
 )
 
 type HostActionKind string
 type HostActionStatus string
-
-var inspectHostActionStoragePath = InspectStoragePath
 
 const (
 	HostActionAuthorizeStorageLocation HostActionKind = "authorize_storage_location"
@@ -47,28 +48,64 @@ var (
 )
 
 type HostActionSummary struct {
-	Name         string `json:"name,omitempty"`
-	Purpose      string `json:"purpose,omitempty"`
-	RootID       string `json:"root_id,omitempty"`
-	RepositoryID string `json:"repository_id,omitempty"`
+	Name              string `json:"name,omitempty"`
+	Purpose           string `json:"purpose,omitempty"`
+	StorageLocationID string `json:"storage_location_id,omitempty"`
+	RepositoryID      string `json:"repository_id,omitempty"`
 }
 
+// RiskMountChanged is the continuity risk of a reconnect: the selected tree
+// sits on a different mount than the one the registration recorded. It joins
+// the P1 risk vocabulary for the native review and is acknowledged by code.
+const RiskMountChanged StorageRisk = "mount_fingerprint_changed"
+
 type HostActionConflict struct {
-	Type           string   `json:"type"`
-	RepositoryID   string   `json:"repository_id,omitempty"`
-	RootID         string   `json:"root_id,omitempty"`
-	RegisteredPath string   `json:"registered_path,omitempty"`
-	RequestedPath  string   `json:"requested_path,omitempty"`
-	Actions        []string `json:"actions,omitempty"`
-	RiskWarnings   []string `json:"risk_warnings,omitempty"`
+	Type              string   `json:"type"`
+	RepositoryID      string   `json:"repository_id,omitempty"`
+	StorageLocationID string   `json:"storage_location_id,omitempty"`
+	RegisteredPath    string   `json:"registered_path,omitempty"`
+	RequestedPath     string   `json:"requested_path,omitempty"`
+	Actions           []string `json:"actions,omitempty"`
+	// RiskWarnings are the stable risk codes of a `storage_risk` decision,
+	// the same vocabulary the HTTP create review reports.
+	RiskWarnings []string `json:"risk_warnings,omitempty"`
+	// Fingerprint binds a `storage_risk` decision to the facts it was made
+	// on; an acknowledgement of a different fingerprint is stale. It is a
+	// digest, never the facts, and it never crosses the HTTP contract.
+	Fingerprint string `json:"fingerprint,omitempty"`
+}
+
+// HostActionRefusal is the role-aware policy's verdict when a native action
+// was withheld, so the Web renders the same blockers and alternatives it
+// would for the HTTP command.
+type HostActionRefusal struct {
+	Action       string   `json:"action"`
+	Blockers     []string `json:"blockers,omitempty"`
+	Alternatives []string `json:"alternatives,omitempty"`
 }
 
 type HostActionResult struct {
-	RepositoryID string              `json:"repository_id,omitempty"`
-	RootID       string              `json:"root_id,omitempty"`
-	Name         string              `json:"name,omitempty"`
-	Conflict     *HostActionConflict `json:"conflict,omitempty"`
+	RepositoryID      string              `json:"repository_id,omitempty"`
+	StorageLocationID string              `json:"storage_location_id,omitempty"`
+	Name              string              `json:"name,omitempty"`
+	Conflict          *HostActionConflict `json:"conflict,omitempty"`
+	Refusal           *HostActionRefusal  `json:"refusal,omitempty"`
 }
+
+// Host action failure codes that name a registered Problem type. A failed
+// action whose ErrorCode is one of these is projected as that Problem rather
+// than the generic host-action failure, so a domain reason survives the
+// native transport.
+const (
+	hostActionCodeActionUnavailable    = "storage/action-unavailable"
+	hostActionCodeOriginalOnline       = "storage/original-online"
+	hostActionCodeIdentityMismatch     = "storage/identity-mismatch"
+	hostActionCodeOwnershipUnavailable = "storage/ownership-unavailable"
+	hostActionCodeBusy                 = "storage/busy"
+	hostActionCodeVolumeUnqualified    = "storage/volume-unqualified"
+	hostActionCodeNameCollision        = "storage/name-collision"
+	hostActionCodeRepositoryConflict   = "repository/conflict"
+)
 
 type HostAction struct {
 	ActionID        string
@@ -187,8 +224,8 @@ func validateHostActionInput(input CreateHostActionInput) error {
 	switch input.Kind {
 	case HostActionAuthorizeStorageLocation, HostActionOpenRepository:
 	case HostActionLocateStorageLocation:
-		if _, err := uuid.Parse(strings.TrimSpace(input.Summary.RootID)); err != nil {
-			return fmt.Errorf("locate Storage Location requires a valid root_id: %w", err)
+		if _, err := uuid.Parse(strings.TrimSpace(input.Summary.StorageLocationID)); err != nil {
+			return fmt.Errorf("locate Storage Location requires a valid storage_location_id: %w", err)
 		}
 	case HostActionLocateRepository:
 		if _, err := uuid.Parse(strings.TrimSpace(input.Summary.RepositoryID)); err != nil {
@@ -246,7 +283,9 @@ func (rm *DefaultRepositoryManager) expirePendingHostActions(ctx context.Context
 
 // SetHostActionExpectedVersion binds a pending request to the Desktop storage
 // snapshot on which it was presented. Only the native control plane has the
-// nonce needed to perform this one-time compare-and-set.
+// nonce needed to bind it, and presenting the request again after the
+// storage snapshot moved rebinds it: a stale binding is restarted by the
+// next presentation, never left un-approvable.
 func (rm *DefaultRepositoryManager) SetHostActionExpectedVersion(ctx context.Context, actionID, nonce string, version uint64) (HostAction, error) {
 	if version == 0 {
 		return HostAction{}, errors.New("expected storage version must be non-zero")
@@ -258,16 +297,16 @@ func (rm *DefaultRepositoryManager) SetHostActionExpectedVersion(ctx context.Con
 	if subtle.ConstantTimeCompare([]byte(action.nonce), []byte(strings.TrimSpace(nonce))) != 1 {
 		return HostAction{}, ErrHostActionNonceInvalid
 	}
-	if action.Status != HostActionPending {
+	if action.Status != HostActionPending && action.Status != HostActionNeedsDecision {
 		return HostAction{}, ErrHostActionNotPending
 	}
-	if action.ExpectedVersion != 0 {
+	if action.ExpectedVersion == version {
 		return action, nil
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	result, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions SET expected_version = ?, updated_at = ?
-		WHERE action_id = ? AND status = 'pending' AND expected_version = 0 AND expires_at > ?
+		WHERE action_id = ? AND status IN ('pending', 'needs_decision') AND expires_at > ?
 	`, version, now, actionID, now)
 	if err != nil {
 		return HostAction{}, fmt.Errorf("bind host action expected version: %w", err)
@@ -323,7 +362,149 @@ func (rm *DefaultRepositoryManager) ListHostActionsForActor(ctx context.Context,
 	return actions, rows.Err()
 }
 
-func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, riskConfirmation ...bool) (HostAction, error) {
+// hostActionReview is the shared assessment of a natively selected folder:
+// the P1 observation and classification of the exact path the Desktop
+// returned, the risks the administrator must acknowledge, and the fingerprint
+// an acknowledgement is bound to. It is the native twin of the HTTP create
+// review, so both transports refuse and warn on the same facts.
+type hostActionReview struct {
+	Assessment  StorageAssessment
+	Risks       []StorageRisk
+	Fingerprint string
+}
+
+func (r hostActionReview) Problem() StorageProblemCode { return r.Assessment.Classification.Problem }
+
+// refusalError maps the classification to the typed storage error the HTTP
+// create command returns, before any consent is considered.
+func (r hostActionReview) refusalError() error {
+	return (&CreateTargetAssessment{Assessment: r.Assessment}).RefusalError()
+}
+
+// reviewHostActionTarget samples the selected path through the installed
+// observer. Authorizing or reconnecting a Storage Location is always outside
+// the Default Storage Location; opening or reconnecting a Repository takes
+// the kind of the Storage Location that contains the selected folder. A
+// reconnect adds the continuity risk when the selected tree sits on a
+// different mount than the registration recorded. Nothing here writes.
+func (rm *DefaultRepositoryManager) reviewHostActionTarget(ctx context.Context, action HostAction, selectedPath string) hostActionReview {
+	nonDefault := true
+	expectedRepositoryID := ""
+	previousFingerprint := ""
+	switch action.Kind {
+	case HostActionOpenRepository:
+		nonDefault = rm.hostActionPathIsOutsideDefault(ctx, selectedPath)
+	case HostActionLocateRepository:
+		expectedRepositoryID = strings.TrimSpace(action.Summary.RepositoryID)
+		nonDefault = rm.hostActionPathIsOutsideDefault(ctx, selectedPath)
+		if repositoryID, err := uuid.Parse(expectedRepositoryID); err == nil {
+			if repository, repositoryErr := rm.queries.GetRepository(ctx, repositoryID); repositoryErr == nil {
+				if root, rootErr := rm.queries.GetStorageLocation(ctx, repository.StorageLocationID); rootErr == nil {
+					previousFingerprint = root.MountFingerprint
+				}
+			}
+		}
+	case HostActionLocateStorageLocation:
+		if storageLocationID, err := uuid.Parse(strings.TrimSpace(action.Summary.StorageLocationID)); err == nil {
+			if root, rootErr := rm.queries.GetStorageLocation(ctx, storageLocationID); rootErr == nil {
+				previousFingerprint = root.MountFingerprint
+			}
+		}
+	}
+	review := hostActionReview{Assessment: AssessStorageTarget(ctx, rm.observerOrDefault(), selectedPath, nonDefault, expectedRepositoryID)}
+	review.Risks = append(review.Risks, review.Assessment.Classification.Risks...)
+	if previousFingerprint != "" && review.Problem() == "" {
+		if current := InspectStoragePathReadOnly(selectedPath).MountFingerprint; current != "" && current != previousFingerprint {
+			review.Risks = append(review.Risks, RiskMountChanged)
+		}
+	}
+	review.Fingerprint = hostActionFingerprint(action, selectedPath, review)
+	return review
+}
+
+func (rm *DefaultRepositoryManager) hostActionPathIsOutsideDefault(ctx context.Context, path string) bool {
+	defaultLocation, err := rm.queries.GetDefaultStorageLocation(ctx)
+	if err != nil {
+		return true
+	}
+	return !pathIsDirectChild(defaultLocation.Path, path)
+}
+
+// hostActionFingerprint is the fact set a native acknowledgement is bound to:
+// the task, the selected path, the risk vocabulary, and the marker and mount
+// facts that decide the classification. Capacity figures are excluded, so
+// free-space drift keeps a review valid while a replaced disk or a changed
+// marker always asks again. Only its digest is stored.
+func hostActionFingerprint(action HostAction, selectedPath string, review hostActionReview) string {
+	risks := RiskCodes(review.Risks)
+	sort.Strings(risks)
+	observed := review.Assessment.Observation
+	fields := []string{
+		"lumilio.storage.host-action.v1",
+		action.ActionID,
+		string(action.Kind),
+		filepath.Clean(selectedPath),
+		string(review.Assessment.Classification.Support),
+		string(review.Assessment.Classification.Problem),
+		strings.Join(risks, ","),
+		string(observed.Access.State),
+		fmt.Sprintf("empty=%t", observed.Empty),
+		fmt.Sprintf("placeholder=%t", observed.Placeholder),
+		observed.Volume.Filesystem,
+		observed.Mount.Platform,
+		observed.Mount.MountID,
+		observed.Mount.MountSource,
+		observed.Mount.MountPath,
+		observed.Mount.Device,
+		fmt.Sprintf("remote=%t", observed.Mount.Remote),
+		fmt.Sprintf("removable=%t", observed.Mount.Removable),
+		observed.Mount.CloudProvider,
+		string(observed.RootMarker.State),
+		observed.RootMarker.UUID,
+		string(observed.RepositoryMarker.State),
+		observed.RepositoryMarker.UUID,
+	}
+	digest := sha256.Sum256([]byte(strings.Join(fields, "\x00")))
+	return hex.EncodeToString(digest[:])
+}
+
+func hostActionProblemMessage(code StorageProblemCode) string {
+	switch code {
+	case ProblemUnsupportedFilesystem:
+		return "The selected folder is on a network or remote filesystem, which this release does not support"
+	case ProblemNotMountedVolume:
+		return NotMountedVolumeMessage
+	case ProblemPermissionDenied:
+		return "The Server was denied access to the selected folder"
+	case ProblemMaterializationRequired:
+		return "The selected folder holds files that must be downloaded first"
+	default:
+		return "The selected folder could not be observed"
+	}
+}
+
+func risksFromCodes(codes []string) []StorageRisk {
+	risks := make([]StorageRisk, 0, len(codes))
+	for _, code := range codes {
+		risks = append(risks, StorageRisk(strings.TrimSpace(code)))
+	}
+	return risks
+}
+
+func storageRiskConflict(path string, review hostActionReview) HostActionConflict {
+	return HostActionConflict{
+		Type: "storage_risk", RequestedPath: path, Actions: []string{"confirm_risk"},
+		RiskWarnings: RiskCodes(review.Risks), Fingerprint: review.Fingerprint,
+	}
+}
+
+// ExecuteHostAction runs a native task on the folder the Desktop chose. The
+// first call carries the selected path; a call that resumes a `storage_risk`
+// decision carries the acknowledged risk codes instead and re-samples the
+// same path, so an acknowledgement given for facts that have since changed
+// is stale and a new review is presented. The selected path and the nonce
+// never cross the HTTP contract.
+func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, acknowledgedRisks []string) (HostAction, error) {
 	action, err := rm.GetHostAction(ctx, actionID)
 	if err != nil {
 		return HostAction{}, err
@@ -331,17 +512,20 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 	if subtle.ConstantTimeCompare([]byte(action.nonce), []byte(strings.TrimSpace(nonce))) != 1 {
 		return HostAction{}, ErrHostActionNonceInvalid
 	}
-	confirmedRisk := len(riskConfirmation) > 0 && riskConfirmation[0]
 	resumingRiskDecision := action.Status == HostActionNeedsDecision && action.Result != nil &&
 		action.Result.Conflict != nil && action.Result.Conflict.Type == "storage_risk"
 	if action.Status != HostActionPending && !resumingRiskDecision {
 		return HostAction{}, ErrHostActionNotPending
 	}
 	if resumingRiskDecision {
-		if !confirmedRisk {
-			return HostAction{}, ErrHostActionDecisionNeeded
+		reviewed := risksFromCodes(action.Result.Conflict.RiskWarnings)
+		if !acknowledgesRisks(acknowledgedRisks, reviewed) {
+			return HostAction{}, &StorageRiskConfirmationError{Risks: reviewed}
 		}
 		selectedPath = action.selectedPath
+		if strings.TrimSpace(hostInstanceID) == "" {
+			hostInstanceID = action.HostInstanceID
+		}
 	}
 	if !time.Now().UTC().Before(action.ExpiresAt) {
 		_ = rm.finishHostAction(ctx, actionID, HostActionExpired, nil, "expired", "Native host approval expired")
@@ -366,31 +550,66 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 	if rows, _ := result.RowsAffected(); rows != 1 {
 		return HostAction{}, ErrHostActionNotPending
 	}
-	warnings := rm.hostActionRiskWarnings(ctx, action, cleanPath)
-	if len(warnings) > 0 && !confirmedRisk {
-		return rm.storeHostActionConflict(ctx, action, cleanPath, HostActionConflict{
-			Type: "storage_risk", RequestedPath: cleanPath,
-			Actions: []string{"confirm_risk"}, RiskWarnings: warnings,
-		}, ErrRepositoryRiskConfirmationRequired)
+
+	// The native host goes through the same role-aware policy as the HTTP
+	// command: a reconnect the policy withholds is refused with its verdict
+	// before the selected folder is even reviewed.
+	switch action.Kind {
+	case HostActionLocateRepository:
+		if current, lookupErr := rm.GetRepository(action.Summary.RepositoryID); lookupErr == nil && current != nil {
+			if admitErr := rm.admitReconnect(ctx, *current); admitErr != nil {
+				return rm.failHostActionTyped(ctx, actionID, "locate_repository_failed", "Repository could not be reconnected", admitErr)
+			}
+		}
+	case HostActionLocateStorageLocation:
+		if current, lookupErr := rm.GetStorageLocation(ctx, action.Summary.StorageLocationID); lookupErr == nil && current != nil {
+			if admitErr := rm.admitStorageLocationAction(ctx, *current, LocationActionReconnect); admitErr != nil {
+				return rm.failHostActionTyped(ctx, actionID, "locate_storage_location_failed", "Storage Location could not be reconnected", admitErr)
+			}
+		}
 	}
+	review := rm.reviewHostActionTarget(ctx, action, cleanPath)
+	if review.Problem() != "" {
+		return rm.failHostAction(ctx, actionID, string(review.Problem()), hostActionProblemMessage(review.Problem()), review.refusalError())
+	}
+	if review.Assessment.Observation.Access.State == AccessAbsent {
+		// The picker returns folders that exist; one that is gone by the
+		// time the task runs is unavailable, never created on its behalf.
+		return rm.failHostAction(ctx, actionID, "invalid_path", "The selected directory is unavailable", fmt.Errorf("%w: %s", ErrStorageLocationOffline, cleanPath))
+	}
+	if len(review.Risks) > 0 {
+		if resumingRiskDecision && review.Fingerprint != action.Result.Conflict.Fingerprint {
+			// The facts moved under the acknowledgement: present the current
+			// review instead of running on consent given for other facts.
+			stale, storeErr := rm.storeHostActionConflict(ctx, action, cleanPath, storageRiskConflict(cleanPath, review), ErrStorageAssessmentStale)
+			if storeErr != nil {
+				return stale, storeErr
+			}
+			return stale, ErrStorageAssessmentStale
+		}
+		if !acknowledgesRisks(acknowledgedRisks, review.Risks) {
+			return rm.storeHostActionConflict(ctx, action, cleanPath, storageRiskConflict(cleanPath, review), ErrRepositoryRiskConfirmationRequired)
+		}
+	}
+	confirmedRisk := len(review.Risks) > 0
 
 	var actionResult HostActionResult
 	switch action.Kind {
 	case HostActionAuthorizeStorageLocation:
-		root, callErr := rm.AddRepositoryRoot(ctx, cleanPath, action.Summary.Name,
+		root, callErr := rm.AddStorageLocation(ctx, cleanPath, action.Summary.Name,
 			LifecycleRequest{RequestID: "host-action:" + action.ActionID, Actor: "desktop_host:" + hostInstanceID, ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID, ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk})
 		if callErr != nil {
-			var conflict *RepositoryRootConflictError
+			var conflict *StorageLocationConflictError
 			if errors.As(callErr, &conflict) {
 				return rm.storeHostActionConflict(ctx, action, cleanPath, HostActionConflict{
-					Type: "storage_location_identity", RootID: conflict.RootID,
+					Type: "storage_location_identity", StorageLocationID: conflict.StorageLocationID,
 					RegisteredPath: conflict.RegisteredPath, RequestedPath: conflict.RequestedPath,
 					Actions: conflict.Actions,
 				}, callErr)
 			}
-			return rm.failHostAction(ctx, actionID, "storage_location_failed", "Storage Location could not be added", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "storage_location_failed", "Storage Location could not be added", callErr)
 		}
-		actionResult = HostActionResult{RootID: root.RootID.String(), Name: root.Name}
+		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	case HostActionOpenRepository:
 		ownerID, callErr := rm.HostOwnerID(ctx)
 		if callErr == nil && ownerID == nil {
@@ -415,26 +634,26 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 					Actions: conflict.Actions,
 				}, callErr)
 			}
-			return rm.failHostAction(ctx, actionID, "open_repository_failed", "Repository could not be opened", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "open_repository_failed", "Repository could not be opened", callErr)
 		}
 	case HostActionLocateStorageLocation:
-		root, callErr := rm.RelocateRepositoryRoot(ctx, action.Summary.RootID, cleanPath, LifecycleRequest{
-			RequestID: "host-action-relocate-root:" + action.ActionID, Actor: action.Actor,
+		root, callErr := rm.ReconnectStorageLocation(ctx, action.Summary.StorageLocationID, cleanPath, LifecycleRequest{
+			RequestID: "host-action-reconnect-root:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID,
 			ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk,
 		})
 		if callErr != nil {
-			return rm.failHostAction(ctx, actionID, "locate_storage_location_failed", "Storage Location could not be reconnected", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "locate_storage_location_failed", "Storage Location could not be reconnected", callErr)
 		}
-		actionResult = HostActionResult{RootID: root.RootID.String(), Name: root.Name}
+		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	case HostActionLocateRepository:
-		repository, callErr := rm.RelocateRepository(ctx, action.Summary.RepositoryID, cleanPath, LifecycleRequest{
-			RequestID: "host-action-relocate:" + action.ActionID, Actor: action.Actor,
+		repository, callErr := rm.ReconnectRepository(ctx, action.Summary.RepositoryID, cleanPath, LifecycleRequest{
+			RequestID: "host-action-reconnect:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: hostInstanceID,
 			ConfirmationType: hostActionConfirmationType(confirmedRisk, "native_directory_selection"), RiskConfirmation: confirmedRisk,
 		})
 		if callErr != nil {
-			return rm.failHostAction(ctx, actionID, "locate_repository_failed", "Repository location could not be updated", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "locate_repository_failed", "Repository could not be reconnected", callErr)
 		}
 		actionResult = HostActionResult{RepositoryID: repository.RepoID.String(), Name: repository.Name}
 	}
@@ -444,7 +663,11 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 	return rm.GetHostAction(ctx, actionID)
 }
 
-func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actionID, resolution string, riskConfirmation ...bool) (HostAction, error) {
+// ResolveHostAction applies an administrator's decision to a task that stopped
+// at a review: the acknowledgement of a `storage_risk` review by its risk
+// codes, or the moved-original / independent-copy answer to an identity
+// conflict. The answer is applied to the path the Desktop already chose.
+func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actionID, resolution string, acknowledgedRisks []string) (HostAction, error) {
 	action, err := rm.GetHostAction(ctx, actionID)
 	if err != nil {
 		return HostAction{}, err
@@ -454,11 +677,10 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 	}
 	conflict := action.Result.Conflict
 	if conflict.Type == "storage_risk" {
-		confirmed := len(riskConfirmation) > 0 && riskConfirmation[0]
-		if strings.TrimSpace(resolution) != "confirm_risk" || !confirmed {
-			return HostAction{}, ErrRepositoryRiskConfirmationRequired
+		if strings.TrimSpace(resolution) != "confirm_risk" {
+			return HostAction{}, &StorageRiskConfirmationError{Risks: risksFromCodes(conflict.RiskWarnings)}
 		}
-		return rm.ExecuteHostAction(ctx, actionID, action.nonce, action.HostInstanceID, action.selectedPath, true)
+		return rm.ExecuteHostAction(ctx, actionID, action.nonce, action.HostInstanceID, action.selectedPath, acknowledgedRisks)
 	}
 	protocolAction := ""
 	switch strings.TrimSpace(resolution) {
@@ -489,25 +711,25 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 		if protocolAction != "relocate" {
 			return rm.failHostAction(ctx, actionID, "unsupported_resolution", "A copied Storage Location cannot be registered automatically", nil)
 		}
-		root, callErr := rm.RelocateRepositoryRoot(ctx, conflict.RootID, action.selectedPath, LifecycleRequest{
-			RequestID: "host-action-resolve-relocate-root:" + action.ActionID, Actor: action.Actor,
+		root, callErr := rm.ReconnectStorageLocation(ctx, conflict.StorageLocationID, action.selectedPath, LifecycleRequest{
+			RequestID: "host-action-resolve-reconnect-root:" + action.ActionID, Actor: action.Actor,
 			ActorUserID: action.ActorUserID, HostInstanceID: action.HostInstanceID,
 			ConfirmationType: "update_location",
 		})
 		if callErr != nil {
-			return rm.failHostAction(ctx, actionID, "resolution_failed", "Storage Location location could not be updated", callErr)
+			return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Storage Location could not be reconnected", callErr)
 		}
-		actionResult = HostActionResult{RootID: root.RootID.String(), Name: root.Name}
+		actionResult = HostActionResult{StorageLocationID: root.StorageLocationID.String(), Name: root.Name}
 	} else {
 		var repositoryID string
 		if protocolAction == "relocate" {
-			repository, callErr := rm.RelocateRepository(ctx, conflict.RepositoryID, action.selectedPath, LifecycleRequest{
-				RequestID: "host-action-resolve-relocate:" + action.ActionID, Actor: action.Actor,
+			repository, callErr := rm.ReconnectRepository(ctx, conflict.RepositoryID, action.selectedPath, LifecycleRequest{
+				RequestID: "host-action-resolve-reconnect:" + action.ActionID, Actor: action.Actor,
 				ActorUserID: action.ActorUserID, HostInstanceID: action.HostInstanceID,
 				ConfirmationType: "update_location",
 			})
 			if callErr != nil {
-				return rm.failHostAction(ctx, actionID, "resolution_failed", "Repository location could not be updated", callErr)
+				return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Repository could not be reconnected", callErr)
 			}
 			repositoryID = repository.RepoID.String()
 			actionResult = HostActionResult{RepositoryID: repositoryID, Name: repository.Name}
@@ -529,7 +751,7 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 				}
 			}
 			if callErr != nil {
-				return rm.failHostAction(ctx, actionID, "resolution_failed", "Repository copy could not be added separately", callErr)
+				return rm.failHostActionTyped(ctx, actionID, "resolution_failed", "Repository copy could not be added separately", callErr)
 			}
 			actionResult = HostActionResult{RepositoryID: repositoryID, Name: repositoryName}
 		}
@@ -547,33 +769,54 @@ func hostActionConfirmationType(riskConfirmed bool, fallback string) string {
 	return fallback
 }
 
-func (rm *DefaultRepositoryManager) hostActionRiskWarnings(ctx context.Context, action HostAction, selectedPath string) []string {
-	info := inspectHostActionStoragePath(selectedPath)
-	warnings := append([]string(nil), info.RiskWarnings...)
-	switch action.Kind {
-	case HostActionOpenRepository:
-		if rootID, err := rm.repositoryRootIDForPath(ctx, selectedPath); err == nil {
-			if root, rootErr := rm.queries.GetRepositoryRoot(ctx, rootID); rootErr == nil {
-				warnings = repositoryCandidateRiskWarnings(root, selectedPath, info)
-			}
+// failHostActionTyped records a failed task whose cause is a typed storage
+// refusal under that refusal's Problem code, keeping the policy verdict's
+// blockers and alternatives, so the Web presents the same reason the HTTP
+// command would. Other causes keep the task-specific fallback code.
+func (rm *DefaultRepositoryManager) failHostActionTyped(ctx context.Context, actionID, fallbackCode, message string, cause error) (HostAction, error) {
+	code := fallbackCode
+	var refusal *HostActionRefusal
+	var unavailable *RepositoryActionUnavailableError
+	var locationUnavailable *StorageLocationActionUnavailableError
+	var collision *PathKeyCollisionError
+	switch {
+	case errors.As(cause, &unavailable):
+		code = hostActionCodeActionUnavailable
+		refusal = &HostActionRefusal{
+			Action: string(unavailable.Action), Blockers: BlockerCodes(unavailable.Blockers),
+			Alternatives: AlternativeCodes(unavailable.Alternatives),
 		}
-	case HostActionLocateRepository:
-		if repositoryID, err := uuid.Parse(strings.TrimSpace(action.Summary.RepositoryID)); err == nil {
-			if repository, repositoryErr := rm.queries.GetRepository(ctx, repositoryID); repositoryErr == nil {
-				if root, rootErr := rm.queries.GetRepositoryRoot(ctx, repository.RootID); rootErr == nil {
-					warnings = repositoryCandidateRiskWarnings(root, selectedPath, info)
-				}
-			}
+	case errors.As(cause, &locationUnavailable):
+		code = hostActionCodeActionUnavailable
+		refusal = &HostActionRefusal{
+			Action: string(locationUnavailable.Action), Blockers: BlockerCodes(locationUnavailable.Blockers),
+			Alternatives: AlternativeCodes(locationUnavailable.Alternatives),
 		}
-	case HostActionLocateStorageLocation:
-		if rootID, err := uuid.Parse(strings.TrimSpace(action.Summary.RootID)); err == nil {
-			if root, rootErr := rm.queries.GetRepositoryRoot(ctx, rootID); rootErr == nil &&
-				root.MountFingerprint != "" && info.MountFingerprint != "" && root.MountFingerprint != info.MountFingerprint {
-				warnings = append(warnings, "mount_fingerprint_changed")
-			}
-		}
+	case errors.Is(cause, ErrRepositoryOriginalOnline), errors.Is(cause, ErrStorageLocationOriginalOnline):
+		code = hostActionCodeOriginalOnline
+	case errors.Is(cause, ErrRepositoryIDMismatch):
+		code = hostActionCodeIdentityMismatch
+	case errors.Is(cause, ErrRepositoryOwnershipUnavailable):
+		code = hostActionCodeOwnershipUnavailable
+	case errors.Is(cause, ErrRepositoryBusy):
+		code = hostActionCodeBusy
+	case errors.Is(cause, pathsemantics.ErrUnqualified):
+		code = hostActionCodeVolumeUnqualified
+	case errors.As(cause, &collision):
+		code = hostActionCodeNameCollision
 	}
-	return uniqueStrings(warnings)
+	var result *HostActionResult
+	if refusal != nil {
+		result = &HostActionResult{Refusal: refusal}
+	}
+	if err := rm.finishHostAction(ctx, actionID, HostActionFailed, result, code, message); err != nil {
+		return HostAction{}, err
+	}
+	action, err := rm.GetHostAction(ctx, actionID)
+	if err != nil {
+		return HostAction{}, err
+	}
+	return action, cause
 }
 
 func (rm *DefaultRepositoryManager) CancelHostAction(ctx context.Context, actionID string) (HostAction, error) {
@@ -602,13 +845,17 @@ func (rm *DefaultRepositoryManager) storeHostActionConflict(ctx context.Context,
 	if err != nil {
 		return HostAction{}, err
 	}
+	code, message := "identity_conflict", "A repository or Storage Location identity is already registered"
+	if conflict.Type == "storage_risk" {
+		code, message = "risk_confirmation", "Storage risks must be acknowledged before continuing"
+	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	_, err = rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions
 		SET status = 'needs_decision', selected_path = ?, result = ?,
-			error_code = 'identity_conflict', error_message = ?, updated_at = ?
+			error_code = ?, error_message = ?, updated_at = ?
 		WHERE action_id = ?
-	`, selectedPath, string(encoded), "A repository or Storage Location identity is already registered", now, action.ActionID)
+	`, selectedPath, string(encoded), code, message, now, action.ActionID)
 	if err != nil {
 		return HostAction{}, err
 	}
@@ -673,13 +920,13 @@ func hostActionAuditInput(action HostAction, status HostActionStatus, result *Ho
 	targetType, targetID := "runtime_config", ""
 	switch action.Kind {
 	case HostActionAuthorizeStorageLocation, HostActionLocateStorageLocation:
-		targetType, targetID = "storage_location", action.Summary.RootID
+		targetType, targetID = "storage_location", action.Summary.StorageLocationID
 	case HostActionOpenRepository, HostActionLocateRepository:
 		targetType, targetID = "repository", action.Summary.RepositoryID
 	}
 	if result != nil {
-		if result.RootID != "" {
-			targetType, targetID = "storage_location", result.RootID
+		if result.StorageLocationID != "" {
+			targetType, targetID = "storage_location", result.StorageLocationID
 		}
 		if result.RepositoryID != "" {
 			targetType, targetID = "repository", result.RepositoryID
