@@ -180,14 +180,14 @@ Dependency-free primitives every layer may use: the strict TOML configuration lo
 
 ### Desktop host (`desktop-host`)
 
-The Wails v3 tray application: window and tray adapters and the main assembly. The product UI stays in the system browser.
+The MyGo tray application: the main assembly, the tray menu, the on-demand Settings window, the navigation guard, the coordinated quit, and the adapter that gives the update controller MyGo's signed updater. The product UI stays in the system browser.
 
-Uses: `desktop-platform`, `desktop-control`, `desktop-runtime`, `desktop-services`
+Uses: `desktop-platform`, `desktop-control`, `desktop-runtime`, `desktop-services`, `desktop-panel`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `desktop` | Command desktop is the Lumilio Desktop App: a Wails v3 system-tray host that runs the complete Server in-process and opens the product in the system browser. | [`desktop/doc.go`](../../../desktop/doc.go) |
-| `desktop/internal/host` | Package host adapts the Desktop control plane to Wails. | [`desktop/internal/host/doc.go`](../../../desktop/internal/host/doc.go) |
+| `desktop` | Command desktop is the Lumilio Desktop App: a MyGo system-tray host that runs the complete Server in-process and opens the product in the system browser. | [`desktop/doc.go`](../../../desktop/doc.go) |
+| `desktop/internal/host` | Package host adapts the Desktop control plane to MyGo. | [`desktop/internal/host/doc.go`](../../../desktop/internal/host/doc.go) |
 
 ### Desktop runtime (`desktop-runtime`)
 
@@ -200,12 +200,12 @@ Uses: `desktop-platform`, `desktop-control`, `foundation`, `runtime`
 | `desktop/internal/preferences` | Package preferences owns the small set of Desktop host preferences stored in settings.v1.json. | [`desktop/internal/preferences/doc.go`](../../../desktop/internal/preferences/doc.go) |
 | `desktop/internal/runtime` | Package runtime owns the in-process Server generation. | [`desktop/internal/runtime/doc.go`](../../../desktop/internal/runtime/doc.go) |
 | `desktop/internal/runtime/runtimeconfig` | Package runtimeconfig stores the complete, schema-versioned Server intent and its crash-recoverable current/LKG pointers. | [`desktop/internal/runtime/runtimeconfig/doc.go`](../../../desktop/internal/runtime/runtimeconfig/doc.go) |
-| `desktop/internal/shutdown` | Package shutdown is the only owner allowed to arm the Wails application for exit. | [`desktop/internal/shutdown/doc.go`](../../../desktop/internal/shutdown/doc.go) |
+| `desktop/internal/shutdown` | Package shutdown is the only owner allowed to arm the application for exit. | [`desktop/internal/shutdown/doc.go`](../../../desktop/internal/shutdown/doc.go) |
 | `desktop/internal/storage` | Package storage adapts the in-process repository control handoff into the small, cache-backed surface needed by Tray and Settings. | [`desktop/internal/storage/doc.go`](../../../desktop/internal/storage/doc.go) |
 
 ### Desktop services (`desktop-services`)
 
-Optional supervised capabilities: the Lumen ML child process with signed staged artifacts, and signed application updates.
+Optional supervised capabilities: the Lumen ML child process with signed staged artifacts, and the application update aggregate, whose transport and signature verification the host supplies.
 
 Uses: `desktop-platform`, `desktop-control`
 
@@ -213,7 +213,18 @@ Uses: `desktop-platform`, `desktop-control`
 | --- | --- | --- |
 | `desktop/internal/lumen` | Package lumen installs and supervises the optional Lumen Hub child process. | [`desktop/internal/lumen/doc.go`](../../../desktop/internal/lumen/doc.go) |
 | `desktop/internal/lumen/controlv1` | Package controlv1 is the generated gRPC client and server for the Lumen Hub control protocol (control.proto). | [`desktop/internal/lumen/controlv1/doc.go`](../../../desktop/internal/lumen/controlv1/doc.go) |
-| `desktop/internal/update` | Package update contains the platform-neutral trust and state policy for Desktop updates. | [`desktop/internal/update/doc.go`](../../../desktop/internal/update/doc.go) |
+| `desktop/internal/update` | Package update owns the Desktop update aggregate: its snapshot, its operations, and the order check, download, apply. | [`desktop/internal/update/doc.go`](../../../desktop/internal/update/doc.go) |
+
+### Desktop panel (`desktop-panel`)
+
+The Settings window as native UI drawn by MyGo: its view state, the draft that is the one save boundary, operation tracking, and the message catalogs every string a person reads comes from. It calls the control plane through the validating service facade and never a controller.
+
+Uses: `desktop-control`
+
+| Module | Purpose | Doc |
+| --- | --- | --- |
+| `desktop/internal/locales` | Package locales holds every string a person reads in the Desktop App: the Settings window, the tray, and the window title. | [`desktop/internal/locales/doc.go`](../../../desktop/internal/locales/doc.go) |
+| `desktop/internal/panel` | Package panel is the Desktop Settings window, drawn as native UI with github.com/egoist/mygo/ui: there is no webview, HTML, or JavaScript. | [`desktop/internal/panel/doc.go`](../../../desktop/internal/panel/doc.go) |
 
 ### Desktop platform (`desktop-platform`)
 
@@ -228,11 +239,11 @@ OS integration for the Desktop App: application-support paths, schema versions f
 
 ### Desktop control plane (`desktop-control`)
 
-The revisioned snapshot the control panel renders, its DTOs, and the request-id idempotent operation gate that serializes every mutation.
+The revisioned snapshot the Settings window and the tray render, its DTOs, the validating service facade they call, and the request-id idempotent operation gate that serializes every mutation.
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `desktop/internal/control` | Package control is the service surface the Desktop Settings window calls through Wails bindings. | [`desktop/internal/control/doc.go`](../../../desktop/internal/control/doc.go) |
+| `desktop/internal/control` | Package control is the service surface the Desktop Settings window and the tray call. | [`desktop/internal/control/doc.go`](../../../desktop/internal/control/doc.go) |
 | `desktop/internal/control/dto` | Package dto defines the Desktop control-plane wire types. | [`desktop/internal/control/dto/doc.go`](../../../desktop/internal/control/dto/doc.go) |
 | `desktop/internal/operation` | Package operation tracks every durable or lifecycle mutation exposed by the Desktop control plane. | [`desktop/internal/operation/doc.go`](../../../desktop/internal/operation/doc.go) |
 | `desktop/internal/state` | Package state owns the immutable DesktopSnapshot and its latest-only notification stream. | [`desktop/internal/state/doc.go`](../../../desktop/internal/state/doc.go) |

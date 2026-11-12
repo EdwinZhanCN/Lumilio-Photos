@@ -32,7 +32,7 @@ Desktop 与 Docker Server 使用同一套流明集 Server 能力，但宿主方�
 
 ## Desktop
 
-Desktop 通过 Wails 承载界面，并在应用内部启动 Server 与 SQLite。它还能管理本机运行时、添加存储位置，并可选安装和监督本机 Lumen Intelligence 子进程。关闭 Desktop 或停止其运行时后，浏览器端服务也会停止。
+Desktop 是常驻菜单栏或系统托盘的原生应用，在应用内部启动 Server 与 SQLite。它还能管理本机运行时、添加存储位置，并可选安装和监督本机 Lumen Intelligence 子进程。关闭 Desktop 或停止其运行时后，浏览器端服务也会停止。
 
 ## Docker Server
 

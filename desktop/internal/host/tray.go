@@ -1,134 +1,160 @@
 package host
 
 import (
+	"bytes"
 	"context"
-	"encoding/base64"
-	"runtime"
+	"image"
+	"image/color"
+	"image/png"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
 	"desktop/internal/control"
 	"desktop/internal/control/dto"
+	"desktop/internal/locales"
+	"desktop/internal/panel"
 
-	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/egoist/mygo"
 )
 
+// Tray is the menu-bar icon and its native menu. It is built and changed on
+// the UI thread; its labels come from the same catalog and the same status
+// names as the Settings window.
 type Tray struct {
 	host *Host
-	tray *application.SystemTray
-	menu *application.Menu
+	tray *mygo.Tray
+	dots map[dto.DotColor]*mygo.MenuIcon
 
-	runtimeRoot    *application.MenuItem
-	runtimeStart   *application.MenuItem
-	runtimeStop    *application.MenuItem
-	runtimeRestart *application.MenuItem
-	lumenRoot      *application.MenuItem
-	lumenStart     *application.MenuItem
-	lumenStop      *application.MenuItem
-	lumenRestart   *application.MenuItem
-	open           *application.MenuItem
-	manageStorage  *application.MenuItem
-	storageMenu    *application.Menu
+	runtimeRoot, runtimeStart, runtimeStop, runtimeRestart *mygo.MenuItem
+	lumenRoot, lumenStart, lumenStop, lumenRestart         *mygo.MenuItem
+	open, storageRoot, manageStorage, settings, quit       *mygo.MenuItem
+
+	shortcuts      []dto.StorageShortcut
+	shortcutItems  []*mygo.MenuItem
 	storageVersion uint64
 	storageLoaded  bool
 	storageReady   bool
-	settings       *application.MenuItem
-	quit           *application.MenuItem
+	storageLoading bool
 
 	mu       sync.RWMutex
 	actions  map[string]TrayActionBinding
 	sequence atomic.Uint64
 }
 
+// TrayActionBinding is the command a menu item sends and the aggregate
+// version it was offered at. A click on a menu that showed an older state
+// is refused as stale instead of acting on a state the person did not see.
 type TrayActionBinding struct {
 	CommandKind      string
 	AggregateVersion uint64
 }
 
-func NewTray(app *application.App, host *Host, icon, darkIcon []byte) *Tray {
-	tray := &Tray{host: host, actions: make(map[string]TrayActionBinding)}
-	tray.tray = app.SystemTray.New()
-	tray.menu = app.NewMenu()
-	tray.buildMenu()
-	if runtime.GOOS == "darwin" {
-		// macOS: the framework's pre-click event monitor drives native menu
-		// tracking (proper highlight, no app activation). Registering
-		// OnClick/OnRightClick replaces that path with the handler, and the
-		// programmatic OpenMenu synthesizes a mouse-down that re-enters the
-		// monitor — unreliable. Leave both buttons on the native menu.
-		tray.tray.SetMenu(tray.menu)
-	} else {
-		// Windows: NotifyIcon has no native menu-on-click, so both buttons
-		// open the menu programmatically.
-		tray.tray.SetMenu(tray.menu).OnClick(tray.tray.OpenMenu).OnRightClick(tray.tray.OpenMenu)
-	}
-	if len(icon) > 0 {
-		// SetIcon first (Windows light mode / fallback), then SetTemplateIcon:
-		// the template flag only affects macOS, where the black outline is
-		// auto-coloured for light/dark menu bars.
-		tray.tray.SetIcon(icon).SetTemplateIcon(icon)
-	}
-	if len(darkIcon) > 0 {
-		// Windows has no template mechanism; dark mode needs a white outline.
-		tray.tray.SetDarkModeIcon(darkIcon)
-	}
-	tray.refresh(host.Store().Get())
-	ch, cancel := host.Store().Subscribe(1)
-	go func() {
-		defer cancel()
-		for notice := range ch {
-			_ = notice
-			tray.refresh(host.Store().Get())
+func newTray(host *Host, icon []byte) (*Tray, error) {
+	t := &Tray{host: host, actions: make(map[string]TrayActionBinding), dots: make(map[dto.DotColor]*mygo.MenuIcon)}
+	for name, ink := range map[dto.DotColor]color.NRGBA{
+		dto.DotGray:   {R: 142, G: 142, B: 147, A: 255},
+		dto.DotYellow: {R: 255, G: 204, B: 0, A: 255},
+		dto.DotGreen:  {R: 52, G: 199, B: 89, A: 255},
+		dto.DotRed:    {R: 255, G: 59, B: 48, A: 255},
+	} {
+		if dot, err := mygo.NewMenuIcon(statusDot(ink), false); err == nil {
+			t.dots[name] = dot
 		}
-	}()
-	return tray
-}
-
-func (t *Tray) buildMenu() {
-	t.runtimeRoot = application.NewSubmenu("Lumilio Photos", application.NewMenu())
-	t.menu.Append(application.NewMenuFromItems(t.runtimeRoot))
-	t.runtimeStart = t.runtimeRoot.GetSubmenu().Add("Start")
-	t.runtimeStop = t.runtimeRoot.GetSubmenu().Add("Stop")
-	t.runtimeRestart = t.runtimeRoot.GetSubmenu().Add("Restart")
-	t.runtimeStart.OnClick(func(*application.Context) { t.dispatch("runtime-start") })
-	t.runtimeStop.OnClick(func(*application.Context) { t.dispatch("runtime-stop") })
-	t.runtimeRestart.OnClick(func(*application.Context) { t.dispatch("runtime-restart") })
-
-	t.lumenRoot = application.NewSubmenu("Lumen Hub", application.NewMenu())
-	t.menu.Append(application.NewMenuFromItems(t.lumenRoot))
-	t.lumenStart = t.lumenRoot.GetSubmenu().Add("Start")
-	t.lumenStop = t.lumenRoot.GetSubmenu().Add("Stop")
-	t.lumenRestart = t.lumenRoot.GetSubmenu().Add("Restart")
-	t.lumenStart.OnClick(func(*application.Context) { t.dispatch("lumen-start") })
-	t.lumenStop.OnClick(func(*application.Context) { t.dispatch("lumen-stop") })
-	t.lumenRestart.OnClick(func(*application.Context) { t.dispatch("lumen-restart") })
-
-	t.menu.AddSeparator()
-	t.open = t.menu.Add("Open")
-	t.open.OnClick(func(*application.Context) { _ = t.host.OpenProduct() })
-	storage := application.NewSubmenu("Storage Locations", application.NewMenu())
-	t.storageMenu = storage.GetSubmenu()
-	t.menu.Append(application.NewMenuFromItems(storage))
-	t.manageStorage = t.storageMenu.Add("Manage Storage Locations…")
-	t.manageStorage.OnClick(func(*application.Context) { _ = t.host.ShowSettings("/storage") })
-	t.settings = t.menu.Add("Settings…")
-	t.settings.OnClick(func(*application.Context) { _ = t.host.ShowSettings("/general") })
-	t.menu.AddSeparator()
-	t.quit = t.menu.Add("Quit Lumilio Photos")
-	t.quit.OnClick(func(*application.Context) {
-		snapshot := t.host.Store().Get()
-		_, _ = t.host.RequestQuit(t.nextRequestID("quit"), snapshot.Revision)
+	}
+	tray, err := mygo.NewTray(mygo.TrayOptions{
+		ID: "lumilio-photos", Icon: icon, IconIsTemplate: true, ToolTip: locales.TrayToolTip(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	t.tray = tray
+	t.rebuild()
+	return t, nil
 }
 
+// rebuild makes the menu again. It is needed when its structure changes:
+// the Storage Locations it lists, or the language of its labels.
+func (t *Tray) rebuild() {
+	command := func(name string) func(*mygo.MenuItem, *mygo.Window) {
+		return func(*mygo.MenuItem, *mygo.Window) { t.dispatch(name) }
+	}
+	settingsRoute := func(route string) func(*mygo.MenuItem, *mygo.Window) {
+		return func(*mygo.MenuItem, *mygo.Window) { _ = t.host.ShowSettings(route) }
+	}
+	t.runtimeStart = &mygo.MenuItem{Click: command("runtime-start")}
+	t.runtimeStop = &mygo.MenuItem{Click: command("runtime-stop")}
+	t.runtimeRestart = &mygo.MenuItem{Click: command("runtime-restart")}
+	t.runtimeRoot = &mygo.MenuItem{Submenu: []*mygo.MenuItem{t.runtimeStart, t.runtimeStop, t.runtimeRestart}}
+	t.lumenStart = &mygo.MenuItem{Click: command("lumen-start")}
+	t.lumenStop = &mygo.MenuItem{Click: command("lumen-stop")}
+	t.lumenRestart = &mygo.MenuItem{Click: command("lumen-restart")}
+	t.lumenRoot = &mygo.MenuItem{Submenu: []*mygo.MenuItem{t.lumenStart, t.lumenStop, t.lumenRestart}}
+	t.open = &mygo.MenuItem{Click: func(*mygo.MenuItem, *mygo.Window) { _ = t.host.OpenProduct() }}
+
+	t.shortcutItems = t.shortcutItems[:0]
+	var storage []*mygo.MenuItem
+	for _, shortcut := range t.shortcuts {
+		id := shortcut.ID
+		item := &mygo.MenuItem{Label: shortcut.Name, Click: func(*mygo.MenuItem, *mygo.Window) {
+			go func() { _ = t.host.storage.OpenLocation(context.Background(), id) }()
+		}}
+		t.shortcutItems = append(t.shortcutItems, item)
+		storage = append(storage, item)
+	}
+	if len(storage) > 0 {
+		storage = append(storage, mygo.Separator())
+	}
+	t.manageStorage = &mygo.MenuItem{Click: settingsRoute(panel.RouteStorage)}
+	t.storageRoot = &mygo.MenuItem{Submenu: append(storage, t.manageStorage)}
+	t.settings = &mygo.MenuItem{Click: settingsRoute(panel.RouteGeneral)}
+	t.quit = &mygo.MenuItem{Click: func(*mygo.MenuItem, *mygo.Window) {
+		_, _ = t.host.RequestQuit(t.nextRequestID("quit"), t.host.Store().Get().Revision)
+	}}
+
+	t.label(control.ProjectCapabilities(t.host.Store().Get()))
+	t.tray.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
+		t.runtimeRoot, t.lumenRoot, mygo.Separator(),
+		t.open, t.storageRoot, t.settings, mygo.Separator(), t.quit,
+	}))
+	t.tray.SetToolTip(locales.TrayToolTip())
+}
+
+// refresh shows a new snapshot in the menu and reads the Storage Locations
+// again when they changed.
 func (t *Tray) refresh(snapshot dto.DesktopSnapshot) {
 	snapshot = control.ProjectCapabilities(snapshot)
-	runtime := snapshot.Runtime
-	lumen := snapshot.Lumen
-	t.runtimeRoot.SetLabel("Lumilio Photos (" + runtime.Presentation.Label + ")")
-	t.runtimeRoot.SetBitmap(bitmapFor(runtime.Presentation.Color))
-	t.lumenRoot.SetLabel("Lumen Hub (" + lumen.Presentation.Label + ")")
-	t.lumenRoot.SetBitmap(bitmapFor(lumen.Presentation.Color))
+	t.label(snapshot)
+	t.loadShortcuts(snapshot)
+}
+
+// label sets every label and state from a snapshot. Labels are set on each
+// call, so they follow the language as it changes.
+func (t *Tray) label(snapshot dto.DesktopSnapshot) {
+	runtime, lumen, shutdown := snapshot.Runtime, snapshot.Lumen, snapshot.Host.Shutdown.Phase
+
+	t.runtimeRoot.SetLabel(locales.TrayProcess(locales.ProductCompactName(), panel.StatusLabel(runtime.Presentation)))
+	t.runtimeRoot.SetIcon(t.dots[runtime.Presentation.Color])
+	t.lumenRoot.SetLabel(locales.TrayProcess("Lumen Hub", panel.StatusLabel(lumen.Presentation)))
+	t.lumenRoot.SetIcon(t.dots[lumen.Presentation.Color])
+
+	stopLabel := func(retryCleanup bool) string {
+		if retryCleanup {
+			return locales.CommonRetryCleanup()
+		}
+		return locales.CommonStop()
+	}
+	t.runtimeStart.SetLabel(locales.CommonStart())
+	t.runtimeStop.SetLabel(stopLabel(runtime.Capabilities.CanRetryCleanupRuntime))
+	t.runtimeRestart.SetLabel(locales.CommonRestart())
+	t.lumenStart.SetLabel(locales.CommonStart())
+	t.lumenStop.SetLabel(stopLabel(lumen.Capabilities.CanRetryCleanupLumen))
+	t.lumenRestart.SetLabel(locales.CommonRestart())
+	t.open.SetLabel(locales.HeaderOpenProduct())
+	t.storageRoot.SetLabel(locales.TrayStorageLocations())
+	t.manageStorage.SetLabel(locales.TrayManageStorage())
+	t.settings.SetLabel(locales.TraySettings())
+	t.quit.SetLabel(locales.TrayQuit())
 
 	t.runtimeStart.SetEnabled(runtime.Capabilities.CanStartRuntime)
 	t.runtimeStop.SetEnabled(runtime.Capabilities.CanStopRuntime || runtime.Capabilities.CanRetryCleanupRuntime)
@@ -137,12 +163,15 @@ func (t *Tray) refresh(snapshot dto.DesktopSnapshot) {
 	t.lumenStop.SetEnabled(lumen.Capabilities.CanStopLumen || lumen.Capabilities.CanRetryCleanupLumen)
 	t.lumenRestart.SetEnabled(lumen.Capabilities.CanRestartLumen)
 	t.open.SetEnabled(runtime.Capabilities.CanOpenProduct)
-	// Storage management needs a configured, running runtime; during
-	// onboarding the entry point is the wizard itself, not the tray.
-	t.manageStorage.SetEnabled(snapshot.Runtime.Configured && snapshot.Host.Shutdown.Phase != dto.ShutdownArmed)
-	t.refreshStorage(snapshot)
-	t.settings.SetEnabled(snapshot.Host.Shutdown.Phase != dto.ShutdownArmed)
-	t.quit.SetEnabled(snapshot.Host.Shutdown.Phase == dto.ShutdownIdle || snapshot.Host.Shutdown.Phase == dto.ShutdownFailed)
+	// Storage management needs a configured runtime; during onboarding the
+	// entry point is the wizard itself, not the tray.
+	t.manageStorage.SetEnabled(runtime.Configured && shutdown != dto.ShutdownArmed)
+	t.settings.SetEnabled(shutdown != dto.ShutdownArmed)
+	t.quit.SetEnabled(shutdown == dto.ShutdownIdle || shutdown == dto.ShutdownFailed)
+	canOpenLocations := shutdown == dto.ShutdownIdle
+	for i, item := range t.shortcutItems {
+		item.SetEnabled(canOpenLocations && i < len(t.shortcuts) && t.shortcuts[i].CanOpen)
+	}
 
 	t.setAction("runtime-start", "start", runtime.Version)
 	if runtime.Capabilities.CanRetryCleanupRuntime {
@@ -158,7 +187,6 @@ func (t *Tray) refresh(snapshot dto.DesktopSnapshot) {
 		t.setAction("lumen-stop", "stop", lumen.Version)
 	}
 	t.setAction("lumen-restart", "restart", lumen.Version)
-	t.menu.Update()
 }
 
 func (t *Tray) setAction(name, command string, version uint64) {
@@ -207,65 +235,51 @@ func (t *Tray) dispatch(name string) {
 	}
 }
 
-func (t *Tray) refreshStorage(snapshot dto.DesktopSnapshot) {
-	if t.host.storage == nil || t.storageMenu == nil {
+// loadShortcuts reads the Storage Locations off the UI thread when the
+// storage aggregate changed or the Server became ready, then rebuilds the
+// menu with them.
+func (t *Tray) loadShortcuts(snapshot dto.DesktopSnapshot) {
+	if t.host.storage == nil || t.storageLoading {
 		return
 	}
-	runtimeReady := snapshot.Runtime.Phase == dto.RuntimeRunning && snapshot.Runtime.Ownership == dto.OwnershipHeld
-	if t.storageLoaded && t.storageVersion == snapshot.Storage.Version && (!runtimeReady || t.storageReady) {
+	ready := snapshot.Runtime.Phase == dto.RuntimeRunning && snapshot.Runtime.Ownership == dto.OwnershipHeld
+	if t.storageLoaded && t.storageVersion == snapshot.Storage.Version && (!ready || t.storageReady) {
 		return
 	}
-	items, err := t.host.storage.ListShortcuts(context.Background())
-	if err != nil {
-		return
-	}
-	t.storageVersion = snapshot.Storage.Version
-	t.storageLoaded = true
-	t.storageReady = runtimeReady
-	t.storageMenu.Clear()
-	for _, item := range items {
-		shortcut := item
-		menuItem := t.storageMenu.Add(shortcut.Name)
-		menuItem.SetEnabled(shortcut.CanOpen && snapshot.Host.Shutdown.Phase != dto.ShutdownQuiescing && snapshot.Host.Shutdown.Phase != dto.ShutdownFailed && snapshot.Host.Shutdown.Phase != dto.ShutdownArmed)
-		menuItem.OnClick(func(*application.Context) {
-			go func() { _ = t.host.storage.OpenLocation(context.Background(), shortcut.ID) }()
+	t.storageLoading = true
+	version := snapshot.Storage.Version
+	go func() {
+		items, err := t.host.storage.ListShortcuts(context.Background())
+		mygo.RunOnMain(func() {
+			t.storageLoading = false
+			if err != nil {
+				return
+			}
+			t.storageVersion, t.storageLoaded, t.storageReady = version, true, ready
+			t.shortcuts = items
+			t.rebuild()
 		})
-	}
-	if len(items) > 0 {
-		t.storageMenu.AddSeparator()
-	}
-	t.manageStorage = t.storageMenu.Add("Manage Storage Locations…")
-	t.manageStorage.OnClick(func(*application.Context) { _ = t.host.ShowSettings("/storage") })
-	t.manageStorage.SetEnabled(snapshot.Host.Shutdown.Phase != dto.ShutdownArmed)
+	}()
 }
 
 func (t *Tray) nextRequestID(prefix string) string {
-	return prefix + "-" + t.host.Store().Get().InstanceID + "-" + uintString(t.sequence.Add(1))
+	return prefix + "-" + t.host.Store().Get().InstanceID + "-" + strconv.FormatUint(t.sequence.Add(1), 10)
 }
 
-func uintString(value uint64) string {
-	// Avoid fmt in tray callbacks; request IDs are opaque but deterministic
-	// within one host instance.
-	if value == 0 {
-		return "0"
+// statusDot draws the filled circle of a process status for a menu item.
+func statusDot(ink color.NRGBA) []byte {
+	const size = 32
+	img := image.NewNRGBA(image.Rect(0, 0, size, size))
+	center, radius := float64(size-1)/2, float64(size)/2-7
+	for y := range size {
+		for x := range size {
+			dx, dy := float64(x)-center, float64(y)-center
+			if dx*dx+dy*dy <= radius*radius {
+				img.SetNRGBA(x, y, ink)
+			}
+		}
 	}
-	var buf [20]byte
-	i := len(buf)
-	for value > 0 {
-		i--
-		buf[i] = byte('0' + value%10)
-		value /= 10
-	}
-	return string(buf[i:])
-}
-
-func bitmapFor(color dto.DotColor) []byte {
-	encoded := map[dto.DotColor]string{
-		dto.DotGray:   "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAD0lEQVR42mNowAEYhpYEAILzYAEllbNjAAAAAElFTkSuQmCC",
-		dto.DotYellow: "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR42mN4tIoBK2IYWhIA54JjAQalaOsAAAAASUVORK5CYII=",
-		dto.DotGreen:  "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR42mPQXRWKFTEMLQkARHtLASUwB/oAAAAASUVORK5CYII=",
-		dto.DotRed:    "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR42mM46+aGFTEMLQkA1XdWQaJukugAAAAASUVORK5CYII=",
-	}
-	data, _ := base64.StdEncoding.DecodeString(encoded[color])
-	return data
+	var buffer bytes.Buffer
+	_ = png.Encode(&buffer, img)
+	return buffer.Bytes()
 }

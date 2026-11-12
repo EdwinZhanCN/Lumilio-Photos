@@ -4,12 +4,13 @@
 
 _architecture · source: `derived: //atlas:group desktop-control + imports`_
 
-The revisioned snapshot the control panel renders, its DTOs, and the request-id idempotent operation gate that serializes every mutation.
+The revisioned snapshot the Settings window and the tray render, its DTOs, the validating service facade they call, and the request-id idempotent operation gate that serializes every mutation.
 
 ```mermaid
 flowchart LR
     subgraph n_g_Used_by["Used by"]
         n_in_desktop_host[/"Desktop host"/]
+        n_in_desktop_panel[/"Desktop panel"/]
         n_in_desktop_runtime[/"Desktop runtime"/]
         n_in_desktop_services[/"Desktop services"/]
     end
@@ -20,6 +21,7 @@ flowchart LR
         n_desktop_internal_state["state"]
     end
     n_in_desktop_host -.-> n_g_Desktop_control_plane
+    n_in_desktop_panel -.-> n_g_Desktop_control_plane
     n_in_desktop_runtime -.-> n_g_Desktop_control_plane
     n_in_desktop_services -.-> n_g_Desktop_control_plane
     n_desktop_internal_control --> n_desktop_internal_operation
@@ -27,7 +29,7 @@ flowchart LR
     n_desktop_internal_operation --> n_desktop_internal_control_dto
     n_desktop_internal_state --> n_desktop_internal_control_dto
     classDef external stroke-dasharray:4 3
-    class n_in_desktop_host,n_in_desktop_runtime,n_in_desktop_services external
+    class n_in_desktop_host,n_in_desktop_panel,n_in_desktop_runtime,n_in_desktop_services external
 ```
 
 ## Elements
@@ -35,9 +37,10 @@ flowchart LR
 | Element | Description | Anchor |
 | --- | --- | --- |
 | Desktop host |  | `group:desktop-host` |
+| Desktop panel |  | `group:desktop-panel` |
 | Desktop runtime |  | `group:desktop-runtime` |
 | Desktop services |  | `group:desktop-services` |
-| control | Package control is the service surface the Desktop Settings window calls through Wails bindings. | `mod:desktop/internal/control` [`desktop/internal/control/doc.go`](../../../../desktop/internal/control/doc.go) |
+| control | Package control is the service surface the Desktop Settings window and the tray call. | `mod:desktop/internal/control` [`desktop/internal/control/doc.go`](../../../../desktop/internal/control/doc.go) |
 | control/dto | Package dto defines the Desktop control-plane wire types. | `mod:desktop/internal/control/dto` [`desktop/internal/control/dto/doc.go`](../../../../desktop/internal/control/dto/doc.go) |
 | operation | Package operation tracks every durable or lifecycle mutation exposed by the Desktop control plane. | `mod:desktop/internal/operation` [`desktop/internal/operation/doc.go`](../../../../desktop/internal/operation/doc.go) |
 | state | Package state owns the immutable DesktopSnapshot and its latest-only notification stream. | `mod:desktop/internal/state` [`desktop/internal/state/doc.go`](../../../../desktop/internal/state/doc.go) |

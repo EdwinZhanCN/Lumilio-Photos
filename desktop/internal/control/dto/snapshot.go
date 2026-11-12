@@ -2,8 +2,6 @@ package dto
 
 import "time"
 
-const SnapshotChangedEvent = "desktop:snapshot-changed"
-
 type DesiredState string
 
 const (
@@ -83,8 +81,12 @@ const (
 	DotRed    DotColor = "red"
 )
 
+// ProcessPresentation is the status dot and name of a supervised process.
+// Key is the stable identifier the tray and Settings localize; Label is its
+// English name, for logs and for a key a client does not know yet.
 type ProcessPresentation struct {
 	Color DotColor `json:"color"`
+	Key   string   `json:"key"`
 	Label string   `json:"label"`
 }
 
@@ -237,14 +239,16 @@ type HostActionTicket struct {
 }
 
 type UpdateSnapshot struct {
-	Version           uint64 `json:"version"`
-	Phase             string `json:"phase"`
-	Channel           string `json:"channel"`
-	CurrentVersion    string `json:"currentVersion"`
-	AvailableVersion  string `json:"availableVersion,omitempty"`
-	ProviderAvailable bool   `json:"providerAvailable"`
-	Error             Error  `json:"error,omitempty"`
-	CanApply          bool   `json:"canApply"`
+	Version          uint64 `json:"version"`
+	Phase            string `json:"phase"`
+	Channel          string `json:"channel"`
+	CurrentVersion   string `json:"currentVersion"`
+	AvailableVersion string `json:"availableVersion,omitempty"`
+	// Progress is the fraction of the update downloaded, 0 while unknown.
+	Progress          float64 `json:"progress,omitempty"`
+	ProviderAvailable bool    `json:"providerAvailable"`
+	Error             Error   `json:"error,omitempty"`
+	CanApply          bool    `json:"canApply"`
 }
 
 type OperationSnapshot struct {

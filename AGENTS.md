@@ -31,7 +31,7 @@ configuration that boots and diagnoses cleanly.
 - `web/`: React 19 and TypeScript on Vite+. Feature code lives in
   `web/src/features`; shared runtime code belongs in `web/src/lib`,
   `web/src/components`, or `web/src/contexts`.
-- `desktop/`: Wails v3 desktop app for macOS and Windows. It is a separate Go
+- `desktop/`: MyGo desktop app for macOS and Windows. It is a separate Go
   module that runs `server/app` and SQLite in-process.
 - `wasm/`: Rust WebAssembly crates; checked-in browser bundles live in
   `web/src/wasm`.
@@ -108,7 +108,7 @@ merges. Formats:
 - Workflows call module targets directly (`task web:test`,
   `task server:test:ci`, `task web:e2e:up`). Root `ci:*` names exist only for
   real cross-module orchestration: `task ci:architecture`, `task ci:site`,
-  `task ci:desktop:panel`, `task ci:desktop:native`. Do not add a 1:1 `ci:`
+  `task ci:desktop:native`. Do not add a 1:1 `ci:`
   wrapper for a target a workflow can already invoke.
 - Keep the Taskfile/workflow boundary explicit. `.github/workflows/*.yml`
   owns triggers, path filters, runner and native dependency setup, credentials,

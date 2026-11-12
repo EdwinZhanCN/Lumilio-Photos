@@ -381,16 +381,10 @@ tasks:
       - task: site:build
       - task: site:build:atlas
 
-  ci:desktop:panel:
-    desc: Install, check the locale files of, and build the Desktop control panel frontend
-    cmds:
-      - task: desktop:frontend:install:ci
-      - task: desktop:frontend:i18n:check
-      - task: desktop:frontend:build
-
   ci:desktop:native:
-    desc: Test embedded Server and Desktop modules, then compile Desktop
+    desc: Test embedded Server and Desktop modules, check the Settings window, then compile Desktop
     cmds:
       - task: server:test:ci
       - task: desktop:test:ci
+      - task: desktop:panel:check
       - task: desktop:compile

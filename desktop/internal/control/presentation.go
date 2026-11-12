@@ -7,82 +7,83 @@ import "desktop/internal/control/dto"
 // interpreting lifecycle fields.
 func PresentRuntime(snapshot dto.RuntimeSnapshot) dto.ProcessPresentation {
 	if snapshot.Ownership == dto.OwnershipHeld && snapshot.Phase == dto.RuntimeFailed {
-		return dto.ProcessPresentation{Color: dto.DotRed, Label: "Cleanup Required"}
+		return dto.ProcessPresentation{Color: dto.DotRed, Key: "cleanup-required", Label: "Cleanup Required"}
 	}
 	switch snapshot.Phase {
 	case dto.RuntimeStarting:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Starting"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "starting", Label: "Starting"}
 	case dto.RuntimeStopping:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Stopping"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "stopping", Label: "Stopping"}
 	case dto.RuntimeRestarting:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Restarting"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "restarting", Label: "Restarting"}
 	case dto.RuntimeSavingConfig:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Saving Configuration"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "saving-config", Label: "Saving Configuration"}
 	case dto.RuntimeApplyingConfig:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Applying Configuration"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "applying-config", Label: "Applying Configuration"}
 	case dto.RuntimeRunning:
-		return dto.ProcessPresentation{Color: dto.DotGreen, Label: "Running"}
+		return dto.ProcessPresentation{Color: dto.DotGreen, Key: "running", Label: "Running"}
 	}
 	if !snapshot.Configured {
 		// Action-oriented: the wizard is the only way out of this state.
-		return dto.ProcessPresentation{Color: dto.DotGray, Label: "Setup required"}
+		return dto.ProcessPresentation{Color: dto.DotGray, Key: "setup-required", Label: "Setup required"}
 	}
 	if snapshot.DesiredState == dto.DesiredStopped {
-		return dto.ProcessPresentation{Color: dto.DotGray, Label: "Stopped"}
+		return dto.ProcessPresentation{Color: dto.DotGray, Key: "stopped", Label: "Stopped"}
 	}
 	if snapshot.Phase == dto.RuntimeFailed {
-		return dto.ProcessPresentation{Color: dto.DotRed, Label: startupFailureLabel(snapshot.RecoveryCause)}
+		key, label := startupFailure(snapshot.RecoveryCause)
+		return dto.ProcessPresentation{Color: dto.DotRed, Key: key, Label: label}
 	}
-	return dto.ProcessPresentation{Color: dto.DotGray, Label: "Stopped"}
+	return dto.ProcessPresentation{Color: dto.DotGray, Key: "stopped", Label: "Stopped"}
 }
 
-// startupFailureLabel names the Server-classified startup failures so the
-// tray and Settings say what stopped the runtime, not just that it failed.
-func startupFailureLabel(cause dto.ErrorCode) string {
+// startupFailure names the Server-classified startup failures so the tray and
+// Settings say what stopped the runtime, not just that it failed.
+func startupFailure(cause dto.ErrorCode) (key, label string) {
 	switch cause {
 	case dto.ErrorCatalogIncompatible:
-		return "Catalog incompatible"
+		return "catalog-incompatible", "Catalog incompatible"
 	case dto.ErrorConfigurationIncompatible:
-		return "Configuration incompatible"
+		return "configuration-incompatible", "Configuration incompatible"
 	case dto.ErrorStorageMigrationRejected:
-		return "Storage folder rejected"
+		return "storage-rejected", "Storage folder rejected"
 	case dto.ErrorStorageUnavailable:
-		return "Storage unavailable"
+		return "storage-unavailable", "Storage unavailable"
 	default:
-		return "Failed"
+		return "failed", "Failed"
 	}
 }
 
 func PresentLumen(snapshot dto.LumenSnapshot) dto.ProcessPresentation {
 	if snapshot.Ownership == dto.OwnershipHeld && snapshot.ProcessPhase == dto.LumenFailed {
-		return dto.ProcessPresentation{Color: dto.DotRed, Label: "Cleanup Required"}
+		return dto.ProcessPresentation{Color: dto.DotRed, Key: "cleanup-required", Label: "Cleanup Required"}
 	}
 	if snapshot.InstallPhase == dto.LumenInstalling {
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Installing"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "installing", Label: "Installing"}
 	}
 	switch snapshot.ProcessPhase {
 	case dto.LumenStarting:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Starting"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "starting", Label: "Starting"}
 	case dto.LumenStopping:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Stopping"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "stopping", Label: "Stopping"}
 	case dto.LumenBackoff:
-		return dto.ProcessPresentation{Color: dto.DotYellow, Label: "Retrying"}
+		return dto.ProcessPresentation{Color: dto.DotYellow, Key: "retrying", Label: "Retrying"}
 	case dto.LumenRunning:
-		return dto.ProcessPresentation{Color: dto.DotGreen, Label: "Running"}
+		return dto.ProcessPresentation{Color: dto.DotGreen, Key: "running", Label: "Running"}
 	}
 	if snapshot.InstallPhase == dto.LumenAbsent {
-		return dto.ProcessPresentation{Color: dto.DotGray, Label: "Not Installed"}
+		return dto.ProcessPresentation{Color: dto.DotGray, Key: "not-installed", Label: "Not Installed"}
 	}
 	if snapshot.InstallPhase == dto.LumenInstallFailed {
-		return dto.ProcessPresentation{Color: dto.DotGray, Label: "Install Failed"}
+		return dto.ProcessPresentation{Color: dto.DotGray, Key: "install-failed", Label: "Install Failed"}
 	}
 	if snapshot.DesiredState == dto.DesiredDisabled {
-		return dto.ProcessPresentation{Color: dto.DotGray, Label: "Disabled"}
+		return dto.ProcessPresentation{Color: dto.DotGray, Key: "disabled", Label: "Disabled"}
 	}
 	if snapshot.ProcessPhase == dto.LumenFailed {
-		return dto.ProcessPresentation{Color: dto.DotRed, Label: "Failed"}
+		return dto.ProcessPresentation{Color: dto.DotRed, Key: "failed", Label: "Failed"}
 	}
-	return dto.ProcessPresentation{Color: dto.DotGray, Label: "Stopped"}
+	return dto.ProcessPresentation{Color: dto.DotGray, Key: "stopped", Label: "Stopped"}
 }
 
 func ProjectCapabilities(snapshot dto.DesktopSnapshot) dto.DesktopSnapshot {

@@ -16,13 +16,6 @@
   ],
   "packageRules": [
     {
-      "description": "Group: desktop frontend (npm) — keep before desktop gomod so paths never overlap",
-      "matchFileNames": ["desktop/frontend/**"],
-      "matchManagers": ["npm"],
-      "groupName": "desktop frontend (React)",
-      "labels": ["frontend"]
-    },
-    {
       "description": "Group: desktop Go module",
       "matchFileNames": ["desktop/**"],
       "matchManagers": ["gomod"],
@@ -143,8 +136,8 @@
       "labels": ["dto", "manual-review"]
     },
     {
-      "description": "Tier 1 frozen: Wails3 alpha — Go lib + @wailsio/runtime + CLI must be bumped together by hand",
-      "matchPackageNames": ["github.com/wailsapp/wails/v3", "@wailsio/runtime"],
+      "description": "Tier 1 frozen: MyGo is pre-1.0 and changes its ui API between minor versions — bump by hand with `go tool mygo migrate-ui` and the Desktop panel tests (the CLI is pinned by the same go.mod line)",
+      "matchPackageNames": ["github.com/egoist/mygo"],
       "enabled": false
     },
     {

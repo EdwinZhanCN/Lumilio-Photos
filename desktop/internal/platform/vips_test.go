@@ -30,7 +30,7 @@ func TestBundledVipsModuleDir(t *testing.T) {
 				return filepath.Join(root, "lumilio-photos.exe")
 			},
 			libDir: func(root string) string {
-				return filepath.Join(root, "resources", "lib")
+				return filepath.Join(root, "lib")
 			},
 		},
 	}

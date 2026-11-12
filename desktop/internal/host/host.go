@@ -7,33 +7,47 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"desktop/internal/control"
 	"desktop/internal/control/dto"
 	"desktop/internal/lumen"
 	"desktop/internal/operation"
+	"desktop/internal/panel"
 	"desktop/internal/runtime"
 	"desktop/internal/shutdown"
 	"desktop/internal/state"
 	"desktop/internal/storage"
 	"desktop/internal/update"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type Options struct {
-	Store               *state.Store
-	Operations          *operation.Registry
-	Runtime             *runtime.Controller
-	RuntimeConfig       control.RuntimeConfigAdapter
-	Lumen               *lumen.Controller
-	LumenOwner          shutdown.LumenOwner
-	Storage             *storage.Controller
-	Update              *update.Controller
+	Store         *state.Store
+	Operations    *operation.Registry
+	Runtime       *runtime.Controller
+	RuntimeConfig control.RuntimeConfigAdapter
+	Lumen         *lumen.Controller
+	LumenOwner    shutdown.LumenOwner
+	Storage       *storage.Controller
+	Update        *update.Controller
+	Preferences   control.DesktopPreferencesAdapter
+	// OpenRuntimeManifest reveals the generated Server manifests in the
+	// system's file manager.
+	OpenRuntimeManifest func() error
 	OpenURL             func(string) error
 	OpenProductOnLaunch bool
 }
 
+// settingsWindow is the Settings window as the host's lifecycle logic sees
+// it. The native window is created on demand and destroyed when closed.
+type settingsWindow interface {
+	Show()
+	Hide()
+}
+
+// Host owns what the tray and the Settings window share: the navigation
+// guard, opening the product, and the coordinated quit. It holds no UI
+// state; the Settings window's lives in [panel.Panel].
 type Host struct {
 	store               *state.Store
 	operations          *operation.Registry
@@ -42,15 +56,20 @@ type Host struct {
 	lumen               *lumen.Controller
 	storage             *storage.Controller
 	update              *update.Controller
+	preferences         control.DesktopPreferencesAdapter
+	openRuntimeManifest func() error
 	shutdown            *shutdown.Coordinator
-	openURL             func(string) error
 	openProductOnLaunch bool
 
 	mu       sync.Mutex
-	settings application.Window
-	app      *application.App
+	openURL  func(string) error
+	window   settingsWindow
 	bootOnce sync.Once
 	openOnce sync.Once
+
+	// relaunch makes the armed quit start the app again, into an update the
+	// updater installed.
+	relaunch atomic.Bool
 }
 
 func New(options Options) *Host {
@@ -65,7 +84,9 @@ func New(options Options) *Host {
 	}
 	host := &Host{
 		store: options.Store, operations: options.Operations,
-		runtime: options.Runtime, runtimeConfig: options.RuntimeConfig, lumen: options.Lumen, storage: options.Storage, update: options.Update, openURL: options.OpenURL,
+		runtime: options.Runtime, runtimeConfig: options.RuntimeConfig, lumen: options.Lumen,
+		storage: options.Storage, update: options.Update, preferences: options.Preferences,
+		openRuntimeManifest: options.OpenRuntimeManifest, openURL: options.OpenURL,
 		openProductOnLaunch: options.OpenProductOnLaunch,
 	}
 	lumenOwner := options.LumenOwner
@@ -96,7 +117,9 @@ func (h *Host) SetOpenURL(callback func(string) error) {
 	h.mu.Unlock()
 }
 
-func (h *Host) Services() []application.Service {
+// Services is the validating facade the Settings window calls. Each service
+// delegates to an adapter, so the window never reaches a controller.
+func (h *Host) Services() panel.Services {
 	var runtimeController control.RuntimeController
 	if h.runtime != nil {
 		runtimeController = h.runtime
@@ -113,29 +136,21 @@ func (h *Host) Services() []application.Service {
 	if h.update != nil {
 		updateAdapter = h.update
 	}
-	return []application.Service{
-		application.NewService(&control.DesktopService{Store: h.store, Host: h}),
-		application.NewService(&control.RuntimeService{Controller: runtimeController, Config: h.runtimeConfig}),
-		application.NewService(&control.StorageService{Adapter: storageAdapter}),
-		application.NewService(&control.LumenService{Controller: lumenAdapter}),
-		application.NewService(&control.UpdateService{Store: h.store, Adapter: updateAdapter}),
-		application.NewService(&control.DiagnosticsService{Store: h.store}),
+	return panel.Services{
+		Desktop: &control.DesktopService{
+			Store: h.store, Host: h, Preferences: h.preferences, OpenRuntimeManifestAction: h.openRuntimeManifest,
+		},
+		Runtime: &control.RuntimeService{Controller: runtimeController, Config: h.runtimeConfig},
+		Storage: &control.StorageService{Adapter: storageAdapter},
+		Lumen:   &control.LumenService{Controller: lumenAdapter},
+		Update:  &control.UpdateService{Store: h.store, Adapter: updateAdapter},
 	}
 }
 
-func (h *Host) AttachApplication(app *application.App) {
+func (h *Host) attachWindow(window settingsWindow) {
 	h.mu.Lock()
-	h.app = app
+	h.window = window
 	h.mu.Unlock()
-}
-
-func (h *Host) AttachSettingsWindow(window application.Window) {
-	h.mu.Lock()
-	h.settings = window
-	h.mu.Unlock()
-	if window != nil {
-		window.Hide()
-	}
 }
 
 func (h *Host) Boot(ctx context.Context) {
@@ -214,20 +229,22 @@ func (h *Host) Close() {
 	}
 }
 
+// ShowSettings records where the Settings window should be and shows it.
 func (h *Host) ShowSettings(route string) error {
 	if !validRoute(route) {
 		return operation.NewError(dto.ErrorInvalidArgument, "unknown Settings route")
 	}
 	snapshot := h.store.Get()
 	// Recovery and onboarding own the navigation: any entry point (tray menu,
-	// second-instance args, frontend links) must not be able to leave them
-	// before the user resolves recovery or completes onboarding — otherwise
-	// the app shows a Not Configured state with no path back to the wizard.
-	if route != "/recovery" && route != "/onboarding" {
+	// second-instance args, the window's own sidebar) must not be able to
+	// leave them before the user resolves recovery or completes onboarding —
+	// otherwise the app shows a Not Configured state with no path back to
+	// the wizard.
+	if route != panel.RouteRecovery && route != panel.RouteOnboarding {
 		if snapshot.Host.Recovery.Code != "" {
-			route = "/recovery"
+			route = panel.RouteRecovery
 		} else if !snapshot.Runtime.Configured {
-			route = "/onboarding"
+			route = panel.RouteOnboarding
 		}
 	}
 	h.commit(func(snapshot *dto.DesktopSnapshot) {
@@ -236,23 +253,27 @@ func (h *Host) ShowSettings(route string) error {
 		snapshot.Host.SettingsVisible = true
 	})
 	h.mu.Lock()
-	window := h.settings
+	window := h.window
 	h.mu.Unlock()
 	if window != nil {
 		window.Show()
-		window.Focus()
 	}
 	return nil
 }
 
 func (h *Host) HideSettings() {
-	h.commit(func(snapshot *dto.DesktopSnapshot) { snapshot.Host.SettingsVisible = false })
+	h.settingsClosed()
 	h.mu.Lock()
-	window := h.settings
+	window := h.window
 	h.mu.Unlock()
 	if window != nil {
 		window.Hide()
 	}
+}
+
+// settingsClosed records that the Settings window no longer shows.
+func (h *Host) settingsClosed() {
+	h.commit(func(snapshot *dto.DesktopSnapshot) { snapshot.Host.SettingsVisible = false })
 }
 
 func (h *Host) OpenProduct() error {
@@ -274,7 +295,19 @@ func (h *Host) RequestQuit(requestID string, expectedVersion uint64) (dto.Operat
 	return h.shutdown.RequestQuit(requestID, expectedVersion)
 }
 
+// RequestRelaunch quiesces like a quit and starts the app again once the
+// shutdown is armed. It is how an installed update is applied.
+func (h *Host) RequestRelaunch(requestID string, expectedVersion uint64) (dto.OperationReceipt, error) {
+	h.relaunch.Store(true)
+	receipt, err := h.shutdown.RequestQuit(requestID, expectedVersion)
+	if err != nil {
+		h.relaunch.Store(false)
+	}
+	return receipt, err
+}
+
 func (h *Host) ResumeAfterFailedShutdown(requestID string, expectedVersion uint64) (dto.OperationReceipt, error) {
+	h.relaunch.Store(false)
 	return h.shutdown.ResumeAfterFailedShutdown(requestID, expectedVersion)
 }
 
@@ -291,43 +324,15 @@ func (h *Host) HandleSecondInstance(args []string) {
 	for _, arg := range args {
 		switch arg {
 		case "show-settings":
-			_ = h.ShowSettings("/general")
+			_ = h.ShowSettings(panel.RouteGeneral)
 		case "open-product":
 			_ = h.OpenProduct()
 		default:
-			_ = h.ShowSettings("/general")
+			_ = h.ShowSettings(panel.RouteGeneral)
 		}
 		return
 	}
-	_ = h.ShowSettings("/general")
-}
-
-func (h *Host) EmitSnapshotChanges(ctx context.Context) {
-	app := h.application()
-	if app == nil {
-		return
-	}
-	ch, cancel := h.store.Subscribe(1)
-	go func() {
-		defer cancel()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case notice, ok := <-ch:
-				if !ok {
-					return
-				}
-				app.Event.Emit(dto.SnapshotChangedEvent, notice)
-			}
-		}
-	}()
-}
-
-func (h *Host) application() *application.App {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.app
+	_ = h.ShowSettings(panel.RouteGeneral)
 }
 
 func (h *Host) commit(reducer func(*dto.DesktopSnapshot)) {
@@ -339,7 +344,8 @@ func (h *Host) commit(reducer func(*dto.DesktopSnapshot)) {
 
 func validRoute(route string) bool {
 	switch route {
-	case "/onboarding", "/general", "/server", "/storage", "/lumen", "/updates", "/diagnostics", "/recovery", "/overview", "/runtime", "/settings":
+	case panel.RouteOnboarding, panel.RouteGeneral, panel.RouteServer, panel.RouteStorage, panel.RouteLumen,
+		panel.RouteUpdates, panel.RouteRecovery, "/diagnostics", "/overview", "/runtime", "/settings":
 		return true
 	default:
 		return false

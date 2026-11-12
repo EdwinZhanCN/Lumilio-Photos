@@ -1,13 +1,13 @@
-// Command desktop is the Lumilio Desktop App: a Wails v3 system-tray host that
+// Command desktop is the Lumilio Desktop App: a MyGo system-tray host that
 // runs the complete Server in-process and opens the product in the system
 // browser.
 //
-// main only assembles services. It resolves OS paths, builds the state store
-// and operation gate, constructs the runtime, storage, Lumen, update, and
-// preferences controllers, registers the Wails services the private Settings
-// window calls, and hands window and tray adapters to [desktop/internal/host].
-// The Settings UI source is embedded so tests compile before the frontend is
-// built.
+// main only assembles. It resolves OS paths, builds the state store and
+// operation gate, constructs the runtime, storage, Lumen, update, and
+// preferences controllers, and hands them to [desktop/internal/host], which
+// runs the application: the tray, the native Settings window, and the
+// coordinated quit. The hidden Lumen supervisor mode returns before any of
+// that starts.
 //
 //atlas:group desktop-host
 package main

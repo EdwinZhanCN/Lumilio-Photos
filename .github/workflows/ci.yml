@@ -327,7 +327,7 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # Vite+ workspaces live in web/ and site/,
                   # never the repo root, so each job's Taskfile target runs the
                   # workspace-scoped `vp install`. Disable the action's implicit
                   # root `vp install`: it has no root package.json to install and
@@ -526,7 +526,7 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # Vite+ workspaces live in web/ and site/,
                   # never the repo root, so each job's Taskfile target runs the
                   # workspace-scoped `vp install`. Disable the action's implicit
                   # root `vp install`: it has no root package.json to install and
@@ -658,18 +658,12 @@ jobs:
                       desktop/go.sum
                       server/go.sum
 
-            # `task ci:desktop:panel` builds the React control panel first,
-            # which needs `vp`. `frontend:install:ci` runs `vp install` itself.
-            - uses: voidzero-dev/setup-vp@v1
+            # `desktop:panel:check` runs the MyGo CLI, which evaluates
+            # desktop/mygo.config.ts with Node. The Desktop module has no
+            # JavaScript dependencies to install.
+            - uses: actions/setup-node@v6
               with:
                   node-version: '24'
-                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
-                  # never the repo root, so each job's Taskfile target runs the
-                  # workspace-scoped `vp install`. Disable the action's implicit
-                  # root `vp install`: it has no root package.json to install and
-                  # newer vp fails there with an npm ENOENT (root-level caching
-                  # was already a no-op for the same reason).
-                  run-install: false
 
             # CGO deps: both the complete Server suite and the Desktop module
             # compile govips/libraw. SQLite, FTS5, and Vec1 are linked into the
@@ -680,16 +674,11 @@ jobs:
             - name: Install libvips, libraw, and media tools
               run: brew install vips libraw ffmpeg exiftool
 
-            - name: Build control panel
-              run: task ci:desktop:panel
-
             - name: Run native Desktop CI gate
               run: task ci:desktop:native
 
     # Windows uses the same test/build scope as macOS, but runs Go inside the
-    # MSYS2/mingw64 environment that supplies the release CGo toolchain. The
-    # control panel stays in the default shell because vp is not on the MSYS2
-    # PATH; the generated directory is shared on disk with the later steps.
+    # MSYS2/mingw64 environment that supplies the release CGo toolchain.
     #
     # This job depends on an external toolchain (msys2 package availability), so
     # if it starts failing for reasons unrelated to a change, fix or pin the
@@ -724,19 +713,12 @@ jobs:
                       mingw-w64-x86_64-libraw
                       mingw-w64-x86_64-ffmpeg
 
-            - uses: voidzero-dev/setup-vp@v1
+            # `desktop:panel:check` runs the MyGo CLI, which evaluates
+            # desktop/mygo.config.ts with Node. `path-type: inherit` makes this
+            # Node visible inside the MSYS2 shell of the native gate.
+            - uses: actions/setup-node@v6
               with:
                   node-version: '24'
-                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
-                  # never the repo root, so each job's Taskfile target runs the
-                  # workspace-scoped `vp install`. Disable the action's implicit
-                  # root `vp install`: it has no root package.json to install and
-                  # newer vp fails there with an npm ENOENT (root-level caching
-                  # was already a no-op for the same reason).
-                  run-install: false
-
-            - name: Build control panel
-              run: task ci:desktop:panel
 
             # MSYS2 ships ffmpeg/ffprobe but not exiftool. Desktop hostProjection
             # only needs a resolvable absolute path for strict manifest load in
@@ -760,6 +742,9 @@ jobs:
             - name: Run native Desktop CI gate
               shell: msys2 {0}
               run: |
+                  # desktop/go.mod names the Go release MyGo needs. Let the go
+                  # command fetch it when the MSYS2 package is older.
+                  export GOTOOLCHAIN=auto
                   go version
                   pkgconf --modversion vips libraw
                   export PATH="${LUMILIO_TOOL_STUBS}:${PATH}"
@@ -784,7 +769,7 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # Vite+ workspaces live in web/ and site/,
                   # never the repo root, so each job's Taskfile target runs the
                   # workspace-scoped `vp install`. Disable the action's implicit
                   # root `vp install`: it has no root package.json to install and

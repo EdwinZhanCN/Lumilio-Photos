@@ -4,6 +4,13 @@ ffmpeg/
 exiftool/
 .downloads/
 
+# Staged by `go run ./cmd/devtool package` for the packager to ship: the Web
+# SPA, the license notices, and the native libraries of one platform.
+web/
+licenses/
+darwin-*/
+windows-*/
+
 # The signed payload is generated from the staged tools before packaging.
 payload/*
 !payload/.gitkeep

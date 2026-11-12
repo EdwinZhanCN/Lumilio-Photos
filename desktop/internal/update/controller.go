@@ -2,65 +2,69 @@ package update
 
 import (
 	"context"
-	"crypto/ed25519"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"desktop/internal/control"
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
-	"desktop/internal/platform"
-	"desktop/internal/platform/stateversion"
 	"desktop/internal/state"
 )
 
-type Fetcher func(context.Context, string) (manifestBytes []byte, artifact []byte, err error)
+// ErrSignature marks an update the provider refused because it is not signed
+// with the key this build trusts. A provider wraps it, so the controller can
+// tell a refused artifact from a failed download.
+var ErrSignature = errors.New("update signature verification failed")
+
+// Provider is the signed-update transport. It finds a newer release on a
+// channel, verifies what it downloads against the public key built into the
+// app, and replaces the installed app. The host implements it with the
+// framework's updater; nothing here knows where releases are published.
+type Provider interface {
+	// Enabled reports whether this build can update itself: it was built
+	// with an update feed and can write where it is installed.
+	Enabled() bool
+	// Check returns the newer release of channel, or nil when the app is up
+	// to date.
+	Check(ctx context.Context, channel string) (*Release, error)
+}
+
+// Release is a newer version a Provider found.
+type Release struct {
+	Version string
+	// Install downloads the release, verifies its signature, and replaces
+	// the app on disk. The running app is not affected: the new version
+	// runs after a relaunch. progress may be called from any goroutine.
+	Install func(ctx context.Context, progress func(downloaded, total int64)) error
+}
 
 type Options struct {
-	Store          *state.Store
-	Operations     *operation.Registry
-	PublicKey      ed25519.PublicKey
-	Fetch          Fetcher
-	Apply          func(string, uint64) (dto.OperationReceipt, error)
-	StagingDir     string
+	Store      *state.Store
+	Operations *operation.Registry
+	Provider   Provider
+	// Apply quiesces the application and relaunches it into the installed
+	// update. It belongs to the shutdown coordinator.
+	Apply          func(requestID string, expectedVersion uint64) (dto.OperationReceipt, error)
 	Channel        string
 	CurrentVersion string
 }
 
+// Controller owns the update aggregate: its snapshot, its operations, and
+// the order check, download, apply. Trust is the Provider's; the controller
+// never installs what a Provider did not verify.
 type Controller struct {
 	store          *state.Store
 	operations     *operation.Registry
-	publicKey      ed25519.PublicKey
-	fetch          Fetcher
+	provider       Provider
 	apply          func(string, uint64) (dto.OperationReceipt, error)
-	stagingDir     string
 	channel        string
 	currentVersion string
-	verified       *verifiedArtifact
+	release        *Release
+	installed      bool
 	mu             sync.Mutex
 }
-
-type verifiedArtifact struct {
-	manifestBytes []byte
-	manifest      Manifest
-	artifact      []byte
-}
-
-type stagingPointer struct {
-	SchemaVersion int    `json:"schemaVersion"`
-	Channel       string `json:"channel"`
-	Version       string `json:"version"`
-	SHA256        string `json:"sha256"`
-	Directory     string `json:"directory"`
-}
-
-const stagingSchemaVersion = 1
 
 func NewController(options Options) *Controller {
 	if options.Store == nil {
@@ -74,8 +78,8 @@ func NewController(options Options) *Controller {
 	}
 	controller := &Controller{
 		store: options.Store, operations: options.Operations,
-		publicKey: append(ed25519.PublicKey(nil), options.PublicKey...), fetch: options.Fetch, apply: options.Apply,
-		stagingDir: options.StagingDir, channel: options.Channel, currentVersion: options.CurrentVersion,
+		provider: options.Provider, apply: options.Apply,
+		channel: options.Channel, currentVersion: options.CurrentVersion,
 	}
 	controller.commit(func(snapshot *dto.UpdateSnapshot) {
 		if snapshot.Version == 0 {
@@ -83,14 +87,6 @@ func NewController(options Options) *Controller {
 		}
 		snapshot.Phase = "idle"
 	})
-	if staged, err := controller.loadStaged(); err == nil && staged.manifest.Channel == controller.channel {
-		controller.verified = staged
-		controller.commit(func(snapshot *dto.UpdateSnapshot) {
-			snapshot.Phase = "ready"
-			snapshot.AvailableVersion = staged.manifest.Version
-			snapshot.CanApply = options.Apply != nil
-		})
-	}
 	return controller
 }
 
@@ -107,11 +103,21 @@ func (c *Controller) SetChannel(channel string) error {
 		return nil
 	}
 	c.channel = channel
-	c.verified = nil
+	// A release that is already installed on disk stays ready to apply: the
+	// channel only decides what the next check looks for.
+	if !c.installed {
+		c.release = nil
+	}
+	installed := c.installed
 	c.mu.Unlock()
+	if installed {
+		c.commit(func(update *dto.UpdateSnapshot) { update.Version++ })
+		return nil
+	}
 	c.commit(func(update *dto.UpdateSnapshot) {
 		update.Phase = "idle"
 		update.AvailableVersion = ""
+		update.Progress = 0
 		update.Error = dto.Error{}
 		update.CanApply = false
 		update.Version++
@@ -119,71 +125,112 @@ func (c *Controller) SetChannel(channel string) error {
 	return nil
 }
 
+// SetProvider installs the transport once the host has one.
+func (c *Controller) SetProvider(provider Provider) {
+	c.mu.Lock()
+	c.provider = provider
+	c.mu.Unlock()
+	c.commit(func(*dto.UpdateSnapshot) {})
+}
+
 func (c *Controller) SetApply(callback func(string, uint64) (dto.OperationReceipt, error)) {
 	c.mu.Lock()
 	c.apply = callback
-	canApply := callback != nil && c.verified != nil
+	canApply := callback != nil && c.installed
 	c.mu.Unlock()
 	c.commit(func(update *dto.UpdateSnapshot) { update.CanApply = canApply })
 }
 
+func (c *Controller) enabledProvider() Provider {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.provider == nil || !c.provider.Enabled() {
+		return nil
+	}
+	return c.provider
+}
+
 func (c *Controller) Check(requestID string, expectedVersion uint64) (dto.OperationReceipt, error) {
 	return c.start(requestID, expectedVersion, "checking", func(ctx context.Context) (dto.UpdateSnapshot, error) {
-		if c.fetch == nil {
-			return dto.UpdateSnapshot{Phase: "offline", Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update provider is not configured"}}, nil
+		release, result, err := c.find(ctx)
+		if release == nil {
+			return result, err
 		}
-		data, artifact, err := c.fetch(ctx, c.store.Get().Update.Channel)
-		if err != nil {
-			return dto.UpdateSnapshot{Phase: "offline", Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update check failed"}}, nil
-		}
-		manifest, err := VerifyManifest(data, c.publicKey)
-		if err != nil {
-			return dto.UpdateSnapshot{Phase: "failed", Error: dto.Error{Code: dto.ErrorSignatureInvalid, Message: "update signature verification failed"}}, err
-		}
-		if err := VerifyArtifact(manifest, artifact); err != nil {
-			return dto.UpdateSnapshot{Phase: "failed", Error: dto.Error{Code: dto.ErrorSignatureInvalid, Message: "update artifact verification failed"}}, err
-		}
-		c.mu.Lock()
-		c.verified = &verifiedArtifact{manifestBytes: append([]byte(nil), data...), manifest: manifest, artifact: append([]byte(nil), artifact...)}
-		c.mu.Unlock()
-		return dto.UpdateSnapshot{Phase: "available", Channel: manifest.Channel, AvailableVersion: manifest.Version}, nil
+		return dto.UpdateSnapshot{Phase: "available", AvailableVersion: release.Version}, nil
 	})
 }
+
+// find asks the provider for the channel's newer release and remembers it.
+// Without one it returns the snapshot that says why.
+func (c *Controller) find(ctx context.Context) (*Release, dto.UpdateSnapshot, error) {
+	provider := c.enabledProvider()
+	if provider == nil {
+		return nil, dto.UpdateSnapshot{Phase: "offline", Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update provider is not configured"}}, nil
+	}
+	c.mu.Lock()
+	channel := c.channel
+	c.mu.Unlock()
+	release, err := provider.Check(ctx, channel)
+	switch {
+	case errors.Is(err, ErrSignature):
+		return nil, dto.UpdateSnapshot{Phase: "failed", Error: dto.Error{Code: dto.ErrorSignatureInvalid, Message: "update signature verification failed"}}, err
+	case err != nil:
+		return nil, dto.UpdateSnapshot{Phase: "offline", Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update check failed"}}, nil
+	case release == nil:
+		c.mu.Lock()
+		c.release = nil
+		c.mu.Unlock()
+		return nil, dto.UpdateSnapshot{Phase: "current"}, nil
+	}
+	c.mu.Lock()
+	c.release = release
+	c.mu.Unlock()
+	return release, dto.UpdateSnapshot{}, nil
+}
+
+// progressInterval bounds how often a download republishes the snapshot.
+const progressInterval = 200 * time.Millisecond
 
 func (c *Controller) Download(requestID string, expectedVersion uint64) (dto.OperationReceipt, error) {
 	return c.start(requestID, expectedVersion, "downloading", func(ctx context.Context) (dto.UpdateSnapshot, error) {
 		c.mu.Lock()
-		verified := c.verified
-		fetch := c.fetch
-		channel := c.store.Get().Update.Channel
+		release := c.release
 		c.mu.Unlock()
-		if verified == nil {
-			if fetch == nil {
-				return dto.UpdateSnapshot{Phase: "offline", Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update provider is not configured"}}, nil
+		if release == nil {
+			found, result, err := c.find(ctx)
+			if found == nil {
+				return result, err
 			}
-			manifestBytes, artifact, err := fetch(ctx, channel)
-			if err != nil {
-				return dto.UpdateSnapshot{Phase: "offline", Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update download failed"}}, nil
-			}
-			manifest, err := VerifyManifest(manifestBytes, c.publicKey)
-			if err != nil {
-				return dto.UpdateSnapshot{Phase: "failed", Error: dto.Error{Code: dto.ErrorSignatureInvalid, Message: "update signature verification failed"}}, err
-			}
-			if err := VerifyArtifact(manifest, artifact); err != nil {
-				return dto.UpdateSnapshot{Phase: "failed", Error: dto.Error{Code: dto.ErrorSignatureInvalid, Message: "update artifact verification failed"}}, err
-			}
-			verified = &verifiedArtifact{manifestBytes: append([]byte(nil), manifestBytes...), manifest: manifest, artifact: append([]byte(nil), artifact...)}
-			c.mu.Lock()
-			c.verified = verified
-			c.mu.Unlock()
+			release = found
 		}
-		if err := c.stage(verified); err != nil {
-			return dto.UpdateSnapshot{Phase: "failed", Error: dto.Error{Code: dto.ErrorRecoveryRequired, Message: "verified update could not be staged"}}, err
+		c.commit(func(update *dto.UpdateSnapshot) { update.AvailableVersion = release.Version })
+		var last time.Time
+		var progressMu sync.Mutex
+		err := release.Install(ctx, func(downloaded, total int64) {
+			if total <= 0 {
+				return
+			}
+			progressMu.Lock()
+			due := time.Since(last) >= progressInterval
+			if due {
+				last = time.Now()
+			}
+			progressMu.Unlock()
+			if due {
+				c.commit(func(update *dto.UpdateSnapshot) { update.Progress = float64(downloaded) / float64(total) })
+			}
+		})
+		switch {
+		case errors.Is(err, ErrSignature):
+			return dto.UpdateSnapshot{Phase: "failed", AvailableVersion: release.Version, Error: dto.Error{Code: dto.ErrorSignatureInvalid, Message: "update signature verification failed"}}, err
+		case err != nil:
+			return dto.UpdateSnapshot{Phase: "offline", AvailableVersion: release.Version, Error: dto.Error{Code: dto.ErrorRuntimeNotReady, Message: "update download failed"}}, nil
 		}
 		c.mu.Lock()
+		c.installed = true
 		canApply := c.apply != nil
 		c.mu.Unlock()
-		return dto.UpdateSnapshot{Phase: "ready", Channel: verified.manifest.Channel, AvailableVersion: verified.manifest.Version, CanApply: canApply}, nil
+		return dto.UpdateSnapshot{Phase: "ready", AvailableVersion: release.Version, CanApply: canApply}, nil
 	})
 }
 
@@ -197,12 +244,12 @@ func (c *Controller) RestartAndApply(requestID string, expectedVersion uint64) (
 	}
 	c.mu.Lock()
 	apply := c.apply
-	verified := c.verified
+	installed := c.installed
 	c.mu.Unlock()
 	if apply == nil {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorShutdownInProgress, "update apply requires the shutdown coordinator")
 	}
-	if !snapshot.Update.CanApply || verified == nil {
+	if !snapshot.Update.CanApply || !installed {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "no verified update is ready to apply")
 	}
 	receipt, err := c.operations.Accept(requestID, "update", snapshot.Update.Version, false)
@@ -228,142 +275,6 @@ func (c *Controller) RestartAndApply(requestID string, expectedVersion uint64) (
 	return receipt, nil
 }
 
-func (c *Controller) stage(verified *verifiedArtifact) error {
-	if verified == nil {
-		return errors.New("no verified update artifact is available")
-	}
-	if strings.TrimSpace(c.stagingDir) == "" {
-		return errors.New("update staging directory is not configured")
-	}
-	if err := platform.EnsurePrivateDirectory(c.stagingDir); err != nil {
-		return err
-	}
-	directory := safeSegment(verified.manifest.Version) + "-" + strings.TrimPrefix(verified.manifest.SHA256, "sha256:")[:12]
-	target := filepath.Join(c.stagingDir, directory)
-	if info, err := os.Stat(target); err == nil {
-		if !info.IsDir() {
-			return errors.New("update staging target is not a directory")
-		}
-		if err := verifyStagedDirectory(target, verified, c.publicKey); err != nil {
-			return err
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return err
-	} else {
-		staging, err := os.MkdirTemp(c.stagingDir, ".staging-*")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(staging)
-		if err := platform.WriteAtomic(filepath.Join(staging, "manifest.json"), verified.manifestBytes, 0o600); err != nil {
-			return err
-		}
-		if err := platform.WriteAtomic(filepath.Join(staging, "artifact.bin"), verified.artifact, 0o700); err != nil {
-			return err
-		}
-		if err := os.Rename(staging, target); err != nil {
-			return err
-		}
-	}
-	pointer := stagingPointer{SchemaVersion: stagingSchemaVersion, Channel: verified.manifest.Channel, Version: verified.manifest.Version, SHA256: verified.manifest.SHA256, Directory: directory}
-	data, err := json.MarshalIndent(pointer, "", "  ")
-	if err != nil {
-		return err
-	}
-	return platform.WriteAtomic(filepath.Join(c.stagingDir, "current.json"), append(data, '\n'), 0o600)
-}
-
-func verifyStagedDirectory(directory string, verified *verifiedArtifact, publicKey ed25519.PublicKey) error {
-	manifestBytes, err := os.ReadFile(filepath.Join(directory, "manifest.json"))
-	if err != nil {
-		return err
-	}
-	manifest, err := VerifyManifest(manifestBytes, publicKey)
-	if err != nil {
-		return err
-	}
-	artifact, err := os.ReadFile(filepath.Join(directory, "artifact.bin"))
-	if err != nil {
-		return err
-	}
-	if manifest.Channel != verified.manifest.Channel || manifest.Version != verified.manifest.Version || manifest.SHA256 != verified.manifest.SHA256 {
-		return errors.New("existing update staging target does not match the verified manifest")
-	}
-	return VerifyArtifact(manifest, artifact)
-}
-
-func (c *Controller) loadStaged() (*verifiedArtifact, error) {
-	if strings.TrimSpace(c.stagingDir) == "" {
-		return nil, errors.New("update staging directory is not configured")
-	}
-	data, err := os.ReadFile(filepath.Join(c.stagingDir, "current.json"))
-	if err != nil {
-		return nil, err
-	}
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
-	decoder.DisallowUnknownFields()
-	var pointer stagingPointer
-	if err := decoder.Decode(&pointer); err != nil {
-		return nil, err
-	}
-	if err := stateversion.Check("update staging pointer", pointer.SchemaVersion, stagingSchemaVersion); err != nil {
-		return nil, err
-	}
-	if pointer.Channel == "" || pointer.Version == "" || pointer.SHA256 == "" {
-		return nil, errors.New("invalid update staging pointer")
-	}
-	directory, err := safeJoin(c.stagingDir, pointer.Directory)
-	if err != nil {
-		return nil, err
-	}
-	manifestBytes, err := os.ReadFile(filepath.Join(directory, "manifest.json"))
-	if err != nil {
-		return nil, err
-	}
-	manifest, err := VerifyManifest(manifestBytes, c.publicKey)
-	if err != nil {
-		return nil, err
-	}
-	artifact, err := os.ReadFile(filepath.Join(directory, "artifact.bin"))
-	if err != nil {
-		return nil, err
-	}
-	if manifest.Channel != pointer.Channel || manifest.Version != pointer.Version || manifest.SHA256 != pointer.SHA256 {
-		return nil, errors.New("update staging pointer does not match its signed manifest")
-	}
-	if err := VerifyArtifact(manifest, artifact); err != nil {
-		return nil, err
-	}
-	return &verifiedArtifact{manifestBytes: manifestBytes, manifest: manifest, artifact: artifact}, nil
-}
-
-func safeJoin(root, relative string) (string, error) {
-	if relative == "" || filepath.IsAbs(relative) || filepath.Base(relative) != relative || relative == "." || relative == ".." {
-		return "", fmt.Errorf("invalid update staging directory %q", relative)
-	}
-	joined := filepath.Clean(filepath.Join(root, relative))
-	cleanRoot := filepath.Clean(root)
-	if !strings.HasPrefix(joined, cleanRoot+string(os.PathSeparator)) {
-		return "", errors.New("update staging path escapes its root")
-	}
-	return joined, nil
-}
-
-func safeSegment(value string) string {
-	var result strings.Builder
-	for _, character := range value {
-		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '-' || character == '_' || character == '.' {
-			result.WriteRune(character)
-		} else {
-			result.WriteByte('_')
-		}
-	}
-	if result.Len() == 0 {
-		return "unknown"
-	}
-	return result.String()
-}
-
 func (c *Controller) start(requestID string, expectedVersion uint64, phase string, work func(context.Context) (dto.UpdateSnapshot, error)) (dto.OperationReceipt, error) {
 	if existing, ok := c.operations.ReceiptForRequest(requestID); ok {
 		return existing, nil
@@ -377,14 +288,20 @@ func (c *Controller) start(requestID string, expectedVersion uint64, phase strin
 		return dto.OperationReceipt{}, err
 	}
 	_ = c.operations.MarkRunning(receipt.OperationID)
-	c.commit(func(update *dto.UpdateSnapshot) { update.Phase = phase; update.Version++ })
+	c.commit(func(update *dto.UpdateSnapshot) {
+		update.Phase = phase
+		update.Progress = 0
+		update.Error = dto.Error{}
+		update.Version++
+	})
 	go func() {
 		result, workErr := work(context.Background())
 		// Publish the result before the operation turns terminal, so anyone
 		// who observes the finished operation also observes its snapshot.
 		c.commit(func(update *dto.UpdateSnapshot) {
+			version := update.Version
 			*update = result
-			update.Version++
+			update.Version = version + 1
 		})
 		if workErr != nil {
 			failure := workErr
@@ -404,7 +321,7 @@ func (c *Controller) commit(update func(*dto.UpdateSnapshot)) {
 	c.mu.Lock()
 	channel := c.channel
 	currentVersion := c.currentVersion
-	providerAvailable := c.fetch != nil
+	providerAvailable := c.provider != nil && c.provider.Enabled()
 	c.mu.Unlock()
 	c.store.Commit(func(snapshot *dto.DesktopSnapshot) {
 		update(&snapshot.Update)

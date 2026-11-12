@@ -103,18 +103,36 @@ Last aligned with the codebase: 2026-09-23.
   injected-fact tests (`rc-smoke-checklist.md`, Storage admin row) and the
   native picker pass is the first rc.2 checkpoint.
 
-## Found during the Desktop correctness review (2026-10-26)
+## Found during the Desktop MyGo migration (2026-11-12)
 
-- **The Desktop Storage panel raises an alert for host actions while the
-  runtime is stopped.** Owner: `desktop/frontend/src/app/panels/StoragePanel.tsx`
-  (`refreshHostActions`). Listing pending Web requests needs the in-process
-  repository control, so a stopped runtime answers
-  `repository_control_unavailable` and the panel renders it as a
-  needs-attention alert although no request can exist then; treat that code
-  as the empty state.
-- **The Desktop control panel has no component test runner.** Owner:
-  `desktop/frontend`. The panel is covered by `tsc`, the locale gate and the
-  Go tests behind its bindings only; the two wizard fixes from the S12b review
-  (first-launch storage confirmation, validation notice) landed without a
-  failing-first test because none can be written there today. Adding a
-  Vitest browser project like `web/` would close the gap.
+The two items of the 2026-10-26 Desktop correctness review are closed by the
+migration: the Storage page treats a stopped Server as having no Web
+requests, and the Settings window has view tests
+([decision](../../.agents/decisions/2026-11-12-desktop-mygo-native-host.md)).
+
+- **The Windows package and installer have never run.** Owner:
+  `desktop/cmd/devtool` and `.github/workflows/release.yml`. The DLL staging
+  keeps the proven `ntldd` closure but now runs before the link, and the
+  installer is MyGo's NSIS one instead of Inno Setup. CI compiles and tests
+  on Windows; nothing has yet installed and launched the result.
+- **Updates are built off.** Owner: `desktop/mygo.config.ts`. A build has an
+  update feed only once the update public key is committed (the Updates
+  section of `desktop/README.md` says where) and the release workflow holds
+  its secret half. Until then Settings reports no
+  signed update provider, as before the migration. The released-build
+  updater proof is still #240.
+- **A refused update signature is recognized by its message.** Owner:
+  `desktop/internal/host/updates.go`. MyGo exposes no typed error for an
+  artifact signed with another key. If the message changes, the refusal is
+  reported as an ordinary failed download, which is retried and still never
+  installed; ask upstream for a typed error.
+- **The JSON codec falls back under Go 1.27.** Owner: the Server's `gin` and
+  `eino` dependencies. `bytedance/sonic` supports Go up to 1.26, so a Desktop
+  build, which MyGo holds at Go 1.27, logs a warning at start and uses
+  `encoding/json`. Behaviour is the same; the cost is unmeasured. It ends
+  when sonic supports 1.27.
+- **The tray menu and input-method composition are unproven by automation.**
+  Owner: `desktop/internal/host`. The menu's structure and labels were read
+  from the accessibility tree and the window's text input was driven through
+  it; a real click on the tray icon and composing Chinese with an input
+  method were not.

@@ -907,7 +907,7 @@ func checkUserFacingTerminology(root string) error {
 
 	paths := []string{
 		"README.md", "README.en.md",
-		"web/src", "desktop/frontend/src",
+		"web/src", "desktop/internal/locales", "desktop/internal/panel", "desktop/internal/host",
 		"site/docs/en", "site/docs/zh-cn",
 		"server/internal/api/dto", "server/internal/api/handler", "server/docs",
 	}
