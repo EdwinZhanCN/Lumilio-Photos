@@ -12,6 +12,8 @@ task atlas:check      # fail if anything is out of sync (also in task test and C
 task atlas:generate   # rewrite docs/atlas/generated after editing views or docs
 task atlas:lock       # mark views verified — only after re-reading stale ones
 task atlas:baseline -- <rule-id>   # record a NEW rule's existing violations (owner approves)
+task atlas:split-report -- internal/service [--clusters file]   # plan a package split
+task atlas:movecheck -- --base origin/dev   # behaviour evidence for a move PR
 ```
 
 ### Exploring
@@ -42,7 +44,7 @@ and a table that links each element to `file:line`.
 | --- | --- | --- | --- |
 | **Derived maps** — group maps, per-group package maps, the [module catalog](generated/modules.md), each module's imports and importers | Go imports, Web imports, `atlas.yaml` | nobody (generated) | Always equal to the code. `atlas:check` fails if the checked-in copy is stale. |
 | **Package docs** — `doc.go` per Go package, `doc.ts` per Web feature | the package itself | people and agents | Every package has one; every `[Name]` doc link (Go) and `{@link X}` (TS) resolves; every code-like Mermaid node in a `doc.ts` is imported. A renamed or deleted symbol fails the build. |
-| **Anchored views** — `views/<kind>/<id>.yaml` | YAML next to this file | people (agents draft) | Every element is anchored to a symbol, API operation, table, or declared external. A broken anchor fails. A **changed** anchor makes the view *stale* and fails until someone re-reads the view and runs `task atlas:lock`. A lifecycle with `enum:` must draw exactly the enum's members. |
+| **Anchored views** — `views/<kind>/<id>.yaml` | YAML next to this file | people (agents draft) | Every element is anchored to a symbol, API operation, table, or declared external. A broken anchor fails. Every sequence message and data-flow edge between Go participants must be [in the code](#arrows-are-checked), so a removed call fails. A **changed** anchor makes the view *stale*: a notice, not a failure, until someone re-reads the view and runs `task atlas:lock`. A lifecycle with `enum:` must draw exactly the enum's members. |
 
 Handwritten documents are the fifth piece. Every file listed under `docs:` in
 [`atlas.yaml`](atlas.yaml) — AGENTS.md, CONTRIBUTING.md, `docs/*.md`,
@@ -65,9 +67,11 @@ under `rules:` (see [Rules](#rules)).
 
 ### What it does not guarantee
 
-Anchors make **reference drift impossible** and **semantic drift visible**, not
-impossible: a stale view says "this code changed after the view was verified",
-and a human or agent must re-read and decide. Prose that names no anchor is not
+Anchors make **reference drift impossible**, checked arrows make a **removed
+call impossible**, and the rest of **semantic drift visible**, not impossible:
+a stale view says "this code changed after the view was verified", and a human
+or agent must re-read and decide. An arrow proves the call exists, not that it
+happens in the drawn order or under the drawn condition. Prose that names no anchor is not
 checked. Runtime behaviour (performance, races) is not a diagram's job — tests
 and telemetry own it.
 
@@ -127,7 +131,9 @@ doc. Web features follow [docts.md](../docts.md).
 | `ext:<name>` | something outside the repository (drawn dashed) | `ext:Lumen Hub` |
 
 `go:` and `ts:` anchors are hashed (the declaration's source text); the others
-only have to exist.
+only have to exist. Generated pages link an anchor's file without its line, so
+a refactor that keeps every drawn call rewrites nothing checked in; the site
+data keeps the exact line.
 
 ## Rules
 
@@ -202,11 +208,11 @@ Every view has `id` (= file name), `kind` (= directory), `title`, `summary`,
 optional `notes` (titled markdown paragraphs), and `related` view ids. Then,
 per kind:
 
-- **architecture / dataflow** — `edges: [{from, to, label?, anchor?, style?}]`.
+- **architecture / dataflow** — `edges: [{from, to, label?, anchor?, via?, style?}]`.
   `shape`: `store`, `actor`, `queue`, `decision`, `external`. `group` draws a
   labelled box. `style`: `dashed`, `thick`.
 - **sequence** — nodes are participants (`shape: actor` for people);
-  `steps` are messages `{from, to, label, anchor?, reply?, async?}`, notes
+  `steps` are messages `{from, to, label, anchor?, via?, reply?, async?}`, notes
   `{note, over: "a,b"}`, or blocks `{block: loop|alt|opt|par|critical|break,
   label, steps, else: [{label, steps}]}`. Messages are numbered in the diagram
   and in the step table.
@@ -215,6 +221,36 @@ per kind:
   constant set or a TS string-literal union, and anchor each state to its
   constant (Go) or set `member:` (TS); the checker then requires the states to
   be exactly the enum.
+
+### Arrows are checked
+
+A sequence message or data-flow edge whose ends are both `go:` or Go `mod:`
+anchors must exist in the code. Ends that are `ts:`, `api:`, `sql:`, `ext:`,
+or a Web module are not checked, and `via:` on such an arrow is a problem.
+
+A hop **X → Y** holds when some body of X refers to Y. The bodies of a
+function are its signature and body; of a type, all its methods; of an
+interface, the methods of every module type that implements it; of a
+package, all its functions. Y is reached when a body refers to Y itself, a
+method of Y, an interface method Y implements, a module function that
+returns Y, or (for a package) anything the package declares. A function
+value is followed where it is called: a func-typed field reaches what the
+module stores in it (composite literals, assignments, constructor and setter
+parameters), a func-typed parameter reaches what its call sites pass, and a
+module function that returns a func counts as the wrapper it is.
+
+- `reply: true` checks the arrow backwards; a data-flow edge holds in either
+  direction.
+- `via: [go:…, …]` names the hops in between, each checked in turn:
+  `from → via[0] → … → to`. Use it when the call goes through a runtime or a
+  callback the checker cannot see, not to skip a link that is missing.
+- A step `anchor` on the callee end narrows the last hop to that method. On
+  neither end (and no `via`), a type anchor is a **message** both ends' own
+  code must name, and a function anchor is the **wiring site** that refers to
+  both ends.
+
+A failed arrow names the hop that is missing and, when the code has one,
+the shortest call chain within six calls, ready to paste as `via:`.
 
 Optional `layout: dagre` switches a view from the default ELK layout to
 dagre, which suits some cyclic state machines (see `desktop-runtime`).
@@ -241,10 +277,33 @@ to roughly 6–14 nodes, and put the *why* in `notes`. Look at
 | `invariant "…" has no invariants entry` / `enforcement … does not resolve` | A new or reworded invariant needs an `invariants:` entry naming the rule, test, or Task target that enforces it; a renamed test or rule needs its reference updated. Never add an entry with nothing real behind it. |
 | `doc link [X] does not resolve` | Fix the link; the symbol was renamed or removed. |
 | `anchor …: … has no declaration` | The anchored code moved or was deleted. Re-anchor the element, or redraw the view if the flow changed. |
-| `N anchor(s) changed since their view was verified` | Open each listed view, compare it with the code at the listed `file:line`, fix the diagram or notes if behaviour changed, then `task atlas:lock`. |
+| `arrow a -> b (…) is not in the code: nothing in X references Y` | The drawn call is gone, or never went that way. Redraw the step from the code; if the message names a chain the code has, add it as `via:`. A goroutine or a func value the checker cannot follow needs a wiring-site anchor. |
+| `does not reference the message …` / `nothing in … references …` (wiring site) | The anchored message type or wiring function no longer connects both ends. Re-anchor it or redraw the step. |
+| notice: `N anchor(s) changed since their view was verified` | Not a failure. Open each listed view, compare it with the code at the listed `file:line`, fix the diagram or notes if behaviour changed, then `task atlas:lock` in the same PR. |
 | `enum … member X is not drawn as a state` | Draw the new state and its transitions. |
 | `generated files are out of date` | `task atlas:generate`. |
 | `` `x` names a repository path or symbol that does not exist`` / `link … points at a file that does not exist` / `names a Task target` / `API route … is not in the OpenAPI document` | A handwritten document drifted. Point it at the new name, or delete the sentence if the thing is gone. A real route deliberately missing from OpenAPI goes in `undocumentedRoutes`. |
+
+## Refactor tools
+
+Two commands support moving code; neither reads the map, so they need no Web
+facts.
+
+- **`task atlas:split-report -- <package dir> [--clusters file]`** prints the
+  type-resolved file-to-file dependencies of one package (every declaration a
+  file uses from another file of the same package) and the cycles between
+  files. With a clusters file (`clusters: {name: [file.go, …]}`; unlisted
+  files form the remainder) it adds the edges between clusters, the
+  unexported symbols a cut along them would have to export, and the cycles
+  that block it. The package is a directory relative to the repository or a
+  Go module (`internal/service`).
+- **`task atlas:movecheck -- --base <ref>`** indexes every function of the
+  Server and Desktop at `ref` and in the working tree by receiver type and
+  name, drops package qualifiers, and folds export capitalization, so a
+  function that only moved or was exported compares equal. It lists changed
+  bodies (each needs a one-line reason in the PR), renames with an unchanged
+  body, additions, removals, and the moved functions. Comments do not count
+  as changes. Attach its output to every move PR.
 
 ## Prompting agents with the Atlas
 

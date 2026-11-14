@@ -34,7 +34,7 @@ nodes:
     anchor: sql:location_search_fts
   - id: catalog
     label: Catalog reader
-    anchor: go:search.HydrateAssets
+    anchor: go:repo.Queries
 steps:
   - from: web
     to: handler
@@ -42,8 +42,8 @@ steps:
     anchor: api:POST /api/v1/assets/search
   - from: handler
     to: service
-    label: SearchAssets
-    anchor: go:service.AssetService.SearchAssets
+    label: SearchBrowseItems
+    anchor: go:service.AssetService.SearchBrowseItems
   - block: par
     label: every channel is self-thresholded
     steps:
@@ -55,6 +55,7 @@ steps:
         to: lumen
         label: embed query text
         anchor: go:service.LumenService.SemanticTextEmbed
+        via: [go:service.assetService.resolveSemanticQueryEmbedding]
       - from: semantic
         to: vec
         label: KNN in the active embedding space, cosine floor
@@ -76,14 +77,15 @@ steps:
           - from: service
             to: catalog
             label: filename match, one primary per media item
+            anchor: go:repo.Queries.GetMediaItemRefsUnified
   - from: service
     to: service
     label: weighted RRF (semantic 1.0, place 0.8, OCR 0.7, filename 0.6)
     anchor: go:search.FuseSet
   - from: service
     to: catalog
-    label: hydrate ranked Assets in the requested lifecycle state
-    anchor: go:service.assetService.searchAssetsFusedSet
+    label: hydrate the ranked media items in the requested lifecycle state
+    anchor: go:service.assetService.browseItemsForMediaRefs
   - from: handler
     to: web
     label: best results (top-N by confidence) + full set under the chosen sort

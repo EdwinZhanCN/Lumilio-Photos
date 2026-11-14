@@ -3,7 +3,7 @@
 Status: active, created 2026-10-28. The owner asked for one recorded order
 across all open plans after the fix-before-release rule moved the storage
 plans and server-structure Phase B in front of rc.1. Q0 done 2026-10-29
-(#267). A1 done 2026-11-14 (#270). A2 done 2026-11-14 (#271). A3 done 2026-11-14 (#272). Next step: **A4**.
+(#267). A1 done 2026-11-14 (#270). A2 done 2026-11-14 (#271). A3 done 2026-11-14 (#272). A4 done 2026-11-14 (#273). Next step: the section-A full run, then **B1**.
 Update the row of each step in the PR that lands it.
 
 Goal: every open plan lands on `dev` in the order below, then the
@@ -77,7 +77,7 @@ the plan it names.
 | A1 | **Done 2026-11-14 (#270).** Typed facts and path-based groups | [atlas-rules.md](atlas-rules.md) | Q0 | Tools only; starts the rule engine |
 | A2 | **Done 2026-11-14 (#271).** Static rules: `calls`, `constructs`, `forbid-types`, `forbid-imports`, `tables`, `tx-purity`, `budgets` | [atlas-rules.md](atlas-rules.md) | A1 | `tx-purity` and `calls`/`constructs` are the guardrails RA and RL need |
 | A3 | **Done 2026-11-14 (#272).** Behaviour tests, relocated lints, switch; `architecturecheck` deleted | [atlas-rules.md](atlas-rules.md) | A2 | Leaves one gate before any code moves |
-| A4 | Views that verify arrows; `movecheck` and `split-report` | [atlas-rules.md](atlas-rules.md) | A3 | Every B session's evidence |
+| A4 | **Done 2026-11-14 (#273).** Views that verify arrows; `movecheck` and `split-report` | [atlas-rules.md](atlas-rules.md) | A3 | Every B session's evidence |
 | B1 | Infrastructure moves, `server/platform` gone | [server-structure.md](server-structure.md) | A4 | Storage code is then written once, at its final path (`catalog`, `storage/artifact`, `ingest`, `work`) |
 | B2 | Typed catalog handles; `catalog` builds the River driver; database boundary rule 1; rule 4 ceilings recorded | [server-structure.md](server-structure.md) | B1 | New storage SQL obeys the boundary from its first line |
 | RL0 | Layout Phase 0: session-leak test, single-owner rule (Atlas `calls`/`constructs`, report mode), private-path inventory | [repository-layout.md](repository-layout.md) | B2 | Locks the failures first |

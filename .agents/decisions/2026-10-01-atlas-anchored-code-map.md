@@ -2,6 +2,8 @@
 
 Status: implemented, 2026-10-01 (branch `feat/atlas`). `task atlas:check` runs
 in `task test` and in `task verify:generated` (CI `generated` job).
+Hash drift stopped failing CI on 2026-11-14; drawn arrows are checked against
+the code instead ([superseding decision](2026-11-14-atlas-views-verify-arrows.md)).
 
 ## Problem
 

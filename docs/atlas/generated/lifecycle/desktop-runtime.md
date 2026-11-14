@@ -36,42 +36,42 @@ stateDiagram-v2
     n_applying --> n_failed: candidate failed (restore last known good)
 ```
 
-States are exactly the members of `go:desktop/internal/control/dto.RuntimePhase` [`desktop/internal/control/dto/snapshot.go:13`](../../../../desktop/internal/control/dto/snapshot.go#L13).
+States are exactly the members of `go:desktop/internal/control/dto.RuntimePhase` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go).
 
 ## States
 
 | State | Meaning | Anchor |
 | --- | --- | --- |
-| stopped | No Server generation is held. | `go:desktop/internal/control/dto.RuntimeStopped` [`desktop/internal/control/dto/snapshot.go:16`](../../../../desktop/internal/control/dto/snapshot.go#L16) |
-| starting | A new generation runs server/app.Run and waits for RuntimeReady. | `go:desktop/internal/control/dto.RuntimeStarting` [`desktop/internal/control/dto/snapshot.go:17`](../../../../desktop/internal/control/dto/snapshot.go#L17) |
-| running | The Server owns its listener and repositories. | `go:desktop/internal/control/dto.RuntimeRunning` [`desktop/internal/control/dto/snapshot.go:18`](../../../../desktop/internal/control/dto/snapshot.go#L18) |
-| stopping | Graceful shutdown of the held generation. | `go:desktop/internal/control/dto.RuntimeStopping` [`desktop/internal/control/dto/snapshot.go:19`](../../../../desktop/internal/control/dto/snapshot.go#L19) |
-| restarting | Stop then start a new generation in one operation. | `go:desktop/internal/control/dto.RuntimeRestarting` [`desktop/internal/control/dto/snapshot.go:20`](../../../../desktop/internal/control/dto/snapshot.go#L20) |
-| saving-config | Writing a validated runtime intent while stopped. | `go:desktop/internal/control/dto.RuntimeSavingConfig` [`desktop/internal/control/dto/snapshot.go:21`](../../../../desktop/internal/control/dto/snapshot.go#L21) |
-| applying-config | Journaled quiesce, candidate start, and commit or rollback. | `go:desktop/internal/control/dto.RuntimeApplyingConfig` [`desktop/internal/control/dto/snapshot.go:22`](../../../../desktop/internal/control/dto/snapshot.go#L22) |
-| failed | Start or the running Server failed; the error is in the snapshot. | `go:desktop/internal/control/dto.RuntimeFailed` [`desktop/internal/control/dto/snapshot.go:23`](../../../../desktop/internal/control/dto/snapshot.go#L23) |
+| stopped | No Server generation is held. | `go:desktop/internal/control/dto.RuntimeStopped` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| starting | A new generation runs server/app.Run and waits for RuntimeReady. | `go:desktop/internal/control/dto.RuntimeStarting` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| running | The Server owns its listener and repositories. | `go:desktop/internal/control/dto.RuntimeRunning` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| stopping | Graceful shutdown of the held generation. | `go:desktop/internal/control/dto.RuntimeStopping` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| restarting | Stop then start a new generation in one operation. | `go:desktop/internal/control/dto.RuntimeRestarting` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| saving-config | Writing a validated runtime intent while stopped. | `go:desktop/internal/control/dto.RuntimeSavingConfig` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| applying-config | Journaled quiesce, candidate start, and commit or rollback. | `go:desktop/internal/control/dto.RuntimeApplyingConfig` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| failed | Start or the running Server failed; the error is in the snapshot. | `go:desktop/internal/control/dto.RuntimeFailed` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
 
 ## Transitions
 
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
-| [*] | stopped |  | `go:desktop/internal/control/dto.InitialSnapshot` [`desktop/internal/control/dto/snapshot.go:321`](../../../../desktop/internal/control/dto/snapshot.go#L321) |
-| stopped | starting | Start | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go:265`](../../../../desktop/internal/runtime/controller.go#L265) |
-| failed | starting | Start | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go:265`](../../../../desktop/internal/runtime/controller.go#L265) |
-| starting | running | Server reports RuntimeReady | `go:desktop/internal/runtime.Controller.handleResult` [`desktop/internal/runtime/controller.go:599`](../../../../desktop/internal/runtime/controller.go#L599) |
+| [*] | stopped |  | `go:desktop/internal/control/dto.InitialSnapshot` [`desktop/internal/control/dto/snapshot.go`](../../../../desktop/internal/control/dto/snapshot.go) |
+| stopped | starting | Start | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go`](../../../../desktop/internal/runtime/controller.go) |
+| failed | starting | Start | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go`](../../../../desktop/internal/runtime/controller.go) |
+| starting | running | Server reports RuntimeReady | `go:desktop/internal/runtime.Controller.handleResult` [`desktop/internal/runtime/controller.go`](../../../../desktop/internal/runtime/controller.go) |
 | starting | failed | startup error |  |
-| running | stopping | Stop or Quiesce | `go:desktop/internal/runtime.Controller.Stop` [`desktop/internal/runtime/controller.go:269`](../../../../desktop/internal/runtime/controller.go#L269) |
+| running | stopping | Stop or Quiesce | `go:desktop/internal/runtime.Controller.Stop` [`desktop/internal/runtime/controller.go`](../../../../desktop/internal/runtime/controller.go) |
 | stopping | stopped | generation released |  |
-| running | restarting | Restart | `go:desktop/internal/runtime.Controller.Restart` [`desktop/internal/runtime/controller.go:306`](../../../../desktop/internal/runtime/controller.go#L306) |
+| running | restarting | Restart | `go:desktop/internal/runtime.Controller.Restart` [`desktop/internal/runtime/controller.go`](../../../../desktop/internal/runtime/controller.go) |
 | restarting | running | new generation ready |  |
 | running | failed | Server exited unexpectedly |  |
-| stopped | saving | Save configuration | `go:runtimeconfig.TransactionController.Save` [`desktop/internal/runtime/runtimeconfig/transaction_controller.go:81`](../../../../desktop/internal/runtime/runtimeconfig/transaction_controller.go#L81) |
+| stopped | saving | Save configuration | `go:runtimeconfig.TransactionController.Save` [`desktop/internal/runtime/runtimeconfig/transaction_controller.go`](../../../../desktop/internal/runtime/runtimeconfig/transaction_controller.go) |
 | failed | saving | Save configuration |  |
 | saving | stopped | intent written |  |
 | saving | failed | write failed |  |
-| running | applying | Apply configuration | `go:runtimeconfig.TransactionController.Apply` [`desktop/internal/runtime/runtimeconfig/transaction_controller.go:152`](../../../../desktop/internal/runtime/runtimeconfig/transaction_controller.go#L152) |
+| running | applying | Apply configuration | `go:runtimeconfig.TransactionController.Apply` [`desktop/internal/runtime/runtimeconfig/transaction_controller.go`](../../../../desktop/internal/runtime/runtimeconfig/transaction_controller.go) |
 | applying | running | candidate generation started and committed |  |
-| applying | failed | candidate failed (restore last known good) | `go:runtimeconfig.TransactionController.RestoreLastKnownGood` [`desktop/internal/runtime/runtimeconfig/transaction_controller.go:317`](../../../../desktop/internal/runtime/runtimeconfig/transaction_controller.go#L317) |
+| applying | failed | candidate failed (restore last known good) | `go:runtimeconfig.TransactionController.RestoreLastKnownGood` [`desktop/internal/runtime/runtimeconfig/transaction_controller.go`](../../../../desktop/internal/runtime/runtimeconfig/transaction_controller.go) |
 
 ## Completeness is enforced
 

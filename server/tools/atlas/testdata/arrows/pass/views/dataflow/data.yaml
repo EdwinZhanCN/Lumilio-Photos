@@ -1,0 +1,15 @@
+id: data
+kind: dataflow
+title: Data moves either way
+summary: Fixture data flow.
+nodes:
+  - { id: scheduler, label: Scheduler, anchor: go:scheduler.Scheduler }
+  - { id: worker, label: Worker, anchor: go:worker.Worker }
+  - { id: service, label: Service, anchor: go:worker.Service }
+  - { id: store, label: Store, anchor: go:store.Store }
+  - { id: audit, label: Audit, anchor: go:audit.Record }
+  - { id: jobs, label: Job payloads, anchor: mod:fx/jobs }
+  - { id: user, label: User, anchor: ext:User }
+edges:
+  - { from: store, to: service, label: "the service calls the store; data flows back" }
+  - { from: jobs, to: worker }

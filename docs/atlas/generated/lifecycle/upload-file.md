@@ -25,25 +25,25 @@ stateDiagram-v2
     n_failed --> n_pending: retry
 ```
 
-States are exactly the members of `ts:FileUploadStatus` [`web/src/features/upload/modules/process/types.ts:19`](../../../../web/src/features/upload/modules/process/types.ts#L19).
+States are exactly the members of `ts:FileUploadStatus` [`web/src/features/upload/modules/process/types.ts`](../../../../web/src/features/upload/modules/process/types.ts).
 
 ## States
 
 | State | Meaning | Anchor |
 | --- | --- | --- |
-| pending | Queued; hashing in the worker. | `ts:features/upload#FileUploadStatus` [`web/src/features/upload/modules/process/types.ts:19`](../../../../web/src/features/upload/modules/process/types.ts#L19) |
-| uploading | Batch or chunked transport in flight. | `ts:features/upload#createUploadTransport` [`web/src/features/upload/modules/process/transport.ts:59`](../../../../web/src/features/upload/modules/process/transport.ts#L59) |
-| processing | Bytes accepted; following the ingest receipt. | `ts:waitForUploadOperations` [`web/src/lib/upload/uploadLifecycle.ts:144`](../../../../web/src/lib/upload/uploadLifecycle.ts#L144) |
-| completed | The server ingest receipt is terminal and successful. | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/commit/typed_catalog.go:93`](../../../../server/internal/commit/typed_catalog.go#L93) |
-| duplicate | Precheck found the same content; the file was never sent. | `ts:DUPLICATE_STATUS` [`web/src/features/upload/modules/process/results.ts:6`](../../../../web/src/features/upload/modules/process/results.ts#L6) |
-| failed | Transport or ingest failed; the File stays queued for retry. | `ts:features/upload#runUploadProcess` [`web/src/features/upload/modules/process/runner.ts:36`](../../../../web/src/features/upload/modules/process/runner.ts#L36) |
+| pending | Queued; hashing in the worker. | `ts:features/upload#FileUploadStatus` [`web/src/features/upload/modules/process/types.ts`](../../../../web/src/features/upload/modules/process/types.ts) |
+| uploading | Batch or chunked transport in flight. | `ts:features/upload#createUploadTransport` [`web/src/features/upload/modules/process/transport.ts`](../../../../web/src/features/upload/modules/process/transport.ts) |
+| processing | Bytes accepted; following the ingest receipt. | `ts:waitForUploadOperations` [`web/src/lib/upload/uploadLifecycle.ts`](../../../../web/src/lib/upload/uploadLifecycle.ts) |
+| completed | The server ingest receipt is terminal and successful. | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/commit/typed_catalog.go`](../../../../server/internal/commit/typed_catalog.go) |
+| duplicate | Precheck found the same content; the file was never sent. | `ts:DUPLICATE_STATUS` [`web/src/features/upload/modules/process/results.ts`](../../../../web/src/features/upload/modules/process/results.ts) |
+| failed | Transport or ingest failed; the File stays queued for retry. | `ts:features/upload#runUploadProcess` [`web/src/features/upload/modules/process/runner.ts`](../../../../web/src/features/upload/modules/process/runner.ts) |
 
 ## Transitions
 
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
 | [*] | pending | file added to the queue |  |
-| pending | duplicate | precheck matched hash + size | `ts:precheckUploads` [`web/src/lib/upload/uploadTransport.ts:56`](../../../../web/src/lib/upload/uploadTransport.ts#L56) |
+| pending | duplicate | precheck matched hash + size | `ts:precheckUploads` [`web/src/lib/upload/uploadTransport.ts`](../../../../web/src/lib/upload/uploadTransport.ts) |
 | pending | uploading | transport starts |  |
 | uploading | processing | server returned a receipt |  |
 | uploading | failed | transport error |  |

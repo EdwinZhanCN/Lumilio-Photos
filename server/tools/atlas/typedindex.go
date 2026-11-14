@@ -31,6 +31,40 @@ type typedIndex struct {
 	refCache    map[*funcBody][]reference
 	implCache   map[*types.Func][]*types.Func
 	lookupCache map[string]*types.Func
+
+	// fieldValues holds, for each func-typed struct field of a mapped
+	// package, the function values and closures the module assigns to it;
+	// built on first use by the arrow check.
+	fieldValues map[*types.Var][]fieldValue
+	// fieldParams holds, for each such field, the parameters stored in it
+	// (a constructor or setter argument); the values are the arguments its
+	// call sites pass.
+	fieldParams map[*types.Var][]fieldParam
+	// callSites holds every call of a module function, for following a
+	// func value passed as an argument.
+	callSites map[*types.Func][]callSite
+	// paramValues caches the function values passed for a func parameter.
+	paramValues map[*types.Var][]fieldValue
+}
+
+// callSite is one call expression and the body it is in.
+type callSite struct {
+	call  *ast.CallExpr
+	owner *funcBody
+}
+
+// fieldParam is parameter index of fn, stored in a func-typed field.
+type fieldParam struct {
+	fn    *types.Func
+	index int
+}
+
+// fieldValue is one function value stored in a func-typed field: a named
+// function or method value, or a closure inside the body that stores it.
+type fieldValue struct {
+	fn      *types.Func
+	closure *ast.FuncLit
+	owner   *funcBody
 }
 
 // funcBody is one function declaration of a mapped package, or the

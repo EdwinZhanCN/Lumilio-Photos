@@ -207,3 +207,32 @@ func TestBaselineLeavesOtherNewRulesUnbaselined(t *testing.T) {
 		t.Fatalf("baselining one rule must not record a baseline for another: %v", baselines)
 	}
 }
+
+// Drawn arrows are checked against the typed facts. The pass fixture holds
+// one arrow for every way the code can make a call (directly, through an
+// interface, a func field, a setter, a wrapper, a message type, a wiring
+// site, a reply, a package participant, either direction of a data-flow
+// edge) and must load clean; the violation fixture breaks each kind once and
+// must report exactly its want.txt.
+func TestArrowFixtures(t *testing.T) {
+	t.Run("pass", func(t *testing.T) {
+		a := loadFixture(t, filepath.Join("testdata", "arrows", "pass"))
+		if len(a.Problems) != 0 {
+			t.Fatalf("every arrow in the pass fixture holds, got:\n%s", formatProblems(a.Problems))
+		}
+	})
+	t.Run("violation", func(t *testing.T) {
+		fixture := filepath.Join("testdata", "arrows", "violation")
+		a := loadFixture(t, fixture)
+		want := readLines(t, filepath.Join(fixture, "want.txt"))
+		got := messages(a.Problems)
+		for _, line := range want {
+			if !strings.Contains(got, line) {
+				t.Errorf("missing problem %q", line)
+			}
+		}
+		if len(a.Problems) != len(want) {
+			t.Errorf("want %d problems, got %d:\n%s", len(want), len(a.Problems), formatProblems(a.Problems))
+		}
+	})
+}

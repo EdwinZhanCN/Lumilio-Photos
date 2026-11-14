@@ -19,7 +19,7 @@ sequenceDiagram
     participant n_place as Place retriever (FTS5)
     participant n_catalog as Catalog reader
     n_web->>n_handler: POST /assets/search {query, filter}
-    n_handler->>n_service: SearchAssets
+    n_handler->>n_service: SearchBrowseItems
     par every channel is self-thresholded
         n_service->>n_semantic: RetrieveSet (calibrated cutoff)
         n_semantic->>n_lumen: embed query text
@@ -32,7 +32,7 @@ sequenceDiagram
         n_service->>n_catalog: filename match, one primary per media item
     end
     n_service->>n_service: weighted RRF (semantic 1.0, place 0.8, OCR 0.7, filename 0.6)
-    n_service->>n_catalog: hydrate ranked Assets in the requested lifecycle state
+    n_service->>n_catalog: hydrate the ranked media items in the requested lifecycle state
     n_handler-->>n_web: best results (top-N by confidence) + full set under the chosen sort
 ```
 
@@ -40,30 +40,30 @@ sequenceDiagram
 
 | Participant | Anchor |
 | --- | --- |
-| Assets search (Web) | `ts:useAssetsSearch` [`web/src/features/assets/api/useAssetsSearch.ts:61`](../../../../web/src/features/assets/api/useAssetsSearch.ts#L61) |
-| AssetHandler | `go:handler.AssetHandler.SearchAssets` [`server/internal/api/handler/asset_query_handler.go:528`](../../../../server/internal/api/handler/asset_query_handler.go#L528) |
-| AssetService | `go:service.AssetService` [`server/internal/service/asset_service.go:48`](../../../../server/internal/service/asset_service.go#L48) |
-| Embedding retriever | `go:search.EmbeddingRetriever` [`server/internal/search/retrievers.go:26`](../../../../server/internal/search/retrievers.go#L26) |
-| Lumen Hub | `go:service.LumenService` [`server/internal/service/lumen_service.go:34`](../../../../server/internal/service/lumen_service.go#L34) |
+| Assets search (Web) | `ts:useAssetsSearch` [`web/src/features/assets/api/useAssetsSearch.ts`](../../../../web/src/features/assets/api/useAssetsSearch.ts) |
+| AssetHandler | `go:handler.AssetHandler.SearchAssets` [`server/internal/api/handler/asset_query_handler.go`](../../../../server/internal/api/handler/asset_query_handler.go) |
+| AssetService | `go:service.AssetService` [`server/internal/service/asset_service.go`](../../../../server/internal/service/asset_service.go) |
+| Embedding retriever | `go:search.EmbeddingRetriever` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
+| Lumen Hub | `go:service.LumenService` [`server/internal/service/lumen_service.go`](../../../../server/internal/service/lumen_service.go) |
 | Vec1 vector index | `sql:search_embeddings_vec` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Bleve OCR retriever | `go:search.BleveOCRRetriever` [`server/internal/search/retrievers.go:260`](../../../../server/internal/search/retrievers.go#L260) |
+| Bleve OCR retriever | `go:search.BleveOCRRetriever` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
 | Place retriever (FTS5) | `sql:location_search_fts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Catalog reader | `go:search.HydrateAssets` [`server/internal/search/retrievers.go:423`](../../../../server/internal/search/retrievers.go#L423) |
+| Catalog reader | `go:repo.Queries` [`server/internal/db/repo/db.go`](../../../../server/internal/db/repo/db.go) |
 
 ## Steps
 
 | # | From → To | Message | Anchor |
 | --- | --- | --- | --- |
 | 1 | web → handler | POST /assets/search {query, filter} | `api:POST /api/v1/assets/search` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
-| 2 | handler → service | SearchAssets | `go:service.AssetService.SearchAssets` [`server/internal/service/asset_service.go:118`](../../../../server/internal/service/asset_service.go#L118) |
-| 3 | service → semantic | _par every channel is self-thresholded_ — RetrieveSet (calibrated cutoff) | `go:search.EmbeddingRetriever.RetrieveSet` [`server/internal/search/setretrieve.go:148`](../../../../server/internal/search/setretrieve.go#L148) |
-| 4 | semantic → lumen | _par every channel is self-thresholded_ — embed query text | `go:service.LumenService.SemanticTextEmbed` [`server/internal/service/lumen_service.go:35`](../../../../server/internal/service/lumen_service.go#L35) |
+| 2 | handler → service | SearchBrowseItems | `go:service.AssetService.SearchBrowseItems` [`server/internal/service/asset_service.go`](../../../../server/internal/service/asset_service.go) |
+| 3 | service → semantic | _par every channel is self-thresholded_ — RetrieveSet (calibrated cutoff) | `go:search.EmbeddingRetriever.RetrieveSet` [`server/internal/search/setretrieve.go`](../../../../server/internal/search/setretrieve.go) |
+| 4 | semantic → lumen | _par every channel is self-thresholded_ — embed query text | `go:service.LumenService.SemanticTextEmbed` [`server/internal/service/lumen_service.go`](../../../../server/internal/service/lumen_service.go) |
 | 5 | semantic → vec | _par every channel is self-thresholded_ — KNN in the active embedding space, cosine floor |  |
-| 6 | service → ocr | _else OCR_ — strict-then-relaxed Bleve match | `go:search.BleveOCRRetriever.Retrieve` [`server/internal/search/retrievers.go:273`](../../../../server/internal/search/retrievers.go#L273) |
-| 7 | service → place | _else place_ — FTS match on place names | `go:search.NewPlaceRetriever` [`server/internal/search/retrievers.go:197`](../../../../server/internal/search/retrievers.go#L197) |
-| 8 | service → catalog | _else filename_ — filename match, one primary per media item |  |
-| 9 | service → service | weighted RRF (semantic 1.0, place 0.8, OCR 0.7, filename 0.6) | `go:search.FuseSet` [`server/internal/search/setretrieve.go:359`](../../../../server/internal/search/setretrieve.go#L359) |
-| 10 | service → catalog | hydrate ranked Assets in the requested lifecycle state | `go:service.assetService.searchAssetsFusedSet` [`server/internal/service/asset_search_fused.go:89`](../../../../server/internal/service/asset_search_fused.go#L89) |
+| 6 | service → ocr | _else OCR_ — strict-then-relaxed Bleve match | `go:search.BleveOCRRetriever.Retrieve` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
+| 7 | service → place | _else place_ — FTS match on place names | `go:search.NewPlaceRetriever` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
+| 8 | service → catalog | _else filename_ — filename match, one primary per media item | `go:repo.Queries.GetMediaItemRefsUnified` [`server/internal/db/repo/assets_01.sql.go`](../../../../server/internal/db/repo/assets_01.sql.go) |
+| 9 | service → service | weighted RRF (semantic 1.0, place 0.8, OCR 0.7, filename 0.6) | `go:search.FuseSet` [`server/internal/search/setretrieve.go`](../../../../server/internal/search/setretrieve.go) |
+| 10 | service → catalog | hydrate the ranked media items in the requested lifecycle state | `go:service.assetService.browseItemsForMediaRefs` [`server/internal/service/asset_browse_service.go`](../../../../server/internal/service/asset_browse_service.go) |
 | 11 | handler → web | best results (top-N by confidence) + full set under the chosen sort |  |
 
 ## No TopK anywhere

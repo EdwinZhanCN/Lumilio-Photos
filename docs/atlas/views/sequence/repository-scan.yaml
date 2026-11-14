@@ -74,14 +74,17 @@ steps:
         to: scanner
         label: RunTurn
         anchor: go:scan.Scanner.RunTurn
+        via: [go:server/app.pipelineRuntime.scanRepository, go:server/app.runRepositoryScanBatch]
       - from: scanner
         to: disk
         label: list one directory completely (sorted, stat cache); key names under the repository's own volume rule
         anchor: go:scan.walkTurn.processDirectory
+        via: [go:scan.walkTurn]
       - from: scanner
         to: writer
         label: write only the diff — new, changed (pending_hash), restored, missing
         anchor: go:scan.walkTurn.flush
+        via: [go:scan.walkTurn]
       - from: writer
         to: catalog
         label: one bounded transaction per batch (≤ 256 rows)
@@ -94,6 +97,7 @@ steps:
         to: scanner
         label: HashTurn (32 pending_hash entries)
         anchor: go:scan.Scanner.HashTurn
+        via: [go:server/app.pipelineRuntime.scanRepository, go:server/app.runRepositoryScanBatch]
       - from: scanner
         to: disk
         label: hash outside any transaction
@@ -105,9 +109,8 @@ steps:
         to: catalog
         label: activation requests the Asset's pipeline stages
         anchor: go:service.ApplyAssetActivationTx
-  - from: worker
-    to: scheduler
-    label: snooze while more work remains; finish records counters
+  - note: The worker snoozes the River job while more work remains; the final turn records the scan's counters.
+    over: worker
 notes:
   - title: Disk is the truth
     body: >-
