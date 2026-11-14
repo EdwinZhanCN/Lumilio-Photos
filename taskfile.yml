@@ -112,6 +112,13 @@ tasks:
     cmds:
       - go -C server run ./tools/architecturecheck
 
+  # The product vocabulary spans the Web, Desktop, docs, and API annotations,
+  # so its check lives here; lumilio-frontend-i18n owns the term registry.
+  terminology:check:
+    desc: Check canonical product terminology and literal copy for contract codes
+    cmds:
+      - go -C server run ./tools/terminology
+
   # The Atlas spans Server, Desktop, and Web, so its targets live here. The Web
   # facts are extracted first; the Go tool joins them with the Go packages.
   atlas:
