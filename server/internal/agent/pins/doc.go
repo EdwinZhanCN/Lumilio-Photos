@@ -4,6 +4,4 @@
 // is a self-contained producer expression (filter_assets / search_*).
 // Transformed or combined refs pin as frozen — their plans reference session
 // refs that do not outlive the conversation.
-//
-//atlas:group agent
 package pins

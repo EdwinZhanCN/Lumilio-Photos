@@ -11,6 +11,4 @@
 // boundary for repository removal; copies in other repositories survive.
 // Neither performs filesystem I/O; callers unlink trashed files first, and the
 // artifact cleaner later reclaims artifacts whose Asset no longer exists.
-//
-//atlas:group domain
 package lifecycle

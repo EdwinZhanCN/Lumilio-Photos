@@ -2,7 +2,7 @@
 
 # Web components
 
-_architecture · source: `derived: //atlas:group web-components + imports`_
+_architecture · source: `derived: atlas.yaml group web-components + imports`_
 
 Reusable presentational UI with no feature, API, or store dependency.
 

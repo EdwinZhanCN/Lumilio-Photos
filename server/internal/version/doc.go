@@ -4,6 +4,4 @@
 //
 // Release builds (Docker image, desktop bundle) stamp the git tag; local and
 // test builds report "dev". Surfaced through GET /api/v1/health.
-//
-//atlas:group foundation
 package version

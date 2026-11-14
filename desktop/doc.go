@@ -8,6 +8,4 @@
 // runs the application: the tray, the native Settings window, and the
 // coordinated quit. The hidden Lumen supervisor mode returns before any of
 // that starts.
-//
-//atlas:group desktop-host
 package main

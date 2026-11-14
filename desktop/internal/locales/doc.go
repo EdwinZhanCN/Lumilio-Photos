@@ -9,6 +9,4 @@
 //
 // Product terms follow the canonical bilingual terminology registry in
 // .agents/skills/lumilio-frontend-i18n/SKILL.md.
-//
-//atlas:group desktop-panel
 package locales

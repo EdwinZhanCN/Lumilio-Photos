@@ -1,6 +1,6 @@
 # Atlas rules: one architecture gate
 
-Status: active, created 2026-10-19; nothing has landed. Child of
+Status: active, created 2026-10-19; A1 landed 2026-11-14. Next: A2. Child of
 [server-structure.md](server-structure.md) (Phase A, sessions A1–A4). It
 touches only `server/tools`, tests, docs, `docs/atlas`, the Taskfile, and CI
 wiring, so it may run between rc.1 sessions. A4 supersedes part of the
@@ -113,15 +113,41 @@ peers are covered through the call graph whatever their names.
 ## Execution phases
 
 ### A1 — Typed facts and path-based groups
-- [ ] Load Server and Desktop facts with `golang.org/x/tools/go/packages`
+- [x] Load Server and Desktop facts with `golang.org/x/tools/go/packages`
   and `go/types` (already an indirect dependency of `server`).
-- [ ] Server and Desktop groups declare `match` paths like the Web groups;
+- [x] Server and Desktop groups declare `match` paths like the Web groups;
   delete every `//atlas:group` directive (each `doc.go` stays). Today's
   membership is expressed with explicit paths; parent B1 simplifies them to
   directory globs.
-- [ ] Rule engine skeleton (`rules:` list, `id`/`why`, findings, baselines in
+- [x] Rule engine skeleton (`rules:` list, `id`/`why`, findings, baselines in
   `atlas.lock.json`) and the fixture harness. The group-dependency check is
   the first rule; its findings and the generated maps are unchanged.
+
+Found in A1 (2026-11-14), binding on A2–A4:
+
+- **Two fact layers.** Typed facts (`typed.go`) are the host build:
+  cgo-processed syntax and `go/types` objects for the files the platform
+  compiles (Linux in CI). The map facts (symbols, anchor hashes, doc links,
+  imports, line counts) stay a syntactic parse of every non-test file,
+  because the Server has `_windows`/`_darwin` files and cgo rewrites file
+  text; only that keeps generated files and lock hashes identical on every
+  host. Rules use typed facts; a rule about platform-specific files must say
+  so.
+- **The loader builds like the compiler.** `task atlas:run` sets
+  `GOTOOLCHAIN` to Desktop's `go` line plus `+auto` (go/types refuses a
+  module newer than the tool's own Go, and Desktop is on 1.27) and
+  `GOFLAGS=-tags=$GO_BUILD_TAGS`; the root CGo allowlist applies. The CI
+  `generated` job therefore sets up Go from `desktop/go.mod` and installs the
+  Server's CGo headers. Any type error is an Atlas problem, never ignored.
+- **Lock format.** `atlas.lock.json` is `{views, baselines}`. Finding keys
+  are symbols or package paths, never lines. `atlas baseline <rule>`
+  (`task atlas:baseline -- <rule>`) records findings only for a rule with no
+  baseline entry yet; `atlas check` fails on a stale entry and `atlas lock`
+  drops it.
+- **Fixture shape.** `testdata/rules/<id>/{violation,pass}/` is a small
+  repository: `atlas.yaml`, Go module(s), and, for `violation`, `want.txt`
+  with the exact finding keys. `TestEveryDeclaredRuleHasFixtures` fails for
+  a declared rule without both.
 
 ### A2 — Static rules
 - [ ] Rule kinds `calls` (only/forbid), `constructs`, `forbid-types`,

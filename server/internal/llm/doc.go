@@ -11,6 +11,4 @@
 // explicitly constructed Developer API client, and DeepSeek its native
 // adapter. Hosted variants whose credentials need ambient cloud state stay
 // unsupported.
-//
-//atlas:group domain
 package llm

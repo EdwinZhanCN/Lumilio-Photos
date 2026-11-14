@@ -39,6 +39,4 @@
 // manifest's required repository_trash.retention_days. Repository verification runs at
 // startup and periodically with 3/4–5/4 interval jitter; watcher hints never
 // replace authoritative full scans.
-//
-//atlas:group runtime
 package app

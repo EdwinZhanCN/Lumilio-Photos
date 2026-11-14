@@ -6,6 +6,4 @@
 //
 // It has no dependencies so every layer, including media utilities, can speak
 // catalog vocabulary without importing the database.
-//
-//atlas:group foundation
 package dbtypes

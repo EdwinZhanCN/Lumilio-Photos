@@ -2,7 +2,7 @@
 
 # Lumilio Agent
 
-_architecture · source: `derived: //atlas:group agent + imports`_
+_architecture · source: `derived: atlas.yaml group agent + imports`_
 
 The in-app assistant: the agent run loop, typed references and facets, pinned widgets, prompt injection of library context, and the tools the model may call over the catalog.
 

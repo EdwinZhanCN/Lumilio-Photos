@@ -319,10 +319,20 @@ jobs:
               with:
                   version: 3.52.0
 
+            # The Atlas type-checks Server and Desktop with go/packages: it needs
+            # the newest toolchain any module declares (Desktop's) and the
+            # Server's CGo headers, exactly like a build.
             - uses: actions/setup-go@v6
               with:
-                  go-version-file: server/go.mod
-                  cache-dependency-path: server/go.sum
+                  go-version-file: desktop/go.mod
+                  cache-dependency-path: |
+                      server/go.sum
+                      desktop/go.sum
+
+            - name: Install libvips, libraw, and SQLite headers
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev
 
             - uses: voidzero-dev/setup-vp@v1
               with:

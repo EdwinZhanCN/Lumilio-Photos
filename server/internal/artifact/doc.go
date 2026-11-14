@@ -6,6 +6,4 @@
 // if a nondeterministic encoder would produce different valid bytes. No
 // catalog row ever references a temporary or partial artifact; the [Cleaner]
 // removes artifacts nothing references.
-//
-//atlas:group storage
 package artifact

@@ -7,6 +7,4 @@
 // [ShutdownPhase], [DesiredState]) are the lifecycle vocabulary every
 // controller reports in. [InitialSnapshot] is the state before any controller
 // starts.
-//
-//atlas:group desktop-control
 package dto

@@ -32,9 +32,22 @@ anchor grammar, and view schema: [docs/atlas/README.md](../../../docs/atlas/READ
    invariants, and its entry points as doc links (`[Name]`,
    `[Type.Method]`, `[server/internal/x.Name]`). Do not list importers or
    imports; they are derived.
-2. End the comment with `//` and `//atlas:group <id>` using a group from
-   `atlas.yaml` on the same side (server/desktop).
+2. Add the package path to the `match` list of its group in
+   `docs/atlas/atlas.yaml` (a group on the same side: server/desktop). A
+   moved or deleted package's old path must go too; a path that matches
+   nothing fails.
 3. `task atlas:check`.
+
+## When a rule reports a finding
+
+`[rule-id] …` means the code broke an architecture rule declared under
+`rules:` in `atlas.yaml`. Read the rule's `why`, then fix the code. Never
+weaken the rule or add a baseline entry to pass: baselines hold only the
+violations that existed when a rule landed (`task atlas:baseline -- <id>`,
+owner-approved in the PR) and only shrink. After fixing a baselined
+violation, `task atlas:lock` drops its entry. A new rule needs a
+`testdata/rules/<id>/violation` fixture (with `want.txt`) and a `pass`
+fixture in `server/tools/atlas`; see the Rules section of the Atlas README.
 
 ## Editing code that a view anchors
 

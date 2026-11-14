@@ -32,6 +32,4 @@
 // memberships, cover overrides, and constraints with audio endpoints while
 // preserving eligible corrections; stale audio-only Events retire. See
 // .agents/decisions/2026-10-06-audio-event-participation.md.
-//
-//atlas:group domain
 package event

@@ -12,6 +12,4 @@
 // Readiness comes from Lumen's versioned control gRPC service (a WatchStatus
 // subscription), not a TCP probe, and logs are read with a bounded TailLogs
 // request; model download and warm-up stay independent of Server readiness.
-//
-//atlas:group desktop-services
 package lumen

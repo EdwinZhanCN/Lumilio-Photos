@@ -1,8 +1,9 @@
 package main
 
 // Config is docs/atlas/atlas.yaml: the human-owned half of the architecture
-// map. It names groups, the groups each may depend on, and the reviewed
-// package-level exceptions. Everything else is derived from source.
+// map. It names groups, the groups each may depend on, the reviewed
+// package-level exceptions, and the rules the code must obey. Everything else
+// is derived from source.
 type Config struct {
 	GitHub     string      `yaml:"github"`
 	Branch     string      `yaml:"branch"`
@@ -10,6 +11,7 @@ type Config struct {
 	Exclude    []string    `yaml:"exclude"`
 	Groups     []Group     `yaml:"groups"`
 	Exceptions []Exception `yaml:"exceptions"`
+	Rules      []Rule      `yaml:"rules"`
 	Docs       []string    `yaml:"docs"`
 	// UndocumentedRoutes are real routes deliberately absent from OpenAPI,
 	// such as infrastructure probes, that documents may still name.
@@ -23,8 +25,8 @@ type GoModule struct {
 	Side string `yaml:"side"`
 }
 
-// Group is a named architectural slice. Packages opt in with an
-// //atlas:group directive in doc.go; Web modules are assigned by Match.
+// Group is a named architectural slice. Every Go package and Web module
+// belongs to exactly one group, the one whose Match paths contain it.
 type Group struct {
 	ID      string   `yaml:"id" json:"id"`
 	Title   string   `yaml:"title" json:"title"`
@@ -40,6 +42,36 @@ type Exception struct {
 	From   string `yaml:"from"`
 	To     string `yaml:"to"`
 	Reason string `yaml:"reason"`
+}
+
+// Rule is one architecture rule. ID names it in findings, baselines, and
+// fixtures (server/tools/atlas/testdata/rules/<id>); Why names the invariant
+// it protects. Exactly one kind field is set; rules.go maps each kind to its
+// evaluator.
+type Rule struct {
+	ID  string `yaml:"id" json:"id"`
+	Why string `yaml:"why" json:"why"`
+
+	// GroupUses checks every import between groups against groups[].uses
+	// and the reviewed exceptions.
+	GroupUses bool `yaml:"group_uses" json:"groupUses,omitempty"`
+}
+
+// Finding is one violation of a rule. Key identifies it by symbols, never by
+// line, so a baseline entry survives unrelated edits; Where is the location
+// shown to a reader.
+type Finding struct {
+	Rule    string `json:"rule"`
+	Key     string `json:"key"`
+	Where   string `json:"where"`
+	Message string `json:"message"`
+}
+
+// lockFile is docs/atlas/atlas.lock.json: the verified hash of every view
+// anchor, and each rule's baseline of tolerated findings.
+type lockFile struct {
+	Views     map[string]map[string]string `json:"views"`
+	Baselines map[string][]string          `json:"baselines"`
 }
 
 // View is one authored diagram under docs/atlas/views/<kind>/<id>.yaml.
@@ -167,4 +199,5 @@ type ResolvedAnchor struct {
 type Problem struct {
 	Where   string `json:"where"`
 	Message string `json:"message"`
+	Rule    string `json:"rule,omitempty"`
 }

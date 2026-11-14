@@ -42,6 +42,4 @@
 // and [AssetHandler.EmptyAssetTrash] require confirm: true and audit explicit
 // confirmation. Repository-wide actions require an administrator; ordinary
 // Empty trash is owner-scoped and preserves copies held elsewhere.
-//
-//atlas:group http
 package handler

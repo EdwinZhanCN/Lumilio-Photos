@@ -35,6 +35,7 @@ type goPackage struct {
 	directives map[string]string
 	imports    map[string]bool
 	lines      int
+	typed      *typedPackage
 }
 
 var skippedDirNames = map[string]bool{

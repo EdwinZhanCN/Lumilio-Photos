@@ -6,6 +6,4 @@
 // [SessionManager] tracks in-flight chunked sessions per user and repository,
 // and [ChunkMerger] assembles received chunks into a repository staging file
 // before the sourcing pipeline takes over.
-//
-//atlas:group ingest
 package upload

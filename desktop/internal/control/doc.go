@@ -15,6 +15,4 @@
 // apply, or restore runtime intent even when the Server fails to start. The
 // product UI runs in the user's browser at http://localhost:6680, served by
 // the in-process Server like any other.
-//
-//atlas:group desktop-control
 package control

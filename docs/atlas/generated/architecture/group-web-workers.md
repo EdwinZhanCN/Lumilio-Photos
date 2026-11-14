@@ -2,7 +2,7 @@
 
 # Web workers
 
-_architecture · source: `derived: //atlas:group web-workers + imports`_
+_architecture · source: `derived: atlas.yaml group web-workers + imports`_
 
 Browser worker entry points (hashing, justified layout, Studio tools) and the shared worker client.
 

@@ -152,7 +152,7 @@ func (a *Atlas) deriveGroupView(group *Group) *View {
 		Summary:   group.Summary,
 		Direction: "LR",
 		Derived:   true,
-		Source:    "derived: //atlas:group " + group.ID + " + imports",
+		Source:    "derived: atlas.yaml group " + group.ID + " + imports",
 	}
 	members := map[string]bool{}
 	for _, module := range a.sortedModules() {

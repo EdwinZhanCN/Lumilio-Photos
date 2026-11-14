@@ -12,6 +12,4 @@
 // marker with active, staged, previous, and failed files after an interrupted
 // rename. A snapshot at an older supported schema or config version is
 // installed unchanged and upgraded by the next start; a newer one is rejected.
-//
-//atlas:group catalog
 package backup

@@ -22,6 +22,8 @@ func testAtlas() *Atlas {
 		apiRoutes:   map[string]bool{"GET /api/v1/things": true},
 		sqlTables:   map[string]bool{"things": true},
 		groupByID:   map[string]*Group{},
+		matched:     map[string]bool{},
+		Findings:    map[string][]Finding{},
 	}
 	add := func(symbol Symbol) { a.Symbols[symbol.Key] = &symbol }
 	add(Symbol{Key: "go:server/internal/phase.Phase", Name: "Phase", Module: "server/internal/phase", File: "phase.go", Line: 3, Kind: "type", Hash: "t", Members: []string{"PhaseDone", "PhaseNew"}})
@@ -71,7 +73,7 @@ func TestChangedAnchorIsStaleUntilLocked(t *testing.T) {
 	if len(a.Stale) != 1 || !strings.Contains(a.Stale[0].Message, "go:phase.PhaseNew changed") {
 		t.Fatalf("only the edited constant should be stale, got:\n%s", messages(a.Stale))
 	}
-	if got := string(a.lockFile()); !strings.Contains(got, `"go:phase.PhaseNew": "n1"`) {
+	if got := string(encodeLock(a.viewLock(), nil)); !strings.Contains(got, `"go:phase.PhaseNew": "n1"`) {
 		t.Fatalf("lock should record the current hash, got:\n%s", got)
 	}
 }

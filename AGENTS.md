@@ -145,11 +145,13 @@ merges. Formats:
   matching `import type`, and the generated sibling `doc.md` is never edited by
   hand
   ([lumilio-feature-doc](.agents/skills/lumilio-feature-doc/SKILL.md)).
-- Every Go package documents itself in `doc.go` with an `//atlas:group`
-  directive and doc links that resolve. An import that crosses into a group
-  not listed in its group's `uses` in `docs/atlas/atlas.yaml` fails
-  `task atlas:check`: declare it there (an architecture decision) or remove
-  the import. When code an Atlas view anchors changes, re-read that view,
+- Every Go package documents itself in `doc.go` with doc links that
+  resolve, and its path is in exactly one group's `match` in
+  `docs/atlas/atlas.yaml`. An import that crosses into a group not listed in
+  its group's `uses` fails `task atlas:check`: declare it there (an
+  architecture decision) or remove the import. A rule under `rules:` that
+  reports a finding is fixed in the code, never baselined to pass. When
+  code an Atlas view anchors changes, re-read that view,
   fix it if the behaviour changed, then `task atlas:lock` — never lock
   without reading
   ([lumilio-atlas](.agents/skills/lumilio-atlas/SKILL.md)).

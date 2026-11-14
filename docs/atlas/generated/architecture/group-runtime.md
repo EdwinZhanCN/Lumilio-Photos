@@ -2,7 +2,7 @@
 
 # Server runtime
 
-_architecture · source: `derived: //atlas:group runtime + imports`_
+_architecture · source: `derived: atlas.yaml group runtime + imports`_
 
 Process composition: the CLI entry point, the Docker entrypoint, and server/app, the only place that wires every subsystem together and owns startup and graceful shutdown. Desktop hosts the same runtime in-process.
 

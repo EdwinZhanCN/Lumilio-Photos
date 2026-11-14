@@ -3,6 +3,4 @@
 // A reader that changes its file's version handles each older supported
 // version before calling Check, so later builds read older files forward;
 // a file from a newer Desktop is rejected rather than misread.
-//
-//atlas:group desktop-platform
 package stateversion

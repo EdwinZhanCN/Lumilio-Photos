@@ -2,7 +2,7 @@
 
 # Catalog
 
-_architecture · source: `derived: //atlas:group catalog + imports`_
+_architecture · source: `derived: atlas.yaml group catalog + imports`_
 
 The embedded SQLite catalog and its QueueDB sibling: the single-writer runtime, named transactions, sqlc queries, the Vec1 vector index, migrations, and verified backups. The catalog is product truth.
 

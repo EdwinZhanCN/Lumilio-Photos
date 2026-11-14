@@ -22,6 +22,4 @@
 // intact input; an expected stdin EPIPE must not mask valid output, and every
 // started process is waited for. Decision:
 // .agents/decisions/2026-09-18-processing-convergence.md.
-//
-//atlas:group ingest
 package processors

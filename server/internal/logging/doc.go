@@ -3,6 +3,4 @@
 // [RedirectStandardLog] route slog and the standard library logger into it,
 // and [RepositoryAuditProvider] supplies per-repository audit logs for storage
 // operations.
-//
-//atlas:group foundation
 package logging

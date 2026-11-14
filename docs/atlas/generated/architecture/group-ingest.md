@@ -2,7 +2,7 @@
 
 # Ingest and execution
 
-_architecture · source: `derived: //atlas:group ingest + imports`_
+_architecture · source: `derived: atlas.yaml group ingest + imports`_
 
 Everything that moves bytes and background results into the catalog: staged sourcing for upload and cloud import, the River workers and scheduler, media processors, and the commit coordinator that is the only writer of asynchronous results.
 

@@ -6,6 +6,4 @@
 //
 // Callers pass bytes or readers, never repository paths, so the package stays
 // free of storage and catalog knowledge.
-//
-//atlas:group media
 package imaging

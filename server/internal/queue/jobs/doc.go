@@ -9,6 +9,4 @@
 // [BackupCatalogArgs]) carry stable identities and expected revisions only.
 // Product truth stays in the catalog's desired/applied records; River is
 // disposable delivery state.
-//
-//atlas:group work
 package jobs

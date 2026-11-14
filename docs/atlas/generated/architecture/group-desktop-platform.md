@@ -2,7 +2,7 @@
 
 # Desktop platform
 
-_architecture · source: `derived: //atlas:group desktop-platform + imports`_
+_architecture · source: `derived: atlas.yaml group desktop-platform + imports`_
 
 OS integration for the Desktop App: application-support paths, schema versions for desktop state files, signed resource manifests, and build metadata.
 

@@ -11,6 +11,4 @@
 // (or [ErrMixed]); the storage package stores the measured rule on the
 // repository row and refuses to register or reconnect a tree it cannot
 // qualify.
-//
-//atlas:group storage
 package pathsemantics

@@ -15,16 +15,20 @@ import (
 
 // Atlas is the merged, resolved model behind every output.
 type Atlas struct {
-	Root     string
-	Config   *Config
-	Modules  map[string]*Module
-	Symbols  map[string]*Symbol
-	Views    []*View
-	Anchors  map[string]*ResolvedAnchor
-	Usage    map[string][]string
-	Problems []Problem
-	Stale    []Problem
-	Lock     map[string]map[string]string
+	Root      string
+	ConfigDir string
+	Config    *Config
+	Modules   map[string]*Module
+	Symbols   map[string]*Symbol
+	Views     []*View
+	Anchors   map[string]*ResolvedAnchor
+	Usage     map[string][]string
+	Problems  []Problem
+	Stale     []Problem
+	Lock      map[string]map[string]string
+	// Baselines are the reviewed violations each rule tolerates, by finding
+	// key. They only shrink: see rules.go.
+	Baselines map[string][]string
 
 	viewAnchors map[string]map[string]bool
 
@@ -35,7 +39,17 @@ type Atlas struct {
 	apiRoutes   map[string]bool
 	sqlTables   map[string]bool
 	groupByID   map[string]*Group
+	matched     map[string]bool
 	webProblems []Problem
+
+	// Findings holds every rule's findings by rule id, baselined or not.
+	Findings map[string][]Finding
+	// StaleBaselines are baseline entries whose violation is gone; `atlas
+	// lock` drops them, and `atlas check` fails until it has.
+	StaleBaselines []Problem
+	// groupFindings are the undeclared group imports checkGroups found; the
+	// group_uses rule reports them.
+	groupFindings []Finding
 }
 
 type webFacts struct {
@@ -67,9 +81,13 @@ func (a *Atlas) problem(where, format string, args ...any) {
 	a.Problems = append(a.Problems, Problem{Where: where, Message: fmt.Sprintf(format, args...)})
 }
 
-func loadAtlas(root, webFactsPath string) (*Atlas, error) {
+// loadAtlas reads the declaration in configDir (atlas.yaml, atlas.lock.json,
+// views/) relative to root and loads every fact. An empty webFactsPath loads
+// no Web modules, which fixtures use.
+func loadAtlas(root, configDir, webFactsPath string) (*Atlas, error) {
 	a := &Atlas{
 		Root:        root,
+		ConfigDir:   configDir,
 		Modules:     map[string]*Module{},
 		Symbols:     map[string]*Symbol{},
 		Anchors:     map[string]*ResolvedAnchor{},
@@ -82,8 +100,10 @@ func loadAtlas(root, webFactsPath string) (*Atlas, error) {
 		apiRoutes:   map[string]bool{},
 		sqlTables:   map[string]bool{},
 		groupByID:   map[string]*Group{},
+		matched:     map[string]bool{},
+		Findings:    map[string][]Finding{},
 	}
-	configBytes, err := os.ReadFile(filepath.Join(root, atlasDir, "atlas.yaml"))
+	configBytes, err := os.ReadFile(filepath.Join(root, configDir, "atlas.yaml"))
 	if err != nil {
 		return nil, err
 	}
@@ -101,15 +121,22 @@ func loadAtlas(root, webFactsPath string) (*Atlas, error) {
 	if err := a.loadGo(); err != nil {
 		return nil, err
 	}
-	if err := a.loadWeb(webFactsPath); err != nil {
-		return nil, err
+	if webFactsPath != "" {
+		if err := a.loadWeb(webFactsPath); err != nil {
+			return nil, err
+		}
 	}
 	a.loadContracts()
 	a.linkModules()
-	if lock, err := os.ReadFile(filepath.Join(root, atlasDir, "atlas.lock.json")); err == nil {
-		if err := json.Unmarshal(lock, &a.Lock); err != nil {
+	if lock, err := os.ReadFile(filepath.Join(root, configDir, "atlas.lock.json")); err == nil {
+		var file lockFile
+		if err := json.Unmarshal(lock, &file); err != nil {
 			return nil, fmt.Errorf("atlas.lock.json: %w", err)
 		}
+		if file.Views != nil {
+			a.Lock = file.Views
+		}
+		a.Baselines = file.Baselines
 	}
 	if err := a.loadViews(); err != nil {
 		return nil, err
@@ -157,7 +184,7 @@ func (a *Atlas) loadGo() error {
 			Kind:       kind,
 			Name:       pkg.name,
 			ImportPath: pkg.importPath,
-			Group:      pkg.directives["group"],
+			Group:      a.matchGroup(pkg.dir, pkg.module.Side),
 			DocFile:    pkg.docFile,
 			Files:      len(pkg.files),
 			Lines:      pkg.lines,
@@ -171,7 +198,7 @@ func (a *Atlas) loadGo() error {
 		where := pkg.dir
 		switch {
 		case pkg.docFile == "":
-			a.problem(where, "missing doc.go: every package documents itself in doc.go with a package comment and an //atlas:group directive")
+			a.problem(where, "missing doc.go: every package documents itself in doc.go with a package comment")
 		case strings.TrimSpace(pkg.docText) == "":
 			a.problem(pkg.docFile, "doc.go has no package comment")
 		}
@@ -182,19 +209,8 @@ func (a *Atlas) loadGo() error {
 			a.problem(stray, "package comment belongs in doc.go; move it there so the package has one canonical description")
 		}
 		if pkg.docFile != "" {
-			group := pkg.directives["group"]
-			switch {
-			case group == "":
-				a.problem(pkg.docFile, "missing //atlas:group directive")
-			case a.groupByID[group] == nil:
-				a.problem(pkg.docFile, "//atlas:group %q is not declared in docs/atlas/atlas.yaml", group)
-			case a.groupByID[group].Side != pkg.module.Side:
-				a.problem(pkg.docFile, "//atlas:group %q belongs to side %q, not %q", group, a.groupByID[group].Side, pkg.module.Side)
-			}
 			for key := range pkg.directives {
-				if key != "group" {
-					a.problem(pkg.docFile, "unknown directive //atlas:%s", key)
-				}
+				a.problem(pkg.docFile, "unknown directive //atlas:%s; a package joins its group through `match` paths in docs/atlas/atlas.yaml", key)
 			}
 			for _, message := range docIndex.checkDocLinks(pkg) {
 				a.problem(pkg.docFile, "%s", message)
@@ -202,7 +218,7 @@ func (a *Atlas) loadGo() error {
 			module.DocHTML, module.Synopsis = docIndex.renderGoDoc(pkg, moduleOf)
 		}
 	}
-	return nil
+	return a.attachTyped()
 }
 
 func (a *Atlas) loadWeb(factsPath string) error {
@@ -229,10 +245,7 @@ func (a *Atlas) loadWeb(factsPath string) error {
 		if item.DocFile != nil {
 			module.DocFile = *item.DocFile
 		}
-		module.Group = a.webGroup(module.ID)
-		if module.Group == "" {
-			a.problem(module.ID, "no Web group in docs/atlas/atlas.yaml matches this module")
-		}
+		module.Group = a.matchGroup(module.ID, "web")
 		a.Modules[module.ID] = module
 	}
 	for _, item := range facts.Symbols {
@@ -260,18 +273,42 @@ func (a *Atlas) loadWeb(factsPath string) error {
 	return nil
 }
 
-func (a *Atlas) webGroup(moduleID string) string {
+// matchGroup returns the group whose `match` paths contain a module. Every
+// module belongs to exactly one group of its own side; no match, a match on
+// the other side, or matches in two groups is a problem.
+func (a *Atlas) matchGroup(moduleID, side string) string {
+	var found []string
 	for _, group := range a.Config.Groups {
-		if group.Side != "web" {
-			continue
-		}
 		for _, pattern := range group.Match {
 			if excluded([]string{pattern}, moduleID) {
-				return group.ID
+				a.matched[group.ID+"\x00"+pattern] = true
+				found = appendUnique(found, group.ID)
 			}
 		}
 	}
-	return ""
+	switch {
+	case len(found) == 0:
+		a.problem(moduleID, "no group in docs/atlas/atlas.yaml matches this module; add its path to the `match` list of the group it belongs to")
+		return ""
+	case len(found) > 1:
+		a.problem(moduleID, "groups %s all match this module; a module belongs to exactly one group", strings.Join(found, ", "))
+	}
+	if group := a.groupByID[found[0]]; group.Side != side {
+		a.problem(moduleID, "group %s matches this module, but it belongs to side %q, not %q", group.ID, group.Side, side)
+	}
+	return found[0]
+}
+
+// checkMatches reports `match` patterns that no module needs, so a moved or
+// deleted package cannot leave a stale path behind.
+func (a *Atlas) checkMatches() {
+	for _, group := range a.Config.Groups {
+		for _, pattern := range group.Match {
+			if !a.matched[group.ID+"\x00"+pattern] {
+				a.problem("atlas.yaml", "group %s match %q matches no module; remove it", group.ID, pattern)
+			}
+		}
+	}
 }
 
 var (
@@ -347,7 +384,7 @@ func (a *Atlas) sortedModules() []*Module {
 }
 
 func (a *Atlas) loadViews() error {
-	base := filepath.Join(a.Root, atlasDir, "views")
+	base := filepath.Join(a.Root, a.ConfigDir, "views")
 	for _, kind := range viewKinds {
 		files, _ := filepath.Glob(filepath.Join(base, kind, "*.yaml"))
 		sort.Strings(files)

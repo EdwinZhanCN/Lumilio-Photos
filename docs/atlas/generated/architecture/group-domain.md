@@ -2,7 +2,7 @@
 
 # Domain semantics
 
-_architecture · source: `derived: //atlas:group domain + imports`_
+_architecture · source: `derived: atlas.yaml group domain + imports`_
 
 Derived product meaning that is independent of storage and transport: Event topology, the Asset lifecycle rules, search (FTS5, vectors, OCR sidecar), zero-shot classification math, and the LLM provider adapter.
 

@@ -10,6 +10,4 @@
 // The index lives at <sqlite-directory>/indexes/bleve/ocr-v1. A missing,
 // corrupt, mapping-mismatched, or post-restore index is deleted and rebuilt
 // before HTTP starts.
-//
-//atlas:group domain
 package bleveocr

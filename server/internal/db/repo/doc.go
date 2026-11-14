@@ -8,6 +8,4 @@
 // belong to other owners are mapped by sqlc overrides (for example the
 // repository configuration column uses
 // [server/internal/storage/repocfg.RepositoryConfig]).
-//
-//atlas:group catalog
 package repo

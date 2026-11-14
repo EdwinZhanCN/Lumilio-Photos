@@ -22,6 +22,4 @@
 // starts a fresh bounded delivery. asset_pipeline_failures is catalog product
 // state fenced by source content, pipeline version, and desired version: River
 // delivery attempts never decide retry or terminal outcomes.
-//
-//atlas:group ingest
 package queue

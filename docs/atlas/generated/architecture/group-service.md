@@ -2,7 +2,7 @@
 
 # Services
 
-_architecture · source: `derived: //atlas:group service + imports`_
+_architecture · source: `derived: atlas.yaml group service + imports`_
 
 Business logic behind the HTTP API: authentication and MFA, assets, albums, people, music, settings, setup, search orchestration, cloud import planning, and ML adapters.
 

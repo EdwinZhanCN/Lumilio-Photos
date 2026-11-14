@@ -3,6 +3,4 @@
 // media tools ([ResolveBundledResourcesDir], [ResolveMediaToolPaths]), libvips
 // module configuration, crash-safe atomic file replacement ([WriteAtomic]),
 // and owner-only directories ([EnsurePrivateDirectory]).
-//
-//atlas:group desktop-platform
 package platform

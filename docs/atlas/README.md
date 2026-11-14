@@ -11,6 +11,7 @@ task atlas:data       # refresh its data; an open Atlas page reloads by itself
 task atlas:check      # fail if anything is out of sync (also in task test and CI)
 task atlas:generate   # rewrite docs/atlas/generated after editing views or docs
 task atlas:lock       # mark views verified — only after re-reading stale ones
+task atlas:baseline -- <rule-id>   # record a NEW rule's existing violations (owner approves)
 ```
 
 ### Exploring
@@ -54,10 +55,13 @@ works* does not belong in `docs/` at all: that is the owning `doc.go` or
 external contracts, and procedures.
 
 The dependency rules are the fourth piece: [`atlas.yaml`](atlas.yaml) lists
-every group and the groups it may use. The checker compares that declaration
-with the real import graph **in both directions** — an undeclared import fails,
-and so does a declaration nothing needs — and requires the declared graph to be
-acyclic. Reviewed package-level exceptions carry a written reason.
+every group, the paths it `match`es, and the groups it may use. Every Go
+package and Web module belongs to exactly one group. The `group-dependencies`
+rule compares the declaration with the real import graph **in both
+directions** — an undeclared import fails, and so does a declaration nothing
+needs — and the declared graph must be acyclic. Reviewed package-level
+exceptions carry a written reason. The other architecture rules live beside it
+under `rules:` (see [Rules](#rules)).
 
 ### What it does not guarantee
 
@@ -77,9 +81,10 @@ docs/atlas/
     sequence/*.yaml       request and job sequences         (authored)
     dataflow/*.yaml       how data moves and where it lands (authored)
     lifecycle/*.yaml      state machines                    (authored)
-  atlas.lock.json         verified hash of every code anchor (task atlas:lock)
+  atlas.lock.json         verified hash of every code anchor, rule baselines (task atlas:lock)
   generated/              markdown for every view + module catalog (never edit)
-server/tools/atlas/       the Go extractor, checker, and generator (writes .local/atlas/*.json)
+server/tools/atlas/       the Go extractor, rule engine, checker, and generator (writes .local/atlas/*.json)
+server/tools/atlas/testdata/rules/<id>/  each rule's violation and passing fixture
 web/scripts/atlas-facts.ts  the Web extractor (modules, imports, doc.ts, symbols)
 site/docs/.vitepress/atlas/  the explorer UI (Vue, Mermaid + ELK), local-only
 ```
@@ -88,17 +93,20 @@ site/docs/.vitepress/atlas/  the explorer UI (Vue, Mermaid + ELK), local-only
 
 Every Go package in `server/` and `desktop/` (except `atlas.yaml`'s `exclude`
 list: dev tools and generated code) has a `doc.go` that holds the only package
-comment, nothing but the package clause, and a group directive at the end:
+comment and nothing but the package clause:
 
 ```go
 // Package scan is the repository scan index. The catalog mirrors each
 // repository's tree in repository_entries ...
 //
 // [Scanner.RunTurn] walks one bounded turn; [Scanner.HashTurn] hashes ...
-//
-//atlas:group storage
 package scan
 ```
+
+The package joins its group through a `match` path in `atlas.yaml`, never a
+directive in the file. Server and Desktop groups list explicit package paths
+today; the server-structure plan turns them into directory globs once each
+group owns one directory.
 
 Write what the package **owns**, its **invariants**, and the **entry points**
 as doc links (`[Name]`, `[Type.Method]`, `[server/internal/db.DB]`). Do not
@@ -120,6 +128,41 @@ doc. Web features follow [docts.md](../docts.md).
 
 `go:` and `ts:` anchors are hashed (the declaration's source text); the others
 only have to exist.
+
+## Rules
+
+Every architecture rule is declared under `rules:` in
+[`atlas.yaml`](atlas.yaml) with an `id`, a one-line `why` naming the invariant
+it protects, and exactly one kind. Rules match **type-resolved facts**: the
+Server and Desktop modules are loaded with `golang.org/x/tools/go/packages`
+and type-checked by `go/types`, exactly as the compiler builds them (CGo,
+`GO_BUILD_TAGS`, and the newest Go toolchain any module declares, which the
+Task targets select). A rule never matches the text of a line, a variable
+name, or a name suffix; a check like that is a lint and belongs in the owning
+package's tests.
+
+Typed facts cover the files the host platform builds, which in CI is Linux.
+The map itself (symbols, anchor hashes, doc links, imports) still comes from
+parsing every non-test file regardless of build constraints, so generated
+files are identical on every host.
+
+| Kind | Checks |
+| --- | --- |
+| `group_uses: true` | Every import between groups follows `groups[].uses` and the reviewed `exceptions` (rule `group-dependencies`). |
+
+**Every rule is proven.** `server/tools/atlas/testdata/rules/<rule-id>/` holds
+a `violation/` fixture, whose findings must equal its `want.txt` exactly, and
+a `pass/` fixture that must load without any problem. Each fixture is a small
+repository: an `atlas.yaml` and one or more Go modules, type-checked like the
+real one. `go test ./tools/atlas` fails for a declared rule without both.
+
+**Baselines only shrink.** A finding has a key made of symbols and package
+paths, never line numbers. A new rule that finds existing violations lands
+with them recorded by `task atlas:baseline -- <rule-id>`, which works only
+for a rule that has no baseline yet; the owner approves those entries in the
+PR. After that, `atlas check` fails on any finding not in the baseline and on
+any baseline entry that no longer occurs, and `task atlas:lock` drops fixed
+entries but never adds one.
 
 ## Authoring a view
 
@@ -156,7 +199,11 @@ to roughly 6–14 nodes, and put the *why* in `notes`. Look at
 | --- | --- |
 | `imports X, but group G does not declare uses: [H]` | Decide whether the dependency is right. If yes, add `H` to `G.uses` in `atlas.yaml` (reviewers see an architecture change). If not, remove the import. |
 | `declares uses H, but no package import needs it` | Delete the stale declaration. |
-| `missing doc.go` / `missing //atlas:group` / `package comment belongs in doc.go` | Write or move the package doc as described above. |
+| `missing doc.go` / `package comment belongs in doc.go` | Write or move the package doc as described above. |
+| `no group in docs/atlas/atlas.yaml matches this module` / `match … matches no module` | Add the new package's path to its group's `match`, or remove the path of a package that moved or was deleted. |
+| `[rule-id] …` | A rule found a new violation. Fix the code. Read the rule's `why` first; the rule is the decision, the code is what changes. |
+| `baselined violation … no longer occurs` | You fixed a baselined violation. Run `task atlas:lock` to drop the entry. |
+| `type-check failed: …` | The Atlas could not type-check a package, so rule facts would be unsound. Run through the Task target (it sets the CGo flags, build tags, and toolchain) with the Server's CGo headers installed, or fix the compile error. |
 | `doc link [X] does not resolve` | Fix the link; the symbol was renamed or removed. |
 | `anchor …: … has no declaration` | The anchored code moved or was deleted. Re-anchor the element, or redraw the view if the flow changed. |
 | `N anchor(s) changed since their view was verified` | Open each listed view, compare it with the code at the listed `file:line`, fix the diagram or notes if behaviour changed, then `task atlas:lock`. |

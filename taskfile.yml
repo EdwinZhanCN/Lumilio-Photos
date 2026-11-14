@@ -124,25 +124,50 @@ tasks:
     desc: Write the Atlas site model to .local/atlas; an open Atlas page hot-reloads
     cmds:
       - task: web:atlas:facts
-      - go -C server run ./tools/atlas data
+      - task: atlas:run
+        vars: { ATLAS_ARGS: data }
 
   atlas:generate:
-    desc: Regenerate docs/atlas/generated; fails on broken anchors, undeclared dependencies, or stale views
+    desc: Regenerate docs/atlas/generated; fails on broken anchors, rule findings, or stale views
     cmds:
       - task: web:atlas:facts
-      - go -C server run ./tools/atlas generate
+      - task: atlas:run
+        vars: { ATLAS_ARGS: generate }
 
   atlas:check:
-    desc: Fail if any Atlas anchor, dependency declaration, package doc, or generated file is out of sync
+    desc: Fail if any Atlas rule, anchor, dependency declaration, package doc, or generated file is out of sync
     cmds:
       - task: web:atlas:facts
-      - go -C server run ./tools/atlas check
+      - task: atlas:run
+        vars: { ATLAS_ARGS: check }
 
   atlas:lock:
-    desc: Mark every Atlas view verified against the current code (only after re-reading stale views)
+    desc: Mark every Atlas view verified against the current code (only after re-reading stale views) and drop fixed baseline entries
     cmds:
       - task: web:atlas:facts
-      - go -C server run ./tools/atlas lock
+      - task: atlas:run
+        vars: { ATLAS_ARGS: lock }
+
+  atlas:baseline:
+    desc: Record the existing findings of a new Atlas rule (task atlas:baseline -- <rule-id>); the owner approves it in the PR
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - task: web:atlas:facts
+      - task: atlas:run
+        vars: { ATLAS_ARGS: 'baseline {{.CLI_ARGS}}' }
+
+  # The Atlas type-checks Server and Desktop with go/packages, so it builds the
+  # way the binaries do (cgo, GO_BUILD_TAGS) and on the newest toolchain any
+  # module declares: go/types refuses a module newer than the tool's own Go.
+  atlas:run:
+    internal: true
+    env:
+      GOTOOLCHAIN:
+        sh: awk '$1 == "go" { print "go" $2 "+auto"; exit }' desktop/go.mod
+      GOFLAGS: '-tags={{.GO_BUILD_TAGS}}'
+    cmds:
+      - go -C server run ./tools/atlas {{.ATLAS_ARGS}}
 
   # Published-artifact smoke (release-smoke.yml): install one Server image the
   # way the release bundle does, from its Compose file and .env into host

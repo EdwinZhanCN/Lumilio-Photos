@@ -12,6 +12,4 @@
 // Because River workers never write the catalog themselves, a retried or
 // duplicated delivery can only produce a stale or duplicate outcome, and
 // writer admission stays bounded no matter how many workers run.
-//
-//atlas:group ingest
 package commit

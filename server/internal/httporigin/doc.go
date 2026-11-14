@@ -12,6 +12,4 @@
 // public or Bearer endpoints but never receive Allow-Credentials. Passkey
 // challenges bind the normalized Origin and its hostname RP ID
 // ([Policy.PasskeyAvailability]).
-//
-//atlas:group http
 package httporigin

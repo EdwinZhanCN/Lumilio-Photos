@@ -2,7 +2,7 @@
 
 # Desktop runtime
 
-_architecture · source: `derived: //atlas:group desktop-runtime + imports`_
+_architecture · source: `derived: atlas.yaml group desktop-runtime + imports`_
 
 Hosts server/app in-process: the runtime generation supervisor, the schema-versioned runtime configuration transaction, preferences, the repository handoff, and coordinated shutdown.
 

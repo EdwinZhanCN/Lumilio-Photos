@@ -4,6 +4,4 @@
 // larger libraries train a PQ ANN model ([ModeANN]) whose candidates are
 // filtered inside Vec1 and exactly re-ranked from the authoritative vectors.
 // [Reconcile] restores the index at startup and [Maintain] keeps it current.
-//
-//atlas:group catalog
 package vectorindex

@@ -2,7 +2,7 @@
 
 # Web contexts
 
-_architecture · source: `derived: //atlas:group web-contexts + imports`_
+_architecture · source: `derived: atlas.yaml group web-contexts + imports`_
 
 Truly application-wide React providers: global notifications and worker access.
 

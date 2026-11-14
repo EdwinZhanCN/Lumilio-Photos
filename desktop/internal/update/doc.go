@@ -8,6 +8,4 @@
 // signature the provider refuses ([ErrSignature]) never becomes applicable.
 // Applying is a coordinated quit followed by a relaunch, which belongs to the
 // shutdown coordinator.
-//
-//atlas:group desktop-services
 package update
