@@ -15,7 +15,7 @@ code-evidence:
 - web/ARCHITECTURE.md
 - desktop/README.md
 - taskfile.yml
-- server/tools/architecturecheck
+- docs/atlas/atlas.yaml
 -->
 
 # 一页架构概览
@@ -27,4 +27,4 @@ code-evidence:
 - **WASM**：浏览器端哈希、导出、工作室和缩略图等可选组件。
 - **Site**：VitePress 文档与 OpenAPI 文档。
 
-架构约束由 `server/tools/architecturecheck`、前端边界检查和 Taskfile/CI 门禁执行。不要通过跨层导入或手写 DTO 绕过这些约束。
+架构约束由 Atlas 规则（`docs/atlas/atlas.yaml`，`task atlas:check`）、所属包的测试、前端边界检查和 Taskfile/CI 门禁执行。不要通过跨层导入或手写 DTO 绕过这些约束。

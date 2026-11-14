@@ -283,7 +283,7 @@ jobs:
                           - '.github/workflows/ci.yml'
 
     architecture:
-        name: architecture and Compose gates
+        name: terminology, Compose, and catalog gates
         needs: changes
         runs-on: ubuntu-latest
         steps:
@@ -301,7 +301,7 @@ jobs:
                       server/go.sum
                       desktop/go.sum
 
-            - name: Run architecture and Compose gates
+            - name: Run terminology, Compose, and catalog gates
               run: task ci:architecture
 
     generated:

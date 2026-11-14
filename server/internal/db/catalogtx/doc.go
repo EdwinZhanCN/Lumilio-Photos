@@ -6,8 +6,8 @@
 // Bounded HDR histograms record admission, body, commit, total, cancellation,
 // outcome, and cursor lifetime without retaining SQL text, arguments, or
 // entity IDs, and slow named transactions are logged against the write budget.
-// `task architecture:check` rejects raw production Begin, BeginTx, and
-// standalone writer Exec calls outside the migration and driver boundary.
+// The Atlas catalog-transactions rule rejects raw production Begin, BeginTx,
+// and standalone writer Exec calls outside the migration and driver boundary.
 //
 // A write transaction contains only bounded SQL and in-memory validation.
 // Multi-statement planning that needs one snapshot uses a short reader

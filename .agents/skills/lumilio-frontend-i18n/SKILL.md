@@ -111,15 +111,18 @@ Run from `web/` (or use the stated root Task target):
    move, rename, or delete keys.
 5. When a terminology row or forbidden synonym changes, update
    `web/src/lib/i18n/productTerminology.test.ts` and
-   `server/tools/architecturecheck` in the same change wherever deterministic
+   `server/tools/terminology` in the same change wherever deterministic
    enforcement is possible. Keep exceptions narrow and technical.
 6. Verify `vp exec i18next-cli status` from `web/` reports 100% zh coverage.
-   Run `task web:test` for Web strings and `task architecture:check` whenever
+   Run `task web:test` for Web strings and `task terminology:check` whenever
    terminology or its cross-surface gate changes.
 
 `task web:test` includes `web/src/lib/i18n/productTerminology.test.ts`.
-`task architecture:check` scans human-facing Web/Desktop text, docs, READMEs,
-API annotations, and generated API docs for retired product terms.
+`task terminology:check` scans human-facing Web/Desktop text, docs, READMEs,
+API annotations, and generated API docs for retired product terms, and checks
+that every closed code set the API contract exposes (storage risks, action
+codes, blockers, candidate classes, recovery classes) has literal en/zh copy
+in its Web and Desktop presenters.
 
 E2E and integration specs must not embed UI copy; they resolve names through
 the `en` bundle

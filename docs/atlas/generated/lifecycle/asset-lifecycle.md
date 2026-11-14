@@ -51,7 +51,7 @@ A catalog restored from a backup taken before a Delete lists the file as present
 
 ## What never deletes an Asset
 
-User Delete authorizes trashing; configured retention authorizes hourly expiry after recovery and sidecar rebuild. A scan, a watcher, and a cloud sync never unlink a file, never move one into the trash, and never purge. `lifecycle.PurgeEntriesTx` is the only Asset delete, and `task architecture:check` rejects any other code that deletes from assets.
+User Delete authorizes trashing; configured retention authorizes hourly expiry after recovery and sidecar rebuild. A scan, a watcher, and a cloud sync never unlink a file, never move one into the trash, and never purge. `lifecycle.PurgeEntriesTx` is the only Asset delete, and the Atlas `asset-purge` rule rejects any other code that deletes from assets.
 
 ## Related views
 

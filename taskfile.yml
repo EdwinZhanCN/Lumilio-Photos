@@ -87,9 +87,9 @@ tasks:
       - web:dev
 
   test:
-    desc: Run repository architecture, Atlas, Server, and Web tests
+    desc: Run terminology, Atlas, Server, and Web tests
     cmds:
-      - task: architecture:check
+      - task: terminology:check
       - task: atlas:check
       - task: test:modules
 
@@ -106,11 +106,6 @@ tasks:
       - task: web:openapi-types
       - go -C server run ./tools/problemcatalog ../site/docs/public/problems ../web/src/lib/http-commons/problemRecovery.ts
       - task: site:openapi-docs
-
-  architecture:check:
-    desc: Check repository architecture constraints
-    cmds:
-      - go -C server run ./tools/architecturecheck
 
   # The product vocabulary spans the Web, Desktop, docs, and API annotations,
   # so its check lives here; lumilio-frontend-i18n owns the term registry.
@@ -398,9 +393,9 @@ tasks:
   # One-to-one wrappers are forbidden: workflows call the module target
   # (web:test, server:test:ci, web:e2e:up, …) directly.
   ci:architecture:
-    desc: Run architecture, Compose, and cross-repository catalog CI gates
+    desc: Run terminology, Compose, and cross-repository catalog CI gates
     cmds:
-      - task: architecture:check
+      - task: terminology:check
       - task: compose:test
       - task: lumen:check
       - task: assets:check

@@ -152,6 +152,7 @@ func (a *Atlas) evaluate() {
 	a.checkViews()
 	a.checkDocRefs()
 	a.runRules()
+	a.checkInvariants()
 	for _, view := range a.Views {
 		view.Mermaid = a.mermaid(view)
 	}

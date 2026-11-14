@@ -1,6 +1,6 @@
 # Atlas rules: one architecture gate
 
-Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270); A2 landed 2026-11-14 (#271). Next: A3. Child of
+Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270); A2 landed 2026-11-14 (#271); A3 landed 2026-11-14 (#PR_A3). Next: A4. Child of
 [server-structure.md](server-structure.md) (Phase A, sessions A1–A4). It
 touches only `server/tools`, tests, docs, `docs/atlas`, the Taskfile, and CI
 wiring, so it may run between rc.1 sessions. A4 supersedes part of the
@@ -218,23 +218,63 @@ Found in A2 (2026-11-14), binding on A3–A4:
   would have blocked baselining them later.
 
 ### A3 — Behaviour tests, relocated lints, and the switch
-- [ ] Connection-policy and foreground-read tests, the River kind-catalog
+- [x] Connection-policy and foreground-read tests, the River kind-catalog
   test, and the `MaxBatchRows` assertion; each shown failing on a temporary
   violation before it lands.
-- [ ] `server/tools/terminology` and `task terminology:check`; the Problem,
+- [x] `server/tools/terminology` and `task terminology:check`; the Problem,
   sqlc-hazard, and ffmpeg lints in their package tests and in
   `check-source-boundaries.ts`.
-- [ ] `invariants:` registry: every bullet under "Cross-cutting invariants"
+- [x] `invariants:` registry: every bullet under "Cross-cutting invariants"
   in `docs/architecture.md` has an entry whose `enforced_by` resolves; an
   invariant without enforcement fails `atlas check`.
-- [ ] Delete `server/tools/architecturecheck` and `task architecture:check`.
+- [x] Delete `server/tools/architecturecheck` and `task architecture:check`.
   `task test` keeps `atlas:check`; `ci:architecture` runs
   `terminology:check` (Atlas already runs in CI through
   `verify:generated` → `atlas:generate`; confirm the `generated` job covers
   it); update workflow path filters per `lumilio-add-task-target`.
-- [ ] Update every live reference: `CLAUDE.md`, `docs/architecture.md`,
+- [x] Update every live reference: `CLAUDE.md`, `docs/architecture.md`,
   `lumilio-select-checks`, `lumilio-frontend-i18n`, `lumilio-atlas`,
   `lumilio-add-task-target`. Decision records keep their history.
+
+Found in A3 (2026-11-14), binding on A4:
+
+- **A foreground read wrote.** The writer-held test found that opening an
+  agent ref (`GET /api/v1/agent/refs/:id` and its assets, music, and pins)
+  ran `GetAgentRef`, an `UPDATE` that slid the ref's expiry, under the ref
+  store's lock. Owner decision: the read is a `SELECT`; a ref lives while its
+  thread is active, then for the TTL `ReleaseAgentThreadRefs` starts, and
+  viewing it renews nothing.
+- **"Foreground reads never write" is tested by holding the writer.** The
+  `server/app` tests take the one writer connection, then require setup
+  status (before and after setup), storage targets and view, native tasks,
+  processing status, and an agent ref to answer within 3 s. That catches a
+  read bound to the writer pool and a read that persists on the way; the
+  audit's observer design could not tell a request's writes from background
+  work. Two reconciles write nothing on an idle system, so they are covered
+  elsewhere: the bootstrap phase by the before-setup test, runtime status by
+  `storage-reconciliation`, whose `calls` rule now takes `only` and `forbid`
+  together (`forbid` carves `runtime_status.go` out of `storage`).
+- **Wiring checks wait for B2.** The agent library's reader only feeds the
+  event resolver of agent tool runs, which no HTTP read reaches. The
+  `app.go` wiring snippets therefore moved verbatim to
+  `TestProductionCatalogWiring`, which B2 deletes when constructors take
+  `catalogtx.Reader` and `catalogtx.Writer`.
+- **`MaxBatchRows` was already asserted** by
+  `TestWriterTransactionsStayWithinTheRowBudget` (#222).
+- **Problem artifacts were not covered** by `problem_test.go`, as the audit
+  assumed; `TestEveryProblemTypeHasItsArtifacts` ports that check.
+- **Web halves scan source files only**, not the `doc.md`, JSON, and HTML
+  under `features/` or the `wasm/` bundles the old walk also read.
+- **`invariants:`** is one section (`doc:`) with an entry per bold bullet
+  title; references are `rule:`, `go:<import path>.<Test>`, and `task:`.
+- **Linux gate target.** `task server:test:linux` builds
+  `server/test.Dockerfile` on the Docker host named by `DOCKER_CONTEXT` and
+  runs CI's three Linux Server jobs (`server:test:ci`,
+  `server:test:concurrency:ci`, `server:test:volumes` on loop-mounted vfat,
+  exfat, ext4, and casefold images) in a detached, privileged container.
+  The vfat image is mounted with `utf8` explicitly: Fedora kernels (the
+  Radxa) default to `iocharset=ascii` and refuse `é`, which Ubuntu CI
+  runners accept by default.
 
 ### A4 — Views that verify arrows, and refactor tools
 - [ ] Sequence and data-flow steps whose `from` and `to` are `go:` anchors

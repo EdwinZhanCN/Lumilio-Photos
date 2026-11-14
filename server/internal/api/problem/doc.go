@@ -15,9 +15,10 @@
 //
 // `task dto` runs tools/openapinormalize (exact discriminator unions and
 // problem media types) and tools/problemcatalog (the published pages under
-// site/docs/public/problems). `task architecture:check` rejects legacy
-// responders, direct non-success JSON, raw public error text, unregistered or
-// undocumented types, and catalog drift.
+// site/docs/public/problems). The package tests reject undocumented types
+// and catalog drift, and those of server/internal/api reject legacy
+// responders, direct non-success JSON, raw public error text, and
+// unregistered types.
 //
 // It is a leaf package: handlers and transports depend on these descriptors,
 // while domain packages stay unaware of HTTP problem URIs.

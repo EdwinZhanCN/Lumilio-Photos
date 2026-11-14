@@ -61,8 +61,10 @@ generated markdown under [`atlas/generated/`](atlas/generated/README.md):
 
 ## Cross-cutting invariants
 
-These hold across packages, so no single `doc.go` owns them. Each is enforced
-by a gate or test where one is named.
+These hold across packages, so no single `doc.go` owns them. The
+`invariants:` registry in [atlas.yaml](atlas/atlas.yaml) names the Atlas rules,
+tests, and Task targets that enforce each one; `task atlas:check` fails on an
+invariant with no enforcement.
 
 - **The catalog is product truth.** One physical SQLite writer applies product
   facts and desired/applied work state; bounded query-only WAL readers serve
@@ -72,7 +74,8 @@ by a gate or test where one is named.
 - **No work inside write transactions.** Filesystem, media, network, hashing,
   and unbounded CPU work happen before a transaction begins. Writer
   transactions are named, bounded, and admitted through
-  `internal/db/catalogtx` (`task architecture:check` rejects raw ones).
+  `internal/db/catalogtx` (the Atlas `catalog-transactions` rule rejects raw
+  ones; `tx-purity` rejects slow work inside them).
 - **Background results have one writer.** Workers compute; the commit
   coordinator alone applies their results and checks each result's fence.
 - **Foreground reads never write.** Bootstrap, setup, status, and storage read
@@ -81,7 +84,7 @@ by a gate or test where one is named.
 - **Originals are never rewritten; deletion follows explicit lifecycle policy.**
   A scan, watcher, or cloud sync never unlinks, trashes, or purges. An Asset exists exactly while
   it has a repository entry; `lifecycle.PurgeEntriesTx` is the only Asset
-  hard-delete boundary, also used by repository removal (`task architecture:check`).
+  hard-delete boundary, also used by repository removal (Atlas `asset-purge`).
   User Delete moves files into repository Trash; configured retention authorizes
   expiry. Atlas:
   [Asset lifecycle](atlas/generated/lifecycle/asset-lifecycle.md).

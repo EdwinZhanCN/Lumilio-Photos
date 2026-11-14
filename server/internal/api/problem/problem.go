@@ -23,8 +23,8 @@ type Descriptor struct {
 	// Recovery is the human sentence of the catalog page. Entry is the
 	// executable form of the same recovery: who acts, in which phase, and
 	// through which real entry (a Web route, a Desktop host action, a sign-in,
-	// a retry). The Web renders Entry; architecturecheck proves every route
-	// and host action it names exists.
+	// a retry). The Web renders Entry; a package test proves every route and
+	// host action it names exists.
 	Recovery   string
 	Entry      RecoveryEntry
 	Extensions []Extension
@@ -80,7 +80,7 @@ type RecoveryEntry struct {
 	HostAction string
 }
 
-// Web routes and host action kinds the entries may name. architecturecheck
+// Web routes and host action kinds the entries may name. A package test
 // verifies each against web/src/app/router/routes.tsx and
 // server/internal/storage/host_action.go, so a renamed route or kind fails
 // the gate instead of leaving a dead entry.

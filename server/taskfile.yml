@@ -59,6 +59,28 @@ tasks:
         ./internal/storage/pathsemantics
         ./app
 
+  # The Linux Server gate on another machine: DOCKER_CONTEXT names the Docker
+  # host (for example a Linux test box), and the image is built there from
+  # this checkout. The container runs detached so a dropped connection does
+  # not stop it; `docker logs lumilio-server-test` re-attaches. Privileged
+  # with /dev for the loop-mounted volume images. LUMILIO_GATE_STEPS narrows
+  # the steps (ci concurrency volumes).
+  test:linux:
+    desc: Run the Linux Server gate (CI, concurrency, volume semantics) in a container on the Docker host named by DOCKER_CONTEXT
+    preconditions:
+      - sh: test -n "$DOCKER_CONTEXT"
+        msg: 'set DOCKER_CONTEXT to the Docker context of the Linux host that builds and runs the gate'
+    cmds:
+      - docker build -f test.Dockerfile -t lumilio-server-test ..
+      - docker rm -f lumilio-server-test >/dev/null 2>&1 || true
+      - >-
+        docker run -d --name lumilio-server-test --privileged -v /dev:/dev
+        -v lumilio-server-test-tmp:/scratch
+        -e LUMILIO_GATE_STEPS="${LUMILIO_GATE_STEPS:-ci concurrency volumes}"
+        lumilio-server-test >/dev/null
+      - docker logs -f lumilio-server-test
+      - exit "$(docker wait lumilio-server-test)"
+
   test:concurrency:ci:
     desc: Race, shuffle, and repeat concurrency-sensitive Server packages
     env:
