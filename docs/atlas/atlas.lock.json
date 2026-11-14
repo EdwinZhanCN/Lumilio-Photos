@@ -186,6 +186,63 @@
     }
   },
   "baselines": {
-    "group-dependencies": []
+    "asset-purge": [],
+    "catalog-handle-imports": [],
+    "catalog-transactions": [],
+    "desktop-marker-parsing": [],
+    "execution-governor": [],
+    "execution-resources": [],
+    "group-dependencies": [],
+    "package-size": [],
+    "producer-capabilities": [],
+    "river-child-jobs": [],
+    "river-tables": [],
+    "scan-index-query-set": [],
+    "scheduling-algorithms": [],
+    "static-sql": [
+      "(*server/internal/event.RelationService).ForEvent executes non-constant SQL",
+      "(*server/internal/processing.Reader).Items executes non-constant SQL",
+      "(*server/internal/processing.Reader).catalogCounts executes non-constant SQL",
+      "(*server/internal/search.BleveOCRRetriever).filterCandidates executes non-constant SQL",
+      "(*server/internal/search.EmbeddingRetriever).Retrieve executes non-constant SQL",
+      "(*server/internal/search.EmbeddingRetriever).retrieveExactWithinCutoff executes non-constant SQL",
+      "(*server/internal/search.TextRetriever).retrievePlace executes non-constant SQL",
+      "(*server/internal/service.classifierService).loadDefinitions executes non-constant SQL",
+      "server/internal/db.applyCatalogBaseline executes non-constant SQL",
+      "server/internal/db.applyCatalogStep executes non-constant SQL",
+      "server/internal/db.claimOrVerifyCatalog executes non-constant SQL",
+      "server/internal/db.claimOrVerifyQueue executes non-constant SQL",
+      "server/internal/db.loadCatalogSteps executes non-constant SQL",
+      "server/internal/db.verifyPragmas executes non-constant SQL",
+      "server/internal/db/sqlitespike.Open executes non-constant SQL",
+      "server/internal/lifecycle.collectAssetsTx executes non-constant SQL"
+    ],
+    "storage-reconciliation": [],
+    "tx-purity": [
+      "(*server/internal/service.faceService).isCoreFaceDBSCAN calls (*server/internal/db/repo.Queries).CountIncrementalFaceNeighbors",
+      "(*server/internal/storage.RepositoryFS).Close calls (*os.Root).Close",
+      "(*server/internal/storage.RepositoryFS).RemovePrivate calls (*os.Root).Remove",
+      "(*server/internal/storage.RepositoryFS).WritePrivateFileAtomic calls (*os.File).Close",
+      "(*server/internal/storage.RepositoryFS).WritePrivateFileAtomic calls (*os.File).Sync",
+      "(*server/internal/storage.RepositoryFS).WritePrivateFileAtomic calls (*os.Root).OpenFile",
+      "(*server/internal/storage.RepositoryFS).WritePrivateFileAtomic calls (*os.Root).Remove",
+      "(*server/internal/storage.RepositoryFS).WritePrivateFileAtomic calls (*os.Root).Rename",
+      "(*server/internal/storage.RepositoryFS).WritePrivateFileAtomic calls io.Copy",
+      "(*server/internal/storage.RepositoryFS).mkdirAll calls (*os.Root).MkdirAll",
+      "(*server/internal/storage.RepositoryFSFactory).OpenContext calls (*os.Root).Close",
+      "(*server/internal/storage.RepositoryFSFactory).OpenContext calls (*os.Root).ReadFile",
+      "(*server/internal/storage.RepositoryFSFactory).OpenContext calls os.OpenRoot",
+      "server/internal/storage.syncRepositoryDirectory calls (*os.File).Sync",
+      "server/internal/storage.syncRootDirectory calls (*os.File).Close",
+      "server/internal/storage.syncRootDirectory calls (*os.Root).Open"
+    ]
+  },
+  "ceilings": {
+    "package-size": {
+      "server/internal/api/handler": 18129,
+      "server/internal/db/repo": 31464,
+      "server/internal/service": 20116,
+      "server/internal/storage": 14605
+    }
   }
 }

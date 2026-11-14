@@ -1,0 +1,15 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+sql:
+  queries:
+    - files: [fx/repo/queries/*.sql]
+      type: "*fx/repo.Queries"
+  executors: ["*database/sql.DB", "*database/sql.Tx"]
+  triggers: [migrations/*.up.sql]
+rules:
+  - id: river-tables
+    why: River's tables are the queue's private state
+    tables:
+      river_job: { read: [fx/queue], write: [fx/queue] }

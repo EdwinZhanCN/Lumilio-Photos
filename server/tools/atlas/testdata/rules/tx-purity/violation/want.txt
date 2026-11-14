@@ -1,0 +1,5 @@
+(fx/store.diskCleaner).Clean calls os.Remove
+fx/store.Region calls os.ReadFile
+fx/store.Run calls time.Sleep
+fx/store.applyTx calls (*fx/repo.Queries).CountAssets
+fx/store.helper calls os.Stat

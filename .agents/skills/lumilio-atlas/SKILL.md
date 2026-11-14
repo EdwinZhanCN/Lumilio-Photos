@@ -49,6 +49,18 @@ violation, `task atlas:lock` drops its entry. A new rule needs a
 `testdata/rules/<id>/violation` fixture (with `want.txt`) and a `pass`
 fixture in `server/tools/atlas`; see the Rules section of the Atlas README.
 
+- A `tx-purity` finding names the call chain from the transaction root. Move
+  the I/O, hashing, sleep, or COUNT before the transaction opens or after it
+  commits; an `allow` entry is only for a pure helper or a COUNT bounded by
+  a key, with a comment saying which.
+- A `package-size` finding means the package grew past its ceiling, which
+  is its size when the rule landed. Move code out or split the package;
+  never raise a ceiling.
+- A `static-sql` finding means SQL reached an executor as a non-constant.
+  Prefer a sqlc query or a constant; if the statement is chosen at run time,
+  keep each candidate a constant in the same function so the table rules
+  still see it.
+
 ## Editing code that a view anchors
 
 `task atlas:check` reports `anchor(s) changed since their view was verified`

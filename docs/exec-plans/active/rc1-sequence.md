@@ -43,6 +43,18 @@ the plan it names.
   ([rc-release.md](rc-release.md), owner rule 2026-10-28.) A problem a step
   finds is fixed in that step, or it becomes a new row here with the owner's
   agreement. It is never pushed past the tag.
+- **Local evidence per step; PR CI once, at the end** (owner decision
+  2026-11-14). PR CI is too slow to gate every step, so a step merges on
+  local evidence: unit tests and `task atlas:check` on the Mac, and the
+  full Server gate (`server/app` and the Linux volume-semantics tests
+  included) plus the Docker E2E stack (`task web:e2e:up` and the slices the
+  step touches) on the owner's amd64 Linux test host through a Docker
+  context, with images built there. A red PR check does not block a merge.
+  After B14, PR CI runs once on the final head, and S13 fixes everything it
+  finds, including what only CI can see (Windows Desktop, the macOS
+  volume-semantics job, runner timeouts such as `server/app` on Windows,
+  480 s of Go's 600 s default on 2026-11-14). A step whose local gate
+  cannot run a package says so in its PR.
 - **The order changes only with the owner.** A session that finds a
   dependency this order misses stops and asks.
 - **No data migration.** No production install exists. Dev and demo

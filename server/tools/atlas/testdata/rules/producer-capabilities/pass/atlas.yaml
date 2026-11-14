@@ -1,0 +1,10 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: producer-capabilities
+    why: preparers own only narrow interfaces
+    forbid_types:
+      in: [fx/sourcing/materializer.go]
+      types: ["*database/sql.DB", "*fx/repo.Queries"]

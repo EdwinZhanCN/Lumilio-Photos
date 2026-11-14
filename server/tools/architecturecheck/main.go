@@ -1256,7 +1256,13 @@ func scanGoLines(root, directory string, match func(relative, line string) bool)
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || filepath.Ext(path) != ".go" {
+		if entry.IsDir() {
+			if entry.Name() == "testdata" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) != ".go" {
 			return nil
 		}
 		relative, err := filepath.Rel(root, path)
@@ -1360,7 +1366,9 @@ func scanAssetHardDeletes(root string) ([]string, error) {
 			return walkErr
 		}
 		if entry.IsDir() {
-			if entry.Name() == "node_modules" || entry.Name() == ".git" {
+			// testdata holds fixtures the go tool never builds, such as the
+			// Atlas rule fixtures that delete Assets on purpose.
+			if entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == "testdata" {
 				return filepath.SkipDir
 			}
 			return nil

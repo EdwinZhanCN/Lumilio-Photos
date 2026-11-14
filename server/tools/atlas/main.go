@@ -77,7 +77,7 @@ func main() {
 			fmt.Fprint(os.Stderr, "atlas: fix these before locking:\n"+formatProblems(atlas.Problems))
 			os.Exit(1)
 		}
-		if err := os.WriteFile(filepath.Join(root, atlasDir, "atlas.lock.json"), encodeLock(atlas.viewLock(), atlas.lockedBaselines()), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(root, atlasDir, "atlas.lock.json"), encodeLock(atlas.viewLock(), atlas.lockedBaselines(), atlas.lockedCeilings()), 0o644); err != nil {
 			fail(err)
 		}
 		if err := writeFiles(root, files); err != nil {
@@ -88,14 +88,25 @@ func main() {
 			fmt.Printf("atlas: dropped %d baseline entr(ies) that no longer occur\n", len(atlas.StaleBaselines))
 		}
 	case "baseline":
-		baselines, err := atlas.baselineRule(ruleID)
-		if err != nil {
+		baselines, ceilings := atlas.shrunkBaselines(true), atlas.shrunkCeilings(true)
+		count := 0
+		if rule := atlas.rule(ruleID); rule != nil && rule.Budgets != nil {
+			recorded, err := atlas.baselineCeilings(*rule)
+			if err != nil {
+				fail(err)
+			}
+			ceilings, count = recorded, len(recorded[ruleID])
+		} else {
+			recorded, err := atlas.baselineRule(ruleID)
+			if err != nil {
+				fail(err)
+			}
+			baselines, count = recorded, len(recorded[ruleID])
+		}
+		if err := os.WriteFile(filepath.Join(root, atlasDir, "atlas.lock.json"), encodeLock(atlas.Lock, baselines, ceilings), 0o644); err != nil {
 			fail(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, atlasDir, "atlas.lock.json"), encodeLock(atlas.Lock, baselines), 0o644); err != nil {
-			fail(err)
-		}
-		fmt.Printf("atlas: baselined %d existing finding(s) of rule %s; they may only shrink from here\n", len(baselines[ruleID]), ruleID)
+		fmt.Printf("atlas: baselined %d existing finding(s) of rule %s; they may only shrink from here\n", count, ruleID)
 	case "data":
 		target := filepath.Join(root, *out)
 		if err := atlas.writeData(target); err != nil {

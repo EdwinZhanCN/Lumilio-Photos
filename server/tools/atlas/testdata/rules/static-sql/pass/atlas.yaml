@@ -1,0 +1,14 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+sql:
+  queries:
+    - files: [fx/repo/queries/*.sql]
+      type: "*fx/repo.Queries"
+  executors: ["*database/sql.DB", "*database/sql.Tx"]
+  triggers: [migrations/*.up.sql]
+rules:
+  - id: static-sql
+    why: every SQL statement is a constant or a sqlc query
+    static_sql: true

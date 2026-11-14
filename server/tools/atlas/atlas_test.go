@@ -73,7 +73,7 @@ func TestChangedAnchorIsStaleUntilLocked(t *testing.T) {
 	if len(a.Stale) != 1 || !strings.Contains(a.Stale[0].Message, "go:phase.PhaseNew changed") {
 		t.Fatalf("only the edited constant should be stale, got:\n%s", messages(a.Stale))
 	}
-	if got := string(encodeLock(a.viewLock(), nil)); !strings.Contains(got, `"go:phase.PhaseNew": "n1"`) {
+	if got := string(encodeLock(a.viewLock(), nil, nil)); !strings.Contains(got, `"go:phase.PhaseNew": "n1"`) {
 		t.Fatalf("lock should record the current hash, got:\n%s", got)
 	}
 }
