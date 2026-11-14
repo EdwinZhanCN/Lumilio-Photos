@@ -155,7 +155,7 @@ owners) are package directories, `dir/**` globs, or single files.
 | Kind | Checks |
 | --- | --- |
 | `group_uses: true` | Every import between groups follows `groups[].uses` and the reviewed `exceptions` (rule `group-dependencies`). |
-| `calls: {targets, only \| forbid}` | Who may refer to a function or method: calls, method values, and generic instantiations, through interfaces whose implementations include a target. Key `caller -> target`. |
+| `calls: {targets, only, forbid}` | Who may refer to a function or method: calls, method values, and generic instantiations, through interfaces whose implementations include a target. A reference outside `only`, or inside `forbid`, is a finding; give either or both (`forbid` then carves files out of `only`). Key `caller -> target`. |
 | `constructs: {types, only}` | Who may build a value of a type with a composite literal or `new`. Key `func constructs T`. |
 | `forbid_types: {in, types}` | No field, parameter, result, variable, or function literal in scope holds one of the types (directly, behind pointers, or in slices, maps, and channels). Key `name holds T`. |
 | `forbid_imports: {from, imports}` | No file in scope imports a listed path or `path/**`. Key `file imports X`, or `package imports X` when a package is in scope whole. |
@@ -180,6 +180,20 @@ for a rule that has no baseline yet; the owner approves those entries in the
 PR. After that, `atlas check` fails on any finding not in the baseline and on
 any baseline entry that no longer occurs, and `task atlas:lock` drops fixed
 entries but never adds one.
+
+**Runtime facts are tests, not rules.** What only running code shows (one
+writer connection, foreground reads that never wait for it, the River worker
+set) is a behaviour test in the package that owns it, and a content lint
+(Problem responses, sqlc hazards, risk-code literals) is a test of the
+package it guards. Product vocabulary and contract copy are
+`task terminology:check`.
+
+**Every cross-cutting invariant names its enforcement.** `invariants:` ties
+each bold-titled bullet under `doc:` (`docs/architecture.md#cross-cutting-invariants`)
+to the `rule:<id>`, `go:<import path>.<TestName>`, and `task:<name>`
+references that enforce it. `atlas check` fails on a bullet without an entry,
+an entry without a bullet or without enforcement, and a reference that does
+not resolve.
 
 ## Authoring a view
 
@@ -224,6 +238,7 @@ to roughly 6–14 nodes, and put the *why* in `notes`. Look at
 | `has N production lines, over its ceiling of M` | Split the package or move code out; a ceiling is never raised by hand. |
 | `… does not resolve` (a rule target, type, or `sql:` entry) | The named object was renamed or removed. Point the rule at its new name; if the code it guarded is gone, ask whether the rule still protects anything. |
 | `type-check failed: …` | The Atlas could not type-check a package, so rule facts would be unsound. Run through the Task target (it sets the CGo flags, build tags, and toolchain) with the Server's CGo headers installed, or fix the compile error. |
+| `invariant "…" has no invariants entry` / `enforcement … does not resolve` | A new or reworded invariant needs an `invariants:` entry naming the rule, test, or Task target that enforces it; a renamed test or rule needs its reference updated. Never add an entry with nothing real behind it. |
 | `doc link [X] does not resolve` | Fix the link; the symbol was renamed or removed. |
 | `anchor …: … has no declaration` | The anchored code moved or was deleted. Re-anchor the element, or redraw the view if the flow changed. |
 | `N anchor(s) changed since their view was verified` | Open each listed view, compare it with the code at the listed `file:line`, fix the diagram or notes if behaviour changed, then `task atlas:lock`. |

@@ -178,3 +178,59 @@ func TestDocReferencesMustResolve(t *testing.T) {
 		}
 	}
 }
+
+// Every bullet of the invariant section needs an entry, every entry a bullet
+// and an enforcement, and every enforcement must resolve: an Atlas rule, a
+// Go test that exists, or a Task target.
+func TestInvariantsNeedResolvingEnforcement(t *testing.T) {
+	a := testAtlas()
+	a.Root = t.TempDir()
+	write := func(relative, content string) {
+		t.Helper()
+		target := filepath.Join(a.Root, relative)
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("docs/architecture.md", "# Map\n\n## Cross-cutting invariants\n\n"+
+		"- **One writer.** Text.\n  continued.\n- **Reads never write.** Text.\n- **Unregistered.** Text.\n\n"+
+		"## Contracts\n\n- **Not an invariant.** Text.\n")
+	write("server/internal/phase/phase_test.go", "package phase\n\nfunc TestPhaseHolds(t *testing.T) {}\n")
+	write("taskfile.yml", "version: '3'\ntasks:\n  real:\n    cmds: [true]\n")
+	a.goPackages = []*goPackage{{importPath: "server/internal/phase", dir: "server/internal/phase"}}
+	a.Config.Rules = []Rule{{ID: "one-writer"}}
+	a.Config.Invariants = InvariantRegistry{
+		Doc: "docs/architecture.md#cross-cutting-invariants",
+		Entries: []Invariant{
+			{Title: "One writer.", EnforcedBy: []string{"rule:one-writer", "go:server/internal/phase.TestPhaseHolds", "task:real"}},
+			{Title: "Reads never write.", EnforcedBy: []string{"rule:gone", "go:server/internal/phase.TestMissing", "task:fake", "file:x"}},
+			{Title: "Removed bullet.", EnforcedBy: []string{"task:real"}},
+			{Title: "Not an invariant."},
+		},
+	}
+	a.checkInvariants()
+	got := messages(a.Problems)
+	for _, want := range []string{
+		`"Unregistered." has no invariants entry`,
+		"enforcement rule:gone does not resolve",
+		"enforcement go:server/internal/phase.TestMissing does not resolve",
+		"enforcement task:fake does not resolve",
+		"enforcement file:x does not resolve",
+		`entry "Removed bullet." is not a bullet`,
+		`entry "Not an invariant." is not a bullet`,
+		`"Not an invariant." names no enforcement`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected a problem containing %s, got:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "One writer") {
+		t.Errorf("a fully enforced invariant was reported:\n%s", got)
+	}
+	if strings.Count(got, "\n")+1 != 8 {
+		t.Errorf("want exactly 8 problems, got:\n%s", got)
+	}
+}

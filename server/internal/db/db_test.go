@@ -255,6 +255,34 @@ func TestQueryOnlyReaderPoolStaysAvailableDuringWriterTransaction(t *testing.T) 
 	}
 }
 
+// query_only is a per-connection setting that a statement can switch off;
+// opening the reader file read-only is what makes a reader write impossible
+// even then.
+func TestReaderStaysReadOnlyWhenQueryOnlyIsSwitchedOff(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	database, err := Open(ctx, config.DatabaseConfig{Path: filepath.Join(secureTempDir(t), "reader-ro.sqlite3")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if _, err := database.SQL.ExecContext(ctx, `CREATE TABLE reader_ro_probe (id INTEGER PRIMARY KEY)`); err != nil {
+		t.Fatal(err)
+	}
+	conn, err := database.ReaderSQL.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `PRAGMA query_only = 0`); err != nil {
+		t.Fatalf("switch query_only off on a reader: %v", err)
+	}
+	_, err = conn.ExecContext(ctx, `INSERT INTO reader_ro_probe (id) VALUES (1)`)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "readonly") {
+		t.Fatalf("reader write with query_only off: err = %v, want a readonly failure", err)
+	}
+}
+
 func TestPassiveCheckpointIsExplicitWriterMaintenance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

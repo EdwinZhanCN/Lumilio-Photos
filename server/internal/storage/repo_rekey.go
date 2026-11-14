@@ -33,7 +33,7 @@ func RepositoryVolumeRule(repository repo.Repository) pathsemantics.Semantics {
 
 const (
 	// rekeyBatchRows bounds one rekey writer transaction to the scan index's
-	// structural writer budget (architecturecheck: 256 rows per transaction).
+	// structural writer budget (scan.MaxBatchRows: 256 rows per transaction).
 	rekeyBatchRows = 256
 	// rekeyPageRows bounds one preflight read.
 	rekeyPageRows = 1024

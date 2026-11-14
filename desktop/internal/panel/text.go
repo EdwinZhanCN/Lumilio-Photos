@@ -141,7 +141,7 @@ func networkLabel(mode string) string {
 
 // storageRiskLabel is the Desktop's copy for the Server's closed storage
 // risk vocabulary, one literal entry per code the shared classifier can
-// report on a native task. The architecture check compares these keys with
+// report on a native task. task terminology:check compares these keys with
 // the Server's constants, so a new code lands with its copy here as well as
 // in the Web. An unknown code is shown as its identifier.
 func storageRiskLabel(code string) string {

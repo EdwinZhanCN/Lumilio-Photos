@@ -56,6 +56,10 @@ fixture in `server/tools/atlas`; see the Rules section of the Atlas README.
 - A `package-size` finding means the package grew past its ceiling, which
   is its size when the rule landed. Move code out or split the package;
   never raise a ceiling.
+- An `invariant "…"` problem means a bullet under "Cross-cutting
+  invariants" in `docs/architecture.md` and the `invariants:` registry in
+  `atlas.yaml` disagree. Name the rule, test, or Task target that enforces a
+  new invariant; if nothing does yet, write the test first.
 - A `static-sql` finding means SQL reached an executor as a non-constant.
   Prefer a sqlc query or a constant; if the statement is chosen at run time,
   keep each candidate a constant in the same function so the table rules

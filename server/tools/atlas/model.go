@@ -14,6 +14,8 @@ type Config struct {
 	Rules      []Rule      `yaml:"rules"`
 	SQL        SQLConfig   `yaml:"sql"`
 	Docs       []string    `yaml:"docs"`
+	// Invariants names the enforcement of every cross-cutting invariant.
+	Invariants InvariantRegistry `yaml:"invariants"`
 	// UndocumentedRoutes are real routes deliberately absent from OpenAPI,
 	// such as infrastructure probes, that documents may still name.
 	UndocumentedRoutes []string `yaml:"undocumentedRoutes"`
@@ -79,8 +81,8 @@ type Rule struct {
 // (server/internal/db), a directory glob (server/internal/storage/**), or a
 // file (server/app/app.go).
 
-// CallsRule: every reference to a target outside Only (or inside Forbid)
-// is a finding. A reference through an interface method counts when a
+// CallsRule: every reference to a target outside Only, or inside Forbid,
+// is a finding; with both, Forbid carves files or packages out of Only. A reference through an interface method counts when a
 // target implements it.
 type CallsRule struct {
 	Targets []string `yaml:"targets" json:"targets"`
@@ -290,4 +292,20 @@ type Problem struct {
 	Where   string `json:"where"`
 	Message string `json:"message"`
 	Rule    string `json:"rule,omitempty"`
+}
+
+// InvariantRegistry ties each bullet of one document section to what
+// enforces it. Doc is a repository path and a heading anchor
+// (docs/architecture.md#cross-cutting-invariants); every bullet there that
+// opens with a bold title needs an entry, and every entry a bullet.
+type InvariantRegistry struct {
+	Doc     string      `yaml:"doc"`
+	Entries []Invariant `yaml:"entries"`
+}
+
+// Invariant is one bullet's enforcement: rule:<id> (an Atlas rule),
+// go:<import path>.<TestName> (a Go test), or task:<name> (a Task target).
+type Invariant struct {
+	Title      string   `yaml:"title"`
+	EnforcedBy []string `yaml:"enforced_by"`
 }

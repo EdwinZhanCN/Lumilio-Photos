@@ -37,7 +37,7 @@ Run every row the diff touches, nothing more:
 | User-facing copy | [lumilio-frontend-i18n](../lumilio-frontend-i18n/SKILL.md) |
 | `desktop/**` | `task desktop:test` |
 | `deploy/**` or any compose file | `task compose:test` |
-| Module boundaries, cross-module wiring | `task architecture:check` |
+| Product terms in Web, Desktop, docs, READMEs, or API annotations; a contract code set and its copy | `task terminology:check` |
 | Any Go import between packages, a `doc.go`, `docs/atlas/**`, or code an Atlas view anchors | `task atlas:check`; on a stale view follow [lumilio-atlas](../lumilio-atlas/SKILL.md) |
 | `site/**` docs | `task ci:site` |
 | `site/docs/.vitepress/atlas/**` (Atlas explorer UI) | `task site:build:atlas`, then look at it with `task atlas` |
@@ -51,7 +51,7 @@ Browser E2E slices (`task web:test:browser`, `web:test:auth-hardening`,
 ([lumilio-e2e-environment](../lumilio-e2e-environment/SKILL.md)). Run only the
 slice whose behavior the diff reaches; CI runs the matching slices.
 
-`task test` (architecture + Atlas + Server + Web) is for genuinely cross-cutting
+`task test` (terminology + Atlas + Server + Web) is for genuinely cross-cutting
 changes, not a default. Reproduce a CI Server failure with
 `task server:test:ci`.
 

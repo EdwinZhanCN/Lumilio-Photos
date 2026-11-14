@@ -240,7 +240,7 @@
   "ceilings": {
     "package-size": {
       "server/internal/api/handler": 18129,
-      "server/internal/db/repo": 31464,
+      "server/internal/db/repo": 31459,
       "server/internal/service": 20116,
       "server/internal/storage": 14605
     }

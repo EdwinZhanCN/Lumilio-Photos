@@ -101,8 +101,8 @@ merges. Formats:
 - Prefer root Task targets for repository workflows. Use `task server:test` for
   backend changes, `task web:test` for frontend changes, `task desktop:test` for
   desktop changes, and `task compose:test` for deployment changes. These are
-  local development gates; `task test` intentionally runs only the architecture,
-  Server, and Web gates. It does not include Site, Desktop, or browser E2E.
+  local development gates; `task test` intentionally runs only the terminology,
+  Atlas, Server, and Web gates. It does not include Site, Desktop, or browser E2E.
   Map a diff to its narrowest evidence with
   [lumilio-select-checks](.agents/skills/lumilio-select-checks/SKILL.md).
 - Workflows call module targets directly (`task web:test`,

@@ -34,8 +34,8 @@ func (a *Atlas) resolveTargets(rule Rule, targets []string) map[string]bool {
 
 func (a *Atlas) callsFindings(rule Rule) []Finding {
 	config := rule.Calls
-	if len(config.Targets) == 0 || (len(config.Only) == 0) == (len(config.Forbid) == 0) {
-		a.ruleProblem(rule, "calls needs targets and exactly one of only or forbid")
+	if len(config.Targets) == 0 || (len(config.Only) == 0 && len(config.Forbid) == 0) {
+		a.ruleProblem(rule, "calls needs targets and only, forbid, or both")
 		return nil
 	}
 	targets := a.resolveTargets(rule, config.Targets)
@@ -48,8 +48,8 @@ func (a *Atlas) callsFindings(rule Rule) []Finding {
 			if !ok {
 				continue
 			}
-			allowed := inScope(config.Only, fn.pkg.dir, ref.file)
-			if len(config.Forbid) > 0 {
+			allowed := len(config.Only) == 0 || inScope(config.Only, fn.pkg.dir, ref.file)
+			if allowed && len(config.Forbid) > 0 {
 				allowed = !inScope(config.Forbid, fn.pkg.dir, ref.file)
 			}
 			if allowed {
@@ -67,7 +67,10 @@ func (a *Atlas) callsFindings(rule Rule) []Finding {
 }
 
 func scopeText(config *CallsRule) string {
-	if len(config.Only) > 0 {
+	switch {
+	case len(config.Only) > 0 && len(config.Forbid) > 0:
+		return strings.Join(config.Only, ", ") + " (never " + strings.Join(config.Forbid, ", ") + ")"
+	case len(config.Only) > 0:
 		return strings.Join(config.Only, ", ")
 	}
 	return "code outside " + strings.Join(config.Forbid, ", ")

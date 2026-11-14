@@ -90,7 +90,7 @@ Last aligned with the codebase: 2026-09-23.
   `server/internal/storage/lifecycle_operation.go` and
   `repository_candidates.go` (`admitCandidateTarget`). The flag is set only
   after the token-bound review and is journaled in the reconnect payload as
-  `risk_confirmation`; `architecturecheck` forbids the legacy
+  `risk_confirmation`; `TestServerTakesNoCreateRisksFromCandidates` forbids the legacy
   `!request.RiskConfirmation` comparison. Rename it to `RisksAcknowledged`
   when the lifecycle journal payload is next versioned, so a reader cannot
   mistake it for consent.

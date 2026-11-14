@@ -3,8 +3,8 @@ import type { TFunction } from "i18next";
 /**
  * Labels for the closed action vocabularies the Server's role-aware policies
  * emit for Repositories (verify, rename, detach, reconnect) and Storage
- * Locations (reconnect, detach). One literal entry per code, so the
- * architecture check can compare them with the Server's constants and a new
+ * Locations (reconnect, detach). One literal entry per code, so
+ * `task terminology:check` can compare them with the Server's constants and a new
  * action lands with its copy.
  */
 export type StorageActionCode = "verify" | "rename" | "detach" | "reconnect";

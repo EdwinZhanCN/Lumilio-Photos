@@ -532,6 +532,9 @@ rules:
         - (*server/internal/storage.DefaultRepositoryManager).ReconcileAll
         - (*server/internal/storage.DefaultRepositoryManager).ReconcileStorageLocations
       only: [server/app, server/internal/storage]
+      # Setup status reads the storage runtime status on every request; the
+      # projection it reports is the background reconciler's.
+      forbid: [server/internal/storage/runtime_status.go]
 
   # ------------------------------------------------------ desktop
   - id: desktop-marker-parsing
@@ -546,6 +549,72 @@ rules:
     budgets: { default: 5000 }
 
 # Where SQL comes from for the static-sql and tables rules.
+# Every cross-cutting invariant names what enforces it: an Atlas rule, a Go
+# test, or a Task target. A bullet without an entry, an entry without a
+# bullet, or a reference that no longer resolves fails atlas check.
+invariants:
+  doc: docs/architecture.md#cross-cutting-invariants
+  entries:
+    - title: The catalog is product truth.
+      enforced_by:
+        - rule:catalog-transactions
+        - rule:river-tables
+        - go:server/internal/db.TestOpenMigrateAndReopenSQLiteCatalog
+        - go:server/internal/db.TestQueryOnlyReaderPoolStaysAvailableDuringWriterTransaction
+        - go:server/internal/db.TestReaderStaysReadOnlyWhenQueryOnlyIsSwitchedOff
+        - go:server/internal/db.TestConnectionPolicySurvivesPhysicalConnectionReplacement
+        - go:server/app.TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery
+    - title: No work inside write transactions.
+      enforced_by:
+        - rule:tx-purity
+        - rule:catalog-transactions
+        - go:server/internal/storage/scan.TestWriterTransactionsStayWithinTheRowBudget
+    - title: Background results have one writer.
+      enforced_by:
+        - rule:producer-capabilities
+        - rule:catalog-handle-imports
+        - rule:scan-index-query-set
+        - rule:river-child-jobs
+        - go:server/app.TestProductionWorkersAreTheMacroCatalog
+        - go:server/internal/commit.TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop
+    - title: Foreground reads never write.
+      enforced_by:
+        - rule:storage-reconciliation
+        - go:server/app.TestForegroundReadsAnswerWhileTheWriterIsHeld
+        - go:server/app.TestSetupStatusAnswersWhileTheWriterIsHeldBeforeSetupFinishes
+        - go:server/app.TestProductionCatalogWiring
+        - go:server/internal/db.TestForegroundReadStaysAvailableWithQueuedWriter
+    - title: Originals are never rewritten; deletion follows explicit lifecycle policy.
+      enforced_by:
+        - rule:asset-purge
+        - go:server/app.TestLifecycleExternalDeletionIsHiddenEverywhereAndReversible
+        - go:server/app.TestTrashListsADeletedPhotoAndRestoreReturnsIt
+        - go:server/app.TestLifecycleRegressionRepositoryRemovalPurgesMissingOnlyAssets
+    - title: Owner scope is explicit.
+      enforced_by:
+        - go:server/internal/api/handler.TestApplyAssetOwnershipScope_AdminEventQueryUsesCurrentOwner
+        - go:server/internal/api/handler.TestCreateRepositoryUsesHostOwnerNotActingAdmin
+        - go:server/internal/agent/core.TestAuthorizedLibraryReadOCRDocumentsIsOwnerScopedAndOrdered
+    - title: Events contain photos and videos only.
+      enforced_by:
+        - go:server/internal/event.TestAudioNeverSeedsOrBridgesEvents
+        - go:server/internal/event.TestAudioOnlyProducesNoEvents
+        - go:server/internal/event.TestMixedEventResolutionAndRebuildExcludeAudio
+    - title: ML and LLM are optional.
+      enforced_by:
+        - go:server/internal/service.TestSearchAssets_FusedSet_SemanticDegradedStillReturnsResults
+        - go:server/internal/api/handler.TestAssetHandlerSearchAssets_ReturnsDegradedResultsWithout503
+        - go:server/internal/service.TestNewLumenServiceFromAppConfigDisabled
+    - title: The Desktop App supervises, it does not reimplement.
+      enforced_by:
+        - rule:group-dependencies
+        - rule:desktop-marker-parsing
+        - go:desktop/internal/runtime.TestDesktopReadsNoPortableMarker
+        - go:desktop/internal/host.TestOpenProductNeedsARunningServerAndAWebURL
+    - title: Web dependency direction.
+      enforced_by:
+        - task:web:check:boundaries
+
 sql:
   queries:
     - files: [server/internal/db/repo/queries/*.sql]
