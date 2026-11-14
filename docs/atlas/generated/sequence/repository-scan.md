@@ -41,42 +41,41 @@ sequenceDiagram
         n_scanner->>n_writer: compare-and-swap on the entry revision, bind content to an Asset
         n_writer->>n_catalog: activation requests the Asset's pipeline stages
     end
-    n_worker->>n_scheduler: snooze while more work remains#59; finish records counters
+    Note over n_worker: The worker snoozes the River job while more work remains#59; the final turn records the scan's counters.
 ```
 
 ## Participants
 
 | Participant | Anchor |
 | --- | --- |
-| Administrator (Web) | `ts:features/repositories#useRepositoryScan` [`web/src/features/repositories/api/useRepositoryScan.ts:22`](../../../../web/src/features/repositories/api/useRepositoryScan.ts#L22) |
-| Filesystem watcher | `go:scan.Watcher` [`server/internal/storage/scan/watcher.go:27`](../../../../server/internal/storage/scan/watcher.go#L27) |
-| RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go:251`](../../../../server/internal/api/handler/repository_scan_handler.go#L251) |
-| Scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go:118`](../../../../server/internal/storage/scan/scanner.go#L118) |
+| Administrator (Web) | `ts:features/repositories#useRepositoryScan` [`web/src/features/repositories/api/useRepositoryScan.ts`](../../../../web/src/features/repositories/api/useRepositoryScan.ts) |
+| Filesystem watcher | `go:scan.Watcher` [`server/internal/storage/scan/watcher.go`](../../../../server/internal/storage/scan/watcher.go) |
+| RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go`](../../../../server/internal/api/handler/repository_scan_handler.go) |
+| Scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go`](../../../../server/internal/storage/scan/scanner.go) |
 | repository_scans / repository_entries | `sql:repository_entries` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go:28`](../../../../server/internal/queue/scheduler.go#L28) |
-| ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/queue/macro_boundary_workers.go:40`](../../../../server/internal/queue/macro_boundary_workers.go#L40) |
-| Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:190`](../../../../server/internal/storage/repository_fs.go#L190) |
-| ScanWriter (commit coordinator) | `go:commit.ScanWriter` [`server/internal/commit/scan_writer.go:14`](../../../../server/internal/commit/scan_writer.go#L14) |
+| Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
+| ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/queue/macro_boundary_workers.go`](../../../../server/internal/queue/macro_boundary_workers.go) |
+| Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go`](../../../../server/internal/storage/repository_fs.go) |
+| ScanWriter (commit coordinator) | `go:commit.ScanWriter` [`server/internal/commit/scan_writer.go`](../../../../server/internal/commit/scan_writer.go) |
 
 ## Steps
 
 | # | From → To | Message | Anchor |
 | --- | --- | --- | --- |
 | 1 | admin → api | _alt manual verification_ — POST /storage/repositories/{id}/verifications | `api:POST /api/v1/storage/repositories/{id}/verifications` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
-| 2 | api → scanner | _alt manual verification_ — RequestScan(trigger=manual) | `go:scan.Scanner.RequestScan` [`server/internal/storage/scan/commands.go:28`](../../../../server/internal/storage/scan/commands.go#L28) |
-| 3 | watcher → scanner | _else filesystem events (batched, 10 s)_ — request a subtree scan, or a full scan above 512 events | `go:scan.Watcher.Run` [`server/internal/storage/scan/watcher.go:118`](../../../../server/internal/storage/scan/watcher.go#L118) |
-| 4 | scanner → scanner | _else periodic timer (jittered)_ — RequestAllPeriodic | `go:scan.Scanner.RequestAllPeriodic` [`server/internal/storage/scan/commands.go:47`](../../../../server/internal/storage/scan/commands.go#L47) |
+| 2 | api → scanner | _alt manual verification_ — RequestScan(trigger=manual) | `go:scan.Scanner.RequestScan` [`server/internal/storage/scan/commands.go`](../../../../server/internal/storage/scan/commands.go) |
+| 3 | watcher → scanner | _else filesystem events (batched, 10 s)_ — request a subtree scan, or a full scan above 512 events | `go:scan.Watcher.Run` [`server/internal/storage/scan/watcher.go`](../../../../server/internal/storage/scan/watcher.go) |
+| 4 | scanner → scanner | _else periodic timer (jittered)_ — RequestAllPeriodic | `go:scan.Scanner.RequestAllPeriodic` [`server/internal/storage/scan/commands.go`](../../../../server/internal/storage/scan/commands.go) |
 | 5 | scanner → catalog | insert or coalesce a queued scan |  |
-| 6 | scheduler → worker | one unique ScanRepositoryBatchArgs per repository | `go:jobs.ScanRepositoryBatchArgs` [`server/internal/queue/jobs/macro.go:68`](../../../../server/internal/queue/jobs/macro.go#L68) |
-| 7 | worker → scanner | _loop walk turns, up to the delivery budget_ — RunTurn | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:67`](../../../../server/internal/storage/scan/walk.go#L67) |
-| 8 | scanner → disk | _loop walk turns, up to the delivery budget_ — list one directory completely (sorted, stat cache); key names under the repository's own volume rule | `go:scan.walkTurn.processDirectory` [`server/internal/storage/scan/walk.go:343`](../../../../server/internal/storage/scan/walk.go#L343) |
-| 9 | scanner → writer | _loop walk turns, up to the delivery budget_ — write only the diff — new, changed (pending_hash), restored, missing | `go:scan.walkTurn.flush` [`server/internal/storage/scan/walk.go:676`](../../../../server/internal/storage/scan/walk.go#L676) |
+| 6 | scheduler → worker | one unique ScanRepositoryBatchArgs per repository | `go:jobs.ScanRepositoryBatchArgs` [`server/internal/queue/jobs/macro.go`](../../../../server/internal/queue/jobs/macro.go) |
+| 7 | worker → scanner | _loop walk turns, up to the delivery budget_ — RunTurn | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
+| 8 | scanner → disk | _loop walk turns, up to the delivery budget_ — list one directory completely (sorted, stat cache); key names under the repository's own volume rule | `go:scan.walkTurn.processDirectory` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
+| 9 | scanner → writer | _loop walk turns, up to the delivery budget_ — write only the diff — new, changed (pending_hash), restored, missing | `go:scan.walkTurn.flush` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
 | 10 | writer → catalog | _loop walk turns, up to the delivery budget_ — one bounded transaction per batch (≤ 256 rows) |  |
-| 11 | worker → scanner | _loop hash turns, when no walk is due_ — HashTurn (32 pending_hash entries) | `go:scan.Scanner.HashTurn` [`server/internal/storage/scan/hash.go:37`](../../../../server/internal/storage/scan/hash.go#L37) |
+| 11 | worker → scanner | _loop hash turns, when no walk is due_ — HashTurn (32 pending_hash entries) | `go:scan.Scanner.HashTurn` [`server/internal/storage/scan/hash.go`](../../../../server/internal/storage/scan/hash.go) |
 | 12 | scanner → disk | _loop hash turns, when no walk is due_ — hash outside any transaction |  |
-| 13 | scanner → writer | _loop hash turns, when no walk is due_ — compare-and-swap on the entry revision, bind content to an Asset | `go:scan.Scanner.commitHashTx` [`server/internal/storage/scan/hash.go:172`](../../../../server/internal/storage/scan/hash.go#L172) |
-| 14 | writer → catalog | _loop hash turns, when no walk is due_ — activation requests the Asset's pipeline stages | `go:service.ApplyAssetActivationTx` [`server/internal/service/asset_activation.go:22`](../../../../server/internal/service/asset_activation.go#L22) |
-| 15 | worker → scheduler | snooze while more work remains; finish records counters |  |
+| 13 | scanner → writer | _loop hash turns, when no walk is due_ — compare-and-swap on the entry revision, bind content to an Asset | `go:scan.Scanner.commitHashTx` [`server/internal/storage/scan/hash.go`](../../../../server/internal/storage/scan/hash.go) |
+| 14 | writer → catalog | _loop hash turns, when no walk is due_ — activation requests the Asset's pipeline stages | `go:service.ApplyAssetActivationTx` [`server/internal/service/asset_activation.go`](../../../../server/internal/service/asset_activation.go) |
 
 ## Disk is the truth
 

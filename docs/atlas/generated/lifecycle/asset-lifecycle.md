@@ -25,21 +25,21 @@ stateDiagram-v2
 
 | State | Meaning | Anchor |
 | --- | --- | --- |
-| active | At least one entry is present or pending_hash. Browse, search, and processing see it. | `go:lifecycle.StateActive` [`server/internal/lifecycle/purge.go:17`](../../../../server/internal/lifecycle/purge.go#L17) |
-| missing | No present entry, at least one missing. Metadata, albums, and faces are kept until the user removes it. | `go:lifecycle.StateMissing` [`server/internal/lifecycle/purge.go:18`](../../../../server/internal/lifecycle/purge.go#L18) |
-| trashed | Every remaining entry is in a repository trash. Shown only in the Trash view. | `go:lifecycle.StateTrashed` [`server/internal/lifecycle/purge.go:19`](../../../../server/internal/lifecycle/purge.go#L19) |
+| active | At least one entry is present or pending_hash. Browse, search, and processing see it. | `go:lifecycle.StateActive` [`server/internal/lifecycle/purge.go`](../../../../server/internal/lifecycle/purge.go) |
+| missing | No present entry, at least one missing. Metadata, albums, and faces are kept until the user removes it. | `go:lifecycle.StateMissing` [`server/internal/lifecycle/purge.go`](../../../../server/internal/lifecycle/purge.go) |
+| trashed | Every remaining entry is in a repository trash. Shown only in the Trash view. | `go:lifecycle.StateTrashed` [`server/internal/lifecycle/purge.go`](../../../../server/internal/lifecycle/purge.go) |
 
 ## Transitions
 
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
-| [*] | active | a hashed file or bound upload creates the Asset | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go:45`](../../../../server/internal/storage/scan/known.go#L45) |
-| active | missing | scan proves the last present file vanished | `go:scan.removeEntryTx` [`server/internal/storage/scan/walk.go:739`](../../../../server/internal/storage/scan/walk.go#L739) |
-| missing | active | the file returns, or the same content is re-uploaded | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go:67`](../../../../server/internal/storage/scan/walk.go#L67) |
-| active | trashed | user Delete moves every file into the repository trash | `go:trash.Service.Delete` [`server/internal/storage/trash/delete.go:62`](../../../../server/internal/storage/trash/delete.go#L62) |
-| trashed | active | Restore, or a new present copy appears | `go:trash.Service.Restore` [`server/internal/storage/trash/restore.go:61`](../../../../server/internal/storage/trash/restore.go#L61) |
-| missing | [*] | purge (repository removal or confirmed Remove missing items) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go:41`](../../../../server/internal/lifecycle/purge.go#L41) |
-| trashed | [*] | purge (repository removal, expiry, or confirmed permanent delete) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go:41`](../../../../server/internal/lifecycle/purge.go#L41) |
+| [*] | active | a hashed file or bound upload creates the Asset | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go`](../../../../server/internal/storage/scan/known.go) |
+| active | missing | scan proves the last present file vanished | `go:scan.removeEntryTx` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
+| missing | active | the file returns, or the same content is re-uploaded | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
+| active | trashed | user Delete moves every file into the repository trash | `go:trash.Service.Delete` [`server/internal/storage/trash/delete.go`](../../../../server/internal/storage/trash/delete.go) |
+| trashed | active | Restore, or a new present copy appears | `go:trash.Service.Restore` [`server/internal/storage/trash/restore.go`](../../../../server/internal/storage/trash/restore.go) |
+| missing | [*] | purge (repository removal or confirmed Remove missing items) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go`](../../../../server/internal/lifecycle/purge.go) |
+| trashed | [*] | purge (repository removal, expiry, or confirmed permanent delete) | `go:lifecycle.PurgeEntriesTx` [`server/internal/lifecycle/purge.go`](../../../../server/internal/lifecycle/purge.go) |
 
 ## Where the state is written
 

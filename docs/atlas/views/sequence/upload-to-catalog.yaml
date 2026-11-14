@@ -97,6 +97,7 @@ steps:
     to: materializer
     label: run under the execution governor
     anchor: go:server/app.pipelineRuntime.ingest
+    via: [go:server/app.pipelineRuntime.ingest, go:processors.AssetProcessor.IngestAsset]
   - from: materializer
     to: staging
     label: claim commit, verify bytes, move staging file into inbox/
@@ -113,6 +114,7 @@ steps:
     to: commits
     label: acknowledge the ingest receipt
     anchor: go:commit.Coordinator.ApplyIngestReceipt
+    via: [go:server/app.pipelineRuntime.ingest]
   - from: commits
     to: catalog
     label: receipt becomes terminal; wake the scheduler

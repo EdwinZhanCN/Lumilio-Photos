@@ -54,7 +54,9 @@ type Atlas struct {
 	Ceilings map[string]map[string]int
 
 	typedIdx *typedIndex
-	sql      *sqlFacts
+	// staleSeen dedupes stale-anchor notices by view and anchor.
+	staleSeen map[string]bool
+	sql       *sqlFacts
 }
 
 type webFacts struct {

@@ -3,7 +3,8 @@
 // authored with anchors that must resolve to real code and contracts.
 //
 //	atlas generate        write docs/atlas/generated; fail on any problem or stale view
-//	atlas check           fail if anything is invalid, stale, or not regenerated
+//	atlas check           fail if anything is invalid or not regenerated; print a
+//	                      notice for anchors changed since their view was verified
 //	atlas lock            record the current hash of every anchor (after reviewing
 //	                      views) and drop baseline entries that no longer occur
 //	atlas baseline <rule> record the current findings of a rule with no baseline yet
@@ -129,8 +130,9 @@ func report(atlas *Atlas, outdated []string) {
 		fmt.Fprintf(os.Stderr, "atlas: %d baseline entr(ies) no longer occur; run `task atlas:lock` to drop them:\n%s", len(atlas.StaleBaselines), formatProblems(atlas.StaleBaselines))
 	}
 	if len(atlas.Stale) > 0 {
-		failed = true
-		fmt.Fprintf(os.Stderr, "atlas: %d anchor(s) changed since their view was verified:\n%s", len(atlas.Stale), formatProblems(atlas.Stale))
+		// A notice, not a failure: the arrow check proves every drawn call
+		// still exists, so a changed body only asks for a re-read.
+		fmt.Fprintf(os.Stderr, "atlas: notice: %d anchor(s) changed since their view was verified:\n%s", len(atlas.Stale), formatProblems(atlas.Stale))
 		fmt.Fprintln(os.Stderr, "  Re-read each listed view against the code, fix the view if the behaviour changed, then run `task atlas:lock`.")
 	}
 	if len(outdated) > 0 {
@@ -140,7 +142,7 @@ func report(atlas *Atlas, outdated []string) {
 	if failed {
 		os.Exit(1)
 	}
-	fmt.Println("atlas: all views resolve, all anchors are verified, and generated files are current")
+	fmt.Println("atlas: all views resolve, every drawn call is in the code, and generated files are current")
 }
 
 // evaluate runs every check over the loaded facts, in the order later steps
@@ -150,6 +152,7 @@ func (a *Atlas) evaluate() {
 	a.checkMatches()
 	a.deriveViews(edges)
 	a.checkViews()
+	a.checkArrows()
 	a.checkDocRefs()
 	a.runRules()
 	a.checkInvariants()

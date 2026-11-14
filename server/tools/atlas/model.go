@@ -206,6 +206,9 @@ type Edge struct {
 	Label  string `yaml:"label" json:"label,omitempty"`
 	Anchor string `yaml:"anchor" json:"anchor,omitempty"`
 	Style  string `yaml:"style" json:"style,omitempty"`
+	// Via names the go: anchors a data-flow edge passes through when neither
+	// end references the other directly.
+	Via []string `yaml:"via" json:"-"`
 }
 
 // Step is one sequence-diagram message, note, or control block.
@@ -221,6 +224,10 @@ type Step struct {
 	Block  string  `yaml:"block"`
 	Steps  []Step  `yaml:"steps"`
 	Else   []Block `yaml:"else"`
+	// Via names the go: anchors a message passes through, in call order,
+	// when the from participant does not reference the to participant
+	// directly.
+	Via []string `yaml:"via"`
 }
 
 // Block is an else branch of an alt block.

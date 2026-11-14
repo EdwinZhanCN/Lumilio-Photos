@@ -55,7 +55,10 @@ func (a *Atlas) anchorCell(from, anchor string) string {
 	if resolved.File == "" {
 		return "`" + anchor + "`"
 	}
-	return "`" + anchor + "` " + sourceLink(from, resolved.File, resolved.Line)
+	// The checked-in page links the file, not the line: a refactor that keeps
+	// every drawn call must not rewrite generated files. The site data
+	// (atlas data, built at publish time) keeps the exact line.
+	return "`" + anchor + "` " + sourceLink(from, resolved.File, 0)
 }
 
 func (a *Atlas) viewMarkdown(view *View) []byte {

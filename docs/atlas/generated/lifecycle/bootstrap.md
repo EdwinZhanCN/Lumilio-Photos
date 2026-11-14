@@ -24,17 +24,17 @@ stateDiagram-v2
 
 | State | Meaning | Anchor |
 | --- | --- | --- |
-| fresh | The catalog row exists but no reconciliation has run yet. | `go:service.BootstrapPhaseFresh` [`server/internal/service/bootstrap_service.go:13`](../../../../server/internal/service/bootstrap_service.go#L13) |
-| catalog_ready | SQLite is open and migrated; owner registration is pending. | `go:service.BootstrapPhaseCatalogReady` [`server/internal/service/bootstrap_service.go:14`](../../../../server/internal/service/bootstrap_service.go#L14) |
-| admin_created | The owner account exists; the primary repository is not set up. | `go:service.BootstrapPhaseAdminCreated` [`server/internal/service/bootstrap_service.go:15`](../../../../server/internal/service/bootstrap_service.go#L15) |
-| ready | Terminal and durable. Request paths trust the cached value. | `go:service.BootstrapPhaseReady` [`server/internal/service/bootstrap_service.go:16`](../../../../server/internal/service/bootstrap_service.go#L16) |
+| fresh | The catalog row exists but no reconciliation has run yet. | `go:service.BootstrapPhaseFresh` [`server/internal/service/bootstrap_service.go`](../../../../server/internal/service/bootstrap_service.go) |
+| catalog_ready | SQLite is open and migrated; owner registration is pending. | `go:service.BootstrapPhaseCatalogReady` [`server/internal/service/bootstrap_service.go`](../../../../server/internal/service/bootstrap_service.go) |
+| admin_created | The owner account exists; the primary repository is not set up. | `go:service.BootstrapPhaseAdminCreated` [`server/internal/service/bootstrap_service.go`](../../../../server/internal/service/bootstrap_service.go) |
+| ready | Terminal and durable. Request paths trust the cached value. | `go:service.BootstrapPhaseReady` [`server/internal/service/bootstrap_service.go`](../../../../server/internal/service/bootstrap_service.go) |
 
 ## Transitions
 
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
 | [*] | fresh | catalog baseline creates system_state | `sql:system_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| fresh | catalog_ready | startup Reconcile finds no admin | `go:service.BootstrapService.Reconcile` [`server/internal/service/bootstrap_service.go:31`](../../../../server/internal/service/bootstrap_service.go#L31) |
+| fresh | catalog_ready | startup Reconcile finds no admin | `go:service.BootstrapService.Reconcile` [`server/internal/service/bootstrap_service.go`](../../../../server/internal/service/bootstrap_service.go) |
 | catalog_ready | admin_created | the owner registers (first account becomes admin) | `api:POST /api/v1/auth/register/start` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
 | admin_created | ready | POST /setup/primary-repository creates the primary | `api:POST /api/v1/setup/primary-repository` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
 | admin_created | ready | POST /setup/primary-repository/adopt adopts the primary found at <default>/primary | `api:POST /api/v1/setup/primary-repository/adopt` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |

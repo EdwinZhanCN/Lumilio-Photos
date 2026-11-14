@@ -17,13 +17,13 @@ nodes:
     anchor: ts:streamAgent
   - id: handler
     label: AgentHandler
-    anchor: go:handler.AgentHandler.Chat
+    anchor: go:handler.AgentHandler
   - id: service
     label: AgentService
     anchor: go:core.AgentService
   - id: llm
-    label: LLM provider
-    anchor: go:llm.NewChatModel
+    label: LLM provider (via the agent runtime)
+    anchor: ext:LLM provider
   - id: tools
     label: Tools (producers, effects)
     anchor: go:tools.RegisterAll
@@ -75,6 +75,7 @@ steps:
     to: effects
     label: Prepare pending effect (membership snapshot)
     anchor: go:core.EffectRuntime.Prepare
+    via: [go:tools.RegisterAddToAlbum]
   - from: tools
     to: web
     label: interrupt — confirmation card with count and target
@@ -97,6 +98,7 @@ steps:
         to: effects
         label: Commit — mutation + receipt in one transaction
         anchor: go:core.EffectRuntime.Commit
+        via: [go:tools.RegisterAddToAlbum, go:tools.resumeAddToAlbum]
     else:
       - label: declined
         steps:
@@ -104,6 +106,7 @@ steps:
             to: effects
             label: Reject
             anchor: go:core.EffectRuntime.Reject
+            via: [go:tools.RegisterAddToAlbum, go:tools.resumeAddToAlbum]
   - from: tools
     to: web
     label: effect receipt

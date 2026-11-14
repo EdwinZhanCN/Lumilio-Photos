@@ -187,6 +187,9 @@ func (a *Atlas) checkViews() {
 				a.problem(where, "edge %s -> %s references an undeclared node", edge.From, edge.To)
 			}
 			a.useAnchor(view, edge.Anchor)
+			for _, via := range edge.Via {
+				a.useAnchor(view, via)
+			}
 		}
 		for _, transition := range view.Transitions {
 			if !known(transition.From) || !known(transition.To) {
@@ -252,6 +255,9 @@ func (a *Atlas) checkSteps(view *View, steps []Step, nodes map[string]*Node) {
 			}
 		}
 		a.useAnchor(view, step.Anchor)
+		for _, via := range step.Via {
+			a.useAnchor(view, via)
+		}
 	}
 }
 
@@ -276,6 +282,16 @@ func (a *Atlas) useAnchor(view *View, anchor string) {
 		return
 	}
 	locked, ok := a.Lock[view.ID][anchor]
+	if ok && locked == resolved.Hash {
+		return
+	}
+	if a.staleSeen == nil {
+		a.staleSeen = map[string]bool{}
+	}
+	if a.staleSeen[view.ID+"\x00"+anchor] {
+		return
+	}
+	a.staleSeen[view.ID+"\x00"+anchor] = true
 	if !ok {
 		resolved.Stale = true
 		a.Stale = append(a.Stale, Problem{Where: view.Source, Message: fmt.Sprintf("%s is not verified yet", anchor)})

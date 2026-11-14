@@ -10,27 +10,27 @@ direction: LR
 nodes:
   - id: original
     label: Original file in a repository
-    anchor: go:locations.Resolver
+    anchor: go:server/internal/storage.RepositoryFS
     shape: store
     note: Resolved to a present entry just before I/O; never rewritten.
   - id: analyze
     label: analyze
-    anchor: go:processors.AssetProcessor.ComputeMetadataTask
+    anchor: go:server/app.pipelineRuntime.analyze
     group: Stages
     note: exiftool and ffprobe metadata, capture time, GPS, component relations.
   - id: derivatives
     label: derivatives
-    anchor: go:processors.AssetProcessor.LoadThumbnailTask
+    anchor: go:server/app.pipelineRuntime.derivatives
     group: Stages
     note: Thumbnail ladder, video frames, audio artwork (libvips, LibRaw).
   - id: transcode
     label: transcode
-    anchor: go:processors.AssetProcessor.ComputeTranscodeTask
+    anchor: go:server/app.pipelineRuntime.transcode
     group: Stages
     note: Browser-playable video and audio renditions (ffmpeg).
   - id: enrich
     label: enrich
-    anchor: go:queue.EnrichmentRunner
+    anchor: go:server/app.pipelineRuntime.enrich
     group: Stages
     note: pHash, semantic embedding, BioCLIP, OCR, faces, zero-shot tags, video frames.
   - id: lumen
@@ -79,25 +79,32 @@ nodes:
 edges:
   - from: original
     to: analyze
+    via: [go:processors.AssetProcessor.ComputeMetadataTask]
   - from: original
     to: derivatives
+    via: [go:processors.AssetProcessor.ComputeThumbnailCodec]
   - from: original
     to: transcode
-  - from: derivatives
+    via: [go:processors.AssetProcessor.resolveCurrentAssetSource, go:processors.AssetProcessor.LoadTranscodeTask]
+  - from: thumbs
     to: enrich
     label: medium thumbnail as model input
+    anchor: go:queue.NewDBMLImageLoader
   - from: enrich
     to: lumen
     style: dashed
     label: inference
+    via: [go:server/app.runAssetEnrichment, go:queue.EnrichmentRunner]
   - from: derivatives
     to: artifacts
     label: publish
     anchor: go:processors.AssetProcessor.PublishThumbnailTask
+    via: [go:processors.AssetProcessor.PublishThumbnailTask, go:processors.AssetProcessor.saveThumbnail, go:processors.publishDerived]
   - from: transcode
     to: artifacts
     label: publish
     anchor: go:processors.AssetProcessor.PublishTranscodeTask
+    via: [go:processors.AssetProcessor.PublishTranscodeTask, go:processors.copyAudioForWeb, go:processors.saveAudioVersion, go:processors.publishDerived]
   - from: analyze
     to: coordinator
     anchor: go:commit.Coordinator.ApplyAssetMetadata

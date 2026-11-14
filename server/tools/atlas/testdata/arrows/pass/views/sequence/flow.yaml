@@ -1,0 +1,21 @@
+id: flow
+kind: sequence
+title: Every way an arrow holds
+summary: Fixture flow.
+nodes:
+  - { id: scheduler, label: Scheduler, anchor: go:scheduler.Scheduler }
+  - { id: worker, label: Worker, anchor: go:worker.Worker }
+  - { id: service, label: Service, anchor: go:worker.Service }
+  - { id: store, label: Store, anchor: go:store.Store }
+  - { id: audit, label: Audit, anchor: go:audit.Record }
+  - { id: jobs, label: Job payloads, anchor: mod:fx/jobs }
+  - { id: user, label: User, anchor: ext:User }
+steps:
+  - { from: user, to: scheduler, label: "external participants are not checked" }
+  - { from: scheduler, to: worker, label: "message type both ends reference", anchor: "go:jobs.Args" }
+  - { from: worker, to: service, label: "func field filled with a wrapper around a method value", anchor: "go:worker.Service.Handle", via: ["go:app.runtime.run"] }
+  - { from: service, to: store, label: "interface call; the callee end narrows to Save", anchor: "go:store.Store.Save" }
+  - { from: store, to: service, label: "a reply runs the chain backwards", reply: true }
+  - { from: service, to: audit, label: "setter injection of a function value" }
+  - { from: worker, to: audit, label: "a wiring site references both ends", anchor: "go:app.Wire" }
+  - { from: scheduler, to: jobs, label: "a package participant" }

@@ -34,7 +34,7 @@ nodes:
     note: Queued scans and pending_hash entries drive repository work.
   - id: scheduler
     label: Catalog scheduler
-    anchor: go:queue.Scheduler.ScheduleOnce
+    anchor: go:queue.Scheduler
     note: Bounded pass that derives work only from catalog state, never from River.
   - id: wake
     label: SchedulerWake
@@ -42,11 +42,11 @@ nodes:
     note: The scheduler blocks on this channel between passes. Committed writes coalesce into one wake-up; the periodic tick is the recovery path.
   - id: catalogjobs
     label: Macro job catalog
-    anchor: go:jobs.RuntimeJobCatalog
+    anchor: mod:server/internal/queue/jobs
     note: The closed set of job kinds; payloads carry identities and fences only.
   - id: river
     label: River on QueueDB
-    anchor: go:queue.New
+    anchor: ext:River
     shape: queue
     note: Disposable delivery state with uniqueness over active deliveries.
   - id: workers
@@ -108,6 +108,7 @@ edges:
     to: wake
     style: dashed
     label: waits on
+    anchor: go:server/app.run
   - from: scheduler
     to: catalogjobs
     label: typed args
@@ -122,9 +123,11 @@ edges:
     to: governor
     label: admit step
     anchor: go:execution.Engine.Run
-  - from: governor
+    via: [go:queue.assetMacroWorker.work, go:server/app.pipelineRuntime.analyze, go:execution.Engine]
+  - from: workers
     to: processors
-    label: run
+    label: run the admitted step
+    via: [go:queue.assetMacroWorker.work, go:server/app.pipelineRuntime.analyze]
   - from: processors
     to: files
     label: read originals, publish artifacts
@@ -135,7 +138,7 @@ edges:
   - from: processors
     to: coordinator
     label: immutable result + fence
-    anchor: go:commit.Coordinator.ApplyAssetMetadata
+    anchor: go:server/app.pipelineRuntime.analyze
   - from: coordinator
     to: applied
     label: applied_version = desired, or stale
@@ -146,6 +149,7 @@ edges:
     to: wake
     style: dashed
     label: notify
+    via: [go:catalogtx.Writer, go:catalogtx.begin, go:catalogtx.safeObserve]
 notes:
   - title: The invariant
     body: >-

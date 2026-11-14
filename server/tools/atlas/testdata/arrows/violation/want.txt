@@ -1,0 +1,9 @@
+# One problem per line, matched as a substring.
+arrow scheduler -> store ("no reference at all") is not in the code
+arrow service -> store ("the named callee is not the one called") is not in the code: nothing in go:worker.Service references (*fx/store.Store).Load
+go:scheduler.Scheduler does not reference the message go:jobs.Other
+go:worker.Worker does not reference the message go:jobs.Other
+the wiring site go:app.Unrelated does not reference go:worker.Worker
+the wiring site go:app.Unrelated does not reference go:audit.Record
+arrow service -> store ("a hop that is not in the code") is not in the code: nothing in go:audit.Record references fx/store.Store
+arrow service -> store ("an anchor on neither end beside via"): anchor go:scheduler.Scheduler.Enqueue is neither end nor a via hop
