@@ -65,14 +65,27 @@ fixture in `server/tools/atlas`; see the Rules section of the Atlas README.
   keep each candidate a constant in the same function so the table rules
   still see it.
 
+## Errors versus notices
+
+- **Errors fail the check**: a broken anchor, a rule finding, stale generated
+  files, and an **arrow not in the code** — a sequence message or data-flow
+  edge between Go participants whose call is gone.
+- **Notices do not**: `notice: N anchor(s) changed since their view was
+  verified`. The drawn calls still exist, but the anchored code changed.
+  Handle every notice in the same PR anyway; an unread notice is how a view
+  rots.
+
 ## Editing code that a view anchors
 
-`task atlas:check` reports `anchor(s) changed since their view was verified`
-with the view file and `file:line`.
-
-1. Open each listed view YAML and the code at each listed location.
-2. If behaviour changed, fix the view: labels, steps, transitions, notes. If
-   the symbol was renamed or moved, re-anchor it.
+1. For an arrow error, the message names the missing hop and, when there is
+   one, the call chain the code has now. Redraw the step from the code: a
+   renamed method is a new anchor, a call that now goes through a runtime is
+   a `via:` list (each hop is checked), a call that moved behind a goroutine
+   or a callback needs a wiring-site anchor. Never add `via:` hops the code
+   does not have.
+2. For a notice, open each listed view YAML and the code at each listed
+   `file:line`. If behaviour changed, fix the view: labels, steps,
+   transitions, notes.
 3. Only then run `task atlas:lock`. Locking without reading defeats the gate;
    the lock diff is reviewed in the PR as "these views were re-verified".
 
@@ -84,7 +97,10 @@ with the view file and `file:line`.
    string-literal union); *system boundaries* → architecture.
 2. Copy the closest existing view. Anchor every node; prefer the narrowest
    anchor (`go:scan.Scanner.RunTurn` over `mod:...`). Use `ext:` only for
-   things outside the repository.
+   things outside the repository. Every arrow between Go participants must be
+   a call the code makes (README "Arrows are checked"): the step `anchor` on
+   the callee names the method; a type anchored on neither end is a message
+   both ends name; a function there is the wiring site.
 3. Keep 6–14 nodes. Put the *why* in `notes`. Link `related` views.
 4. `task atlas:generate`, open the view with `task atlas`
    (http://localhost:6690/atlas/; `task atlas:data` refreshes an open page),
@@ -98,9 +114,18 @@ task atlas:check
 cd server && go test ./tools/atlas/
 ```
 
-`task atlas:check` must print "all views resolve, all anchors are verified,
-and generated files are current". Commit `docs/atlas/**` (views, lock,
-generated) with the code change.
+`task atlas:check` must print "all views resolve, every drawn call is in the
+code, and generated files are current", with no notice left. Commit
+`docs/atlas/**` (views, lock, generated) with the code change.
+
+## Moving code (Phase B sessions)
+
+- Before a split: `task atlas:split-report -- <package dir> --clusters
+  <file>` lists the edges, crossing unexported symbols, and cycles of the
+  proposed cut. Resolve every cycle in the plan before moving a file.
+- Every move PR: `task atlas:movecheck -- --base origin/dev` and paste the
+  report into the PR. Each "changed body" line gets a one-line reason; a
+  pure move has none.
 
 ## Known failure modes
 

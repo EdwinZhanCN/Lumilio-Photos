@@ -1,11 +1,12 @@
 # Atlas rules: one architecture gate
 
-Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270); A2 landed 2026-11-14 (#271); A3 landed 2026-11-14 (#272). Next: A4. Child of
+Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270); A2 landed 2026-11-14 (#271); A3 landed 2026-11-14 (#272); A4 landed 2026-11-14. Every phase is done; the plan completes with parent B14. Child of
 [server-structure.md](server-structure.md) (Phase A, sessions A1–A4). It
 touches only `server/tools`, tests, docs, `docs/atlas`, the Taskfile, and CI
 wiring, so it may run between rc.1 sessions. A4 supersedes part of the
 [Atlas decision](../../../.agents/decisions/2026-10-01-atlas-anchored-code-map.md)
-(hash drift stops failing CI); record that in a new decision at completion.
+(hash drift stops failing CI); recorded in
+[the arrows decision](../../../.agents/decisions/2026-11-14-atlas-views-verify-arrows.md).
 
 Goal: `task atlas:check` is the only architecture gate. Every rule is
 declared in `docs/atlas/atlas.yaml`, matches type-resolved facts (`go/types`
@@ -277,20 +278,54 @@ Found in A3 (2026-11-14), binding on A4:
   runners accept by default.
 
 ### A4 — Views that verify arrows, and refactor tools
-- [ ] Sequence and data-flow steps whose `from` and `to` are `go:` anchors
+- [x] Sequence and data-flow steps whose `from` and `to` are `go:` anchors
   are verified: the `from` body references `to` directly, or through an
   interface method that `to` implements, or through a declared `via:` hop.
   A missing arrow is an error. A changed anchor hash becomes a notice that
   does not fail CI.
-- [ ] `atlas split-report <package> [--clusters file]`: type-resolved
+- [x] `atlas split-report <package> [--clusters file]`: type-resolved
   file-to-file dependencies, inter-cluster edges, crossing unexported
   symbols, and cycles (the analysis behind the parent plan's tables).
-- [ ] `atlas movecheck --base <ref>`: indexes every function of the base and
+- [x] `atlas movecheck --base <ref>`: indexes every function of the base and
   head trees by receiver type and name, normalizes package qualifiers and
   export capitalization, and lists moved, changed, added, and removed
   functions; parent Phase B attaches it to every PR.
-- [ ] Update `lumilio-atlas` (lock procedure, notices versus errors, the two
+- [x] Update `lumilio-atlas` (lock procedure, notices versus errors, the two
   tools).
+
+Found in A4 (2026-11-14), binding on Phase B:
+
+- **The views drew calls the code does not make.** Checked against the typed
+  facts, seven views were redrawn: the search handler calls
+  `SearchBrowseItems` and the service embeds the query and hydrates fused
+  members (`resolveSemanticQueryEmbedding`, `browseItemsForMediaRefs`);
+  workers reach the scanner, the materializer, and the processors through
+  `server/app`'s `pipelineRuntime`; the original is read through
+  `RepositoryFS`; thumbnails, not the derivatives stage, feed enrichment;
+  River, the LLM provider, and the agent runtime are `ext:` participants.
+- **Hop semantics beyond the plan's three.** Direct reference, interface
+  implementation, and `via:` were not enough for real wiring. A hop also
+  holds through a constructor returning the target, through func values (a
+  func-typed field reaches what is stored in it by literal, assignment,
+  constructor, or setter; a func-typed parameter reaches its call sites'
+  arguments; a func-returning wrapper counts), and for a `mod:` participant,
+  through anything the package declares. A func value counts only where it
+  is called. Step anchors on neither end are a message type both ends name
+  or a wiring site that names both. Data-flow edges are undirected. Fixture:
+  `testdata/arrows/{pass,violation}`; eight mutations of the pass fixture
+  each fail it.
+- **Generated pages link files without lines.** Otherwise any edit above an
+  anchor rewrote checked-in markdown and failed `generated`, so a refactor
+  that keeps every call could not produce "a notice only".
+- **`split-report` reproduces the parent plan's numbers**: `service` is 39
+  files, 20,116 lines, 60 file-to-file edges. With the plan's capability
+  clusters it finds one blocking cycle, assets ↔ people ↔ search, and five
+  unexported symbols crossing the cut (`canonicalizeSemanticVector`,
+  `optionalStringFromSQLiteUUID`, `normalizeStoredGeocoding`,
+  `derefFloat64`, `detectionOwnerKey`).
+- **`movecheck` renames need a unique, non-empty body.** Empty or shared
+  bodies (`func gone() {}`) would otherwise pair unrelated additions and
+  removals.
 
 ## Validation boundaries
 

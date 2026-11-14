@@ -159,6 +159,22 @@ tasks:
       - task: atlas:run
         vars: { ATLAS_ARGS: 'baseline {{.CLI_ARGS}}' }
 
+  atlas:split-report:
+    desc: File-to-file dependencies of one Go package, and the edges, crossing unexported symbols, and cycles of a proposed cut (task atlas:split-report -- internal/service [--clusters file])
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - task: atlas:run
+        vars: { ATLAS_ARGS: 'split-report {{.CLI_ARGS}}' }
+
+  atlas:movecheck:
+    desc: Every Go function changed, renamed, moved, added, or removed since a ref (task atlas:movecheck -- --base origin/dev); attach the report to a move PR
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - task: atlas:run
+        vars: { ATLAS_ARGS: 'movecheck {{.CLI_ARGS}}' }
+
   # The Atlas type-checks Server and Desktop with go/packages, so it builds the
   # way the binaries do (cgo, GO_BUILD_TAGS) and on the newest toolchain any
   # module declares: go/types refuses a module newer than the tool's own Go.

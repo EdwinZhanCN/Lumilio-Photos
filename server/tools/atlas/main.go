@@ -9,8 +9,16 @@
 //	                      views) and drop baseline entries that no longer occur
 //	atlas baseline <rule> record the current findings of a rule with no baseline yet
 //	atlas data            write the site model to .local/atlas for the VitePress Atlas
+//	atlas split-report <package> [--clusters file]
+//	                      file-to-file dependencies of one package and, for a
+//	                      proposed cut, the edges, crossing unexported
+//	                      symbols, and cycles between clusters of files
+//	atlas movecheck --base <ref>
+//	                      every function changed, renamed, moved, added, or
+//	                      removed since ref, with package qualifiers and
+//	                      export capitalization normalized
 //
-// Every command needs --web-facts, written by web/scripts/atlas-facts.ts.
+// The map commands need --web-facts, written by web/scripts/atlas-facts.ts.
 // Use the root Task targets (task atlas, atlas:generate, atlas:check,
 // atlas:lock) rather than invoking this directly.
 package main
@@ -31,6 +39,12 @@ func main() {
 	}
 	command := os.Args[1]
 	args := os.Args[2:]
+	if command == "split-report" || command == "movecheck" {
+		if err := refactorTool(command, args); err != nil {
+			fail(err)
+		}
+		return
+	}
 	ruleID := ""
 	if command == "baseline" {
 		if len(args) == 0 || strings.HasPrefix(args[0], "-") {
@@ -159,6 +173,59 @@ func (a *Atlas) evaluate() {
 	for _, view := range a.Views {
 		view.Mermaid = a.mermaid(view)
 	}
+}
+
+// refactorTool runs split-report or movecheck, which read only atlas.yaml
+// and source, not the map.
+func refactorTool(command string, args []string) error {
+	root, err := gitRoot()
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(filepath.Join(root, atlasDir, "atlas.yaml"))
+	if err != nil {
+		return err
+	}
+	config := &Config{}
+	if err := strictYAML(data, config); err != nil {
+		return fmt.Errorf("atlas.yaml: %w", err)
+	}
+	flags := flag.NewFlagSet("atlas "+command, flag.ExitOnError)
+	var output string
+	switch command {
+	case "split-report":
+		clusters := flags.String("clusters", "", "YAML file: clusters: {name: [file.go, ...]}")
+		target := ""
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			target, args = args[0], args[1:]
+		}
+		_ = flags.Parse(args)
+		if target == "" && flags.NArg() > 0 {
+			target = flags.Arg(0)
+		}
+		if target == "" {
+			return errors.New("usage: atlas split-report <package dir> [--clusters file]")
+		}
+		clustersPath := *clusters
+		if clustersPath != "" && !filepath.IsAbs(clustersPath) {
+			if cwd, err := os.Getwd(); err == nil {
+				clustersPath = filepath.Join(cwd, clustersPath)
+			}
+		}
+		output, err = runSplitReport(root, config, target, clustersPath)
+	case "movecheck":
+		base := flags.String("base", "", "git ref to compare the working tree against, such as origin/dev")
+		_ = flags.Parse(args)
+		if *base == "" {
+			return errors.New("usage: atlas movecheck --base <ref>")
+		}
+		output, err = runMovecheck(root, config, *base)
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Print(output)
+	return nil
 }
 
 func gitRoot() (string, error) {
