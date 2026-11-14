@@ -155,23 +155,20 @@ ON CONFLICT (user_id, thread_id, ref_id) DO UPDATE SET
     expires_at = EXCLUDED.expires_at;
 
 -- name: GetAgentRef :one
-UPDATE agent_refs
-SET last_accessed_at = sqlc.arg('now'),
-    expires_at = sqlc.arg('expires_at')
-WHERE agent_refs.user_id = sqlc.arg('user_id')
-  AND agent_refs.thread_id = sqlc.arg('thread_id')
-  AND agent_refs.ref_id = sqlc.arg('ref_id')
+SELECT r.* FROM agent_refs r
+WHERE r.user_id = sqlc.arg('user_id')
+  AND r.thread_id = sqlc.arg('thread_id')
+  AND r.ref_id = sqlc.arg('ref_id')
   AND (
-      expires_at > sqlc.arg('now')
+      r.expires_at > sqlc.arg('now')
       OR EXISTS (
           SELECT 1
           FROM agent_threads t
-          WHERE t.user_id = agent_refs.user_id
-            AND t.thread_id = agent_refs.thread_id
+          WHERE t.user_id = r.user_id
+            AND t.thread_id = r.thread_id
             AND t.status IN ('active', 'awaiting_confirmation')
       )
-  )
-RETURNING *;
+  );
 
 -- name: ListAgentRefs :many
 SELECT r.* FROM agent_refs r

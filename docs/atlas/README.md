@@ -155,7 +155,7 @@ owners) are package directories, `dir/**` globs, or single files.
 | Kind | Checks |
 | --- | --- |
 | `group_uses: true` | Every import between groups follows `groups[].uses` and the reviewed `exceptions` (rule `group-dependencies`). |
-| `calls: {targets, only \| forbid}` | Who may refer to a function or method: calls, method values, and generic instantiations, through interfaces whose implementations include a target. Key `caller -> target`. |
+| `calls: {targets, only, forbid}` | Who may refer to a function or method: calls, method values, and generic instantiations, through interfaces whose implementations include a target. A reference outside `only`, or inside `forbid`, is a finding; give either or both (`forbid` then carves files out of `only`). Key `caller -> target`. |
 | `constructs: {types, only}` | Who may build a value of a type with a composite literal or `new`. Key `func constructs T`. |
 | `forbid_types: {in, types}` | No field, parameter, result, variable, or function literal in scope holds one of the types (directly, behind pointers, or in slices, maps, and channels). Key `name holds T`. |
 | `forbid_imports: {from, imports}` | No file in scope imports a listed path or `path/**`. Key `file imports X`, or `package imports X` when a package is in scope whole. |

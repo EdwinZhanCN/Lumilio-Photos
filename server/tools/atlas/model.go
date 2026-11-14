@@ -79,8 +79,8 @@ type Rule struct {
 // (server/internal/db), a directory glob (server/internal/storage/**), or a
 // file (server/app/app.go).
 
-// CallsRule: every reference to a target outside Only (or inside Forbid)
-// is a finding. A reference through an interface method counts when a
+// CallsRule: every reference to a target outside Only, or inside Forbid,
+// is a finding; with both, Forbid carves files or packages out of Only. A reference through an interface method counts when a
 // target implements it.
 type CallsRule struct {
 	Targets []string `yaml:"targets" json:"targets"`

@@ -1,1 +1,2 @@
 (*fx/handler.Handler).List -> (*fx/storage.DefaultRepositoryManager).ReconcileAll
+(*fx/storage.DefaultRepositoryManager).RuntimeStatus -> (*fx/storage.DefaultRepositoryManager).ReconcileAll

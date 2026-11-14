@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"server/config"
+	"server/internal/db"
 	"server/internal/storage/scan"
 )
 
@@ -99,6 +100,8 @@ type blackboxOptions struct {
 	// repositoryControl receives the in-process native control plane, the
 	// seam the Desktop host uses; setting it also enables the native tasks.
 	repositoryControl func(RepositoryControl)
+	// catalogOpened receives the Server's catalog handle.
+	catalogOpened func(*db.DB)
 }
 
 const (
@@ -168,6 +171,7 @@ func startBlackboxServerWith(tb testing.TB, options blackboxOptions) *blackboxSe
 			RuntimeReady:           func(info RuntimeInfo) { ready <- info },
 			ChangeWatchBackend:     options.changeWatch,
 			RepositoryManagerReady: options.repositoryControl,
+			catalogOpened:          options.catalogOpened,
 		})
 	}()
 	stop := func() {

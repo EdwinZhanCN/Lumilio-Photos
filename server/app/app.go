@@ -89,6 +89,9 @@ type OperatorControls struct {
 	// own; hints only shorten latency, and the periodic full scan stays the
 	// authority whatever backend is installed.
 	ChangeWatchBackend scan.ChangeWatchBackend
+	// catalogOpened hands the opened catalog to an in-package test; hosts
+	// cannot set it.
+	catalogOpened func(*db.DB)
 }
 
 // RuntimeInfo describes the listener published by one server generation. It
@@ -267,6 +270,9 @@ func run(
 	database, err := db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))
 	if err != nil {
 		return fmt.Errorf("open SQLite database: %w", err)
+	}
+	if controls.catalogOpened != nil {
+		controls.catalogOpened(database)
 	}
 	databaseCloseAllowed := true
 	defer func() {

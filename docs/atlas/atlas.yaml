@@ -532,6 +532,9 @@ rules:
         - (*server/internal/storage.DefaultRepositoryManager).ReconcileAll
         - (*server/internal/storage.DefaultRepositoryManager).ReconcileStorageLocations
       only: [server/app, server/internal/storage]
+      # Setup status reads the storage runtime status on every request; the
+      # projection it reports is the background reconciler's.
+      forbid: [server/internal/storage/runtime_status.go]
 
   # ------------------------------------------------------ desktop
   - id: desktop-marker-parsing

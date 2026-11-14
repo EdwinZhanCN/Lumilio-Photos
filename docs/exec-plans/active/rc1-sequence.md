@@ -44,12 +44,19 @@ the plan it names.
   finds is fixed in that step, or it becomes a new row here with the owner's
   agreement. It is never pushed past the tag.
 - **Local evidence per step; PR CI once, at the end** (owner decision
-  2026-11-14). PR CI is too slow to gate every step, so a step merges on
-  local evidence: unit tests and `task atlas:check` on the Mac, and the
-  full Server gate (`server/app` and the Linux volume-semantics tests
-  included) plus the Docker E2E stack (`task web:e2e:up` and the slices the
-  step touches) on the owner's amd64 Linux test host through a Docker
-  context, with images built there. A red PR check does not block a merge.
+  2026-11-14). PR CI is too slow to gate every step, and so is the full
+  suite.
+  - *Per step:* the narrowest checks for the diff
+    ([lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md))
+    and `task atlas:check` on the Mac, plus every test the step adds or
+    changes, run on the Linux test host when the Mac cannot run it.
+  - *Per section:* the full Server gate (`server/app` and the Linux
+    volume-semantics tests included) and the Docker E2E slices on the
+    owner's amd64 Linux test host through a Docker context, with images
+    built there. Sections end at A4, B2, RL4, RA4, SC4, B8, and B14. A
+    failure is bisected over that section's squash commits and fixed on top
+    before the next section starts.
+  - A red PR check does not block a merge.
   After B14, PR CI runs once on the final head, and S13 fixes everything it
   finds, including what only CI can see (Windows Desktop, the macOS
   volume-semantics job, runner timeouts such as `server/app` on Windows,

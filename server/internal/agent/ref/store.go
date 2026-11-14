@@ -156,6 +156,10 @@ func (s *MemoryStore) Create(ctx context.Context, scope Scope, plan Plan, hint, 
 	return r, nil
 }
 
+// Get never writes the catalog: the frontend hydrates refs over HTTP GETs,
+// and a foreground read must not wait for SQLite's writer. With a catalog,
+// its row decides expiry; the in-memory last-access time only orders hot
+// eviction.
 func (s *MemoryStore) Get(ctx context.Context, scope Scope, id string) (*Ref, *Error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -175,11 +179,10 @@ func (s *MemoryStore) Get(ctx context.Context, scope Scope, id string) (*Ref, *E
 				}
 				if s.queries != nil {
 					if _, err := s.queries.GetAgentRef(ctx, repo.GetAgentRefParams{
-						Now:       dbtypes.NewTimestamp(now),
-						ExpiresAt: dbtypes.NewTimestamp(now.Add(s.ttl)),
-						UserID:    scope.UserID,
-						ThreadID:  scope.ThreadID,
-						RefID:     id,
+						Now:      dbtypes.NewTimestamp(now),
+						UserID:   scope.UserID,
+						ThreadID: scope.ThreadID,
+						RefID:    id,
 					}); err != nil {
 						s.removeHotLocked(sc, r)
 						return nil, NotFound(id)
@@ -194,9 +197,8 @@ func (s *MemoryStore) Get(ctx context.Context, scope Scope, id string) (*Ref, *E
 		return nil, NotFound(id)
 	}
 	row, err := s.queries.GetAgentRef(ctx, repo.GetAgentRefParams{
-		Now:       dbtypes.NewTimestamp(now),
-		ExpiresAt: dbtypes.NewTimestamp(now.Add(s.ttl)),
-		UserID:    scope.UserID, ThreadID: scope.ThreadID, RefID: id,
+		Now:    dbtypes.NewTimestamp(now),
+		UserID: scope.UserID, ThreadID: scope.ThreadID, RefID: id,
 	})
 	if err != nil {
 		return nil, NotFound(id)

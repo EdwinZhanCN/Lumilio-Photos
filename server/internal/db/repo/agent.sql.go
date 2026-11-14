@@ -456,40 +456,35 @@ func (q *Queries) GetActiveAgentRun(ctx context.Context, arg GetActiveAgentRunPa
 }
 
 const getAgentRef = `-- name: GetAgentRef :one
-UPDATE agent_refs
-SET last_accessed_at = ?1,
-    expires_at = ?2
-WHERE agent_refs.user_id = ?3
-  AND agent_refs.thread_id = ?4
-  AND agent_refs.ref_id = ?5
+SELECT r.user_id, r.thread_id, r.ref_id, r.sequence, r."plan", r.asset_ids, r.summary, r.truncated, r.created_at, r.last_accessed_at, r.expires_at FROM agent_refs r
+WHERE r.user_id = ?1
+  AND r.thread_id = ?2
+  AND r.ref_id = ?3
   AND (
-      expires_at > ?1
+      r.expires_at > ?4
       OR EXISTS (
           SELECT 1
           FROM agent_threads t
-          WHERE t.user_id = agent_refs.user_id
-            AND t.thread_id = agent_refs.thread_id
+          WHERE t.user_id = r.user_id
+            AND t.thread_id = r.thread_id
             AND t.status IN ('active', 'awaiting_confirmation')
       )
   )
-RETURNING user_id, thread_id, ref_id, sequence, "plan", asset_ids, summary, truncated, created_at, last_accessed_at, expires_at
 `
 
 type GetAgentRefParams struct {
-	Now       dbtypes.Timestamp `db:"now" json:"now"`
-	ExpiresAt dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
-	UserID    int32             `db:"user_id" json:"user_id"`
-	ThreadID  string            `db:"thread_id" json:"thread_id"`
-	RefID     string            `db:"ref_id" json:"ref_id"`
+	UserID   int32             `db:"user_id" json:"user_id"`
+	ThreadID string            `db:"thread_id" json:"thread_id"`
+	RefID    string            `db:"ref_id" json:"ref_id"`
+	Now      dbtypes.Timestamp `db:"now" json:"now"`
 }
 
 func (q *Queries) GetAgentRef(ctx context.Context, arg GetAgentRefParams) (AgentRef, error) {
 	row := q.db.QueryRowContext(ctx, getAgentRef,
-		arg.Now,
-		arg.ExpiresAt,
 		arg.UserID,
 		arg.ThreadID,
 		arg.RefID,
+		arg.Now,
 	)
 	var i AgentRef
 	err := row.Scan(
