@@ -1,6 +1,6 @@
 # Decision: Atlas views verify their arrows; anchor drift is a notice
 
-Status: implemented, 2026-11-14 (A4 of the
+Status: implemented, 2026-11-14 (#273, A4 of the
 [Atlas rules plan](../../docs/exec-plans/active/atlas-rules.md)). Supersedes
 the "hard-fail on every anchored-code change" part of the
 [anchored code map decision](2026-10-01-atlas-anchored-code-map.md); the rest
