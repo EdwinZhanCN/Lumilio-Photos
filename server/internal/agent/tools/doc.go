@@ -14,6 +14,4 @@
 // and provider order, separates unsupported media from missing and empty
 // results, and exposes only sanitized filenames, status, region count, and
 // capped text — never UUIDs, paths, confidence, geometry, or model identity.
-//
-//atlas:group agent
 package tools

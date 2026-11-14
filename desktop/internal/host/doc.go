@@ -16,6 +16,4 @@
 // Runtime and Lumen controllers remain the lifecycle owners of their
 // processes. The host gives them the system's folder picker and file
 // manager, and gives the update controller the framework's signed updater.
-//
-//atlas:group desktop-host
 package host

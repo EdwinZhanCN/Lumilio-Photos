@@ -2,7 +2,7 @@
 
 # Desktop host
 
-_architecture · source: `derived: //atlas:group desktop-host + imports`_
+_architecture · source: `derived: atlas.yaml group desktop-host + imports`_
 
 The MyGo tray application: the main assembly, the tray menu, the on-demand Settings window, the navigation guard, the coordinated quit, and the adapter that gives the update controller MyGo's signed updater. The product UI stays in the system browser.
 

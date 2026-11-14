@@ -38,6 +38,4 @@
 // after a graceful stop ([InspectCatalog]). Named transactions and admission
 // metrics live in [server/internal/db/catalogtx]; generated queries in
 // [server/internal/db/repo].
-//
-//atlas:group catalog
 package db

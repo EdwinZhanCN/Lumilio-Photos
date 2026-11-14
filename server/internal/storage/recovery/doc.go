@@ -20,6 +20,4 @@
 // the held Trash counts. [Service.OpenItem] exports an item's bytes and
 // [Service.DeleteItem] removes one explicitly; both are audited. Trash holds
 // are released through [server/internal/storage/trash.Service.AcceptRetention].
-//
-//atlas:group storage
 package recovery

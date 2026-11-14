@@ -9,6 +9,4 @@
 // and shipped files are never edited. The decision is
 // .agents/decisions/2026-09-24-rc-compatibility-baseline.md. QueueDB River
 // migrations are independent and disposable.
-//
-//atlas:group catalog
 package migrations

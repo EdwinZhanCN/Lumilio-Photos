@@ -6,6 +6,4 @@
 //
 // libvips cannot decode RAW in every build, so full renders always go through
 // LibRaw to TIFF first.
-//
-//atlas:group media
 package raw

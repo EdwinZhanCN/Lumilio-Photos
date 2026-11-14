@@ -1,0 +1,10 @@
+# high imports low without declaring it.
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: low, title: Low, side: server, summary: The lower layer., match: [fx/low] }
+  - { id: high, title: High, side: server, summary: The upper layer., match: [fx/high] }
+rules:
+  - id: group-dependencies
+    why: every import that crosses a group boundary is a reviewed architecture decision
+    group_uses: true

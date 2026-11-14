@@ -3,6 +3,4 @@
 // sign-in with two-factor and trusted-session handling ([NewClient]), lists
 // albums and assets ([PhotoService], [PhotoAlbum], [PhotoAsset]), and streams
 // original downloads for the cloud import layer.
-//
-//atlas:group ingest
 package icloud

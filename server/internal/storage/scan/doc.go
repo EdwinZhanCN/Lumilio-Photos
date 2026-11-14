@@ -50,6 +50,4 @@
 // [ChangeWatchBackend] makes recursive hints replaceable; the default
 // [LocalChangeWatchBackend] uses the existing syncthing/notify policy. Losing
 // hints never proves absence; retries and full-scan authority remain unchanged.
-//
-//atlas:group storage
 package scan

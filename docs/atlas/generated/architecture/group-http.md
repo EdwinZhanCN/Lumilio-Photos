@@ -2,7 +2,7 @@
 
 # HTTP API
 
-_architecture · source: `derived: //atlas:group http + imports`_
+_architecture · source: `derived: atlas.yaml group http + imports`_
 
 The transport edge: router and auth boundaries, handlers, DTOs, RFC 9457 Problem responses, rate limiting, request-origin policy, and the plaintext/ACME listeners.
 

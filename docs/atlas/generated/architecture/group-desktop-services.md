@@ -2,7 +2,7 @@
 
 # Desktop services
 
-_architecture · source: `derived: //atlas:group desktop-services + imports`_
+_architecture · source: `derived: atlas.yaml group desktop-services + imports`_
 
 Optional supervised capabilities: the Lumen ML child process with signed staged artifacts, and the application update aggregate, whose transport and signature verification the host supplies.
 

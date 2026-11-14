@@ -2,7 +2,7 @@
 
 # Work contracts
 
-_architecture · source: `derived: //atlas:group work + imports`_
+_architecture · source: `derived: atlas.yaml group work + imports`_
 
 Catalog-owned asynchronous work vocabulary: desired/applied pipeline contracts, the closed River macro-job catalog, the process-wide execution governor, and the administrator processing read model.
 

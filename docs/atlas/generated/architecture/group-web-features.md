@@ -2,7 +2,7 @@
 
 # Web features
 
-_architecture · source: `derived: //atlas:group web-features + imports`_
+_architecture · source: `derived: atlas.yaml group web-features + imports`_
 
 Product capabilities. Each feature owns its routes, flows, model, API adapters, and state, and documents itself in doc.ts. Features import each other only through narrow public entries, acyclically.
 

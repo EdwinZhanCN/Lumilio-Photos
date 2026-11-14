@@ -21,6 +21,4 @@
 // panel never calls the Server HTTP API and takes no part in product
 // accounts: it can validate, apply, or restore runtime intent even when the
 // Server fails to start.
-//
-//atlas:group desktop-panel
 package panel

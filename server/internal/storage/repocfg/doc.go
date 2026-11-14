@@ -12,6 +12,4 @@
 // independently from layout. [RepositoryConfig.SaveGuarded] provides atomic
 // identity-guarded mutation; legacy saves retain their admission until command
 // boundaries refresh identity under leases.
-//
-//atlas:group storage
 package repocfg

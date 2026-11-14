@@ -38,6 +38,4 @@
 // IoU order, with each face and assignment used at most once: IoU >= 0.5 stays
 // manual; smaller positive overlap becomes an unconfirmed automatic member.
 // Empty people are dissolved only after assignments are reapplied.
-//
-//atlas:group service
 package service

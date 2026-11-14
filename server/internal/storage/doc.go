@@ -92,6 +92,4 @@
 // parent marker health. [RepositoryLockProvider] and
 // [RepositoryIdentityDetector] keep local ownership and identity replaceable;
 // alternatives are installed before serving, preserving rooted I/O.
-//
-//atlas:group storage
 package storage

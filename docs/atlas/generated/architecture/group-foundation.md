@@ -2,7 +2,7 @@
 
 # Foundation
 
-_architecture · source: `derived: //atlas:group foundation + imports`_
+_architecture · source: `derived: atlas.yaml group foundation + imports`_
 
 Dependency-free primitives every layer may use: the strict TOML configuration loader, runtime-mutable settings types, logging, version, work QoS classes, catalog value types, secret sealing, and OS/SQLite platform helpers. Nothing here knows about Assets, repositories, or HTTP.
 

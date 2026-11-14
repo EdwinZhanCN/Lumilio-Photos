@@ -15,6 +15,4 @@
 // serialization, sleep, or River work. Large atomic membership changes are
 // set-based; restartable derived projections publish in bounded,
 // revision-checked turns instead of monopolizing the writer.
-//
-//atlas:group catalog
 package catalogtx

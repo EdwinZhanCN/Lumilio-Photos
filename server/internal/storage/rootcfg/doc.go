@@ -4,6 +4,4 @@
 // [ReadMarker] preserves typed access/compatibility facts independently from
 // child health. [RootConfig.SaveGuarded] supplies guarded atomic writes for
 // explicit mutations; observation never creates or repairs markers.
-//
-//atlas:group storage
 package rootcfg

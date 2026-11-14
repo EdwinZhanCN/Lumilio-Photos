@@ -21,6 +21,4 @@
 //
 // It is a leaf package: handlers and transports depend on these descriptors,
 // while domain packages stay unaware of HTTP problem URIs.
-//
-//atlas:group http
 package problem

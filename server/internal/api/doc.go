@@ -7,6 +7,4 @@
 // [server/internal/api/handler] and wire types in [server/internal/api/dto].
 // OpenAPI is generated from handler annotations and is the contract the Web
 // client is typed against.
-//
-//atlas:group http
 package api

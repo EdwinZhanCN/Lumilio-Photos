@@ -2,7 +2,7 @@
 
 # Web app shell
 
-_architecture · source: `derived: //atlas:group web-app + imports`_
+_architecture · source: `derived: atlas.yaml group web-app + imports`_
 
 Composition root: providers, router, shell, and fatal-error handling. No domain behaviour.
 

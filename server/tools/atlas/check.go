@@ -16,8 +16,8 @@ type groupEdge struct {
 
 // checkGroups compares the declared group graph in atlas.yaml with the import
 // graph derived from source. Both directions must agree: an undeclared edge is
-// an architecture change that needs review, and a declared edge nobody uses is
-// a stale claim.
+// an architecture change that needs review (a finding of the group_uses rule),
+// and a declared edge nobody uses is a stale claim.
 func (a *Atlas) checkGroups() []groupEdge {
 	exceptions := map[string]*Exception{}
 	usedExceptions := map[string]bool{}
@@ -68,7 +68,11 @@ func (a *Atlas) checkGroups() []groupEdge {
 					edge.Excepted++
 					continue
 				}
-				a.problem(module.ID, "imports %s, but group %s does not declare `uses: [%s]`; declare the dependency in docs/atlas/atlas.yaml or remove the import", other.ID, module.Group, other.Group)
+				a.groupFindings = append(a.groupFindings, Finding{
+					Key:     packageKey,
+					Where:   module.ID,
+					Message: fmt.Sprintf("imports %s, but group %s does not declare `uses: [%s]`; declare the dependency in docs/atlas/atlas.yaml or remove the import", other.ID, module.Group, other.Group),
+				})
 			}
 		}
 	}
@@ -194,6 +198,10 @@ func formatProblems(problems []Problem) string {
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Where < sorted[j].Where })
 	var builder strings.Builder
 	for _, problem := range sorted {
+		if problem.Rule != "" {
+			fmt.Fprintf(&builder, "  %s: [%s] %s\n", problem.Where, problem.Rule, problem.Message)
+			continue
+		}
 		fmt.Fprintf(&builder, "  %s: %s\n", problem.Where, problem.Message)
 	}
 	return builder.String()

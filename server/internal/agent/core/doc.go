@@ -19,6 +19,4 @@
 // the awaiting run, activates the replacement, and repoints the thread. The
 // browser E2E stack exercises this end to end against a keyless, deterministic
 // agent-model-fixture at the Ollama boundary.
-//
-//atlas:group agent
 package core

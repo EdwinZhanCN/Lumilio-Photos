@@ -6,6 +6,4 @@
 // versioned quick fingerprint (size plus fixed first/last chunks) that is only
 // a duplicate precheck hint, never identity. The browser upload fingerprint
 // mirrors the same policy.
-//
-//atlas:group media
 package hash

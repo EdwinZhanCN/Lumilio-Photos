@@ -1,12 +1,14 @@
 # Lumilio Atlas — the human-owned architecture declaration.
 #
-# Groups are the architecture vocabulary. A Go package joins a group with an
-# `//atlas:group <id>` directive in its doc.go; a Web module joins by `match`.
-# `uses` is the complete, reviewed list of groups a group may import. The
-# checker compares it with the import graph derived from source in BOTH
-# directions: an import without a declaration fails, and a declaration that
-# no import needs fails. Changing this file is an architecture decision —
-# review it as one. Authoring guide: docs/atlas/README.md.
+# Groups are the architecture vocabulary. Every Go package and Web module
+# belongs to exactly one group: the one whose `match` paths contain it. `uses`
+# is the complete, reviewed list of groups a group may import. The
+# group-dependencies rule compares it with the import graph derived from
+# source in BOTH directions: an import without a declaration fails, and a
+# declaration that no import needs fails. `rules` are the other architecture
+# rules, each proven by fixtures in server/tools/atlas/testdata/rules/<id>.
+# Changing this file is an architecture decision — review it as one.
+# Authoring guide: docs/atlas/README.md.
 
 github: https://github.com/EdwinZhanCN/Lumilio-Photos
 branch: dev
@@ -47,6 +49,19 @@ groups:
   - id: foundation
     title: Foundation
     side: server
+    match:
+      - server/config
+      - server/internal/db/dbtypes
+      - server/internal/logging
+      - server/internal/secretbox
+      - server/internal/settings
+      - server/internal/testutil
+      - server/internal/utils/memory
+      - server/internal/utils/sysproc
+      - server/internal/version
+      - server/internal/workqos
+      - server/platform/fsprivacy
+      - server/platform/sqliteuri
     summary: >-
       Dependency-free primitives every layer may use: the strict TOML
       configuration loader, runtime-mutable settings types, logging, version,
@@ -56,6 +71,15 @@ groups:
   - id: media
     title: Media utilities
     side: server
+    match:
+      - server/internal/utils/exif
+      - server/internal/utils/file
+      - server/internal/utils/geohash
+      - server/internal/utils/hash
+      - server/internal/utils/imagesource
+      - server/internal/utils/imaging
+      - server/internal/utils/phash
+      - server/internal/utils/raw
     uses: [foundation]
     summary: >-
       Stateless file and media mechanics: content hashing, EXIF extraction,
@@ -65,6 +89,15 @@ groups:
   - id: catalog
     title: Catalog
     side: server
+    match:
+      - server/internal/db
+      - server/internal/db/backup
+      - server/internal/db/catalogtx
+      - server/internal/db/repo
+      - server/internal/db/sqlitespike
+      - server/internal/db/vec1ext
+      - server/internal/db/vectorindex
+      - server/migrations
     uses: [foundation, media]
     summary: >-
       The embedded SQLite catalog and its QueueDB sibling: the single-writer
@@ -74,6 +107,11 @@ groups:
   - id: work
     title: Work contracts
     side: server
+    match:
+      - server/internal/execution
+      - server/internal/pipeline
+      - server/internal/processing
+      - server/internal/queue/jobs
     uses: [foundation, catalog]
     summary: >-
       Catalog-owned asynchronous work vocabulary: desired/applied pipeline
@@ -83,6 +121,13 @@ groups:
   - id: domain
     title: Domain semantics
     side: server
+    match:
+      - server/internal/classify
+      - server/internal/event
+      - server/internal/lifecycle
+      - server/internal/llm
+      - server/internal/search
+      - server/internal/search/bleveocr
     uses: [foundation, catalog, work]
     summary: >-
       Derived product meaning that is independent of storage and transport:
@@ -92,6 +137,18 @@ groups:
   - id: storage
     title: Storage
     side: server
+    match:
+      - server/internal/artifact
+      - server/internal/storage
+      - server/internal/storage/locations
+      - server/internal/storage/marker
+      - server/internal/storage/pathsemantics
+      - server/internal/storage/recovery
+      - server/internal/storage/repocfg
+      - server/internal/storage/rootcfg
+      - server/internal/storage/scan
+      - server/internal/storage/testfixture
+      - server/internal/storage/trash
     uses: [foundation, media, catalog, domain]
     summary: >-
       Storage Locations and Repositories on disk: repository lifecycle and
@@ -102,6 +159,13 @@ groups:
   - id: agent
     title: Lumilio Agent
     side: server
+    match:
+      - server/internal/agent/core
+      - server/internal/agent/facets
+      - server/internal/agent/inject
+      - server/internal/agent/pins
+      - server/internal/agent/ref
+      - server/internal/agent/tools
     uses: [foundation, media, catalog, domain]
     summary: >-
       The in-app assistant: the agent run loop, typed references and facets,
@@ -111,6 +175,8 @@ groups:
   - id: service
     title: Services
     side: server
+    match:
+      - server/internal/service
     uses: [foundation, media, catalog, work, domain, storage, agent]
     summary: >-
       Business logic behind the HTTP API: authentication and MFA, assets,
@@ -120,6 +186,14 @@ groups:
   - id: ingest
     title: Ingest and execution
     side: server
+    match:
+      - server/internal/cloud
+      - server/internal/cloud/icloud
+      - server/internal/commit
+      - server/internal/processors
+      - server/internal/queue
+      - server/internal/sourcing
+      - server/internal/utils/upload
     uses: [foundation, media, catalog, work, domain, storage, service]
     summary: >-
       Everything that moves bytes and background results into the catalog:
@@ -130,6 +204,14 @@ groups:
   - id: http
     title: HTTP API
     side: server
+    match:
+      - server/internal/api
+      - server/internal/api/dto
+      - server/internal/api/handler
+      - server/internal/api/problem
+      - server/internal/api/ratelimit
+      - server/internal/httporigin
+      - server/internal/servertransport
     uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest]
     summary: >-
       The transport edge: router and auth boundaries, handlers, DTOs, RFC 9457
@@ -139,6 +221,10 @@ groups:
   - id: runtime
     title: Server runtime
     side: server
+    match:
+      - server
+      - server/app
+      - server/cmd
     uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest, http]
     summary: >-
       Process composition: the CLI entry point, the Docker entrypoint, and
@@ -149,6 +235,11 @@ groups:
   - id: desktop-platform
     title: Desktop platform
     side: desktop
+    match:
+      - desktop/internal/buildinfo
+      - desktop/internal/platform
+      - desktop/internal/platform/stateversion
+      - desktop/internal/resources
     summary: >-
       OS integration for the Desktop App: application-support paths, schema
       versions for desktop state files, signed resource manifests, and build
@@ -157,6 +248,11 @@ groups:
   - id: desktop-control
     title: Desktop control plane
     side: desktop
+    match:
+      - desktop/internal/control
+      - desktop/internal/control/dto
+      - desktop/internal/operation
+      - desktop/internal/state
     summary: >-
       The revisioned snapshot the Settings window and the tray render, its
       DTOs, the validating service facade they call, and the request-id
@@ -165,6 +261,12 @@ groups:
   - id: desktop-runtime
     title: Desktop runtime
     side: desktop
+    match:
+      - desktop/internal/preferences
+      - desktop/internal/runtime
+      - desktop/internal/runtime/runtimeconfig
+      - desktop/internal/shutdown
+      - desktop/internal/storage
     uses: [desktop-platform, desktop-control, foundation, runtime]
     summary: >-
       Hosts server/app in-process: the runtime generation supervisor, the
@@ -174,6 +276,10 @@ groups:
   - id: desktop-services
     title: Desktop services
     side: desktop
+    match:
+      - desktop/internal/lumen
+      - desktop/internal/lumen/controlv1
+      - desktop/internal/update
     uses: [desktop-platform, desktop-control]
     summary: >-
       Optional supervised capabilities: the Lumen ML child process with signed
@@ -183,6 +289,9 @@ groups:
   - id: desktop-panel
     title: Desktop panel
     side: desktop
+    match:
+      - desktop/internal/locales
+      - desktop/internal/panel
     uses: [desktop-control]
     summary: >-
       The Settings window as native UI drawn by MyGo: its view state, the
@@ -193,6 +302,9 @@ groups:
   - id: desktop-host
     title: Desktop host
     side: desktop
+    match:
+      - desktop
+      - desktop/internal/host
     uses: [desktop-platform, desktop-control, desktop-runtime, desktop-services, desktop-panel]
     summary: >-
       The MyGo tray application: the main assembly, the tray menu, the
@@ -254,6 +366,14 @@ groups:
     summary: >-
       Composition root: providers, router, shell, and fatal-error handling. No
       domain behaviour.
+
+# Architecture rules over type-resolved facts. Each names the invariant it
+# protects in `why`; violations that existed when a rule landed are baselined
+# by symbol in atlas.lock.json and may only shrink.
+rules:
+  - id: group-dependencies
+    why: every import that crosses a group boundary is a reviewed architecture decision
+    group_uses: true
 
 exceptions:
   - from: server/internal/db/repo

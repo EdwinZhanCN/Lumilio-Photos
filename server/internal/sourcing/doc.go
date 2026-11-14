@@ -16,6 +16,4 @@
 // verification before staging is removed; conflicts keep both files with a
 // recoverable ingest phase. HTTP and cloud callers must not add their own
 // error cleanup around this boundary.
-//
-//atlas:group ingest
 package sourcing

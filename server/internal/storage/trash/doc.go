@@ -27,6 +27,4 @@
 // are audited in batches of 256 through [server/internal/lifecycle.PurgeEntriesTx];
 // Assets and metadata survive while any entry remains. Offline repositories
 // retain their Trash until available for expiry.
-//
-//atlas:group storage
 package trash

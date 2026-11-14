@@ -2,7 +2,7 @@
 
 # Media utilities
 
-_architecture · source: `derived: //atlas:group media + imports`_
+_architecture · source: `derived: atlas.yaml group media + imports`_
 
 Stateless file and media mechanics: content hashing, EXIF extraction, libvips imaging, LibRaw decoding, perceptual hashes, geohash, and process helpers. Pure functions over bytes and paths; no catalog access.
 

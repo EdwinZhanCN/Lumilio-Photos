@@ -13,6 +13,4 @@
 // they are read here and passed separately from configuration. Desktop
 // resource locations, test opt-ins, and container environment are host or
 // harness contracts, never Server configuration.
-//
-//atlas:group runtime
 package main

@@ -2,7 +2,7 @@
 
 # Desktop panel
 
-_architecture · source: `derived: //atlas:group desktop-panel + imports`_
+_architecture · source: `derived: atlas.yaml group desktop-panel + imports`_
 
 The Settings window as native UI drawn by MyGo: its view state, the draft that is the one save boundary, operation tracking, and the message catalogs every string a person reads comes from. It calls the control plane through the validating service facade and never a controller.
 

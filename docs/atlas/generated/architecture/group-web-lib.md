@@ -2,7 +2,7 @@
 
 # Web lib
 
-_architecture · source: `derived: //atlas:group web-lib + imports`_
+_architecture · source: `derived: atlas.yaml group web-lib + imports`_
 
 Non-visual lower layer: the generated OpenAPI client, i18n, preferences, theme, formatting, geo, and small cross-feature contracts. Never imports a feature.
 

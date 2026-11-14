@@ -14,6 +14,4 @@
 //
 // It depends on nothing internal, so the queue's ML configuration provider and
 // the settings service share these types without an import cycle.
-//
-//atlas:group foundation
 package settings

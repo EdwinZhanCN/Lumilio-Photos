@@ -7,6 +7,4 @@
 // path comes from the strict runtime manifest, never from a search. Console
 // windows are suppressed on Windows through
 // [server/internal/utils/sysproc.HideConsole].
-//
-//atlas:group media
 package exif

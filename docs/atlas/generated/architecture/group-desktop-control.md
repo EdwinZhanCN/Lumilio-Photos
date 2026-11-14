@@ -2,7 +2,7 @@
 
 # Desktop control plane
 
-_architecture · source: `derived: //atlas:group desktop-control + imports`_
+_architecture · source: `derived: atlas.yaml group desktop-control + imports`_
 
 The revisioned snapshot the Settings window and the tray render, its DTOs, the validating service facade they call, and the request-id idempotent operation gate that serializes every mutation.
 

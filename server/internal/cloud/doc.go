@@ -10,6 +10,4 @@
 //	CloudImportSource                  ← implements sourcing.AssetSource
 //	      ↓
 //	CloudSyncConsumer                  ← acknowledged materializer loop
-//
-//atlas:group ingest
 package cloud

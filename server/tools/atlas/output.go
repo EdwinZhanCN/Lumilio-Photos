@@ -183,8 +183,8 @@ func (a *Atlas) indexMarkdown() []byte {
 	return b.Bytes()
 }
 
-// lockFile returns the verified hash of every code anchor in authored views.
-func (a *Atlas) lockFile() []byte {
+// viewLock returns the verified hash of every code anchor in authored views.
+func (a *Atlas) viewLock() map[string]map[string]string {
 	lock := map[string]map[string]string{}
 	for viewID, anchors := range a.viewAnchors {
 		for anchor := range anchors {
@@ -196,7 +196,12 @@ func (a *Atlas) lockFile() []byte {
 			}
 		}
 	}
-	data, _ := json.MarshalIndent(lock, "", "  ")
+	return lock
+}
+
+// encodeLock renders atlas.lock.json.
+func encodeLock(views map[string]map[string]string, baselines map[string][]string) []byte {
+	data, _ := json.MarshalIndent(lockFile{Views: views, Baselines: baselines}, "", "  ")
 	return append(data, '\n')
 }
 

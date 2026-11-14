@@ -5,6 +5,4 @@
 // inference, and memory — in the step's QoS [Class], using the demand declared
 // by the [DemandCatalog]. Runtime diagnostics report execution waits next to
 // desired/applied lag and coordinator load.
-//
-//atlas:group work
 package execution

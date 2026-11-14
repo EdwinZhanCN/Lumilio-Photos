@@ -2,7 +2,7 @@
 
 # Storage
 
-_architecture · source: `derived: //atlas:group storage + imports`_
+_architecture · source: `derived: atlas.yaml group storage + imports`_
 
 Storage Locations and Repositories on disk: repository lifecycle and layout, the scan index that mirrors each repository tree in repository_entries, the journaled repository trash, and immutable derived artifacts.
 

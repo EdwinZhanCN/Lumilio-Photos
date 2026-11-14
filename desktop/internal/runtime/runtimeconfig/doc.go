@@ -14,6 +14,4 @@
 // released ownership before the candidate starts and promotes the candidate to
 // last-known-good only after it is ready. Candidate edits are fingerprinted
 // and guarded by aggregate version and base fingerprint.
-//
-//atlas:group desktop-runtime
 package runtimeconfig

@@ -4,6 +4,4 @@
 // variants prepare fixed-size RGB tensors for a [Purpose] (semantic,
 // BioCLIP, OCR, face); [PrepareSemanticThumbnail] produces an in-memory WebP for Lumen
 // without writing to the repository.
-//
-//atlas:group media
 package imagesource
