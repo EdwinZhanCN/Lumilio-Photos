@@ -1,6 +1,6 @@
 # Atlas rules: one architecture gate
 
-Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270). Next: A2. Child of
+Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270); A2 landed 2026-11-14 (#271). Next: A3. Child of
 [server-structure.md](server-structure.md) (Phase A, sessions A1–A4). It
 touches only `server/tools`, tests, docs, `docs/atlas`, the Taskfile, and CI
 wiring, so it may run between rc.1 sessions. A4 supersedes part of the
