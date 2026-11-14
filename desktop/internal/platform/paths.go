@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 )
 
 type Paths struct {
@@ -59,27 +57,16 @@ func ResolvePaths() (Paths, error) {
 	return paths, nil
 }
 
-// bundleWebRoot returns the product SPA directory shipped next to the
-// executable when running from a packaged bundle (macOS .app or the Windows
-// portable layout), or "" in API-only mode (dev runs, unpackaged binaries).
-// The empty case is intentional: server RegisterSPA stays a no-op and the
-// runtime remains usable as a pure API host.
+// bundleWebRoot returns the product SPA directory shipped with a packaged app,
+// the web directory of its bundled resources, or "" in API-only mode (dev
+// runs, unpackaged binaries). The empty case is intentional: server
+// RegisterSPA stays a no-op and the runtime remains usable as a pure API host.
 func bundleWebRoot() string {
-	exe, err := os.Executable()
-	if err != nil {
+	resources, err := ResolveBundledResourcesDir()
+	if err != nil || resources == "" {
 		return ""
 	}
-	var web string
-	if runtime.GOOS == "darwin" {
-		// .../Lumilio Photos.app/Contents/MacOS/lumilio-photos
-		marker := ".app" + string(os.PathSeparator) + "Contents" + string(os.PathSeparator) + "MacOS"
-		if idx := strings.LastIndex(exe, marker); idx > 0 {
-			web = filepath.Join(exe[:idx+len(".app")], "Contents", "Resources", "web")
-		}
-	} else {
-		// Windows portable layout: <app dir>/resources/web beside the exe.
-		web = filepath.Join(filepath.Dir(exe), "resources", "web")
-	}
+	web := filepath.Join(resources, "web")
 	if _, err := os.Stat(filepath.Join(web, "index.html")); err == nil {
 		return web
 	}

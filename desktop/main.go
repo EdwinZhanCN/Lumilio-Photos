@@ -6,15 +6,15 @@ import (
 	"errors"
 	"io/fs"
 	"log"
-	"net/http"
 	"os"
+	"path/filepath"
 
 	"desktop/internal/buildinfo"
-	"desktop/internal/control"
 	"desktop/internal/control/dto"
 	"desktop/internal/host"
 	"desktop/internal/lumen"
 	"desktop/internal/operation"
+	"desktop/internal/panel"
 	"desktop/internal/platform"
 	"desktop/internal/preferences"
 	"desktop/internal/resources"
@@ -23,33 +23,17 @@ import (
 	"desktop/internal/state"
 	"desktop/internal/storage"
 	"desktop/internal/update"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 )
-
-// The source tree is embedded as a compile-safe fallback for `go test` before
-// the Vite build has produced frontend/dist. Wails production builds select the
-// generated dist subtree when it is present.
-//
-//go:embed frontend
-var frontendAssets embed.FS
 
 //go:embed resources/manifest.json all:resources/payload
 var packagedResources embed.FS
 
-// System tray icons: tray.png is the black-outline template glyph (macOS
-// template + Windows light mode), tray-dark.png is the white outline for
-// Windows dark mode. Kept out of packagedResources because the tray is not a
-// staged payload item — it is baked into the binary.
+// The tray icon is a black-outline template glyph: macOS tints it for the menu
+// bar, and Windows shows it white on a dark taskbar. It is baked into the
+// binary rather than staged, because the tray is not a payload item.
 //
 //go:embed build/tray.png
 var trayIcon []byte
-
-//go:embed build/tray-dark.png
-var trayIconDark []byte
-
-const applicationID = "com.lumilio.photos.desktop"
 
 func main() {
 	if handled, err := lumen.RunSupervisorMode(os.Args[1:]); handled {
@@ -211,7 +195,7 @@ func main() {
 		Paths: paths, Runtime: runtimeController, Store: store,
 	})
 	updateController := update.NewController(update.Options{
-		Store: store, Operations: operations, StagingDir: paths.UpdatesStaging,
+		Store: store, Operations: operations,
 		Channel: settings.UpdateChannel, CurrentVersion: buildinfo.Version,
 	})
 	preferencesController := preferences.NewController(preferences.Options{
@@ -219,10 +203,11 @@ func main() {
 	})
 
 	desktopHost := host.New(host.Options{
-		Store: store, Operations: operations, Runtime: runtimeController, RuntimeConfig: configController, Lumen: lumenController, Storage: storageController, Update: updateController, OpenProductOnLaunch: settings.OpenProductOnLaunch,
-	})
-	updateController.SetApply(func(requestID string, _ uint64) (dto.OperationReceipt, error) {
-		return desktopHost.RequestQuit("update-"+requestID, store.Get().Revision)
+		Store: store, Operations: operations, Runtime: runtimeController, RuntimeConfig: configController,
+		Lumen: lumenController, Storage: storageController, Update: updateController,
+		Preferences:         preferencesController,
+		OpenRuntimeManifest: func() error { return host.OpenFolder(paths.RuntimeIntents) },
+		OpenProductOnLaunch: settings.OpenProductOnLaunch,
 	})
 	if resourceErr != nil {
 		store.Commit(func(snapshot *dto.DesktopSnapshot) {
@@ -246,103 +231,24 @@ func main() {
 			snapshot.Host.Recovery = dto.Error{Code: dto.ErrorRecoveryRequired, Message: "Lumen installation requires recovery"}
 		})
 	}
-	desktopService := &control.DesktopService{Store: store, Host: desktopHost, Preferences: preferencesController}
-	runtimeService := &control.RuntimeService{Controller: runtimeController, Config: configController}
-	storageService := &control.StorageService{Adapter: storageController}
-	lumenService := &control.LumenService{Controller: lumenController}
-	updateService := &control.UpdateService{Store: store, Adapter: updateController}
-	diagnosticsService := &control.DiagnosticsService{Store: store}
-
-	app := application.New(application.Options{
-		Name:        "Lumilio Photos",
-		Description: "Local-first photo management",
-		Assets: application.AssetOptions{
-			Handler: frontendHandler(frontendAssets),
-		},
-		Services: []application.Service{
-			application.NewService(desktopService),
-			application.NewService(runtimeService),
-			application.NewService(storageService),
-			application.NewService(lumenService),
-			application.NewService(updateService),
-			application.NewService(diagnosticsService),
-		},
-		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: applicationID,
-			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
-				desktopHost.HandleSecondInstance(data.Args)
-			},
-		},
-		Mac: application.MacOptions{
-			ActivationPolicy: application.ActivationPolicyAccessory,
-			ApplicationShouldTerminateAfterLastWindowClosed: false,
-		},
-		Windows: application.WindowsOptions{
-			DisableQuitOnLastWindowClosed: true,
-		},
-		ShouldQuit: desktopHost.ShouldQuit,
-		OnShutdown: desktopHost.Close,
-	})
-	desktopHost.AttachApplication(app)
-	desktopHost.SetOpenURL(app.Browser.OpenURL)
-	desktopService.OpenRuntimeManifestAction = func() error {
-		return app.Env.OpenFileManager(paths.RuntimeIntents, false)
+	showOnLaunch := ""
+	switch {
+	case settingsRecovery || resourceErr != nil || configRecovery || lumenRecovery:
+		showOnLaunch = panel.RouteRecovery
+	case !configured:
+		showOnLaunch = panel.RouteOnboarding
 	}
-	storageController.SetOpenFileManager(app.Env.OpenFileManager)
-	pickDirectory := func(title string) (string, error) {
-		dialog := app.Dialog.OpenFile().
-			CanChooseDirectories(true).
-			CanChooseFiles(false).
-			CanCreateDirectories(true).
-			SetTitle(title)
-		return dialog.PromptForSingleSelection()
+	// The framework keeps its own small state (the window's place, the chosen
+	// language) apart from the files the Desktop controllers own.
+	frameworkData := filepath.Join(paths.Root, "host")
+	if err := platform.EnsurePrivateDirectory(frameworkData); err != nil {
+		log.Printf("prepare host state directory: %v", err)
+		frameworkData = ""
 	}
-	storageController.SetPickDirectory(pickDirectory)
-	lumenController.SetPickDirectory(pickDirectory)
-	desktopHost.SetQuitArmed(app.Quit)
-
-	settingsWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:      "settings",
-		Title:     "Lumilio Photos Settings",
-		Width:     1080,
-		Height:    760,
-		MinWidth:  760,
-		MinHeight: 520,
-		Hidden:    true,
-		URL:       "/",
-	})
-	settingsWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
-		event.Cancel()
-		desktopHost.HideSettings()
-	})
-	desktopHost.AttachSettingsWindow(settingsWindow)
-	_ = host.NewTray(app, desktopHost, trayIcon, trayIconDark)
-
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		desktopHost.Boot(app.Context())
-		desktopHost.EmitSnapshotChanges(app.Context())
-		if settingsRecovery || resourceErr != nil || configRecovery || lumenRecovery {
-			_ = desktopHost.ShowSettings("/recovery")
-		} else if !configured {
-			_ = desktopHost.ShowSettings("/onboarding")
-		}
-	})
-
-	if err := app.Run(); err != nil {
+	if err := desktopHost.Run(host.RunOptions{
+		TrayIcon: trayIcon, FrameworkData: frameworkData, ShowOnLaunch: showOnLaunch,
+	}); err != nil {
 		log.Printf("Desktop application exited with error: %v", err)
 		os.Exit(1)
 	}
-}
-
-func frontendHandler(assets embed.FS) http.Handler {
-	root, err := fs.Sub(assets, "frontend")
-	if err != nil {
-		return http.NotFoundHandler()
-	}
-	if dist, err := fs.Sub(assets, "frontend/dist"); err == nil {
-		if _, err := fs.Stat(dist, "index.html"); err == nil {
-			root = dist
-		}
-	}
-	return http.FileServer(http.FS(root))
 }

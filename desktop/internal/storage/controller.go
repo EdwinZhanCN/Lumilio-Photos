@@ -65,7 +65,7 @@ func NewController(options Options) *Controller {
 }
 
 // SetPickDirectory installs the host-owned native directory picker. The
-// callback is the only Wails/UI boundary here; the selected path is still
+// callback is the only UI boundary here; the selected path is still
 // treated as untrusted and canonicalized before it is returned to bindings.
 func (c *Controller) SetPickDirectory(pick func(string) (string, error)) {
 	c.openMu.Lock()

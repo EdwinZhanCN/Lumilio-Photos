@@ -23,7 +23,7 @@ code-evidence:
 | --- | --- |
 | `server/` | Go Server、配置、API、数据库、队列、存储和工具 |
 | `web/` | React Web、功能模块、i18n、E2E 与生成类型 |
-| `desktop/` | Wails Desktop、主机控制面、资源与打包 |
+| `desktop/` | MyGo Desktop、主机控制面、原生设置窗口、资源与打包 |
 | `deploy/compose/` | Server、反向代理和 Lumen Compose 交付配置 |
 | `wasm/` | 浏览器 WASM 包 |
 | `site/` | VitePress 文档、媒体和 OpenAPI 站点 |

@@ -234,7 +234,7 @@ var contractVocabularies = []vocabulary{
 		Pattern: regexp.MustCompile(`StorageRisk\s*=\s*"([a-z_]+)"`),
 		Copies: []copyTarget{
 			{File: "web/src/features/repositories/model/storageRiskCopy.ts", Literal: recordKey},
-			{File: "desktop/frontend/src/features/storage/storageRiskCopy.ts", Literal: recordKey},
+			{File: "desktop/internal/panel/text.go", Literal: switchCase},
 		},
 	},
 	{

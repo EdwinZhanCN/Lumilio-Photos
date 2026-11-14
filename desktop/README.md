@@ -1,30 +1,89 @@
 # Lumilio Photos Desktop
 
-This is the Wails v3 desktop host for Lumilio Photos. Server and SQLite run
+This is the MyGo desktop host for Lumilio Photos. Server and SQLite run
 in-process; the optional Lumen Hub is a separately supervised child process.
-The native tray and Settings window consume the same typed control-plane
-snapshot.
+The tray and the Settings window render the same typed control-plane snapshot.
 
-The versions in `toolchain.json` are part of the build contract. The Wails CLI
-must report `3.0.0-alpha2.119`; generated bindings and resource metadata are
-checked in after running the pinned command.
+The Settings window is native UI, written in Go and drawn by MyGo: there is no
+webview, HTML, or JavaScript. It is created on demand and destroyed when
+closed, so the tray-only app keeps nothing in memory for it.
 
-Useful local commands:
+MyGo and its CLI are pinned together by `go.mod` (`require` and `tool`). The
+CLI always runs as `go tool mygo`; there is nothing to install separately.
+`mygo.config.ts` imports nothing and is evaluated by Node or Bun, so the
+module has no JavaScript dependencies.
+
+Useful local commands, from the repository root:
+
+```sh
+task desktop:dev            # run the app, rebuilding as sources change
+task desktop:test           # Go tests with the race detector
+task desktop:panel:check    # catalogs, generated accessors, view vet
+task desktop:resources      # fetch the pinned media tools
+task desktop:package        # stage resources and package with mygo build
+```
+
+`go build` and `go test` need neither the CLI nor Node.
+
+## Settings window
+
+`internal/panel` holds the window's state and builds its interface for every
+frame; `internal/host` owns the tray, the window's lifetime, and the
+coordinated quit. Views are tested without a window with `ui.NewTester`
+(`internal/panel/panel_test.go`): prefer a failing view test to a manual
+check.
+
+Every string a person reads lives in `internal/locales`, one ICU MessageFormat
+catalog per language. `catalog_gen.go` is generated from them and committed:
 
 ```sh
 cd desktop
-vp install
-vp run check
-vp run build
-GOCACHE=/private/tmp/lumilio-desktop-go-cache go test -race ./...
+go tool mygo generate       # after changing a catalog
+go tool mygo i18n check
 ```
 
-The generated TypeScript bindings live in `frontend/bindings` and are produced
-with:
+Add a message to `en.json` first, then to every other catalog. A message
+nothing says fails `go test ./internal/locales/`.
+
+## Packaging
+
+`go run ./cmd/devtool package` stages what the app ships beside its executable
+into `resources/` (the Web SPA, license notices, and the native libraries of
+the current platform), then runs `mygo build`, which compiles, bundles, signs,
+and, with `--installer`, makes the disk image or setup program.
+
+Native libraries are staged before the app is linked, not patched in
+afterwards, because the packager signs the bundle and writes the update
+archive in one step. On macOS the libvips dylib closure and its modules are
+made relocatable (`@rpath` names, one rpath on the executable) and the build
+then checks that the packaged executable refers to nothing outside the
+bundle. On Windows the mingw64 DLL closure is staged beside the executable,
+and packaging must run in MSYS2 MINGW64.
+
+The release identity comes from the environment: `LUMILIO_VERSION` is the
+product version the app reports and the updater compares.
+
+## Updates
+
+Updates use MyGo's signed updater: `mygo build` signs each platform's update
+archive, and the app verifies it against the public key built into it before
+replacing itself. The Stable channel reads the latest full GitHub release and
+Beta also reads prereleases.
+
+A build has an update feed only when `build/update.pub` exists. To turn
+updates on, create the key pair once and commit the public half:
 
 ```sh
-wails3 generate bindings -f '' -clean=true -ts -i
+cd desktop
+go tool mygo keygen -o /path/outside/the/repository
+cp /path/outside/the/repository/mygo-update.pub build/update.pub
 ```
+
+Store the secret half as the `MYGO_UPDATER_PRIVATE_KEY` secret of the release
+workflow and nowhere in the repository: installed apps accept only updates
+signed with it, so losing it strands them, and anyone who has it can ship code
+to them. Without the file the app says in Settings that no signed update
+provider is configured.
 
 Runtime intent, journals, shortcut cache, resources, Lumen versions, and
 update staging are stored under the OS application-data directory. The host
@@ -70,9 +129,9 @@ protoc -I internal/lumen/controlv1 -I /opt/homebrew/include \
 The Settings window is a guided control surface, not a TOML prerequisite. On
 first run, Go materialises a complete Desktop-local candidate and validates it
 with the real strict Server loader. The user edits the projected library,
-access, and runtime fields, sees an explicit draft/save state, and can inspect
-the full TOML only from the optional Advanced tab. Reading or editing a draft
-does not persist intent; only a successful Save or Apply changes the current
+access, and runtime fields and sees an explicit draft/save state; the complete
+manifest stays a file that Settings can reveal. Reading or editing a draft
+does not persist intent; only a successful Save changes the current
 fingerprint.
 
 `internal/storage` remains the native grant and tray-shortcut host. Shortcuts

@@ -4,7 +4,7 @@
 
 _architecture · source: `derived: //atlas:group desktop-host + imports`_
 
-The Wails v3 tray application: window and tray adapters and the main assembly. The product UI stays in the system browser.
+The MyGo tray application: the main assembly, the tray menu, the on-demand Settings window, the navigation guard, the coordinated quit, and the adapter that gives the update controller MyGo's signed updater. The product UI stays in the system browser.
 
 ```mermaid
 flowchart LR
@@ -14,26 +14,29 @@ flowchart LR
     end
     subgraph n_g_Depends_on["Depends on"]
         n_out_desktop_control[/"Desktop control plane"/]
+        n_out_desktop_panel[/"Desktop panel"/]
         n_out_desktop_platform[/"Desktop platform"/]
         n_out_desktop_runtime[/"Desktop runtime"/]
         n_out_desktop_services[/"Desktop services"/]
     end
     n_desktop --> n_desktop_internal_host
     n_g_Desktop_host -.-> n_out_desktop_control
+    n_g_Desktop_host -.-> n_out_desktop_panel
     n_g_Desktop_host -.-> n_out_desktop_platform
     n_g_Desktop_host -.-> n_out_desktop_runtime
     n_g_Desktop_host -.-> n_out_desktop_services
     classDef external stroke-dasharray:4 3
-    class n_out_desktop_control,n_out_desktop_platform,n_out_desktop_runtime,n_out_desktop_services external
+    class n_out_desktop_control,n_out_desktop_panel,n_out_desktop_platform,n_out_desktop_runtime,n_out_desktop_services external
 ```
 
 ## Elements
 
 | Element | Description | Anchor |
 | --- | --- | --- |
-| desktop | Command desktop is the Lumilio Desktop App: a Wails v3 system-tray host that runs the complete Server in-process and opens the product in the system browser. | `mod:desktop` [`desktop/doc.go`](../../../../desktop/doc.go) |
-| host | Package host adapts the Desktop control plane to Wails. | `mod:desktop/internal/host` [`desktop/internal/host/doc.go`](../../../../desktop/internal/host/doc.go) |
+| desktop | Command desktop is the Lumilio Desktop App: a MyGo system-tray host that runs the complete Server in-process and opens the product in the system browser. | `mod:desktop` [`desktop/doc.go`](../../../../desktop/doc.go) |
+| host | Package host adapts the Desktop control plane to MyGo. | `mod:desktop/internal/host` [`desktop/internal/host/doc.go`](../../../../desktop/internal/host/doc.go) |
 | Desktop control plane |  | `group:desktop-control` |
+| Desktop panel |  | `group:desktop-panel` |
 | Desktop platform |  | `group:desktop-platform` |
 | Desktop runtime |  | `group:desktop-runtime` |
 | Desktop services |  | `group:desktop-services` |

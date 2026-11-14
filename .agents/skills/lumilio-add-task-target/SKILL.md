@@ -29,7 +29,7 @@ target must earn its placement.
    devstate, wasm, `lumen:record`), and the few `ci:*` orchestrators.
 3. **`ci:*` contract**: create one only when a workflow needs a *sequence* no
    module target already is. Current set: `ci:architecture`, `ci:site`,
-   `ci:desktop:panel`, `ci:desktop:native`. Do not add `ci:web:test` for
+   `ci:desktop:native`. Do not add `ci:web:test` for
    `web:test`.
 
 ## Naming

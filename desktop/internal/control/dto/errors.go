@@ -36,7 +36,7 @@ const (
 	ErrorStorageUnavailable        ErrorCode = "storage_unavailable"
 )
 
-// Error is the only error shape exposed through Wails bindings and events.
+// Error is the only error shape the Settings window and the tray are shown.
 // Internal errors must be redacted before they reach this type.
 type Error struct {
 	Code        ErrorCode `json:"code"`

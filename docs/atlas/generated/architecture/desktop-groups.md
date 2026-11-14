@@ -11,18 +11,21 @@ flowchart TB
     n_desktop_platform["Desktop platform"]
     n_desktop_control["Desktop control plane"]
     n_desktop_services["Desktop services"]
+    n_desktop_panel["Desktop panel"]
     n_desktop_runtime["Desktop runtime"]
     n_desktop_host["Desktop host"]
     n_foundation[/"Foundation (server)"/]
     n_runtime[/"Server runtime (server)"/]
+    n_desktop_host -->|"3"| n_desktop_panel
     n_desktop_host -->|"7"| n_desktop_runtime
     n_desktop_host -->|"4"| n_desktop_services
+    n_desktop_panel -->|"3"| n_desktop_control
     n_desktop_runtime -->|"18"| n_desktop_control
     n_desktop_runtime -->|"4"| n_desktop_platform
     n_desktop_runtime -->|"2"| n_foundation
     n_desktop_runtime -->|"2"| n_runtime
     n_desktop_services -->|"8"| n_desktop_control
-    n_desktop_services -->|"4"| n_desktop_platform
+    n_desktop_services -->|"2"| n_desktop_platform
     classDef external stroke-dasharray:4 3
     class n_foundation,n_runtime external
 ```
@@ -32,10 +35,11 @@ flowchart TB
 | Element | Description | Anchor |
 | --- | --- | --- |
 | Desktop platform | OS integration for the Desktop App: application-support paths, schema versions for desktop state files, signed resource manifests, and build metadata. | `group:desktop-platform` |
-| Desktop control plane | The revisioned snapshot the control panel renders, its DTOs, and the request-id idempotent operation gate that serializes every mutation. | `group:desktop-control` |
-| Desktop services | Optional supervised capabilities: the Lumen ML child process with signed staged artifacts, and signed application updates. | `group:desktop-services` |
+| Desktop control plane | The revisioned snapshot the Settings window and the tray render, its DTOs, the validating service facade they call, and the request-id idempotent operation gate that serializes every mutation. | `group:desktop-control` |
+| Desktop services | Optional supervised capabilities: the Lumen ML child process with signed staged artifacts, and the application update aggregate, whose transport and signature verification the host supplies. | `group:desktop-services` |
+| Desktop panel | The Settings window as native UI drawn by MyGo: its view state, the draft that is the one save boundary, operation tracking, and the message catalogs every string a person reads comes from. It calls the control plane through the validating service facade and never a controller. | `group:desktop-panel` |
 | Desktop runtime | Hosts server/app in-process: the runtime generation supervisor, the schema-versioned runtime configuration transaction, preferences, the repository handoff, and coordinated shutdown. | `group:desktop-runtime` |
-| Desktop host | The Wails v3 tray application: window and tray adapters and the main assembly. The product UI stays in the system browser. | `group:desktop-host` |
+| Desktop host | The MyGo tray application: the main assembly, the tray menu, the on-demand Settings window, the navigation guard, the coordinated quit, and the adapter that gives the update controller MyGo's signed updater. The product UI stays in the system browser. | `group:desktop-host` |
 | Foundation (server) |  | `group:foundation` |
 | Server runtime (server) |  | `group:runtime` |
 
@@ -43,13 +47,15 @@ flowchart TB
 
 The diagram hides an edge when a longer path between the same groups already implies it (transitive reduction). This is the complete derived list.
 
-- `desktop-host` → `desktop-control`: 8 package import(s), declared
+- `desktop-host` → `desktop-control`: 7 package import(s), declared
+- `desktop-host` → `desktop-panel`: 3 package import(s), declared
 - `desktop-host` → `desktop-platform`: 3 package import(s), declared
 - `desktop-host` → `desktop-runtime`: 7 package import(s), declared
 - `desktop-host` → `desktop-services`: 4 package import(s), declared
+- `desktop-panel` → `desktop-control`: 3 package import(s), declared
 - `desktop-runtime` → `desktop-control`: 18 package import(s), declared
 - `desktop-runtime` → `desktop-platform`: 4 package import(s), declared
 - `desktop-runtime` → `foundation`: 2 package import(s), declared
 - `desktop-runtime` → `runtime`: 2 package import(s), declared
 - `desktop-services` → `desktop-control`: 8 package import(s), declared
-- `desktop-services` → `desktop-platform`: 4 package import(s), declared
+- `desktop-services` → `desktop-platform`: 2 package import(s), declared

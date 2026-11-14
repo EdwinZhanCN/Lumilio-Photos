@@ -24,3 +24,14 @@ web/src/features/*/doc.md       linguist-generated=true
 # `go test ./...` after a checkout that would otherwise convert them to CRLF.
 server/config/schema/*.json          linguist-generated=true text eol=lf
 server/config/examples/**/*.toml     linguist-generated=true text eol=lf
+
+# Desktop message catalogs and the accessors `go tool mygo generate` writes
+# from them.
+#
+# eol=lf is load-bearing here too: `task desktop:panel:check` regenerates the
+# accessors and fails on any difference, and catalog_gen.go embeds the
+# catalogs byte-for-byte. A Windows checkout would otherwise convert the
+# directory to CRLF, which the MSYS2 git of the Windows CI job then reports as
+# every line changed.
+desktop/internal/locales/**             text eol=lf
+desktop/internal/locales/catalog_gen.go linguist-generated=true text eol=lf

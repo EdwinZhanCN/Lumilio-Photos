@@ -36,26 +36,26 @@ stateDiagram-v2
     n_applying --> n_failed: candidate failed (restore last known good)
 ```
 
-States are exactly the members of `go:desktop/internal/control/dto.RuntimePhase` [`desktop/internal/control/dto/snapshot.go:15`](../../../../desktop/internal/control/dto/snapshot.go#L15).
+States are exactly the members of `go:desktop/internal/control/dto.RuntimePhase` [`desktop/internal/control/dto/snapshot.go:13`](../../../../desktop/internal/control/dto/snapshot.go#L13).
 
 ## States
 
 | State | Meaning | Anchor |
 | --- | --- | --- |
-| stopped | No Server generation is held. | `go:desktop/internal/control/dto.RuntimeStopped` [`desktop/internal/control/dto/snapshot.go:18`](../../../../desktop/internal/control/dto/snapshot.go#L18) |
-| starting | A new generation runs server/app.Run and waits for RuntimeReady. | `go:desktop/internal/control/dto.RuntimeStarting` [`desktop/internal/control/dto/snapshot.go:19`](../../../../desktop/internal/control/dto/snapshot.go#L19) |
-| running | The Server owns its listener and repositories. | `go:desktop/internal/control/dto.RuntimeRunning` [`desktop/internal/control/dto/snapshot.go:20`](../../../../desktop/internal/control/dto/snapshot.go#L20) |
-| stopping | Graceful shutdown of the held generation. | `go:desktop/internal/control/dto.RuntimeStopping` [`desktop/internal/control/dto/snapshot.go:21`](../../../../desktop/internal/control/dto/snapshot.go#L21) |
-| restarting | Stop then start a new generation in one operation. | `go:desktop/internal/control/dto.RuntimeRestarting` [`desktop/internal/control/dto/snapshot.go:22`](../../../../desktop/internal/control/dto/snapshot.go#L22) |
-| saving-config | Writing a validated runtime intent while stopped. | `go:desktop/internal/control/dto.RuntimeSavingConfig` [`desktop/internal/control/dto/snapshot.go:23`](../../../../desktop/internal/control/dto/snapshot.go#L23) |
-| applying-config | Journaled quiesce, candidate start, and commit or rollback. | `go:desktop/internal/control/dto.RuntimeApplyingConfig` [`desktop/internal/control/dto/snapshot.go:24`](../../../../desktop/internal/control/dto/snapshot.go#L24) |
-| failed | Start or the running Server failed; the error is in the snapshot. | `go:desktop/internal/control/dto.RuntimeFailed` [`desktop/internal/control/dto/snapshot.go:25`](../../../../desktop/internal/control/dto/snapshot.go#L25) |
+| stopped | No Server generation is held. | `go:desktop/internal/control/dto.RuntimeStopped` [`desktop/internal/control/dto/snapshot.go:16`](../../../../desktop/internal/control/dto/snapshot.go#L16) |
+| starting | A new generation runs server/app.Run and waits for RuntimeReady. | `go:desktop/internal/control/dto.RuntimeStarting` [`desktop/internal/control/dto/snapshot.go:17`](../../../../desktop/internal/control/dto/snapshot.go#L17) |
+| running | The Server owns its listener and repositories. | `go:desktop/internal/control/dto.RuntimeRunning` [`desktop/internal/control/dto/snapshot.go:18`](../../../../desktop/internal/control/dto/snapshot.go#L18) |
+| stopping | Graceful shutdown of the held generation. | `go:desktop/internal/control/dto.RuntimeStopping` [`desktop/internal/control/dto/snapshot.go:19`](../../../../desktop/internal/control/dto/snapshot.go#L19) |
+| restarting | Stop then start a new generation in one operation. | `go:desktop/internal/control/dto.RuntimeRestarting` [`desktop/internal/control/dto/snapshot.go:20`](../../../../desktop/internal/control/dto/snapshot.go#L20) |
+| saving-config | Writing a validated runtime intent while stopped. | `go:desktop/internal/control/dto.RuntimeSavingConfig` [`desktop/internal/control/dto/snapshot.go:21`](../../../../desktop/internal/control/dto/snapshot.go#L21) |
+| applying-config | Journaled quiesce, candidate start, and commit or rollback. | `go:desktop/internal/control/dto.RuntimeApplyingConfig` [`desktop/internal/control/dto/snapshot.go:22`](../../../../desktop/internal/control/dto/snapshot.go#L22) |
+| failed | Start or the running Server failed; the error is in the snapshot. | `go:desktop/internal/control/dto.RuntimeFailed` [`desktop/internal/control/dto/snapshot.go:23`](../../../../desktop/internal/control/dto/snapshot.go#L23) |
 
 ## Transitions
 
 | From | To | Trigger | Anchor |
 | --- | --- | --- | --- |
-| [*] | stopped |  | `go:desktop/internal/control/dto.InitialSnapshot` [`desktop/internal/control/dto/snapshot.go:317`](../../../../desktop/internal/control/dto/snapshot.go#L317) |
+| [*] | stopped |  | `go:desktop/internal/control/dto.InitialSnapshot` [`desktop/internal/control/dto/snapshot.go:321`](../../../../desktop/internal/control/dto/snapshot.go#L321) |
 | stopped | starting | Start | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go:265`](../../../../desktop/internal/runtime/controller.go#L265) |
 | failed | starting | Start | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go:265`](../../../../desktop/internal/runtime/controller.go#L265) |
 | starting | running | Server reports RuntimeReady | `go:desktop/internal/runtime.Controller.handleResult` [`desktop/internal/runtime/controller.go:599`](../../../../desktop/internal/runtime/controller.go#L599) |
