@@ -193,3 +193,17 @@ func TestGroupMembershipIsByMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestBaselineLeavesOtherNewRulesUnbaselined(t *testing.T) {
+	a := testAtlas()
+	a.Config.Rules = []Rule{{ID: "new", Why: "x", GroupUses: true}, {ID: "other", Why: "x", GroupUses: true}}
+	a.groupFindings = []Finding{{Key: "k", Where: "w", Message: "m"}}
+	a.runRules()
+	baselines, err := a.baselineRule("new")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := baselines["other"]; ok {
+		t.Fatalf("baselining one rule must not record a baseline for another: %v", baselines)
+	}
+}

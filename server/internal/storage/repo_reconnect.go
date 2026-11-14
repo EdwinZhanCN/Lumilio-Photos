@@ -350,12 +350,14 @@ func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id 
 		})
 	}
 	if err != nil {
-		if isUniquePathViolation(err) {
-			rm.repoAudit(cleanPath).Error("repository.reconnect", err, zap.String("repository_id", id))
-			return failInTx(fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, cleanPath))
-		}
+		// The audit log is a file in the repository: write it after the
+		// rollback releases the writer, never inside the transaction.
+		_ = tx.Rollback()
 		rm.repoAudit(cleanPath).Error("repository.reconnect", err, zap.String("repository_id", id))
-		return failInTx(fmt.Errorf("failed to reconnect repository: %w", err))
+		if isUniquePathViolation(err) {
+			return failPrepared(fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, cleanPath))
+		}
+		return failPrepared(fmt.Errorf("failed to reconnect repository: %w", err))
 	}
 	nowStamp := dbtypes.NewTimestamp(now)
 	if err := invalidateRepositoryObservationAfterRelocation(ctx, tx, repoUUID, cleanPath, nowStamp); err != nil {

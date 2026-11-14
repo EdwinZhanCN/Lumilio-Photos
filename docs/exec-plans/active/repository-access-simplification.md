@@ -204,6 +204,11 @@ parallel, and asserts that nothing ever blocks past its deadline.
 - Replace `clusterRebuildMu`, which is held while waiting for the writer,
   with ordering that SQLite's writer enforces. For example, the rebuild runs
   as writer transactions, and apply checks a rebuild generation.
+- Move the DBSCAN core check (`isCoreFaceDBSCAN`, which runs the owner-wide
+  `CountIncrementalFaceNeighbors` once per new face) out of
+  `ApplyFaceResultsTx`, or bound it: no owner-wide COUNT runs inside the
+  writer transaction. Atlas `tx-purity` forbids COUNT queries there, and its
+  A2 baseline for face apply reaches zero in this phase.
 - Audit every `commit.Coordinator` `Apply` callback for file I/O and for any
   wait.
 

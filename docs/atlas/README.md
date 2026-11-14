@@ -146,9 +146,26 @@ The map itself (symbols, anchor hashes, doc links, imports) still comes from
 parsing every non-test file regardless of build constraints, so generated
 files are identical on every host.
 
+Targets name Go objects the way `go doc` would print them with full import
+paths: `pkg.Func`, `(*pkg.T).Method`, `(pkg.Iface).Method`, and types as
+`pkg.T` or `*pkg.T`. A target that does not resolve is a problem, so a rename
+cannot silently disable a rule. Scopes (`only`, `forbid`, `in`, `from`, table
+owners) are package directories, `dir/**` globs, or single files.
+
 | Kind | Checks |
 | --- | --- |
 | `group_uses: true` | Every import between groups follows `groups[].uses` and the reviewed `exceptions` (rule `group-dependencies`). |
+| `calls: {targets, only \| forbid}` | Who may refer to a function or method: calls, method values, and generic instantiations, through interfaces whose implementations include a target. Key `caller -> target`. |
+| `constructs: {types, only}` | Who may build a value of a type with a composite literal or `new`. Key `func constructs T`. |
+| `forbid_types: {in, types}` | No field, parameter, result, variable, or function literal in scope holds one of the types (directly, behind pointers, or in slices, maps, and channels). Key `name holds T`. |
+| `forbid_imports: {from, imports}` | No file in scope imports a listed path or `path/**`. Key `file imports X`, or `package imports X` when a package is in scope whole. |
+| `static_sql: true` | Every SQL statement handed to an executor (`sql.executors`) is a constant or a sqlc query, so the table rules see it. A function that picks a statement at run time is a finding, and its SQL constants are still attributed to it. Key `func executes non-constant SQL`. |
+| `tables: {table: {read, write, insert, update, delete}}` | Who may read or write a table. Statements come from sqlc query files (`sql.queries`, attributed to the callers of the generated method), constants passed to executors, and migration triggers (owner `trigger:<name>`); `write` covers the operations not listed on their own. Key `owner op table`. |
+| `tx_purity: {tx_types, begin, forbid_packages, forbid_calls, forbid_count_queries, allow}` | Nothing slow runs inside a transaction. Roots are every function or literal with a `tx_types` parameter and the statements between a `begin` call and its `Commit` (a non-deferred `Rollback` ends that path). The scope is everything statically reachable from the roots; calls through interfaces declared in the module resolve to their module implementations, while library interfaces such as `io.Writer` are judged at the implementation the walk reaches, never by their package. Key `func calls callee`. |
+| `budgets: {default}` | No package exceeds its production-line ceiling: the recorded one in `atlas.lock.json` `ceilings`, else the default. Ceilings only fall: `task atlas:lock` lowers one to the package's size and drops it once the package is under the default. |
+
+`sql:` in `atlas.yaml` says where statements come from; it is shared by
+`static_sql` and every `tables` rule.
 
 **Every rule is proven.** `server/tools/atlas/testdata/rules/<rule-id>/` holds
 a `violation/` fixture, whose findings must equal its `want.txt` exactly, and
@@ -203,6 +220,9 @@ to roughly 6–14 nodes, and put the *why* in `notes`. Look at
 | `no group in docs/atlas/atlas.yaml matches this module` / `match … matches no module` | Add the new package's path to its group's `match`, or remove the path of a package that moved or was deleted. |
 | `[rule-id] …` | A rule found a new violation. Fix the code. Read the rule's `why` first; the rule is the decision, the code is what changes. |
 | `baselined violation … no longer occurs` | You fixed a baselined violation. Run `task atlas:lock` to drop the entry. |
+| `ceiling N for P is above its M lines` | A package over the default shrank. Run `task atlas:lock` to lower its ceiling. |
+| `has N production lines, over its ceiling of M` | Split the package or move code out; a ceiling is never raised by hand. |
+| `… does not resolve` (a rule target, type, or `sql:` entry) | The named object was renamed or removed. Point the rule at its new name; if the code it guarded is gone, ask whether the rule still protects anything. |
 | `type-check failed: …` | The Atlas could not type-check a package, so rule facts would be unsound. Run through the Task target (it sets the CGo flags, build tags, and toolchain) with the Server's CGo headers installed, or fix the compile error. |
 | `doc link [X] does not resolve` | Fix the link; the symbol was renamed or removed. |
 | `anchor …: … has no declaration` | The anchored code moved or was deleted. Re-anchor the element, or redraw the view if the flow changed. |

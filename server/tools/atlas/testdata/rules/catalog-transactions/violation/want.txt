@@ -1,0 +1,3 @@
+fx/service.Hidden -> (*database/sql.DB).BeginTx
+fx/service.Raw -> (*database/sql.DB).BeginTx
+fx/service.Value -> (*database/sql.DB).ExecContext

@@ -200,8 +200,8 @@ func (a *Atlas) viewLock() map[string]map[string]string {
 }
 
 // encodeLock renders atlas.lock.json.
-func encodeLock(views map[string]map[string]string, baselines map[string][]string) []byte {
-	data, _ := json.MarshalIndent(lockFile{Views: views, Baselines: baselines}, "", "  ")
+func encodeLock(views map[string]map[string]string, baselines map[string][]string, ceilings map[string]map[string]int) []byte {
+	data, _ := json.MarshalIndent(lockFile{Views: views, Baselines: baselines, Ceilings: ceilings}, "", "  ")
 	return append(data, '\n')
 }
 

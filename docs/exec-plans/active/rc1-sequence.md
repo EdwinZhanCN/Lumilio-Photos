@@ -3,7 +3,7 @@
 Status: active, created 2026-10-28. The owner asked for one recorded order
 across all open plans after the fix-before-release rule moved the storage
 plans and server-structure Phase B in front of rc.1. Q0 done 2026-10-29
-(#267). A1 done 2026-11-14 (#270). Next step: **A2**.
+(#267). A1 done 2026-11-14 (#270). A2 done 2026-11-14 (#271). Next step: **A3**.
 Update the row of each step in the PR that lands it.
 
 Goal: every open plan lands on `dev` in the order below, then the
@@ -43,6 +43,18 @@ the plan it names.
   ([rc-release.md](rc-release.md), owner rule 2026-10-28.) A problem a step
   finds is fixed in that step, or it becomes a new row here with the owner's
   agreement. It is never pushed past the tag.
+- **Local evidence per step; PR CI once, at the end** (owner decision
+  2026-11-14). PR CI is too slow to gate every step, so a step merges on
+  local evidence: unit tests and `task atlas:check` on the Mac, and the
+  full Server gate (`server/app` and the Linux volume-semantics tests
+  included) plus the Docker E2E stack (`task web:e2e:up` and the slices the
+  step touches) on the owner's amd64 Linux test host through a Docker
+  context, with images built there. A red PR check does not block a merge.
+  After B14, PR CI runs once on the final head, and S13 fixes everything it
+  finds, including what only CI can see (Windows Desktop, the macOS
+  volume-semantics job, runner timeouts such as `server/app` on Windows,
+  480 s of Go's 600 s default on 2026-11-14). A step whose local gate
+  cannot run a package says so in its PR.
 - **The order changes only with the owner.** A session that finds a
   dependency this order misses stops and asks.
 - **No data migration.** No production install exists. Dev and demo
@@ -56,7 +68,7 @@ the plan it names.
 | --- | --- | --- | --- | --- |
 | Q0 | **Done 2026-10-29 (#267).** Merge #267: lease mitigation, postmortem 0004, the storage and sequence plans, and the owner's server-structure revision | — | — | Every later step reads these plans from `dev` |
 | A1 | **Done 2026-11-14 (#270).** Typed facts and path-based groups | [atlas-rules.md](atlas-rules.md) | Q0 | Tools only; starts the rule engine |
-| A2 | Static rules: `calls`, `constructs`, `forbid-types`, `forbid-imports`, `tables`, `tx-purity`, `budgets` | [atlas-rules.md](atlas-rules.md) | A1 | `tx-purity` and `calls`/`constructs` are the guardrails RA and RL need |
+| A2 | **Done 2026-11-14 (#271).** Static rules: `calls`, `constructs`, `forbid-types`, `forbid-imports`, `tables`, `tx-purity`, `budgets` | [atlas-rules.md](atlas-rules.md) | A1 | `tx-purity` and `calls`/`constructs` are the guardrails RA and RL need |
 | A3 | Behaviour tests, relocated lints, switch; `architecturecheck` deleted | [atlas-rules.md](atlas-rules.md) | A2 | Leaves one gate before any code moves |
 | A4 | Views that verify arrows; `movecheck` and `split-report` | [atlas-rules.md](atlas-rules.md) | A3 | Every B session's evidence |
 | B1 | Infrastructure moves, `server/platform` gone | [server-structure.md](server-structure.md) | A4 | Storage code is then written once, at its final path (`catalog`, `storage/artifact`, `ingest`, `work`) |

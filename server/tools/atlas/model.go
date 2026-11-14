@@ -12,6 +12,7 @@ type Config struct {
 	Groups     []Group     `yaml:"groups"`
 	Exceptions []Exception `yaml:"exceptions"`
 	Rules      []Rule      `yaml:"rules"`
+	SQL        SQLConfig   `yaml:"sql"`
 	Docs       []string    `yaml:"docs"`
 	// UndocumentedRoutes are real routes deliberately absent from OpenAPI,
 	// such as infrastructure probes, that documents may still name.
@@ -55,6 +56,92 @@ type Rule struct {
 	// GroupUses checks every import between groups against groups[].uses
 	// and the reviewed exceptions.
 	GroupUses bool `yaml:"group_uses" json:"groupUses,omitempty"`
+	// Calls limits who may refer to the target functions and methods.
+	Calls *CallsRule `yaml:"calls" json:"calls,omitempty"`
+	// Constructs limits who may build values of the target types.
+	Constructs *ConstructsRule `yaml:"constructs" json:"constructs,omitempty"`
+	// ForbidTypes keeps declarations in scope from holding the types.
+	ForbidTypes *ForbidTypesRule `yaml:"forbid_types" json:"forbidTypes,omitempty"`
+	// ForbidImports keeps packages or files in scope from importing paths.
+	ForbidImports *ForbidImportsRule `yaml:"forbid_imports" json:"forbidImports,omitempty"`
+	// StaticSQL requires every SQL statement handed to an executor to be a
+	// constant, so the tables rules see every statement.
+	StaticSQL bool `yaml:"static_sql" json:"staticSql,omitempty"`
+	// Tables limits which code may read or write catalog tables.
+	Tables map[string]TableAccess `yaml:"tables" json:"tables,omitempty"`
+	// TxPurity forbids slow or unbounded work inside a transaction.
+	TxPurity *TxPurityRule `yaml:"tx_purity" json:"txPurity,omitempty"`
+	// Budgets caps the production lines of every package.
+	Budgets *BudgetsRule `yaml:"budgets" json:"budgets,omitempty"`
+}
+
+// A scope is a list of patterns, each a package directory
+// (server/internal/db), a directory glob (server/internal/storage/**), or a
+// file (server/app/app.go).
+
+// CallsRule: every reference to a target outside Only (or inside Forbid)
+// is a finding. A reference through an interface method counts when a
+// target implements it.
+type CallsRule struct {
+	Targets []string `yaml:"targets" json:"targets"`
+	Only    []string `yaml:"only" json:"only,omitempty"`
+	Forbid  []string `yaml:"forbid" json:"forbid,omitempty"`
+}
+
+// ConstructsRule: a composite literal or new() of a target type outside
+// Only is a finding.
+type ConstructsRule struct {
+	Types []string `yaml:"types" json:"types"`
+	Only  []string `yaml:"only" json:"only"`
+}
+
+// ForbidTypesRule: a field, parameter, result, or variable declared in
+// scope whose type mentions a target type is a finding.
+type ForbidTypesRule struct {
+	In    []string `yaml:"in" json:"in"`
+	Types []string `yaml:"types" json:"types"`
+}
+
+// ForbidImportsRule: an import of one of Imports (paths or path/**) by a
+// file in From is a finding.
+type ForbidImportsRule struct {
+	From    []string `yaml:"from" json:"from"`
+	Imports []string `yaml:"imports" json:"imports"`
+}
+
+// TableAccess lists, per operation, the scopes that may perform it. An
+// operation that is not listed is unrestricted. write covers insert,
+// update, and delete unless one of them is listed itself. A scope entry
+// "trigger:<name>" names a trigger in the baseline migration.
+type TableAccess struct {
+	Read   []string `yaml:"read" json:"read,omitempty"`
+	Write  []string `yaml:"write" json:"write,omitempty"`
+	Insert []string `yaml:"insert" json:"insert,omitempty"`
+	Update []string `yaml:"update" json:"update,omitempty"`
+	Delete []string `yaml:"delete" json:"delete,omitempty"`
+}
+
+// TxPurityRule: nothing reachable from a transaction body may call into a
+// forbidden package or function. Roots are functions with a parameter of
+// one of TxTypes and the statements after a Begin call up to its Commit.
+type TxPurityRule struct {
+	TxTypes        []string `yaml:"tx_types" json:"txTypes"`
+	Begin          []string `yaml:"begin" json:"begin"`
+	ForbidPackages []string `yaml:"forbid_packages" json:"forbidPackages"`
+	ForbidCalls    []string `yaml:"forbid_calls" json:"forbidCalls"`
+	// ForbidCountQueries forbids sqlc queries whose result is a single
+	// COUNT aggregate, which scan a table range unboundedly.
+	ForbidCountQueries bool `yaml:"forbid_count_queries" json:"forbidCountQueries,omitempty"`
+	// Allow lists pure functions of a forbidden package (os.IsNotExist)
+	// and reviewed calls that stay allowed.
+	Allow []string `yaml:"allow" json:"allow,omitempty"`
+}
+
+// BudgetsRule: a package whose production lines exceed Default (or its
+// recorded ceiling) is a finding. Ceilings live in atlas.lock.json and
+// only fall.
+type BudgetsRule struct {
+	Default int `yaml:"default" json:"default"`
 }
 
 // Finding is one violation of a rule. Key identifies it by symbols, never by
@@ -72,6 +159,9 @@ type Finding struct {
 type lockFile struct {
 	Views     map[string]map[string]string `json:"views"`
 	Baselines map[string][]string          `json:"baselines"`
+	// Ceilings are the recorded line ceilings of budgets rules, by rule id
+	// and package. They only fall.
+	Ceilings map[string]map[string]int `json:"ceilings,omitempty"`
 }
 
 // View is one authored diagram under docs/atlas/views/<kind>/<id>.yaml.

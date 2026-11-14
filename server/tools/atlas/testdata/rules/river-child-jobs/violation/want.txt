@@ -1,0 +1,1 @@
+(*fx/queue.Worker).Work -> (*fx/river.Client).InsertMany

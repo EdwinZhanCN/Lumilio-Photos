@@ -1,0 +1,3 @@
+fx/service.Remove delete assets
+fx/service.ViaQuery delete assets
+trigger:assets_cleanup delete assets

@@ -1,0 +1,4 @@
+fx/sourcing.Materializer.db holds *database/sql.DB
+fx/sourcing.Materializer.queries holds *fx/repo.Queries
+fx/sourcing.New holds *fx/repo.Queries
+fx/sourcing.Run func literal holds *database/sql.DB

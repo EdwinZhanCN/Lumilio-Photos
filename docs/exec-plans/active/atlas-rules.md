@@ -1,6 +1,6 @@
 # Atlas rules: one architecture gate
 
-Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270). Next: A2. Child of
+Status: active, created 2026-10-19; A1 landed 2026-11-14 (#270); A2 landed 2026-11-14 (#271). Next: A3. Child of
 [server-structure.md](server-structure.md) (Phase A, sessions A1–A4). It
 touches only `server/tools`, tests, docs, `docs/atlas`, the Taskfile, and CI
 wiring, so it may run between rc.1 sessions. A4 supersedes part of the
@@ -68,8 +68,14 @@ than architecture.
 | `checkAPIProblemArchitecture` (success writes, private error use, catalog artifacts, Web Problem helpers) | D | Go half to a test in `internal/api`; Web half to `check-source-boundaries.ts`; catalog completeness already in `api/problem/problem_test.go`; A3 |
 | `checkSQLiteSQL` (unresolved sqlc macros, `randomblob`, slice plus fixed parameters) | D | Test in `internal/db` over the generated and query files; A3 |
 | Naked ffmpeg `-threads`/`-preset` flags | D | Test in `internal/processors`; A3 |
+| `checkRecoveryReachability` (R10, added after the audit): every public Problem's recovery entry names a Web route and Desktop host action kind that exist | D | Test in `internal/api/problem` that reads the Web route table and the storage host action kinds; A3 |
+| `checkStorageClassifierBoundary` (P7): storage risk code literals only in the classifier files; retired classifier symbols absent | D, then C | Literal half: test in `internal/storage` over its non-classifier files; retired symbols: delete; A3 |
+| `checkDesktopMarkerParsing` (P7): no marker file names or YAML decoding in Desktop | A for YAML, D for names | `forbid_imports` rule `desktop-marker-parsing` (A2); the marker file names become a test in `desktop/internal/runtime`; A3 |
+| `checkHandlerActionLists` (P7): no storage action or resolution code built into a slice inside `api/handler` | D | Test in `internal/api/handler`; A3 |
+| `checkCandidateCreateRisks` (P7): repository candidates carry no risks, and candidate commands take no boolean confirmation | D | Go half: test in `internal/storage` and `internal/api/dto`; Web half: `check-source-boundaries.ts`; A3 |
+| `checkContractEnumCoverage` (P7): every closed vocabulary the contract exposes has literal copy | D | Moves with the terminology check to `server/tools/terminology`; A3 |
 
-## Target `atlas.yaml` additions (shape, finalized in A2)
+## Target `atlas.yaml` additions (the sketch; A2 landed the rules in `docs/atlas/atlas.yaml`)
 
 ```yaml
 rules:
@@ -150,14 +156,66 @@ Found in A1 (2026-11-14), binding on A2–A4:
   a declared rule without both.
 
 ### A2 — Static rules
-- [ ] Rule kinds `calls` (only/forbid), `constructs`, `forbid-types`,
+- [x] Rule kinds `calls` (only/forbid), `constructs`, `forbid-types`,
   `forbid-imports`, `tables`, `tx-purity`, and `budgets` (ceilings recorded
   per package, default 5,000 production lines).
-- [ ] Port every A-class check and the type-resolvable B-class checks from
+- [x] Port every A-class check and the type-resolvable B-class checks from
   the audit, each with a violation and a passing fixture; record baselines.
-- [ ] Run `architecturecheck` and Atlas side by side: every finding the old
+- [x] Run `architecturecheck` and Atlas side by side: every finding the old
   tool reports on a deliberately broken branch is reported by Atlas or by a
   named A3 test.
+
+Found in A2 (2026-11-14), binding on A3–A4:
+
+- **Side by side.** Fourteen deliberate breakages, one per ported check
+  (raw `BeginTx`, `DELETE FROM assets`, I/O and sleep in a scan `Tx`
+  function, a producer holding `*sql.DB` or importing `db`, the scan index
+  building `repo.New`, `river_job` in a service, a worker inserting child
+  work, a second governor, a `Resources{}` literal, a scheduling call in
+  `app.go`, a handler calling `ReconcileAll`, YAML in Desktop): each fails
+  both tools, and Atlas names the rule. The old text check for
+  `switch args.ProjectionKind` in `app.go` became a `scheduling-algorithms`
+  target, `(*pipelineRuntime).prepareProjection`. Marker file names in
+  Desktop are left to the A3 Desktop test.
+- **Executors forward SQL.** `sql.executors` lists `*sql.DB`, `*sql.Tx`,
+  `*sql.Conn`, the `catalogtx` `Tx`, `Writer`, and `Reader`, and the
+  `db.queryRouter`; an executor's own methods pass their caller's SQL on, so
+  the statement is resolved at the caller. A function that picks SQL at run
+  time is a `static-sql` finding, and every SQL constant in it is attributed
+  to it, so `lifecycle.collectAssetsTx`, which runs a table of constants,
+  still owns its `DELETE FROM assets`. A table is known when a migration
+  creates it or any statement uses it (River creates its own).
+- **tx-purity precision.** Interface calls resolve to module implementations
+  only for interfaces declared in a mapped package; a library interface
+  method (`io.Writer.Write` on a SHA-256 hash) is never judged by its
+  package, which had resolved one hash write to every module `io.Writer`. A
+  non-deferred `Rollback` ends a Begin region on its path. Findings carry the
+  call chain from the root. `CountStackedMediaItems` is allowed: it is
+  bounded by the media items of one Live Photo pair.
+- **Fixed rather than baselined:** `reconnectRepository` wrote the
+  repository audit log file inside its writer transaction on the
+  duplicate-path failure; it now rolls back first
+  (`TestReconnectOntoAClaimedPathFailsAndKeepsTheRow`). `architecturecheck`
+  walks skip `testdata`, so the rule fixtures do not trip it.
+- **Baselines recorded (owner approval in the A2 PR):**
+  - `tx-purity`, 16 entries, all one root:
+    `(*faceService).ApplyFaceResultsTx` opens the repository FS, encodes,
+    writes, and fsyncs face crops, removes old crops, and runs the
+    owner-wide `CountIncrementalFaceNeighbors` DBSCAN core check per face,
+    all inside the writer transaction. Owned by sequence step RA3
+    ([repository access](repository-access-simplification.md) Phase 3):
+    crops become `faces` artifacts published before the transaction (RL3),
+    the `RepositoryFS` open leaves it, and the DBSCAN COUNT moves out or is
+    bounded. Its gate, "`tx-purity` clean for face apply", empties this
+    baseline.
+  - `static-sql`, 16 entries: migration and pragma application in `db`,
+    `sqlitespike`, and run-time-built statements in `event`, `lifecycle`,
+    `processing`, `search`, and `service` classifier definitions.
+  - `package-size` ceilings: `api/handler` 18,129, `db/repo` 31,464,
+    `service` 20,116, `storage` 14,605. Parent B14 tightens them.
+- **`atlas baseline <rule>` records only that rule.** Recording one rule had
+  also written empty baselines for every other unbaselined rule, which
+  would have blocked baselining them later.
 
 ### A3 — Behaviour tests, relocated lints, and the switch
 - [ ] Connection-policy and foreground-read tests, the River kind-catalog

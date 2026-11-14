@@ -50,6 +50,11 @@ type Atlas struct {
 	// groupFindings are the undeclared group imports checkGroups found; the
 	// group_uses rule reports them.
 	groupFindings []Finding
+	// Ceilings are the recorded budgets ceilings from atlas.lock.json.
+	Ceilings map[string]map[string]int
+
+	typedIdx *typedIndex
+	sql      *sqlFacts
 }
 
 type webFacts struct {
@@ -137,6 +142,7 @@ func loadAtlas(root, configDir, webFactsPath string) (*Atlas, error) {
 			a.Lock = file.Views
 		}
 		a.Baselines = file.Baselines
+		a.Ceilings = file.Ceilings
 	}
 	if err := a.loadViews(); err != nil {
 		return nil, err

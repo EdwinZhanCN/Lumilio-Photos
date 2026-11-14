@@ -375,6 +375,191 @@ rules:
     why: every import that crosses a group boundary is a reviewed architecture decision
     group_uses: true
 
+  # ------------------------------------------------------ catalog writer
+  - id: catalog-transactions
+    why: one writer; every catalog transaction is named, admitted, and measured by catalogtx
+    calls:
+      targets:
+        - (*database/sql.DB).Begin
+        - (*database/sql.DB).BeginTx
+        - (*database/sql.Conn).BeginTx
+        - (*database/sql.DB).Exec
+        - (*database/sql.DB).ExecContext
+      # sqlitespike is the SQLite conformance harness; it opens its own
+      # throwaway databases.
+      only: [server/internal/db/catalogtx, server/internal/db, server/internal/db/sqlitespike]
+
+  - id: tx-purity
+    why: no filesystem, network, hashing, sleeping, or table-wide COUNT inside a transaction, which holds the single writer or a read snapshot
+    tx_purity:
+      tx_types: ["*database/sql.Tx", "*server/internal/db/catalogtx.Tx"]
+      begin: [(*server/internal/db/catalogtx.Writer).BeginTx]
+      forbid_packages: [os, io, io/fs, io/ioutil, net, net/http, server/internal/utils/hash, github.com/zeebo/blake3]
+      forbid_calls:
+        - time.Sleep
+        - time.After
+        - time.Tick
+        - time.NewTimer
+        - time.NewTicker
+        - path/filepath.Walk
+        - path/filepath.WalkDir
+        - path/filepath.Glob
+      forbid_count_queries: true
+      allow:
+        # Pure helpers of a forbidden package.
+        - os.IsNotExist
+        - os.IsExist
+        - os.IsPermission
+        - io/fs.ValidPath
+        # Bounded by a unique key: one trash ID per trashed file.
+        - (*server/internal/db/repo.Queries).CountRepositoryEntriesWithTrashID
+        # Bounded by its key set: the media items of one Live Photo pair.
+        - (*server/internal/db/repo.Queries).CountStackedMediaItems
+
+  - id: static-sql
+    why: every SQL statement is a constant or a sqlc query, so the table rules see every read and write
+    static_sql: true
+
+  - id: asset-purge
+    why: an Asset disappears only through the lifecycle purge, which removes its entries first
+    tables:
+      assets: { delete: [server/internal/lifecycle] }
+
+  - id: river-tables
+    why: River's tables are the queue's private state; product correctness never consults them
+    tables:
+      river_job:
+        read:
+          - server/internal/queue
+          - server/internal/queue/jobs
+          - server/internal/api/handler/queue_handler.go
+          - server/app/sqlite_diagnostics.go
+        write: [server/internal/queue]
+
+  # ------------------------------------------------------ asynchronous work
+  - id: producer-capabilities
+    why: asynchronous preparers own only narrow read and compute interfaces; catalog mutation belongs to the commit coordinator
+    forbid_types:
+      in:
+        - server/internal/sourcing/materializer.go
+        - server/internal/storage/locations/resolver.go
+        - server/internal/processors/asset_processor.go
+        - server/internal/queue/asset_work_fence.go
+        - server/internal/queue/enrichment_runner.go
+        - server/internal/queue/ml_image_loader.go
+        - server/internal/queue/projection_preparer.go
+      types:
+        - "*database/sql.DB"
+        - "*server/internal/db/repo.Queries"
+        - server/internal/service.SettingsService
+        - server/internal/service.LumenService
+        - server/internal/service.ClassifierService
+        - server/internal/service.LocationService
+        - server/internal/service.AssetIndexingService
+
+  - id: catalog-handle-imports
+    why: preparers and the scan index never hold the catalog database; they write through the commit coordinator
+    forbid_imports:
+      from:
+        - server/internal/sourcing/materializer.go
+        - server/internal/storage/locations/resolver.go
+        - server/internal/processors/asset_processor.go
+        - server/internal/queue/asset_work_fence.go
+        - server/internal/queue/enrichment_runner.go
+        - server/internal/queue/ml_image_loader.go
+        - server/internal/queue/projection_preparer.go
+        - server/internal/storage/scan
+      imports: [server/internal/db]
+
+  - id: scan-index-query-set
+    why: the scan index writes only through its Writer; it never builds its own catalog query set
+    calls:
+      targets: [server/internal/db/repo.New]
+      forbid: [server/internal/storage/scan]
+
+  - id: river-child-jobs
+    why: workers never enqueue child work; the catalog-derived scheduler is the only River producer
+    calls:
+      targets:
+        - (*github.com/riverqueue/river.Client).Insert
+        - (*github.com/riverqueue/river.Client).InsertTx
+        - (*github.com/riverqueue/river.Client).InsertMany
+        - (*github.com/riverqueue/river.Client).InsertManyTx
+        - (*github.com/riverqueue/river.Client).InsertManyFast
+        - (*github.com/riverqueue/river.Client).InsertManyFastTx
+      only: [server/internal/queue/scheduler.go]
+
+  - id: execution-governor
+    why: one process-wide execution governor, built by the execution package from the budget
+    calls:
+      targets: [server/internal/execution.NewGovernor]
+      only: [server/internal/execution]
+
+  - id: execution-resources
+    why: resource demands come from the execution package's demand table, never from literals scattered through the pipeline
+    constructs:
+      types: [server/internal/execution.Resources]
+      only: [server/internal/execution]
+
+  - id: scheduling-algorithms
+    why: the composition root only constructs and runs; macro work runs in the pipeline runtime and the ingest packages
+    calls:
+      targets:
+        - (*server/internal/processors.AssetProcessor).ComputeMetadataTask
+        - (*server/internal/processors.AssetProcessor).LoadThumbnailTask
+        - (*server/internal/processors.AssetProcessor).ComputeThumbnailCodec
+        - (*server/internal/processors.AssetProcessor).ComputeThumbnailScale
+        - (*server/internal/processors.AssetProcessor).LoadTranscodeTask
+        - (*server/internal/processors.AssetProcessor).ComputeTranscodeTask
+        - (*server/internal/processors.AssetProcessor).ProcessVideoFramesTask
+        - server/app.runAssetEnrichment
+        - (*server/app.pipelineRuntime).prepareProjection
+        - github.com/riverqueue/river.AddWorker
+      only:
+        - server/internal/cloud/**
+        - server/internal/commit
+        - server/internal/processors
+        - server/internal/queue/**
+        - server/internal/sourcing
+        - server/internal/utils/upload
+        - server/app/pipeline_runtime.go
+
+  # ------------------------------------------------------ storage
+  - id: storage-reconciliation
+    why: projection writes run at startup and in the background reconciler; a foreground read never reconciles
+    calls:
+      targets:
+        - (*server/internal/storage.DefaultRepositoryManager).ReconcileAll
+        - (*server/internal/storage.DefaultRepositoryManager).ReconcileStorageLocations
+      only: [server/app, server/internal/storage]
+
+  # ------------------------------------------------------ desktop
+  - id: desktop-marker-parsing
+    why: the Desktop asks server/app about portable markers; the Server's typed readers are the only marker parsers
+    forbid_imports:
+      from: [desktop/**]
+      imports: [gopkg.in/yaml.v2, gopkg.in/yaml.v3, github.com/goccy/go-yaml]
+
+  # ------------------------------------------------------ size
+  - id: package-size
+    why: a package stays small enough to read and review whole; packages over the default only shrink
+    budgets: { default: 5000 }
+
+# Where SQL comes from for the static-sql and tables rules.
+sql:
+  queries:
+    - files: [server/internal/db/repo/queries/*.sql]
+      type: "*server/internal/db/repo.Queries"
+  executors:
+    - "*database/sql.DB"
+    - "*database/sql.Tx"
+    - "*database/sql.Conn"
+    - "*server/internal/db/catalogtx.Tx"
+    - "*server/internal/db/catalogtx.Writer"
+    - "*server/internal/db/catalogtx.Reader"
+    - "*server/internal/db.queryRouter"
+  triggers: [server/migrations/*.up.sql]
+
 exceptions:
   - from: server/internal/db/repo
     to: server/internal/storage/repocfg

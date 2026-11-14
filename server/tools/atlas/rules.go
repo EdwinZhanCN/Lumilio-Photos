@@ -30,6 +30,14 @@ type ruleKind struct {
 
 var ruleKinds = []ruleKind{
 	{name: "group_uses", set: func(r Rule) bool { return r.GroupUses }, eval: (*Atlas).groupUsesFindings},
+	{name: "calls", set: func(r Rule) bool { return r.Calls != nil }, eval: (*Atlas).callsFindings},
+	{name: "constructs", set: func(r Rule) bool { return r.Constructs != nil }, eval: (*Atlas).constructsFindings},
+	{name: "forbid_types", set: func(r Rule) bool { return r.ForbidTypes != nil }, eval: (*Atlas).forbidTypesFindings},
+	{name: "forbid_imports", set: func(r Rule) bool { return r.ForbidImports != nil }, eval: (*Atlas).forbidImportsFindings},
+	{name: "static_sql", set: func(r Rule) bool { return r.StaticSQL }, eval: (*Atlas).staticSQLFindings},
+	{name: "tables", set: func(r Rule) bool { return r.Tables != nil }, eval: (*Atlas).tablesFindings},
+	{name: "tx_purity", set: func(r Rule) bool { return r.TxPurity != nil }, eval: (*Atlas).txPurityFindings},
+	{name: "budgets", set: func(r Rule) bool { return r.Budgets != nil }, eval: (*Atlas).budgetsFindings},
 }
 
 // runRules evaluates every declared rule and reconciles its findings with its
@@ -97,8 +105,18 @@ func (a *Atlas) reconcileBaseline(ruleID string, findings []Finding) {
 // lockedBaselines is what `atlas lock` writes: every declared rule's
 // baseline with the entries that no longer occur removed. It never adds.
 func (a *Atlas) lockedBaselines() map[string][]string {
+	return a.shrunkBaselines(false)
+}
+
+// shrunkBaselines drops entries that no longer occur. With existingOnly it
+// keeps only rules that already have a baseline, so recording one new rule
+// does not mark the others as baselined.
+func (a *Atlas) shrunkBaselines(existingOnly bool) map[string][]string {
 	out := map[string][]string{}
 	for _, rule := range a.Config.Rules {
+		if _, ok := a.Baselines[rule.ID]; existingOnly && !ok {
+			continue
+		}
 		found := map[string]bool{}
 		for _, finding := range a.Findings[rule.ID] {
 			found[finding.Key] = true
@@ -121,6 +139,9 @@ func (a *Atlas) baselineRule(ruleID string) (map[string][]string, error) {
 	declared := false
 	for _, rule := range a.Config.Rules {
 		declared = declared || rule.ID == ruleID
+		if rule.ID == ruleID && rule.Budgets != nil {
+			return nil, fmt.Errorf("rule %s is a budgets rule; its ceilings are recorded by baselineCeilings", ruleID)
+		}
 	}
 	if !declared {
 		return nil, fmt.Errorf("rule %s is not declared in atlas.yaml", ruleID)
@@ -128,7 +149,7 @@ func (a *Atlas) baselineRule(ruleID string) (map[string][]string, error) {
 	if _, ok := a.Baselines[ruleID]; ok {
 		return nil, fmt.Errorf("rule %s already has a baseline; baselines only shrink (`atlas lock` drops fixed entries), and adding an entry by hand needs the owner's approval in the PR", ruleID)
 	}
-	out := a.lockedBaselines()
+	out := a.shrunkBaselines(true)
 	keys := []string{}
 	for _, finding := range a.Findings[ruleID] {
 		keys = appendUnique(keys, finding.Key)
@@ -142,4 +163,14 @@ func (a *Atlas) baselineRule(ruleID string) (map[string][]string, error) {
 // group that the importer's group does not declare in `uses`.
 func (a *Atlas) groupUsesFindings(Rule) []Finding {
 	return append([]Finding(nil), a.groupFindings...)
+}
+
+// rule returns the declared rule with an id, or nil.
+func (a *Atlas) rule(id string) *Rule {
+	for index := range a.Config.Rules {
+		if a.Config.Rules[index].ID == id {
+			return &a.Config.Rules[index]
+		}
+	}
+	return nil
 }

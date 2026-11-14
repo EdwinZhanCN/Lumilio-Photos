@@ -1,0 +1,10 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: river-child-jobs
+    why: workers never enqueue child work
+    calls:
+      targets: ["(*fx/river.Client).InsertMany"]
+      only: [fx/queue/scheduler.go]

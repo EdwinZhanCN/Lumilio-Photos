@@ -1,0 +1,2 @@
+fx/app.Wire -> (*fx/processors.AssetProcessor).ComputeMetadataTask
+fx/app.Wire -> fx/river.AddWorker
