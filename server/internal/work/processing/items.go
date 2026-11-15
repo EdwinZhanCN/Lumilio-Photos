@@ -142,7 +142,7 @@ func (r *Reader) Items(ctx context.Context, id StageID, state ItemState, limit i
 	query += pick(failed, ` ORDER BY updated DESC, subject DESC`, ` ORDER BY updated ASC, subject ASC`) + ` LIMIT ?`
 	args = append(args, limit+1)
 
-	rows, err := r.catalog.QueryContext(ctx, query, args...)
+	rows, err := r.catalog.Statements().QueryContext(ctx, query, args...)
 	if err != nil {
 		return ItemsPage{}, fmt.Errorf("read %s items: %w", id, err)
 	}

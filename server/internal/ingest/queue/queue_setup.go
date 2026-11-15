@@ -9,41 +9,27 @@ import (
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver"
-	"github.com/riverqueue/river/riverdriver/riversqlite"
 
 	"server/internal/work/jobs"
 )
 
-// riverSQLiteSplitDriver keeps every River mutation and transaction on the
-// QueueDB's sole writer while moving riversqlite's notification outbox
-// polling onto the query-only reader pool. riversqlite otherwise uses the same
-// *sql.DB for its executor and its 50ms NotificationGetAfter SELECT loop,
-// needlessly admitting read polling through the sole writer connection.
-//
-// Embedding the pinned upstream driver deliberately inherits its unstable
-// interface; the compile-time assertion and held-writer test make a River
-// upgrade fail locally if that delegation boundary changes.
-type riverSQLiteSplitDriver struct {
-	*riversqlite.Driver
-	listenerDriver *riversqlite.Driver
-	continuation   *continuationWake
+// continuationDriver wraps the catalog's River driver so a worker that
+// finishes with a continuation wakes the producer without waiting for the
+// fetch poll; see continuationWake.
+type continuationDriver struct {
+	riverdriver.Driver[*sql.Tx]
+	continuation *continuationWake
 }
 
-var _ riverdriver.Driver[*sql.Tx] = (*riverSQLiteSplitDriver)(nil)
-
-func newRiverSQLiteSplitDriver(writerPool, readerPool *sql.DB) *riverSQLiteSplitDriver {
-	return &riverSQLiteSplitDriver{
-		Driver:         riversqlite.New(writerPool),
-		listenerDriver: riversqlite.New(readerPool),
-		continuation:   newContinuationWake(),
-	}
+func newContinuationDriver(driver riverdriver.Driver[*sql.Tx]) *continuationDriver {
+	return &continuationDriver{Driver: driver, continuation: newContinuationWake()}
 }
 
-func (d *riverSQLiteSplitDriver) GetListener(params *riverdriver.GetListenenerParams) riverdriver.Listener {
-	return &continuationListener{Listener: d.listenerDriver.GetListener(params), wake: d.continuation}
+func (d *continuationDriver) GetListener(params *riverdriver.GetListenenerParams) riverdriver.Listener {
+	return &continuationListener{Listener: d.Driver.GetListener(params), wake: d.continuation}
 }
 
-func (d *riverSQLiteSplitDriver) GetExecutor() riverdriver.Executor {
+func (d *continuationDriver) GetExecutor() riverdriver.Executor {
 	return &continuationExecutor{Executor: d.Driver.GetExecutor(), wake: d.continuation}
 }
 
@@ -93,9 +79,12 @@ func validateRuntimeQueueConfigs(queues map[string]river.QueueConfig) error {
 	return fmt.Errorf("runtime queue catalog drift: missing=%v extra=%v", missing, extra)
 }
 
-func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Logger, macroWorkers int) (*river.Client[*sql.Tx], error) {
-	if writerPool == nil || readerPool == nil {
-		return nil, fmt.Errorf("River SQLite requires writer and query-only listener pools")
+// New builds the River client over driver, the QueueDB's River driver
+// (catalog.QueueDB.RiverDriver), which keeps the executor on the queue writer
+// and the listener on the queue readers.
+func New(driver riverdriver.Driver[*sql.Tx], workers *river.Workers, logger *slog.Logger, macroWorkers int) (*river.Client[*sql.Tx], error) {
+	if driver == nil {
+		return nil, fmt.Errorf("River requires the QueueDB driver")
 	}
 	if macroWorkers < 2 {
 		return nil, fmt.Errorf("River macro worker count must be at least 2")
@@ -105,7 +94,7 @@ func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Lo
 		return nil, err
 	}
 
-	client, err := river.NewClient(newRiverSQLiteSplitDriver(writerPool, readerPool), &river.Config{
+	client, err := river.NewClient(newContinuationDriver(driver), &river.Config{
 		Queues:  queues,
 		Workers: workers,
 		Logger:  logger,

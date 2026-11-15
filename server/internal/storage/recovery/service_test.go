@@ -63,7 +63,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	files := storage.NewRepositoryFSFactory(storage.NewRepositoryAccessCoordinator(), database.Queries)
-	manager, err := storage.NewRepositoryManager(database.SQL, database.Queries, zap.NewNop(), nil, files)
+	manager, err := storage.NewRepositoryManager(database.Writer, database.Reader, database.Queries, database.ReaderQueries, zap.NewNop(), nil, files)
 	if err != nil {
 		t.Fatal(err)
 	}

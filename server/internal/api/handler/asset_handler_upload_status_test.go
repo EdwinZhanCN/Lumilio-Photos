@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"server/internal/catalog/catalogtx"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
@@ -36,7 +38,7 @@ func TestLoadUploadOperationStatusesReadsOwnedIngestReceipt(t *testing.T) {
 
 	context, _ := gin.CreateTestContext(httptest.NewRecorder())
 	context.Set("user_id", int32(7))
-	statuses, err := (&AssetHandler{database: database}).loadUploadOperationStatuses(context, receiptID.String())
+	statuses, err := (&AssetHandler{reader: catalogtx.NewReader(database, nil)}).loadUploadOperationStatuses(context, receiptID.String())
 	if err != nil {
 		t.Fatalf("load upload operation statuses: %v", err)
 	}

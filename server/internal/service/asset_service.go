@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
+	"time"
+
 	"server/internal/catalog/catalogtx"
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
@@ -16,8 +19,6 @@ import (
 	aggregatesearch "server/internal/search"
 	"server/internal/search/bleveocr"
 	"server/internal/storage/trash"
-	"strings"
-	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -294,10 +295,9 @@ type PhotoMapPoint struct {
 
 type assetService struct {
 	queries                *repo.Queries
-	pool                   *sql.DB
 	writer                 *catalogtx.Writer
 	readQueries            *repo.Queries
-	readPool               *sql.DB
+	reader                 *catalogtx.Reader
 	lumen                  LumenService
 	embeddingService       EmbeddingService
 	aggregateSearch        aggregatesearch.Service
@@ -312,26 +312,20 @@ type assetService struct {
 	trash                  AssetTrash
 }
 
+// NewAssetService is the runtime constructor with explicit SQLite roles:
+// mutations use the sole writer while library and search reads use the
+// bounded query-only WAL reader and its queries. ocrIndexNotifier wakes the
+// OCR index; the durable projection request is written to Catalog state in
+// the same transaction as the asset mutation.
 func NewAssetService(
 	q *repo.Queries,
-	pool *sql.DB,
-	l LumenService,
-	e EmbeddingService,
-	ocrIndex *bleveocr.Index,
-	loggers ...*zap.Logger,
-) (AssetService, error) {
-	return newAssetService(q, pool, catalogtx.NewWriter(pool, nil), q, pool, l, e, ocrIndex, loggers...)
-}
-
-func newAssetService(
-	q *repo.Queries,
-	pool *sql.DB,
 	writer *catalogtx.Writer,
 	readQueries *repo.Queries,
-	readPool *sql.DB,
+	reader *catalogtx.Reader,
 	l LumenService,
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
+	ocrIndexNotifier OCRIndexNotifier,
 	loggers ...*zap.Logger,
 ) (AssetService, error) {
 	logger := zap.NewNop()
@@ -340,15 +334,15 @@ func newAssetService(
 	}
 	svc := &assetService{
 		queries:          q,
-		pool:             pool,
 		writer:           writer,
 		readQueries:      readQueries,
-		readPool:         readPool,
+		reader:           reader,
 		lumen:            l,
 		embeddingService: e,
+		ocrIndexNotifier: ocrIndexNotifier,
 	}
 	svc.semanticRetriever = aggregatesearch.NewEmbeddingRetriever(
-		readPool,
+		reader,
 		func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
 			embedding, err := svc.resolveSemanticQueryEmbedding(ctx, query, fast)
 			if err != nil {
@@ -367,61 +361,14 @@ func newAssetService(
 		},
 		1.0,
 	)
-	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(readPool, ocrIndex, 0.7)
-	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(readPool, 0.8)
-	svc.aggregateSearch = aggregatesearch.NewAggregateService(readPool, []aggregatesearch.Retriever{
+	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(reader, ocrIndex, 0.7)
+	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(reader, 0.8)
+	svc.aggregateSearch = aggregatesearch.NewAggregateService(readQueries, []aggregatesearch.Retriever{
 		svc.semanticRetriever,
 		svc.ocrRetriever,
 		svc.placeRetriever,
 	}, logger.Named("aggregate_search"))
 	return svc, nil
-}
-
-// NewAssetServiceWithNotifier wires the OCR wakeup notifier. The durable
-// projection request is written to Catalog state in the same transaction as
-// the asset mutation; the Catalog scheduler derives disposable River work.
-func NewAssetServiceWithNotifier(
-	q *repo.Queries,
-	pool *sql.DB,
-	l LumenService,
-	e EmbeddingService,
-	ocrIndex *bleveocr.Index,
-	ocrIndexNotifier OCRIndexNotifier,
-	loggers ...*zap.Logger,
-) (AssetService, error) {
-	created, err := NewAssetService(q, pool, l, e, ocrIndex, loggers...)
-	if err != nil {
-		return nil, err
-	}
-	if concrete, ok := created.(*assetService); ok {
-		concrete.ocrIndexNotifier = ocrIndexNotifier
-	}
-	return created, nil
-}
-
-// NewAssetServiceWithReader is the runtime constructor with explicit
-// SQLite roles: mutations use the sole writer while library/search reads use
-// the bounded query-only WAL pool.
-func NewAssetServiceWithReader(
-	q *repo.Queries,
-	pool *sql.DB,
-	writer *catalogtx.Writer,
-	readQueries *repo.Queries,
-	readPool *sql.DB,
-	l LumenService,
-	e EmbeddingService,
-	ocrIndex *bleveocr.Index,
-	ocrIndexNotifier OCRIndexNotifier,
-	loggers ...*zap.Logger,
-) (AssetService, error) {
-	created, err := newAssetService(q, pool, writer, readQueries, readPool, l, e, ocrIndex, loggers...)
-	if err != nil {
-		return nil, err
-	}
-	if concrete, ok := created.(*assetService); ok {
-		concrete.ocrIndexNotifier = ocrIndexNotifier
-	}
-	return created, nil
 }
 
 // ================================
@@ -1357,7 +1304,7 @@ func (s *assetService) applyEventScope(ctx context.Context, params QueryAssetsPa
 	if params.OwnerID == nil {
 		return QueryAssetsParams{}, event.ErrNotFound
 	}
-	resolved, _, err := event.NewResolver(s.pool).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
+	resolved, _, err := event.NewResolver(s.reader).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
 	if err != nil {
 		return QueryAssetsParams{}, err
 	}

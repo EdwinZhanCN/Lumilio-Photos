@@ -1,4 +1,8 @@
-// Package db owns the catalog and queue SQLite runtimes.
+// Package catalog owns the catalog and queue SQLite runtimes, and is the
+// only place their *sql.DB pools and the go-sqlite3 and riversqlite drivers
+// appear. Code above it holds [catalogtx.Writer] and [catalogtx.Reader]
+// handles, generated [repo.Queries], [QueueDB.RiverDriver], and
+// [IsUniqueViolation].
 //
 // [Open] opens the catalog as a [DB]: go-sqlite3 is the only driver, the
 // writer pool is fixed at one connection for product facts and desired/applied
@@ -11,7 +15,9 @@
 // busy_timeout as writer admission.
 //
 // [OpenQueue] opens [QueueDB], River's separate execution-state file with its
-// own one-writer/four-reader pools; it is disposable and
+// own one-writer/four-reader pools. [QueueDB.RiverDriver] keeps River's
+// executor on its writer and its notification listener on its readers. It is
+// disposable and
 // [OpenQueueWithRecovery] may recreate it, after which the scheduler
 // re-derives every lagging desired version from the catalog. There is
 // deliberately no catalog-to-QueueDB cutover journal.

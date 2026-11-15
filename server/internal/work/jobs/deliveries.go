@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"server/internal/catalog/catalogtx"
 )
 
 // DeliveryGroup is the execution state of one macro kind (and projection kind
@@ -18,8 +20,8 @@ type DeliveryGroup struct {
 }
 
 // ReadDeliveryGroups aggregates River deliveries for read-only monitoring.
-func ReadDeliveryGroups(ctx context.Context, queue *sql.DB) ([]DeliveryGroup, error) {
-	rows, err := queue.QueryContext(ctx, `
+func ReadDeliveryGroups(ctx context.Context, queue *catalogtx.Reader) ([]DeliveryGroup, error) {
+	rows, err := queue.Statements().QueryContext(ctx, `
  SELECT kind, COALESCE(json_extract(args,'$.projectionKind'),''),
   COUNT(*) FILTER (WHERE state='running'),
   COUNT(*) FILTER (WHERE state='retryable'),

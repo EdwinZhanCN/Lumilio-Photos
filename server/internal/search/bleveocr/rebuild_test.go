@@ -69,7 +69,7 @@ func TestOutboxCrashAfterBleveBatchRetriesIdempotently(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
 
 	replaceOCRText(t, database, assetID, "updated crash recovery")
-	writer := NewWriter(database.SQL, database.Writer, database.Queries, index)
+	writer := NewWriter(database.Writer, database.Queries, index)
 	crash := errors.New("simulated crash before SQLite acknowledgement")
 	writer.afterApply = func() error { return crash }
 	_, err = writer.ProcessBatch(ctx, 16)

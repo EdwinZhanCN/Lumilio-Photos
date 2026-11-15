@@ -32,11 +32,11 @@ func TestQueueHandlerLoadQueueSummariesRunsAgainstMigratedSQLiteSchema(t *testin
 	})
 	require.NoError(t, database.Migrate(ctx))
 
-	summaries, err := NewQueueHandler(database.SQL, database.ReaderSQL).loadQueueSummaries(ctx)
+	summaries, err := NewQueueHandler(database.Reader, database.Reader).loadQueueSummaries(ctx)
 	require.NoError(t, err)
 	require.Empty(t, summaries)
 
-	handler := NewQueueHandler(database.SQL, database.ReaderSQL)
+	handler := NewQueueHandler(database.Reader, database.Reader)
 	serve := func(method, target string, invoke func(*gin.Context), params ...gin.Param) *httptest.ResponseRecorder {
 		recorder := httptest.NewRecorder()
 		requestContext, _ := gin.CreateTestContext(recorder)

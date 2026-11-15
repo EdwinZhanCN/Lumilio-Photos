@@ -19,18 +19,18 @@ import (
 // command, stage retry. Reads use query-only pools; retry is bound separately
 // to the Catalog writer.
 type QueueHandler struct {
-	dbpool     *sql.DB
-	catalog    *sql.DB
+	queue      *catalogtx.Reader
+	catalog    *catalogtx.Reader
 	processing *processing.Reader
 	retrier    *processing.Retrier
 }
 
-// NewQueueHandler binds the QueueDB and Catalog reader pools.
-func NewQueueHandler(dbpool, catalog *sql.DB) *QueueHandler {
+// NewQueueHandler binds the QueueDB and Catalog query-only readers.
+func NewQueueHandler(queue, catalog *catalogtx.Reader) *QueueHandler {
 	return &QueueHandler{
-		dbpool:     dbpool,
+		queue:      queue,
 		catalog:    catalog,
-		processing: processing.NewReader(catalog, dbpool),
+		processing: processing.NewReader(catalog, queue),
 	}
 }
 
@@ -180,7 +180,7 @@ func (h *QueueHandler) GetProcessingDiagnostics(c *gin.Context) {
 		}
 	}
 	deliveries := DeliveryStatsDTO{Queues: queues}
-	err = h.dbpool.QueryRowContext(ctx, `SELECT
+	err = h.queue.Statements().QueryRowContext(ctx, `SELECT
  COUNT(*) FILTER (WHERE state='available'), COUNT(*) FILTER (WHERE state='scheduled'),
  COUNT(*) FILTER (WHERE state='running'), COUNT(*) FILTER (WHERE state='retryable'),
  COUNT(*) FILTER (WHERE state='completed'), COUNT(*) FILTER (WHERE state='cancelled'),
@@ -259,7 +259,7 @@ ORDER BY
   qn.name
 `
 
-	rows, err := h.dbpool.QueryContext(ctx, query)
+	rows, err := h.queue.Statements().QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,7 @@ WHERE rn <= ?
 ORDER BY queue, rn
 `
 
-	rows, err := h.dbpool.QueryContext(ctx, query, limit)
+	rows, err := h.queue.Statements().QueryContext(ctx, query, limit)
 	if err != nil {
 		return err
 	}

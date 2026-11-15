@@ -333,6 +333,27 @@ rules:
     group_uses: true
 
   # ------------------------------------------------------ catalog writer
+  # Database boundary (server-structure plan, rules 1 and 4): SQLite is an
+  # implementation detail of the catalog.
+  - id: catalog-engine-drivers
+    why: SQLite is the catalog's implementation detail; only catalog packages import an engine driver, and the catalog builds the River driver
+    forbid_imports:
+      from: [server/**, desktop/**]
+      except: [server/internal/catalog/**]
+      imports: [github.com/mattn/go-sqlite3, github.com/riverqueue/river/riverdriver/riversqlite]
+
+  - id: catalog-sql-handles
+    why: code above the catalog reaches SQLite only through catalogtx.Reader and catalogtx.Writer, so the pool a read or write uses is a type, not a choice
+    forbid_types:
+      in: [server/**, desktop/**]
+      except: [server/internal/catalog/**]
+      types: ["*database/sql.DB"]
+      expressions: true
+
+  - id: catalog-sql-sites
+    why: hand-written SQL only shrinks; new SQL is a sqlc query unless it is chosen at run time, and lives with the tables its package owns
+    budgets: { measure: sql, default: 0, except: [server/internal/catalog/**] }
+
   - id: catalog-transactions
     why: one writer; every catalog transaction is named, admitted, and measured by catalogtx
     calls:
@@ -539,7 +560,7 @@ invariants:
         - rule:storage-reconciliation
         - go:server/app.TestForegroundReadsAnswerWhileTheWriterIsHeld
         - go:server/app.TestSetupStatusAnswersWhileTheWriterIsHeldBeforeSetupFinishes
-        - go:server/app.TestProductionCatalogWiring
+        - rule:catalog-sql-handles
         - go:server/internal/catalog.TestForegroundReadStaysAvailableWithQueuedWriter
     - title: Originals are never rewritten; deletion follows explicit lifecycle policy.
       enforced_by:
@@ -583,6 +604,7 @@ sql:
     - "*server/internal/catalog/catalogtx.Tx"
     - "*server/internal/catalog/catalogtx.Writer"
     - "*server/internal/catalog/catalogtx.Reader"
+    - "server/internal/catalog/catalogtx.Statements"
     - "*server/internal/catalog.queryRouter"
   triggers: [server/migrations/*.up.sql]
 

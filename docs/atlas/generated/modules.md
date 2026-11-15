@@ -132,7 +132,7 @@ Uses: `foundation`, `media`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `server/internal/catalog` | Package db owns the catalog and queue SQLite runtimes. | [`server/internal/catalog/doc.go`](../../../server/internal/catalog/doc.go) |
+| `server/internal/catalog` | Package catalog owns the catalog and queue SQLite runtimes, and is the only place their *sql.DB pools and the go-sqlite3 and riversqlite drivers appear. | [`server/internal/catalog/doc.go`](../../../server/internal/catalog/doc.go) |
 | `server/internal/catalog/backup` | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | [`server/internal/catalog/backup/doc.go`](../../../server/internal/catalog/backup/doc.go) |
 | `server/internal/catalog/catalogtx` | Package catalogtx is the closed application transaction capability for the catalog. | [`server/internal/catalog/catalogtx/doc.go`](../../../server/internal/catalog/catalogtx/doc.go) |
 | `server/internal/catalog/conformance` | Package conformance contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | [`server/internal/catalog/conformance/doc.go`](../../../server/internal/catalog/conformance/doc.go) |

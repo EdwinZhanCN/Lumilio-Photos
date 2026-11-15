@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 
 	"server/config"
+	"server/internal/catalog/catalogtx"
 	migrations "server/migrations"
 )
 
@@ -42,10 +43,10 @@ type recordedBackup struct {
 	stepTwoAtBackup bool
 }
 
-func (r *recordedBackup) backup(ctx context.Context, source *sql.DB, from, to int) (string, error) {
+func (r *recordedBackup) backup(ctx context.Context, source *catalogtx.Reader, from, to int) (string, error) {
 	r.calls++
 	r.from, r.to = from, to
-	r.stepTwoAtBackup = tableExists(ctx, source, "step_two")
+	r.stepTwoAtBackup = tableExists(ctx, source.Pool(), "step_two")
 	return "/backups/pre-upgrade-test.sqlite3", nil
 }
 

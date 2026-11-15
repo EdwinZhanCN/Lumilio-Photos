@@ -23,23 +23,19 @@ import (
 
 type EventHandler struct {
 	service   *event.Service
-	db        *sql.DB
 	writer    *catalogtx.Writer
-	reader    *sql.DB
+	reader    *catalogtx.Reader
 	shares    service.ResolvedSnapshotShareService
 	relations *event.RelationService
 }
 
-func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
-	return NewEventHandlerWithReader(eventService, db, catalogtx.NewWriter(db, nil), db, shares)
-}
-
-func NewEventHandlerWithReader(eventService *event.Service, db *sql.DB, writer *catalogtx.Writer, reader *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
-	handler := &EventHandler{
-		service: eventService, db: db, writer: writer, reader: reader, shares: shares,
+// NewEventHandler serves Events, writing user state through writer and
+// reading lists and relations through the query-only reader.
+func NewEventHandler(eventService *event.Service, writer *catalogtx.Writer, reader *catalogtx.Reader, shares service.ResolvedSnapshotShareService) *EventHandler {
+	return &EventHandler{
+		service: eventService, writer: writer, reader: reader, shares: shares,
 		relations: event.NewRelationService(reader),
 	}
-	return handler
 }
 
 type eventCursor struct {
@@ -95,7 +91,7 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 			return
 		}
 	}
-	rows, err := h.reader.QueryContext(c, `
+	rows, err := h.reader.Statements().QueryContext(c, `
 SELECT e.event_id FROM events e
 WHERE e.owner_id=? AND e.status='active' AND (? OR e.is_hidden=0)
 AND EXISTS (
@@ -426,7 +422,7 @@ func (h *EventHandler) GetRebuildStatus(c *gin.Context) {
 	}
 	var response dto.EventRebuildStatusDTO
 	var paused int
-	err := h.reader.QueryRowContext(c, `
+	err := h.reader.Statements().QueryRowContext(c, `
 SELECT active_algorithm_version,automatic_rebuild_paused,revision,source_revision,published_revision,
  (SELECT count(*) FROM event_dirty_ranges WHERE owner_id=?)
 FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
@@ -443,7 +439,7 @@ FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
 	}
 	response.Initialized, response.Paused = true, paused != 0
 	response.Pending = response.SourceRevision > response.PublishedRevision
-	rows, rowsErr := h.reader.QueryContext(c, `
+	rows, rowsErr := h.reader.Statements().QueryContext(c, `
 SELECT run_id,state,COALESCE(error_code,'') FROM event_rebuild_runs
 WHERE owner_id=? ORDER BY requested_at DESC,run_id DESC LIMIT 20`, ownerID)
 	if rowsErr != nil {
@@ -801,7 +797,7 @@ func (h *EventHandler) AddEventMembers(c *gin.Context) {
 
 func (h *EventHandler) pending(c *gin.Context, ownerID int32) bool {
 	var pending bool
-	_ = h.reader.QueryRowContext(c, `
+	_ = h.reader.Statements().QueryRowContext(c, `
 SELECT source_revision>published_revision FROM event_owner_state WHERE owner_id=?`, ownerID).Scan(&pending)
 	return pending
 }

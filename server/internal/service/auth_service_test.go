@@ -18,7 +18,7 @@ import (
 func TestNewAuthService_UsesSecretKeyFilePath(t *testing.T) {
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
 
-	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
+	svc, err := NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)
 	require.Len(t, svc.jwtSecret, 32)
 
@@ -28,7 +28,7 @@ func TestNewAuthService_UsesSecretKeyFilePath(t *testing.T) {
 }
 
 func TestNewAuthService_RejectsRawSecretText(t *testing.T) {
-	_, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: "raw-secret-value"})
+	_, err := NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: "raw-secret-value"})
 	require.EqualError(t, err, "initialize root secret key: secret key file path must be absolute")
 }
 
@@ -36,7 +36,7 @@ func TestNewAuthService_UsesConfiguredDerivedSecretPath(t *testing.T) {
 	storageLocation := filepath.Join(t.TempDir(), "storage-root")
 	keyFile := filepath.Join(storageLocation, ".secrets", "lumilio_secret_key")
 
-	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
+	svc, err := NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)
 	require.Len(t, svc.jwtSecret, 32)
 
@@ -45,7 +45,7 @@ func TestNewAuthService_UsesConfiguredDerivedSecretPath(t *testing.T) {
 }
 
 func TestCSRFTokenIsBoundToRefreshSession(t *testing.T) {
-	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
+	svc, err := NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
 	require.NoError(t, err)
 
 	token := svc.CSRFTokenForRefresh("refresh-session-a")
@@ -58,7 +58,7 @@ func TestCSRFTokenIsBoundToRefreshSession(t *testing.T) {
 }
 
 func TestRequiredPasswordChangeTokenIsPurposeBoundAndCarriesAuthVersion(t *testing.T) {
-	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
+	svc, err := NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
 	require.NoError(t, err)
 
 	response, err := svc.issueRequiredPasswordChange(repo.User{
@@ -81,7 +81,7 @@ func TestRequiredPasswordChangeTokenIsPurposeBoundAndCarriesAuthVersion(t *testi
 }
 
 func TestRequiredPasswordChangeTokenRejectsWrongPurposeAndSigningMethod(t *testing.T) {
-	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
+	svc, err := NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: filepath.Join(t.TempDir(), "secret")})
 	require.NoError(t, err)
 
 	now := time.Now()
@@ -114,7 +114,7 @@ func TestRequiredPasswordChangeTokenRejectsWrongPurposeAndSigningMethod(t *testi
 }
 
 func TestPasskeyIdentityFollowsCurrentRequestOrigin(t *testing.T) {
-	svc, err := NewAuthService(nil, nil, config.AuthConfig{
+	svc, err := NewAuthService(nil, nil, nil, config.AuthConfig{
 		SecretKeyFile: filepath.Join(t.TempDir(), "secret"),
 		Passkey: config.PasskeyConfig{
 			Enabled: true,

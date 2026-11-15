@@ -101,7 +101,6 @@ type AuthResponse struct {
 type AuthService struct {
 	queries                   *repo.Queries
 	readQueries               *repo.Queries
-	db                        *sql.DB
 	writer                    *catalogtx.Writer
 	jwtSecret                 []byte
 	mfaTokenSecret            []byte
@@ -141,10 +140,13 @@ const mediaTokenScope = "media"
 
 const csrfTokenPrefix = "v1."
 
-// NewAuthService creates a new authentication service. An optional zap logger
-// can be supplied for structured auth/audit logging; when omitted, a no-op
-// logger is used so callers (and tests) without logging stay valid.
-func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, loggers ...*zap.Logger) (*AuthService, error) {
+// NewAuthService creates a new authentication service. Reads use
+// readQueries when it is set, else queries; multi-statement mutations run in
+// named writer transactions, or straight on queries when writer is nil. An
+// optional zap logger can be supplied for structured auth/audit logging; when
+// omitted, a no-op logger is used so callers (and tests) without logging stay
+// valid.
+func NewAuthService(queries, readQueries *repo.Queries, writer *catalogtx.Writer, cfg config.AuthConfig, loggers ...*zap.Logger) (*AuthService, error) {
 	logger := zap.NewNop()
 	securityLogger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
@@ -172,11 +174,10 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 		}
 	}
 
-	return &AuthService{
+	service := &AuthService{
 		queries:                   queries,
-		readQueries:               queries,
-		db:                        db,
-		writer:                    catalogtx.NewWriter(db, nil),
+		readQueries:               readQueries,
+		writer:                    writer,
 		jwtSecret:                 jwtSecret,
 		mfaTokenSecret:            mfaTokenSecret,
 		passkeyTokenSecret:        passkeyTokenSecret,
@@ -191,25 +192,10 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 		passkeyName:               passkeyName,
 		logger:                    logger,
 		securityLogger:            securityLogger,
-	}, nil
-}
-
-func NewAuthServiceWithReader(
-	queries *repo.Queries,
-	readQueries *repo.Queries,
-	db *sql.DB,
-	writer *catalogtx.Writer,
-	cfg config.AuthConfig,
-	loggers ...*zap.Logger,
-) (*AuthService, error) {
-	service, err := NewAuthService(queries, db, cfg, loggers...)
-	if err != nil {
-		return nil, err
 	}
-	if readQueries != nil {
-		service.readQueries = readQueries
+	if service.readQueries == nil {
+		service.readQueries = queries
 	}
-	service.writer = writer
 	return service, nil
 }
 

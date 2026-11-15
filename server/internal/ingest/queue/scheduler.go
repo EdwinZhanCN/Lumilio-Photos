@@ -35,7 +35,7 @@ type Scheduler struct {
 }
 
 func NewScheduler(reader *catalogtx.Reader, writer *catalogtx.Writer, client *river.Client[*sql.Tx], wake <-chan struct{}, batchSize int, interval time.Duration) (*Scheduler, error) {
-	if reader == nil || reader.Pool() == nil || writer == nil || client == nil || wake == nil || batchSize < 1 || interval <= 0 {
+	if reader == nil || writer == nil || client == nil || wake == nil || batchSize < 1 || interval <= 0 {
 		return nil, errors.New("catalog scheduler requires catalog capabilities, River client, and positive bounds")
 	}
 	return &Scheduler{reader: reader, writer: writer, client: client, wake: wake, batchSize: batchSize, interval: interval}, nil
@@ -123,7 +123,7 @@ func (s *Scheduler) ensureOCRState(ctx context.Context) error {
 }
 
 func (s *Scheduler) derive(ctx context.Context) ([]derivedWork, error) {
-	db := s.reader.Pool()
+	db := s.reader.Statements()
 	work := make([]derivedWork, 0, s.batchSize)
 
 	ingestRows, err := db.QueryContext(ctx, `SELECT receipt_id,subject_id FROM catalog_operation_receipts WHERE kind='ingest' AND state='pending' ORDER BY updated_at,receipt_id LIMIT ?`, s.batchSize)

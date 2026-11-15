@@ -224,10 +224,10 @@ func newAwaitingAgentFixture(t *testing.T, provider LLMConfigProvider) awaitingA
 		Role: "user", WebauthnUserHandle: []byte("agent-resume-test-handle"),
 	})
 	require.NoError(t, err)
-	libraries := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.SQL)
+	libraries := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.Reader)
 	refStore := ref.NewMemoryStore(0, 0)
 	service := NewAgentService(
-		catalog.Queries, catalog.SQL, catalog.Writer, provider, refStore, libraries,
+		catalog.Queries, catalog.Writer, provider, refStore, libraries,
 		NewConversationStore(0), "",
 	).(*agentService)
 	thread, err := service.EnsureThread(ctx, user.UserID, "resume-thread", "free", ThreadBindings{})

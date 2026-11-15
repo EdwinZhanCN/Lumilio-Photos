@@ -19,7 +19,7 @@ import (
 func TestAuthorizedLibraryReadOCRDocumentsIsOwnerScopedAndOrdered(t *testing.T) {
 	catalog, ids := openAuthorizedLibraryOCRTestCatalog(t)
 	ctx := context.Background()
-	library := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.SQL).ForUser(1)
+	library := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.Reader).ForUser(1)
 
 	rows, err := library.ReadOCRDocuments(ctx, []uuid.UUID{
 		ids.ownerPhoto,

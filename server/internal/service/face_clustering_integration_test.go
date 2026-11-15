@@ -48,7 +48,7 @@ func TestFaceRebuildConvergesThroughBoundedPublishes(t *testing.T) {
 	}
 
 	ownerID := int32(1)
-	service := NewFaceService(database.Queries, nil, database.SQL, database.Writer)
+	service := NewFaceService(database.Queries, nil, database.Writer)
 	result, err := service.RebuildFaceClusters(ctx, uuid.NullUUID{UUID: repositoryID, Valid: true}, &ownerID)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestFaceRebuildReleasesWriterBeforeDerivedConvergence(t *testing.T) {
 	defer cancel()
 	database := openFaceClusteringDatabase(t, ctx)
 
-	service := NewFaceService(database.Queries, nil, database.SQL, database.Writer).(*faceService)
+	service := NewFaceService(database.Queries, nil, database.Writer).(*faceService)
 	rebuildOutsideWriter := make(chan struct{}, 1)
 	releaseRebuild := make(chan struct{})
 	var releaseOnce sync.Once

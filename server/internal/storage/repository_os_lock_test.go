@@ -145,7 +145,7 @@ func TestRepositoryOSLockCoordinatesProcessAndReleasesAfterCrash(t *testing.T) {
 func TestRuntimeStorageOwnershipKeepsUnavailableRepositoryRegistered(t *testing.T) {
 	catalog, first := newCatalogRepositoryManager(t)
 	initializeDefaultStorageForTest(t, first, filepath.Join(t.TempDir(), "default"))
-	second, err := NewRepositoryManager(catalog.SQL, catalog.Queries, zap.NewNop(), nil, NewRepositoryFSFactory(nil, catalog.Queries))
+	second, err := NewRepositoryManager(catalog.Writer, catalog.Reader, catalog.Queries, catalog.ReaderQueries, zap.NewNop(), nil, NewRepositoryFSFactory(nil, catalog.Queries))
 	if err != nil {
 		t.Fatal(err)
 	}

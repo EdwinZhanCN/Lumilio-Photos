@@ -56,6 +56,13 @@ fixture in `server/tools/atlas`; see the Rules section of the Atlas README.
 - A `package-size` finding means the package grew past its ceiling, which
   is its size when the rule landed. Move code out or split the package;
   never raise a ceiling.
+- A `catalog-sql-sites` finding means a package gained hand-written SQL.
+  Write a sqlc query, or keep the dynamic SQL in the package that owns the
+  table; never raise a ceiling.
+- A `catalog-sql-handles` or `catalog-engine-drivers` finding means code
+  above `catalog` reached a `*sql.DB` or an engine driver. Take a
+  `catalogtx.Reader` or `catalogtx.Writer` (`Reader.Statements()` for an
+  unnamed read), or add the helper to `catalog` (`catalog.IsUniqueViolation`).
 - An `invariant "…"` problem means a bullet under "Cross-cutting
   invariants" in `docs/architecture.md` and the `invariants:` registry in
   `atlas.yaml` disagree. Name the rule, test, or Task target that enforces a
@@ -126,6 +133,13 @@ code, and generated files are current", with no notice left. Commit
 - Every move PR: `task atlas:movecheck -- --base origin/dev` and paste the
   report into the PR. Each "changed body" line gets a one-line reason; a
   pure move has none.
+- A move carries its ceilings. When a package's directory changes, rename its
+  key under `ceilings` in `atlas.lock.json`. When code moves between
+  packages, edit the lock by hand so the `package-size` lines and
+  `catalog-sql-sites` call sites leave the source package and arrive in the
+  destination; the total never rises, and movecheck showing pure moves is
+  the evidence. `task atlas:lock` never raises a ceiling, and
+  `task atlas:baseline` refuses a rule that already has ceilings.
 
 ## Known failure modes
 

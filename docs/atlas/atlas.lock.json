@@ -4,9 +4,9 @@
       "go:core.AgentService": "d81467cd101b6f0e",
       "go:core.AgentService.AskAgent": "ed008ed2f3235b5b",
       "go:core.AgentService.ResumeAgent": "26e7cea545317f92",
-      "go:core.EffectRuntime": "1108f0b2ceb9a3f4",
-      "go:core.EffectRuntime.Commit": "cecdee347a65c3f0",
-      "go:core.EffectRuntime.Prepare": "e35a2c042bd70588",
+      "go:core.EffectRuntime": "1b9e899cfe4dd5a7",
+      "go:core.EffectRuntime.Commit": "851b86c8cf1580aa",
+      "go:core.EffectRuntime.Prepare": "62db67e2f725353f",
       "go:core.EffectRuntime.Reject": "d18f3d585e3a81ea",
       "go:core.SideChannelEvent": "e88de19b6495dc46",
       "go:core.ToolDependencies.CreateRef": "8c942f89fca056a3",
@@ -31,7 +31,7 @@
     "asset-processing": {
       "go:artifact.Store": "40b7808c63b34336",
       "go:bleveocr.Index": "86f49a74107230c4",
-      "go:bleveocr.Writer": "f1ae366249a2c8d7",
+      "go:bleveocr.Writer": "f69667b775cd3fdb",
       "go:commit.Coordinator": "ee857ece1bceae17",
       "go:commit.Coordinator.ApplyAssetDerivatives": "10a52b2c3476d308",
       "go:commit.Coordinator.ApplyAssetMetadata": "f1a8def9fcbb366a",
@@ -72,7 +72,7 @@
       "go:queue.SchedulerWake": "94316fdd1837e84d",
       "go:queue.assetMacroWorker.work": "ee151db46e97780a",
       "go:server/app.pipelineRuntime.analyze": "4d9d8ddb6b0ee596",
-      "go:server/app.run": "68f7ffca8942202b",
+      "go:server/app.run": "395a8bcc9e4b5264",
       "go:server/internal/storage.RepositoryFS": "33ecd8a928f607fa"
     },
     "bootstrap": {
@@ -105,12 +105,12 @@
       "go:handler.AssetHandler.SearchAssets": "5367bfbdd172fcc3",
       "go:repo.Queries": "b5241d595e0f537e",
       "go:repo.Queries.GetMediaItemRefsUnified": "76745874ebf9ece1",
-      "go:search.BleveOCRRetriever": "114ac5415510100a",
-      "go:search.BleveOCRRetriever.Retrieve": "0dbcd0d461bb0752",
-      "go:search.EmbeddingRetriever": "227c9e86ab3a9103",
-      "go:search.EmbeddingRetriever.RetrieveSet": "bd62cb19719cab62",
+      "go:search.BleveOCRRetriever": "7c57c92ca399e989",
+      "go:search.BleveOCRRetriever.Retrieve": "02417b1041c5518d",
+      "go:search.EmbeddingRetriever": "40e8e78d354eef3a",
+      "go:search.EmbeddingRetriever.RetrieveSet": "8f537e0bc8bd5399",
       "go:search.FuseSet": "646c4391b1acb2da",
-      "go:search.NewPlaceRetriever": "095fd30ebf2c076a",
+      "go:search.NewPlaceRetriever": "1b4fdda0734ba679",
       "go:service.AssetService": "2f8b867e5923edfb",
       "go:service.AssetService.SearchBrowseItems": "191c2596bd033455",
       "go:service.LumenService": "4d2efa8e41ea1092",
@@ -147,7 +147,7 @@
       "go:handler.AuthHandler.Login": "d01b2000bf741ab9",
       "go:handler.AuthHandler.installBrowserSession": "11e91b1fc2ffa92a",
       "go:ratelimit.Limiter": "2872fd39f5f233f7",
-      "go:service.AuthService": "5d3aa0eca3fd71f4",
+      "go:service.AuthService": "842dcac78c2c1caf",
       "go:service.AuthService.Login": "6ef6ec6ec800ee22",
       "go:service.AuthService.VerifyLoginMFA": "dd5274d5df1ea319",
       "ts:AuthProvider": "8aa4ba89acbb3bc1",
@@ -158,9 +158,9 @@
       "go:api.NewRouter": "dc5192b593fd0234",
       "go:api.RegisterSPA": "acbd734046d4f776",
       "go:bleveocr.Index": "86f49a74107230c4",
-      "go:bleveocr.Writer": "f1ae366249a2c8d7",
+      "go:bleveocr.Writer": "f69667b775cd3fdb",
       "go:catalog.DB": "1222fe1b358cdc5a",
-      "go:catalog.QueueDB": "b98412ec8dc89cdf",
+      "go:catalog.QueueDB": "43edb6359eee2902",
       "go:commit.Coordinator": "ee857ece1bceae17",
       "go:config.LoadAppConfig": "11fae31f7cdf5aae",
       "go:desktop/internal/runtime.Controller": "f6f7b2088f958ece",
@@ -185,7 +185,7 @@
     "upload-to-catalog": {
       "go:commit.Coordinator": "ee857ece1bceae17",
       "go:commit.Coordinator.ApplyIngestReceipt": "b54f92b3a7236756",
-      "go:handler.AssetHandler": "7a7a1bc851fa2d11",
+      "go:handler.AssetHandler": "cc6348dd01e3f461",
       "go:handler.AssetHandler.PrecheckUpload": "916bdb10163993be",
       "go:handler.AssetHandler.StreamUploadOperationStatus": "324fed9fc28901f0",
       "go:handler.AssetHandler.enqueueStagingCommit": "2ba49c13279118b5",
@@ -210,7 +210,10 @@
   },
   "baselines": {
     "asset-purge": [],
+    "catalog-engine-drivers": [],
     "catalog-handle-imports": [],
+    "catalog-sql-handles": [],
+    "catalog-sql-sites": [],
     "catalog-transactions": [],
     "desktop-marker-parsing": [],
     "execution-governor": [],
@@ -261,11 +264,28 @@
     ]
   },
   "ceilings": {
+    "catalog-sql-sites": {
+      "server/app": 3,
+      "server/internal/agent/core": 9,
+      "server/internal/api/handler": 18,
+      "server/internal/event": 60,
+      "server/internal/ingest/commit": 30,
+      "server/internal/ingest/queue": 11,
+      "server/internal/lifecycle": 9,
+      "server/internal/search": 4,
+      "server/internal/service": 28,
+      "server/internal/storage": 27,
+      "server/internal/storage/artifact": 2,
+      "server/internal/storage/trash": 1,
+      "server/internal/work/jobs": 1,
+      "server/internal/work/pipeline": 15,
+      "server/internal/work/processing": 13
+    },
     "package-size": {
-      "server/internal/api/handler": 18129,
+      "server/internal/api/handler": 18115,
       "server/internal/catalog/repo": 31459,
-      "server/internal/service": 20116,
-      "server/internal/storage": 14605
+      "server/internal/service": 19960,
+      "server/internal/storage": 14574
     }
   }
 }

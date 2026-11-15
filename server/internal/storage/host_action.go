@@ -241,15 +241,15 @@ func (rm *DefaultRepositoryManager) GetHostAction(ctx context.Context, id string
 	if _, err := uuid.Parse(strings.TrimSpace(id)); err != nil {
 		return HostAction{}, fmt.Errorf("invalid host action id: %w", err)
 	}
-	return rm.scanHostAction(rm.readerDatabase.QueryRowContext(ctx, hostActionSelect+" WHERE action_id = ?", id))
+	return rm.scanHostAction(rm.reader.Statements().QueryRowContext(ctx, hostActionSelect+" WHERE action_id = ?", id))
 }
 
 func (rm *DefaultRepositoryManager) getHostActionByRequestID(ctx context.Context, requestID string) (HostAction, error) {
-	return rm.scanHostAction(rm.readerDatabase.QueryRowContext(ctx, hostActionSelect+" WHERE request_id = ?", requestID))
+	return rm.scanHostAction(rm.reader.Statements().QueryRowContext(ctx, hostActionSelect+" WHERE request_id = ?", requestID))
 }
 
 func (rm *DefaultRepositoryManager) ListPendingHostActions(ctx context.Context) ([]HostAction, error) {
-	rows, err := rm.readerDatabase.QueryContext(ctx, hostActionSelect+" WHERE status IN ('pending', 'needs_decision') ORDER BY created_at")
+	rows, err := rm.reader.Statements().QueryContext(ctx, hostActionSelect+" WHERE status IN ('pending', 'needs_decision') ORDER BY created_at")
 	if err != nil {
 		return nil, fmt.Errorf("list pending host actions: %w", err)
 	}
@@ -341,7 +341,7 @@ func (rm *DefaultRepositoryManager) RecoverHostActions(ctx context.Context) erro
 // actor. It is intentionally actor-scoped so a refreshed browser can recover
 // its tasks without exposing another administrator's workflow.
 func (rm *DefaultRepositoryManager) ListHostActionsForActor(ctx context.Context, actorUserID int32) ([]HostAction, error) {
-	rows, err := rm.readerDatabase.QueryContext(ctx, hostActionSelect+`
+	rows, err := rm.reader.Statements().QueryContext(ctx, hostActionSelect+`
 		WHERE actor_user_id = ? AND status IN ('pending', 'running', 'needs_decision')
 		ORDER BY created_at DESC`, actorUserID)
 	if err != nil {

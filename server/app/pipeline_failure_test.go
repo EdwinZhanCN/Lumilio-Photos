@@ -95,7 +95,7 @@ func (f failureFixture) freshQueueSchedules(t *testing.T, want int) {
 	defer q.Close(context.Background())
 	workers := river.NewWorkers()
 	river.AddWorker(workers, queue.NewAnalyzeAssetWorker(nil))
-	client, err := queue.New(q.SQL, q.ReaderSQL, workers, slog.New(slog.NewTextHandler(io.Discard, nil)), 2)
+	client, err := queue.New(q.RiverDriver(), workers, slog.New(slog.NewTextHandler(io.Discard, nil)), 2)
 	if err != nil {
 		t.Fatal(err)
 	}

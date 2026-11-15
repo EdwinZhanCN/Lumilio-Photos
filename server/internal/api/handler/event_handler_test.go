@@ -98,7 +98,7 @@ SET generated_cover_media_item_id = CASE event_id
 END;`)
 	require.NoError(t, err)
 
-	handler := NewEventHandler(event.NewService(database.SQL), database.SQL, nil)
+	handler := NewEventHandler(event.NewService(database.Writer, database.Reader), database.Writer, database.Reader, nil)
 	recorder := httptest.NewRecorder()
 	requestContext, _ := gin.CreateTestContext(recorder)
 	requestContext.Set("current_user", &service.UserResponse{UserID: 1, Username: "owner"})
@@ -235,7 +235,7 @@ VALUES(?,?,'original',0,1)`, assetID, mediaItemID)
 		require.NoError(t, tx.Commit())
 	}
 
-	eventService := event.NewService(database.SQL)
+	eventService := event.NewService(database.Writer, database.Reader)
 	markFactsChanged()
 	_, err = eventService.RebuildOwner(ctx, 1, false)
 	require.NoError(t, err)
@@ -252,7 +252,7 @@ VALUES(?,?,'original',0,1)`, assetID, mediaItemID)
 	prepared, err := eventService.PrepareAtRevision(ctx, 1, revision)
 	require.NoError(t, err)
 
-	handler := NewEventHandler(eventService, database.SQL, nil)
+	handler := NewEventHandler(eventService, database.Writer, database.Reader, nil)
 	recorder := httptest.NewRecorder()
 	requestContext, _ := gin.CreateTestContext(recorder)
 	requestContext.Set("current_user", &service.UserResponse{UserID: 1, Username: "owner"})

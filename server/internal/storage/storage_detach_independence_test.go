@@ -81,7 +81,7 @@ func TestRemoveOfflineRepositoryClearsStaleActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := manager.readerDatabase.ExecContext(ctx, `
+	if _, err := manager.writer.Pool().ExecContext(ctx, `
 		UPDATE repositories SET activity = 'scanning', updated_at = ? WHERE repo_id = ?
 	`, now, created.Repository.RepoID); err != nil {
 		t.Fatal(err)
@@ -248,7 +248,7 @@ func TestDeleteExternalStorageLocationWithMissingPathPreservesFiles(t *testing.T
 		t.Fatalf("removed storageLocation lookup = %v, want sql.ErrNoRows", err)
 	}
 	var auditFilesPreserved int
-	if err := manager.readerDatabase.QueryRowContext(ctx, `
+	if err := manager.writer.Pool().QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_audit_events
 		WHERE request_id = 'delete-missing-external'
 		  AND action = 'remove_storage_location'

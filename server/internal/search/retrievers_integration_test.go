@@ -109,7 +109,7 @@ func TestEmbeddingRetrieverUsesVec1FiltersAndExactReranking(t *testing.T) {
 	}
 
 	retriever := NewEmbeddingRetriever(
-		catalog.SQL,
+		catalog.Reader,
 		func(context.Context, string, bool) (QueryEmbedding, error) {
 			return QueryEmbedding{Model: "fixture", Vector: queryVector}, nil
 		},

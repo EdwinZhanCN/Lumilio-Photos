@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
 	"server/internal/agent/core"
 	"server/internal/agent/tools"
 	"server/internal/foundation/testutil"
-	"testing"
 )
 
 func TestMusicAgentEffectAtomicOrderOwnershipAndReplay(t *testing.T) {
@@ -21,7 +23,7 @@ func TestMusicAgentEffectAtomicOrderOwnershipAndReplay(t *testing.T) {
  INSERT INTO agent_runs(run_id,user_id,thread_id,started_at,created_at,updated_at) VALUES(?,1,?,1,1,1)`, thread, run, thread)
 	require.NoError(t, err)
 	tools.RegisterMusic()
-	runtime := core.NewEffectRuntime(catalog.SQL, catalog.Writer, catalog.Queries, core.GetRegistry(), svc)
+	runtime := core.NewEffectRuntime(catalog.Writer, catalog.Queries, core.GetRegistry(), svc)
 	prepare := func(ids []uuid.UUID, title string, target uuid.UUID, revision int64, skip bool) uuid.UUID {
 		id, err := runtime.Prepare(ctx, 1, thread, run, "save_music_playlist", ids, map[string]any{"title": title, "skip_existing": skip}, map[string]any{"playlist_id": target, "revision": revision})
 		require.NoError(t, err)
@@ -45,7 +47,7 @@ func TestMusicAgentEffectAtomicOrderOwnershipAndReplay(t *testing.T) {
 	require.Equal(t, &b, entries[0].TrackID)
 	require.Equal(t, &a, entries[1].TrackID)
 	originalIDs := []string{entries[0].EntryID, entries[1].EntryID}
-	runtime = core.NewEffectRuntime(catalog.SQL, catalog.Writer, catalog.Queries, core.GetRegistry(), svc)
+	runtime = core.NewEffectRuntime(catalog.Writer, catalog.Queries, core.GetRegistry(), svc)
 	retry, err := runtime.Commit(ctx, 1, thread, run, effect)
 	require.NoError(t, err)
 	require.True(t, retry.AlreadyCommitted)
@@ -108,7 +110,7 @@ func TestAgentMusicSearchOwnerScopeAndMetadata(t *testing.T) {
 	b := seedMusicTrack(t, catalog, svc, repositoryID, `{"title":"Beta","artist":"Two","genre":"Rock"}`)
 	_, err := catalog.SQL.ExecContext(ctx, `UPDATE assets SET liked=1,rating=4,duration=120 WHERE asset_id=?`, a)
 	require.NoError(t, err)
-	library := core.NewAuthorizedLibraryFactory(catalog.Queries, nil).ForUser(1)
+	library := core.NewAuthorizedLibraryFactory(catalog.Queries, nil, nil).ForUser(1)
 	rows, _, err := library.SearchMusic(ctx, core.MusicSearch{LikedOnly: true, MinRating: 4, MissingLyrics: true, MissingCover: true}, nil)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
@@ -119,7 +121,7 @@ func TestAgentMusicSearchOwnerScopeAndMetadata(t *testing.T) {
 	rows, _, err = library.SearchMusic(ctx, core.MusicSearch{Query: "Alpha"}, []uuid.UUID{b})
 	require.NoError(t, err)
 	require.Empty(t, rows)
-	_, err = core.NewAuthorizedLibraryFactory(catalog.Queries, nil).ForUser(2).MusicTracks(ctx, []uuid.UUID{a})
+	_, err = core.NewAuthorizedLibraryFactory(catalog.Queries, nil, nil).ForUser(2).MusicTracks(ctx, []uuid.UUID{a})
 	require.Error(t, err)
 	rows, _, err = library.SearchMusic(ctx, core.MusicSearch{DurationBudgetSeconds: 120}, nil)
 	require.NoError(t, err)

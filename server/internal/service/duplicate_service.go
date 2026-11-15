@@ -183,7 +183,6 @@ type AssetDeleter interface {
 
 type duplicateService struct {
 	queries      *repo.Queries
-	pool         *sql.DB
 	writer       *catalogtx.Writer
 	logger       *zap.Logger
 	assetDeleter AssetDeleter
@@ -192,7 +191,6 @@ type duplicateService struct {
 // NewDuplicateService constructs the default DuplicateService implementation.
 func NewDuplicateService(
 	queries *repo.Queries,
-	pool *sql.DB,
 	writer *catalogtx.Writer,
 	logger *zap.Logger,
 	assetDeleter AssetDeleter,
@@ -202,7 +200,6 @@ func NewDuplicateService(
 	}
 	return &duplicateService{
 		queries:      queries,
-		pool:         pool,
 		writer:       writer,
 		logger:       logger,
 		assetDeleter: assetDeleter,

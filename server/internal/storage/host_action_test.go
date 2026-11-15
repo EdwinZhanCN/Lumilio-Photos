@@ -187,7 +187,6 @@ func TestListPendingHostActionsStaysAvailableWhileWriterIsBusy(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	manager.readerDatabase = catalog.ReaderSQL
 	if _, err := manager.CreateHostAction(ctx, CreateHostActionInput{
 		RequestID: "writer-busy-host-action", Kind: HostActionOpenRepository, TTL: time.Minute,
 	}); err != nil {

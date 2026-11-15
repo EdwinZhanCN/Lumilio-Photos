@@ -849,7 +849,7 @@ func (s *AuthService) decryptMFASecret(ciphertext []byte) (string, error) {
 }
 
 func (s *AuthService) withTx(ctx context.Context, fn func(*repo.Queries) error) error {
-	if s.db == nil {
+	if s.writer == nil {
 		return fn(s.queries)
 	}
 

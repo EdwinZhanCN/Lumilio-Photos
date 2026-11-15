@@ -671,7 +671,7 @@ func (rm *DefaultRepositoryManager) reconnectStorageLocation(ctx context.Context
 	if err := rm.rejectOverlappingStorageLocationExcept(ctx, cleanPath, storageLocationID); err != nil {
 		return nil, err
 	}
-	if rm.database == nil {
+	if rm.writer == nil {
 		return nil, errors.New("repository catalog transaction is unavailable")
 	}
 	coordinator := rm.files.AccessCoordinator()
@@ -1027,12 +1027,12 @@ func (rm *DefaultRepositoryManager) PreviewStorageLocationRemoval(ctx context.Co
 	impact := StorageLocationRemovalImpact{
 		StorageLocationID: storageLocation.StorageLocationID.String(), StorageLocationName: storageLocation.Name, Kind: storageLocation.Kind, FilesPreserved: true,
 	}
-	if err := rm.readerDatabase.QueryRowContext(ctx,
+	if err := rm.reader.Statements().QueryRowContext(ctx,
 		"SELECT count(*) FROM repositories WHERE storage_location_id = ?", storageLocationID,
 	).Scan(&impact.RepositoryCount); err != nil {
 		return StorageLocationRemovalImpact{}, fmt.Errorf("count Storage Location repositories: %w", err)
 	}
-	if err := rm.readerDatabase.QueryRowContext(ctx, `
+	if err := rm.reader.Statements().QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_operations
 		WHERE target_type = 'storage_location' AND target_id = ? AND status = 'running'
 	`, storageLocationID.String()).Scan(&impact.ActiveOperationCount); err != nil {

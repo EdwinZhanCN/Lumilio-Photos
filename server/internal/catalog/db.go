@@ -327,6 +327,14 @@ type TelemetrySnapshot struct {
 	Catalog    catalogtx.Report `json:"catalog"`
 }
 
+// WriterStats returns database/sql's counters for the catalog's sole writer.
+func (d *DB) WriterStats() sql.DBStats {
+	if d == nil || d.SQL == nil {
+		return sql.DBStats{}
+	}
+	return d.SQL.Stats()
+}
+
 func (d *DB) TelemetrySnapshot() TelemetrySnapshot {
 	result := TelemetrySnapshot{ObservedAt: time.Now().UTC()}
 	if d == nil {

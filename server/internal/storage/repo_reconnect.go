@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/catalog"
 	"server/internal/catalog/catalogtx"
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
-	"github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 )
 
@@ -354,7 +354,7 @@ func (rm *DefaultRepositoryManager) reconnectRepository(ctx context.Context, id 
 		// rollback releases the writer, never inside the transaction.
 		_ = tx.Rollback()
 		rm.repoAudit(cleanPath).Error("repository.reconnect", err, zap.String("repository_id", id))
-		if isUniquePathViolation(err) {
+		if catalog.IsUniqueViolation(err) {
 			return failPrepared(fmt.Errorf("%w: %s", ErrRepositoryExistsAtPath, cleanPath))
 		}
 		return failPrepared(fmt.Errorf("failed to reconnect repository: %w", err))
@@ -627,13 +627,4 @@ func (rm *DefaultRepositoryManager) refreshRepositoryConfigCache(ctx context.Con
 		return nil, err
 	}
 	return &updated, nil
-}
-
-func isUniquePathViolation(err error) bool {
-	var sqliteErr sqlite3.Error
-	if !errors.As(err, &sqliteErr) {
-		return false
-	}
-	return sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique ||
-		sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey
 }

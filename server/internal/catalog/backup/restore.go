@@ -661,7 +661,7 @@ func createRestorePoint(ctx context.Context, marker PendingRestore, logf Logf) (
 	}
 	source.SetMaxOpenConns(1)
 	source.SetMaxIdleConns(1)
-	restorePoint, snapshotErr := CreateSnapshot(
+	restorePoint, snapshotErr := createSnapshot(
 		ctx,
 		source,
 		filepath.Dir(marker.SnapshotPath),

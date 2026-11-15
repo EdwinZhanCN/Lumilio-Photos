@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"server/internal/catalog/catalogtx"
 	"server/internal/work/pipeline"
 )
@@ -22,29 +23,15 @@ var (
 )
 
 type Service struct {
-	db       *sql.DB
-	reader   *sql.DB
 	writer   *catalogtx.Writer
 	snapshot *catalogtx.Reader
 	resolver *Resolver
 }
 
-func NewService(db *sql.DB) *Service {
-	return NewServiceWithReader(db, db)
-}
-
-func NewServiceWithReader(db, reader *sql.DB) *Service {
-	return NewServiceWithCatalog(catalogtx.NewWriter(db, nil), catalogtx.NewReader(reader, nil))
-}
-
-// NewServiceWithCatalog wires the measured writer and read-snapshot
-// capabilities owned by the live catalog.
-func NewServiceWithCatalog(writer *catalogtx.Writer, snapshot *catalogtx.Reader) *Service {
-	service := &Service{
-		db: writer.Pool(), reader: snapshot.Pool(), writer: writer, snapshot: snapshot,
-		resolver: NewResolver(snapshot.Pool()),
-	}
-	return service
+// NewService wires the measured writer and read-snapshot capabilities owned
+// by the live catalog.
+func NewService(writer *catalogtx.Writer, snapshot *catalogtx.Reader) *Service {
+	return &Service{writer: writer, snapshot: snapshot, resolver: NewResolver(snapshot)}
 }
 
 func (s *Service) Resolver() *Resolver { return s.resolver }
@@ -85,7 +72,7 @@ INSERT INTO event_dirty_ranges(
 // InitializeBackfill records events-v1 exactly once per owner and creates a
 // factual initial range only when that owner has candidate media.
 func (s *Service) InitializeBackfill(ctx context.Context) ([]int32, error) {
-	rows, err := s.reader.QueryContext(ctx, `SELECT user_id FROM users ORDER BY user_id`)
+	rows, err := s.snapshot.Statements().QueryContext(ctx, `SELECT user_id FROM users ORDER BY user_id`)
 	if err != nil {
 		return nil, err
 	}

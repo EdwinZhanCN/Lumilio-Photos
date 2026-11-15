@@ -71,7 +71,7 @@ flowchart LR
 | Services |  | `group:service` |
 | Storage |  | `group:storage` |
 | Work contracts |  | `group:work` |
-| catalog | Package db owns the catalog and queue SQLite runtimes. | `mod:server/internal/catalog` [`server/internal/catalog/doc.go`](../../../../server/internal/catalog/doc.go) |
+| catalog | Package catalog owns the catalog and queue SQLite runtimes, and is the only place their *sql.DB pools and the go-sqlite3 and riversqlite drivers appear. | `mod:server/internal/catalog` [`server/internal/catalog/doc.go`](../../../../server/internal/catalog/doc.go) |
 | catalog/backup | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | `mod:server/internal/catalog/backup` [`server/internal/catalog/backup/doc.go`](../../../../server/internal/catalog/backup/doc.go) |
 | catalog/catalogtx | Package catalogtx is the closed application transaction capability for the catalog. | `mod:server/internal/catalog/catalogtx` [`server/internal/catalog/catalogtx/doc.go`](../../../../server/internal/catalog/catalogtx/doc.go) |
 | catalog/conformance | Package conformance contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | `mod:server/internal/catalog/conformance` [`server/internal/catalog/conformance/doc.go`](../../../../server/internal/catalog/conformance/doc.go) |

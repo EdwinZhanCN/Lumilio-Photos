@@ -1,0 +1,11 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: catalog-engine-drivers
+    why: only catalog packages import an engine driver
+    forbid_imports:
+      from: [fx/**]
+      except: [fx/engine, fx/catalog/**]
+      imports: [fx/engine]

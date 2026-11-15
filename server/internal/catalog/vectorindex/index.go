@@ -49,10 +49,14 @@ type trainingConfig struct {
 	Threads   int    `json:"nthread"`
 }
 
-// CurrentMode returns the persisted mode of the derived semantic index.
-func CurrentMode(ctx context.Context, database *sql.DB) (string, error) {
+// CurrentMode returns the persisted mode of the derived semantic index, read
+// through the catalog's query-only reader.
+func CurrentMode(ctx context.Context, reader *catalogtx.Reader) (string, error) {
+	if reader == nil {
+		return "", catalogtx.ErrNilPool
+	}
 	var mode string
-	if err := database.QueryRowContext(ctx, `
+	if err := reader.Pool().QueryRowContext(ctx, `
 		SELECT mode
 		FROM semantic_vector_index_state
 		WHERE id = 1
@@ -96,12 +100,20 @@ func Reconcile(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB) er
 		}
 		current.rebuildPending = true
 	}
-	return Maintain(ctx, writer, reader)
+	return maintain(ctx, writer, reader)
 }
 
-// Maintain applies a pending policy transition. It is intentionally cheap
-// when no transition is due, so embedding writes can call it after commit.
-func Maintain(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB) error {
+// Maintain applies a pending policy transition, reading the index state
+// through the catalog's query-only reader. It is intentionally cheap when no
+// transition is due, so embedding writes can call it after commit.
+func Maintain(ctx context.Context, writer *catalogtx.Writer, reader *catalogtx.Reader) error {
+	if reader == nil {
+		return catalogtx.ErrNilPool
+	}
+	return maintain(ctx, writer, reader.Pool())
+}
+
+func maintain(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB) error {
 	current, err := readState(ctx, reader)
 	if err != nil {
 		return err

@@ -26,7 +26,6 @@ type MusicPlaylistWriter interface {
 
 type EffectRuntime struct {
 	music    MusicPlaylistWriter
-	pool     *sql.DB
 	writer   *catalogtx.Writer
 	queries  *repo.Queries
 	registry *ToolRegistry
@@ -47,8 +46,8 @@ type EffectReceipt struct {
 	AlreadyCommitted bool   `json:"already_committed,omitempty"`
 }
 
-func NewEffectRuntime(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry, music ...MusicPlaylistWriter) *EffectRuntime {
-	r := &EffectRuntime{pool: pool, writer: writer, queries: queries, registry: registry}
+func NewEffectRuntime(writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry, music ...MusicPlaylistWriter) *EffectRuntime {
+	r := &EffectRuntime{writer: writer, queries: queries, registry: registry}
 	if len(music) > 0 {
 		r.music = music[0]
 	}
@@ -60,7 +59,7 @@ func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
 }
 
 func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID string, runID uuid.UUID, toolName string, membership []uuid.UUID, payload, target any) (uuid.UUID, error) {
-	if r == nil || r.pool == nil || r.queries == nil {
+	if r == nil || r.writer == nil || r.queries == nil {
 		return uuid.Nil, errors.New("effect runtime unavailable")
 	}
 	// Receipts remain queryable after a run so the client can reconcile a
@@ -138,7 +137,7 @@ func (r *EffectRuntime) Reject(ctx context.Context, userID int32, threadID strin
 }
 
 func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID string, runID, effectID uuid.UUID) (EffectReceipt, error) {
-	if r == nil || r.pool == nil {
+	if r == nil || r.writer == nil {
 		return EffectReceipt{}, errors.New("effect runtime unavailable")
 	}
 	tx, err := r.writer.BeginTx(ctx, catalogtx.OperationAgentEffectCommit, nil)

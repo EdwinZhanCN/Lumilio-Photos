@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"server/internal/catalog/catalogtx"
 	"server/internal/work/jobs"
 )
 
@@ -58,10 +59,10 @@ type Summary struct {
 	Stages      []StageSummary `json:"stages"`
 }
 
-// Reader computes the Processing read model from query-only pools.
+// Reader computes the Processing read model from the query-only readers.
 type Reader struct {
-	catalog *sql.DB
-	queue   *sql.DB
+	catalog *catalogtx.Reader
+	queue   *catalogtx.Reader
 	now     func() time.Time
 
 	doneMu sync.Mutex
@@ -69,8 +70,8 @@ type Reader struct {
 	doneAt time.Time
 }
 
-// NewReader binds the Catalog and QueueDB reader pools.
-func NewReader(catalog, queue *sql.DB) *Reader {
+// NewReader binds the Catalog and QueueDB query-only readers.
+func NewReader(catalog, queue *catalogtx.Reader) *Reader {
 	return &Reader{catalog: catalog, queue: queue, now: time.Now}
 }
 
@@ -132,7 +133,7 @@ func (r *Reader) Summary(ctx context.Context) (Summary, error) {
 			summary.Overview.LastActivityAt = d.lastActivity
 		}
 	}
-	if err := r.catalog.QueryRowContext(ctx, `
+	if err := r.catalog.Statements().QueryRowContext(ctx, `
  WITH asset_work AS (
   SELECT s.asset_id, MAX(s.terminal_error IS NOT NULL) AS failed
   FROM asset_pipeline_state s INDEXED BY idx_asset_pipeline_pending
@@ -177,7 +178,7 @@ func (r *Reader) catalogCounts(ctx context.Context, now time.Time) (map[StageID]
 
 	// Terminal rows stay behind their desired version, so pending and failed
 	// both come from the pending partial index (idx_asset_pipeline_pending).
-	rows, err := r.catalog.QueryContext(ctx, `
+	rows, err := r.catalog.Statements().QueryContext(ctx, `
  SELECT s.stage,
   COALESCE(SUM(s.terminal_error IS NULL),0),
   COALESCE(SUM(s.terminal_error IS NOT NULL),0),
@@ -220,7 +221,7 @@ func (r *Reader) catalogCounts(ctx context.Context, now time.Time) (map[StageID]
 		counts[id].done = &value
 	}
 
-	sourceRows, err := r.catalog.QueryContext(ctx, `
+	sourceRows, err := r.catalog.Statements().QueryContext(ctx, `
  SELECT s.stage, r.kind, count(DISTINCT s.asset_id)
  FROM asset_pipeline_state s
  JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
@@ -283,7 +284,7 @@ func (r *Reader) catalogCounts(ctx context.Context, now time.Time) (map[StageID]
 	for _, item := range singles {
 		var oldest sql.NullInt64
 		c := counts[item.id]
-		if err := r.catalog.QueryRowContext(ctx, item.query, item.args...).Scan(&c.pending, &c.failed, &oldest); err != nil {
+		if err := r.catalog.Statements().QueryRowContext(ctx, item.query, item.args...).Scan(&c.pending, &c.failed, &oldest); err != nil {
 			return nil, fmt.Errorf("read %s counts: %w", item.id, err)
 		}
 		c.oldest = microsPtr(oldest)
@@ -299,7 +300,7 @@ func (r *Reader) doneCounts(ctx context.Context, now time.Time) (map[string]int6
 	if r.done != nil && now.Sub(r.doneAt) < DoneRefreshInterval {
 		return r.done, nil
 	}
-	rows, err := r.catalog.QueryContext(ctx, `
+	rows, err := r.catalog.Statements().QueryContext(ctx, `
  SELECT s.stage, count(*) FROM asset_pipeline_state s
  JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
  WHERE s.desired_version=s.applied_version AND s.terminal_error IS NULL

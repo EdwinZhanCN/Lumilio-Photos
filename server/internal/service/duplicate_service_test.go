@@ -77,7 +77,7 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	service := NewDuplicateService(catalog.Queries, catalog.SQL, catalog.Writer, nil, nil)
+	service := NewDuplicateService(catalog.Queries, catalog.Writer, nil, nil)
 	for run := 0; run < 2; run++ {
 		result, err := service.DetectForRepository(ctx, repositoryID)
 		require.NoError(t, err)

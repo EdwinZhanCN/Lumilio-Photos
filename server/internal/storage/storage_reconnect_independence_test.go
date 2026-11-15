@@ -183,7 +183,7 @@ func TestReconnectRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *test
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := manager.readerDatabase.ExecContext(ctx, `
+	if _, err := manager.writer.Pool().ExecContext(ctx, `
 		UPDATE repositories SET activity = 'scanning', updated_at = ? WHERE repo_id = ?
 	`, now, created.Repository.RepoID); err != nil {
 		t.Fatal(err)

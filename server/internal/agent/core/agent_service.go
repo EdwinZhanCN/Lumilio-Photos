@@ -55,7 +55,6 @@ type AgentService interface {
 
 type agentService struct {
 	queries        *repo.Queries
-	pool           *sql.DB
 	writer         *catalogtx.Writer
 	registry       *ToolRegistry
 	configProvider LLMConfigProvider
@@ -68,12 +67,12 @@ type agentService struct {
 	auditLogPath   string
 }
 
-func NewAgentService(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string, music ...MusicPlaylistWriter) AgentService {
+func NewAgentService(queries *repo.Queries, writer *catalogtx.Writer, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string, music ...MusicPlaylistWriter) AgentService {
 	registry := GetRegistry()
 	return &agentService{
-		queries: queries, pool: pool, writer: writer, registry: registry, configProvider: configProvider,
+		queries: queries, writer: writer, registry: registry, configProvider: configProvider,
 		store: NewCheckpointStore(queries), refStore: refStore, libraries: libraries,
-		effects: NewEffectRuntime(pool, writer, queries, registry, music...), runs: NewRunRegistry(),
+		effects: NewEffectRuntime(writer, queries, registry, music...), runs: NewRunRegistry(),
 		conversations: conversations, auditLogPath: strings.TrimSpace(auditLogPath),
 	}
 }
