@@ -51,8 +51,13 @@ for step in $steps; do
         volumes) target=server:test:volumes ;;
         *) echo "lumilio-linux-gate: unknown step $step" >&2; exit 2 ;;
     esac
+    # Only the volumes step sees the images, as in CI: with the variable set,
+    # server:test:ci would run the volume tests too and push server/app past
+    # Go's package timeout.
+    step_fixtures=""
+    [ "$step" = volumes ] && step_fixtures="$fixtures"
     echo "lumilio-linux-gate: $step ($target) starting"
-    if su runner -s /bin/sh -c "cd /src && TMPDIR='$scratch' LUMILIO_VOLUME_FIXTURES='$fixtures' PATH='$PATH' GOPATH='$GOPATH' GOCACHE='$GOCACHE' task $target"; then
+    if su runner -s /bin/sh -c "cd /src && TMPDIR='$scratch' LUMILIO_VOLUME_FIXTURES='$step_fixtures' PATH='$PATH' GOPATH='$GOPATH' GOCACHE='$GOCACHE' task $target"; then
         echo "lumilio-linux-gate: $step ok"
     else
         echo "lumilio-linux-gate: $step FAILED"
