@@ -1,6 +1,7 @@
 # Server structure: capability packages and Atlas as the only architecture gate
 
-Status: active, created 2026-10-19; B1 done 2026-11-14 (#275), next B2. Owner decisions
+Status: active, created 2026-10-19; B1 done 2026-11-14 (#275), B2 done 2026-11-14 (#276); Phase B resumes at B3 after
+the storage plans. Owner decisions
 (2026-10-19): the cleanest structure wins over a move-only refactor, so code,
 Go type names, and OpenAPI schema names may change; Atlas replaces
 `server/tools/architecturecheck`; Huma replaces swag, so the HTTP contract is
