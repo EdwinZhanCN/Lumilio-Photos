@@ -76,14 +76,14 @@ type macroQueueObservation struct {
 	OldestRemainingAge time.Duration `json:"oldest_remaining_age_ns"`
 }
 
-func readCatalogPipelineObservation(ctx context.Context, reader *sql.DB, startedAt, endedAt time.Time) (catalogPipelineObservation, error) {
+func readCatalogPipelineObservation(ctx context.Context, reader *catalogtx.Reader, startedAt, endedAt time.Time) (catalogPipelineObservation, error) {
 	var snapshot catalogPipelineObservation
 	if reader == nil {
 		return snapshot, errors.New("catalog diagnostics reader is nil")
 	}
 	startedMicros := startedAt.UTC().UnixMicro()
 	endedMicros := endedAt.UTC().UnixMicro()
-	err := reader.QueryRowContext(ctx, `
+	err := reader.Statements().QueryRowContext(ctx, `
 WITH pipeline_state(pending, runnable, terminal, lag, applied_in_interval) AS (
   SELECT desired_version > applied_version,
          desired_version > applied_version AND terminal_error IS NULL,
@@ -164,14 +164,14 @@ FROM pipeline_state`, startedMicros, endedMicros).Scan(
 	return snapshot, nil
 }
 
-func readMacroQueueObservation(ctx context.Context, reader *sql.DB, startedAt, endedAt time.Time) (macroQueueObservation, error) {
+func readMacroQueueObservation(ctx context.Context, reader *catalogtx.Reader, startedAt, endedAt time.Time) (macroQueueObservation, error) {
 	var snapshot macroQueueObservation
 	if reader == nil {
 		return snapshot, errors.New("macro queue diagnostics reader is nil")
 	}
 	var averageLatency, averageRuntime sql.NullFloat64
 	var oldestRemaining sql.NullInt64
-	err := reader.QueryRowContext(ctx, `
+	err := reader.Statements().QueryRowContext(ctx, `
 SELECT
   count(*) FILTER (WHERE state = 'available'),
   count(*) FILTER (WHERE state = 'scheduled'),

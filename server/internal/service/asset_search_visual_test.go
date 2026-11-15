@@ -28,7 +28,7 @@ func TestSearchVisualSimilar_RanksExcludesAndSkipsLumen(t *testing.T) {
 	ctx := context.Background()
 	catalog := openVisualSearchCatalog(t)
 	lumen := &semanticTestLumenStub{available: true, modelID: "fixture", vector: unitVector768(0)}
-	svc, err := NewAssetService(catalog.Queries, catalog.SQL, lumen, NewEmbeddingService(catalog.Queries, catalog.SQL), nil)
+	svc, err := NewAssetService(catalog.Queries, catalog.Writer, catalog.Queries, catalog.Reader, lumen, NewEmbeddingService(catalog.Queries, catalog.Writer, catalog.Reader), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestSearchByImage_ThumbnailsBeforeLumen(t *testing.T) {
 		modelID:             "fixture",
 		vector:              unitVector768(0),
 	}
-	svc, err := NewAssetService(catalog.Queries, catalog.SQL, lumen, NewEmbeddingService(catalog.Queries, catalog.SQL), nil)
+	svc, err := NewAssetService(catalog.Queries, catalog.Writer, catalog.Queries, catalog.Reader, lumen, NewEmbeddingService(catalog.Queries, catalog.Writer, catalog.Reader), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

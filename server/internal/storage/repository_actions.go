@@ -308,11 +308,11 @@ func (rm *DefaultRepositoryManager) repositoryActionFacts(ctx context.Context, r
 }
 
 func (rm *DefaultRepositoryManager) hasRunningLifecycleOperation(ctx context.Context, repositoryID string) (bool, error) {
-	if rm.readerDatabase == nil {
+	if rm.reader == nil {
 		return false, nil
 	}
 	var running int
-	if err := rm.readerDatabase.QueryRowContext(ctx, `
+	if err := rm.reader.Statements().QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_operations
 		WHERE target_type = 'repository' AND target_id = ? AND status = 'running'
 	`, repositoryID).Scan(&running); err != nil {

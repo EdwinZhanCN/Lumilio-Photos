@@ -206,7 +206,7 @@ func (rm *DefaultRepositoryManager) RetryPendingInitialRepositoryScans(ctx conte
 	if rm.initialScan == nil {
 		return errors.New("initial repository scan queue is unavailable")
 	}
-	rows, err := rm.readerDatabase.QueryContext(ctx, `
+	rows, err := rm.reader.Statements().QueryContext(ctx, `
 		SELECT operation_id, target_id
 		FROM lifecycle_operations
 		WHERE kind IN ('open_repository', 'register_repository_copy')

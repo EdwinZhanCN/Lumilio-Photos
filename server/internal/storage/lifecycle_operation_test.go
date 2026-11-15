@@ -36,7 +36,7 @@ func newCatalogRepositoryManager(t *testing.T) (*catalog.DB, *DefaultRepositoryM
 		t.Fatal(err)
 	}
 	files := NewRepositoryFSFactory(NewRepositoryAccessCoordinator(), catalog.Queries)
-	manager, err := NewRepositoryManager(catalog.SQL, catalog.Queries, zap.NewNop(), nil, files)
+	manager, err := NewRepositoryManager(catalog.Writer, catalog.Reader, catalog.Queries, catalog.ReaderQueries, zap.NewNop(), nil, files)
 	if err != nil {
 		t.Fatal(err)
 	}

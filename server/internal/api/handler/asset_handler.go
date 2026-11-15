@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
+	"strconv"
+	"time"
+
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/catalog/catalogtx"
@@ -15,8 +17,6 @@ import (
 	"server/internal/service"
 	"server/internal/storage"
 	roelocations "server/internal/storage/locations"
-	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,8 +30,8 @@ type AssetHandler struct {
 	indexingService    service.AssetIndexingService
 	stackService       service.StackService
 	queries            *repo.Queries
-	database           *sql.DB
-	readerDatabase     *sql.DB
+	readQueries        *repo.Queries
+	reader             *catalogtx.Reader
 	writer             *catalogtx.Writer
 	repoManager        storage.RepositoryManager
 	stagingManager     storage.StagingManager
@@ -52,8 +52,9 @@ func NewAssetHandler(
 	indexingService service.AssetIndexingService,
 	stackService service.StackService,
 	queries *repo.Queries,
-	database *sql.DB,
 	writer *catalogtx.Writer,
+	readQueries *repo.Queries,
+	reader *catalogtx.Reader,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
 	settingsService service.SettingsService,
@@ -72,9 +73,9 @@ func NewAssetHandler(
 		indexingService: indexingService,
 		stackService:    stackService,
 		queries:         queries,
-		database:        database,
-		readerDatabase:  database,
 		writer:          writer,
+		readQueries:     readQueries,
+		reader:          reader,
 		repoManager:     repoManager,
 		stagingManager:  stagingManager,
 		files:           files,
@@ -87,15 +88,6 @@ func NewAssetHandler(
 	}
 
 	return handler
-}
-
-// SetReaderDatabase installs the query-only catalog connection used by
-// polling/status endpoints. Tests and small tools may omit it, in which case
-// the constructor's database connection remains the safe fallback.
-func (h *AssetHandler) SetReaderDatabase(reader *sql.DB) {
-	if h != nil && reader != nil {
-		h.readerDatabase = reader
-	}
 }
 
 // SetLocationResolver installs the single execution-time Asset-to-Location

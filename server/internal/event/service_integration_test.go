@@ -73,7 +73,7 @@ VALUES
 		t.Fatal(err)
 	}
 
-	service := event.NewService(database.SQL)
+	service := event.NewService(database.Writer, database.Reader)
 	first, err := service.RebuildOwner(ctx, 1, false)
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ VALUES
 		t.Fatal(err)
 	}
 
-	service := event.NewService(database.SQL)
+	service := event.NewService(database.Writer, database.Reader)
 	preview, err := service.RebuildOwner(ctx, 1, false)
 	if err != nil {
 		t.Fatal(err)

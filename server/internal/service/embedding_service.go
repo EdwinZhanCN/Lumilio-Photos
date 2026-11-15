@@ -157,10 +157,9 @@ type PrimaryEmbedding struct {
 }
 
 type embeddingService struct {
-	queries    *repo.Queries
-	pool       *sql.DB
-	writer     *catalogtx.Writer
-	readerPool *sql.DB
+	queries *repo.Queries
+	writer  *catalogtx.Writer
+	reader  *catalogtx.Reader
 }
 
 type EmbeddingType string
@@ -179,21 +178,10 @@ type EmbeddingInfo struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-func NewEmbeddingService(queries *repo.Queries, pool *sql.DB) EmbeddingService {
-	return NewEmbeddingServiceWithReader(queries, pool, pool)
-}
-
-func NewEmbeddingServiceWithReader(queries *repo.Queries, pool, readerPool *sql.DB) EmbeddingService {
-	return NewEmbeddingServiceWithCatalog(queries, catalogtx.NewWriter(pool, nil), readerPool)
-}
-
-func NewEmbeddingServiceWithCatalog(queries *repo.Queries, writer *catalogtx.Writer, readerPool *sql.DB) EmbeddingService {
-	return &embeddingService{
-		queries:    queries,
-		pool:       writer.Pool(),
-		writer:     writer,
-		readerPool: readerPool,
-	}
+// NewEmbeddingService saves embeddings through the writer and reads the
+// semantic index state through the query-only reader.
+func NewEmbeddingService(queries *repo.Queries, writer *catalogtx.Writer, reader *catalogtx.Reader) EmbeddingService {
+	return &embeddingService{queries: queries, writer: writer, reader: reader}
 }
 
 // SaveEmbedding saves any type of embedding with specified primary status.
@@ -291,7 +279,7 @@ func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID
 }
 
 func (e *embeddingService) maintainSemanticIndex(ctx context.Context) error {
-	if err := vectorindex.Maintain(ctx, e.writer, e.readerPool); err != nil {
+	if err := vectorindex.Maintain(ctx, e.writer, e.reader); err != nil {
 		return fmt.Errorf("maintain semantic Vec1 index: %w", err)
 	}
 	return nil

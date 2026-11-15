@@ -35,7 +35,10 @@ var ErrQueueDatabaseCorrupt = errors.New("SQLite queue database is corrupt or un
 type QueueDB struct {
 	SQL       *sql.DB
 	ReaderSQL *sql.DB
-	Path      string
+	// Reader is the named-snapshot capability over ReaderSQL, for the
+	// processing and queue-status reads of River's tables.
+	Reader *catalogtx.Reader
+	Path   string
 
 	transactionRecorder *catalogtx.Recorder
 }
@@ -139,7 +142,7 @@ func OpenQueue(ctx context.Context, cfg config.DatabaseConfig, suppliedOptions .
 	}
 
 	log.Printf("SQLite queue database opened: location=%s writer_connections=1 reader_connections=4", safeLocation(path))
-	return &QueueDB{SQL: writer, ReaderSQL: reader, Path: path, transactionRecorder: transactionRecorder}, nil
+	return &QueueDB{SQL: writer, ReaderSQL: reader, Reader: catalogtx.NewReader(reader, transactionObserver), Path: path, transactionRecorder: transactionRecorder}, nil
 }
 
 // OpenQueueWithRecovery quarantines only an explicitly unrecognized/corrupt
@@ -288,6 +291,14 @@ func (q *QueueDB) InspectWAL() (WALState, error) {
 		return WALState{}, fmt.Errorf("inspect SQLite queue WAL: %w", err)
 	}
 	return WALState{SizeBytes: info.Size(), ModifiedAt: info.ModTime()}, nil
+}
+
+// WriterStats returns database/sql's counters for the QueueDB's sole writer.
+func (q *QueueDB) WriterStats() sql.DBStats {
+	if q == nil || q.SQL == nil {
+		return sql.DBStats{}
+	}
+	return q.SQL.Stats()
 }
 
 func (q *QueueDB) TelemetrySnapshot() QueueTelemetrySnapshot {

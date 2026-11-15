@@ -70,7 +70,7 @@ func TestCreateSnapshotIsStandaloneAndChecksumProtected(t *testing.T) {
 	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
 	snapshot, err := CreateSnapshot(
 		context.Background(),
-		catalog.SQL,
+		catalog.Reader,
 		filepath.Join(root, "backups"),
 		"",
 		metadata,
@@ -160,7 +160,7 @@ func TestCatalogSnapshotExcludesIndependentQueueDatabase(t *testing.T) {
 		_ = catalogDB.Close(context.Background())
 	})
 
-	snapshot, err := CreateSnapshot(ctx, catalogDB.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+	snapshot, err := CreateSnapshot(ctx, catalogDB.Reader, filepath.Join(root, "backups"), "", SnapshotMetadata{
 		AppVersion: "test", ConfigSchemaVersion: config.SchemaVersion,
 	}, t.Logf)
 	if err != nil {
@@ -216,7 +216,7 @@ func TestCreateSnapshotFromReaderDoesNotWaitForWriterTransaction(t *testing.T) {
 	defer cancel()
 	if _, err := CreateSnapshot(
 		ctx,
-		catalog.ReaderSQL,
+		catalog.Reader,
 		filepath.Join(root, "backups"),
 		"",
 		SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
@@ -281,7 +281,7 @@ func TestCreateSnapshotMakesProgressDuringContinuousWriterCommits(t *testing.T) 
 	defer cancel()
 	snapshot, err := CreateSnapshot(
 		ctx,
-		catalog.ReaderSQL,
+		catalog.Reader,
 		filepath.Join(root, "backups"),
 		"",
 		SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
@@ -319,7 +319,7 @@ func TestStagedRestoreReplacesOnlyBetweenGenerations(t *testing.T) {
 	}
 	setPhase(catalogDB, "admin_created")
 	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
-	snapshot, err := CreateSnapshot(context.Background(), catalogDB.SQL, backupsDir, "", metadata, t.Logf)
+	snapshot, err := CreateSnapshot(context.Background(), catalogDB.Reader, backupsDir, "", metadata, t.Logf)
 	if err != nil {
 		t.Fatalf("CreateSnapshot: %v", err)
 	}
@@ -487,7 +487,7 @@ func preparePendingRestore(t *testing.T) string {
 	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
 	snapshot, err := CreateSnapshot(
 		context.Background(),
-		catalog.SQL,
+		catalog.Reader,
 		filepath.Join(root, "backups"),
 		"",
 		metadata,
@@ -534,7 +534,7 @@ func TestCorruptSnapshotRejectedBeforeMarker(t *testing.T) {
 	catalog := openTestCatalog(t, activePath)
 	defer closeTestCatalog(t, catalog)
 	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
-	snapshot, err := CreateSnapshot(context.Background(), catalog.SQL, filepath.Join(root, "backups"), "", metadata, t.Logf)
+	snapshot, err := CreateSnapshot(context.Background(), catalog.Reader, filepath.Join(root, "backups"), "", metadata, t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +602,7 @@ func TestSchedulerPolicyAndForcedSnapshot(t *testing.T) {
 	}
 	cfg := settings.Backup{Enabled: false, IntervalHours: 24, KeepLast: 2}
 	scheduler := &Scheduler{
-		Source:   catalog.SQL,
+		Source:   catalog.Reader,
 		Dir:      dir,
 		Metadata: SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
 		Ready:    func(context.Context) (bool, error) { return true, nil },
@@ -656,7 +656,7 @@ func TestInspectCatalogUsesUserVersionWithoutMigrationLedger(t *testing.T) {
 	if err := os.MkdirAll(backupDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := CreateSnapshot(ctx, catalogDB.SQL, backupDir, "", SnapshotMetadata{
+	snapshot, err := CreateSnapshot(ctx, catalogDB.Reader, backupDir, "", SnapshotMetadata{
 		AppVersion: "test", ConfigSchemaVersion: 2,
 	}, t.Logf)
 	if err != nil {
@@ -683,7 +683,7 @@ func TestStageRestoreInstallsOlderSnapshotForUpgrade(t *testing.T) {
 	activePath := filepath.Join(root, "app-state", "library.sqlite3")
 	catalogDB := openTestCatalog(t, activePath)
 	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 1}
-	snapshot, err := CreateSnapshot(ctx, catalogDB.SQL, filepath.Join(root, "backups"), "", metadata, t.Logf)
+	snapshot, err := CreateSnapshot(ctx, catalogDB.Reader, filepath.Join(root, "backups"), "", metadata, t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -713,7 +713,7 @@ func TestValidateSnapshotRejectsNewerSnapshot(t *testing.T) {
 	root := t.TempDir()
 	catalogDB := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
 	defer closeTestCatalog(t, catalogDB)
-	snapshot, err := CreateSnapshot(ctx, catalogDB.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+	snapshot, err := CreateSnapshot(ctx, catalogDB.Reader, filepath.Join(root, "backups"), "", SnapshotMetadata{
 		AppVersion: "test", ConfigSchemaVersion: 2,
 	}, t.Logf)
 	if err != nil {
@@ -756,7 +756,7 @@ func TestManifestSchemaProvenanceReplacesMigrationLedger(t *testing.T) {
 	catalogDB := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
 	defer closeTestCatalog(t, catalogDB)
 
-	snapshot, err := CreateSnapshot(ctx, catalogDB.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+	snapshot, err := CreateSnapshot(ctx, catalogDB.Reader, filepath.Join(root, "backups"), "", SnapshotMetadata{
 		AppVersion: "test", ConfigSchemaVersion: 2,
 	}, t.Logf)
 	if err != nil {
@@ -802,7 +802,7 @@ func TestValidateSnapshotAttributesManifestFormatMismatch(t *testing.T) {
 			catalogDB := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
 			defer closeTestCatalog(t, catalogDB)
 
-			snapshot, err := CreateSnapshot(ctx, catalogDB.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+			snapshot, err := CreateSnapshot(ctx, catalogDB.Reader, filepath.Join(root, "backups"), "", SnapshotMetadata{
 				AppVersion: "test", ConfigSchemaVersion: 2,
 			}, t.Logf)
 			if err != nil {
@@ -877,7 +877,7 @@ func TestSchedulerCreatesMissingDestinationInsideExistingParent(t *testing.T) {
 	dir := filepath.Join(appState, "backups")
 	cfg := settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 2}
 	scheduler := &Scheduler{
-		Source:   catalog.SQL,
+		Source:   catalog.Reader,
 		Dir:      dir,
 		Metadata: SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
 		Ready:    func(context.Context) (bool, error) { return true, nil },
@@ -905,7 +905,7 @@ func TestSchedulerSkipsDestinationWithMissingParent(t *testing.T) {
 	dir := filepath.Join(root, "volumes", "external", "lumilio-backups")
 	cfg := settings.Backup{Enabled: true, IntervalHours: 24, KeepLast: 2}
 	scheduler := &Scheduler{
-		Source:   catalog.SQL,
+		Source:   catalog.Reader,
 		Dir:      dir,
 		Metadata: SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
 		Ready:    func(context.Context) (bool, error) { return true, nil },

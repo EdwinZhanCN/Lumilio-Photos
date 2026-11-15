@@ -1,0 +1,3 @@
+fx/service.Holder.pool holds *database/sql.DB
+fx/service.Stats uses *database/sql.DB
+fx/service.Unwrap uses *database/sql.DB

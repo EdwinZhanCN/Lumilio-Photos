@@ -2,20 +2,20 @@ package backup
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"server/internal/catalog/catalogtx"
 	"server/internal/foundation/settings"
 )
 
 // Scheduler decides on each River tick whether a routine SQLite snapshot is
 // due, then applies count-based retention.
 type Scheduler struct {
-	Source   *sql.DB
+	Source   *catalogtx.Reader
 	Dir      string
 	Metadata SnapshotMetadata
 	Ready    func(ctx context.Context) (bool, error)

@@ -36,7 +36,7 @@ func newMFAIntegrationService(t *testing.T) (context.Context, *catalog.DB, *Auth
 	require.NoError(t, err)
 
 	secretPath := filepath.Join(t.TempDir(), "secret")
-	auth, err := NewAuthService(catalog.Queries, catalog.SQL, config.AuthConfig{
+	auth, err := NewAuthService(catalog.Queries, nil, catalog.Writer, config.AuthConfig{
 		SecretKeyFile:   secretPath,
 		AccessTokenTTL:  time.Hour,
 		RefreshTokenTTL: 24 * time.Hour,
@@ -131,7 +131,7 @@ func TestTOTPEnrollmentAuthoritativelyEnablesLoginMFA(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, reopened.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, reopened.Close(context.Background())) })
-	reopenedAuth, err := NewAuthService(reopened.Queries, reopened.SQL, config.AuthConfig{
+	reopenedAuth, err := NewAuthService(reopened.Queries, nil, reopened.Writer, config.AuthConfig{
 		SecretKeyFile: filepath.Join(t.TempDir(), "secret-reopened"),
 	})
 	require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestPendingTOTPEnrollmentSurvivesRestartAndExpiryIsNonDestructive(t *testin
 		reopened, err := catalog.Open(ctx, config.DatabaseConfig{Path: path})
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, reopened.Close(context.Background())) })
-		reopenedAuth, err := NewAuthService(reopened.Queries, reopened.SQL, config.AuthConfig{
+		reopenedAuth, err := NewAuthService(reopened.Queries, nil, reopened.Writer, config.AuthConfig{
 			SecretKeyFile: secretPath,
 		})
 		require.NoError(t, err)

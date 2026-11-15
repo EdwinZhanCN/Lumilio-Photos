@@ -80,8 +80,7 @@ type ClassifierService interface {
 }
 
 type classifierService struct {
-	pool       *sql.DB
-	readerPool *sql.DB
+	reader     *catalogtx.Reader
 	writer     *catalogtx.Writer
 	lumen      LumenService
 	embeddings EmbeddingService
@@ -94,21 +93,14 @@ type classifierService struct {
 	backgroundDim int
 }
 
-func NewClassifierService(pool *sql.DB, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
-	return NewClassifierServiceWithReader(pool, pool, lumen, embeddings, logger)
-}
-
-func NewClassifierServiceWithReader(pool, readerPool *sql.DB, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
-	return NewClassifierServiceWithCatalog(pool, readerPool, catalogtx.NewWriter(pool, nil), lumen, embeddings, logger)
-}
-
-func NewClassifierServiceWithCatalog(pool, readerPool *sql.DB, writer *catalogtx.Writer, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
+// NewClassifierService reads classifier definitions and previews through the
+// query-only reader and saves prototypes through the writer.
+func NewClassifierService(reader *catalogtx.Reader, writer *catalogtx.Writer, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	return &classifierService{
-		pool:       pool,
-		readerPool: readerPool,
+		reader:     reader,
 		writer:     writer,
 		lumen:      lumen,
 		embeddings: embeddings,
@@ -324,7 +316,7 @@ ORDER BY score DESC, asset_id DESC
 LIMIT ?
 `
 
-	rows, err := s.readerPool.QueryContext(ctx, query, negVec, posVec, space.ID, threshold, limit)
+	rows, err := s.reader.Statements().QueryContext(ctx, query, negVec, posVec, space.ID, threshold, limit)
 	if err != nil {
 		return nil, fmt.Errorf("preview query: %w", err)
 	}
@@ -392,7 +384,7 @@ WHERE %s
 ORDER BY id
 `, where)
 
-	rows, err := s.readerPool.QueryContext(ctx, query)
+	rows, err := s.reader.Statements().QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("load classifier definitions: %w", err)
 	}

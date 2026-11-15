@@ -157,7 +157,7 @@ func (a *Atlas) forbidTypesFindings(rule Rule) []Finding {
 		sort.Slice(idents, func(i, j int) bool { return idents[i].Pos() < idents[j].Pos() })
 		report := func(name string, t types.Type, pos token.Pos) {
 			position, file := index.position(pkg, pos)
-			if !inScope(config.In, pkg.dir, file) {
+			if !inScope(config.In, pkg.dir, file) || inScope(config.Except, pkg.dir, file) {
 				return
 			}
 			held := mentionedType(t, targets)
@@ -196,6 +196,48 @@ func (a *Atlas) forbidTypesFindings(rule Rule) []Finding {
 				return true
 			})
 		}
+		if config.Expressions {
+			findings = append(findings, a.forbiddenExpressions(pkg, config, targets, seen)...)
+		}
+	}
+	return findings
+}
+
+// forbiddenExpressions reports, once per function, an expression in scope
+// whose type mentions a target: a field of another package's struct, a call
+// result, or a variable the declaration check already named. Type
+// expressions are skipped; the declarations that use them are reported.
+func (a *Atlas) forbiddenExpressions(pkg *goPackage, config *ForbidTypesRule, targets map[string]bool, seen map[string]bool) []Finding {
+	index := a.typed()
+	info := pkg.typed.info
+	exprs := make([]ast.Expr, 0, len(info.Types))
+	for expr, value := range info.Types {
+		if value.IsType() || value.Type == nil {
+			continue
+		}
+		exprs = append(exprs, expr)
+	}
+	sort.Slice(exprs, func(i, j int) bool { return exprs[i].Pos() < exprs[j].Pos() })
+	var findings []Finding
+	for _, expr := range exprs {
+		held := mentionedType(info.Types[expr].Type, targets)
+		if held == "" {
+			continue
+		}
+		position, file := index.position(pkg, expr.Pos())
+		if !inScope(config.In, pkg.dir, file) || inScope(config.Except, pkg.dir, file) {
+			continue
+		}
+		name := enclosingFuncAt(pkg, expr.Pos())
+		if name == "" {
+			name = pkg.importPath
+		}
+		key := name + " uses " + held
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		findings = append(findings, Finding{Key: key, Where: where(file, position), Message: fmt.Sprintf("%s uses a %s value; code here may reach only narrow interfaces, not that capability", name, held)})
 	}
 	return findings
 }
@@ -301,7 +343,7 @@ func (a *Atlas) forbidImportsFindings(rule Rule) []Finding {
 	seen := map[string]bool{}
 	for _, pkg := range a.goPackages {
 		for _, fileRel := range sortedKeys(pkg.files) {
-			if !inScope(config.From, pkg.dir, fileRel) {
+			if !inScope(config.From, pkg.dir, fileRel) || inScope(config.Except, pkg.dir, fileRel) {
 				continue
 			}
 			for _, spec := range pkg.files[fileRel].Imports {

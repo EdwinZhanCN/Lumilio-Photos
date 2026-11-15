@@ -190,7 +190,7 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 
 	repositoryText := repositoryID.String()
 	ownerID := int32(1)
-	locationService := NewLocationService(catalog.Queries, catalog.SQL, nil)
+	locationService := NewLocationService(catalog.Queries, catalog.Writer, catalog.Reader)
 	moreWork, err := locationService.RebuildLocationClusters(ctx, &repositoryText, &ownerID)
 	require.NoError(t, err)
 	require.False(t, moreWork)
@@ -403,7 +403,7 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 
 	repositoryText := repositoryID.String()
 	ownerID := int32(1)
-	locationService := NewLocationService(catalog.Queries, catalog.SQL, nil)
+	locationService := NewLocationService(catalog.Queries, catalog.Writer, catalog.Reader)
 	moreWork, err := locationService.RebuildLocationClusters(ctx, &repositoryText, &ownerID)
 	require.NoError(t, err)
 	require.True(t, moreWork, "one River turn must yield after its fixed transaction quantum")

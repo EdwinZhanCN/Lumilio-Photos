@@ -135,25 +135,24 @@ type FaceClusterRebuildResult struct {
 
 type faceService struct {
 	queries           *repo.Queries
-	pool              *sql.DB
 	writer            *catalogtx.Writer
 	files             *storage.RepositoryFSFactory
 	clusterRebuildMu  sync.RWMutex
 	afterRebuildReset func()
 }
 
-// NewFaceService creates face service instance.
-func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, database *sql.DB, writer *catalogtx.Writer) FaceService {
+// NewFaceService creates face service instance. Clustering mutations run in
+// named writer transactions, or straight on queries when writer is nil.
+func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, writer *catalogtx.Writer) FaceService {
 	return &faceService{
 		queries: queries,
-		pool:    database,
 		writer:  writer,
 		files:   files,
 	}
 }
 
 func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) error {
-	if s.pool == nil {
+	if s.writer == nil {
 		return fn(s.queries)
 	}
 

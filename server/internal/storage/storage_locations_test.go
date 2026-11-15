@@ -222,7 +222,7 @@ func TestRecoverLifecycleOperationsRollsForwardInterruptedRootRelocate(t *testin
 		t.Fatal(err)
 	}
 
-	restarted, err := NewRepositoryManager(catalog.SQL, catalog.Queries, zap.NewNop(), nil, NewRepositoryFSFactory(nil, catalog.Queries))
+	restarted, err := NewRepositoryManager(catalog.Writer, catalog.Reader, catalog.Queries, catalog.ReaderQueries, zap.NewNop(), nil, NewRepositoryFSFactory(nil, catalog.Queries))
 	if err != nil {
 		t.Fatal(err)
 	}

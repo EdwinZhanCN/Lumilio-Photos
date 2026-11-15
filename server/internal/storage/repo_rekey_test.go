@@ -422,7 +422,7 @@ func TestStorageLocationReconnectRekeysEveryChildOnTheNewVolume(t *testing.T) {
 
 	// With beta's pair resolved in the index, the whole tree reconnects and
 	// both children are rekeyed for the new volume.
-	if _, err := manager.readerDatabase.ExecContext(ctx, `DELETE FROM repository_entries WHERE entry_id = ?`, betaBefore["Pics/same.jpg"].EntryID.String()); err != nil {
+	if _, err := manager.writer.Pool().ExecContext(ctx, `DELETE FROM repository_entries WHERE entry_id = ?`, betaBefore["Pics/same.jpg"].EntryID.String()); err != nil {
 		t.Fatal(err)
 	}
 	reconnected, err := manager.ReconnectStorageLocation(ctx, disk.StorageLocationID.String(), movedPath, LifecycleRequest{RequestID: "location-rekey", Actor: "web:user:1"})

@@ -40,7 +40,7 @@ func TestLowLoadShortSnoozeWakesAfterCommitAndDeadline(t *testing.T) {
 		reached <- time.Now()
 		return turns.Add(1) < 3, nil
 	}})
-	client, err := New(database.SQL, database.ReaderSQL, workers, slog.New(slog.NewTextHandler(io.Discard, nil)), 2)
+	client, err := New(database.RiverDriver(), workers, slog.New(slog.NewTextHandler(io.Discard, nil)), 2)
 	if err != nil {
 		t.Fatal(err)
 	}

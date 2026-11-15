@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 
+	"server/internal/catalog/catalogtx"
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/search/bleveocr"
@@ -24,21 +25,21 @@ const (
 )
 
 type EmbeddingRetriever struct {
-	pool         *sql.DB
+	reader       *catalogtx.Reader
 	embed        EmbedQueryFunc
 	resolveSpace ResolveEmbeddingSpaceFunc
 	weight       float64
 }
 
-func NewEmbeddingRetriever(pool *sql.DB, embed EmbedQueryFunc, resolveSpace ResolveEmbeddingSpaceFunc, weight float64) *EmbeddingRetriever {
-	return &EmbeddingRetriever{pool: pool, embed: embed, resolveSpace: resolveSpace, weight: weight}
+func NewEmbeddingRetriever(reader *catalogtx.Reader, embed EmbedQueryFunc, resolveSpace ResolveEmbeddingSpaceFunc, weight float64) *EmbeddingRetriever {
+	return &EmbeddingRetriever{reader: reader, embed: embed, resolveSpace: resolveSpace, weight: weight}
 }
 
 func (r *EmbeddingRetriever) Source() string  { return SourceEmbedding }
 func (r *EmbeddingRetriever) Weight() float64 { return r.weight }
 
 func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candidate, error) {
-	if r == nil || r.pool == nil || r.resolveSpace == nil {
+	if r == nil || r.reader == nil || r.resolveSpace == nil {
 		return nil, fmt.Errorf("embedding retriever is not configured")
 	}
 	if req.QueryEmbedding == nil && r.embed == nil {
@@ -109,7 +110,7 @@ LIMIT %s
 		limitPlaceholder,
 	)
 
-	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
+	rows, err := r.reader.Statements().QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("embedding retrieve: %w", err)
 	}
@@ -189,20 +190,20 @@ func (r *EmbeddingRetriever) resolveQuerySpace(ctx context.Context, req Request)
 }
 
 type TextRetriever struct {
-	pool   *sql.DB
+	reader *catalogtx.Reader
 	source string
 	weight float64
 }
 
-func NewPlaceRetriever(pool *sql.DB, weight float64) *TextRetriever {
-	return &TextRetriever{pool: pool, source: SourcePlace, weight: weight}
+func NewPlaceRetriever(reader *catalogtx.Reader, weight float64) *TextRetriever {
+	return &TextRetriever{reader: reader, source: SourcePlace, weight: weight}
 }
 
 func (r *TextRetriever) Source() string  { return r.source }
 func (r *TextRetriever) Weight() float64 { return r.weight }
 
 func (r *TextRetriever) Retrieve(ctx context.Context, req Request) ([]Candidate, error) {
-	if r == nil || r.pool == nil {
+	if r == nil || r.reader == nil {
 		return nil, fmt.Errorf("%s retriever is not configured", r.source)
 	}
 	switch r.source {
@@ -246,7 +247,7 @@ ORDER BY raw_score DESC, a.asset_id DESC
 LIMIT %s
 `, queryPlaceholder, joinConditions(conditions), limitPlaceholder)
 
-	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
+	rows, err := r.reader.Statements().QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("place retrieve: %w", err)
 	}
@@ -258,20 +259,20 @@ LIMIT %s
 const bleveOCRPageSize = 256
 
 type BleveOCRRetriever struct {
-	pool   *sql.DB
+	reader *catalogtx.Reader
 	index  *bleveocr.Index
 	weight float64
 }
 
-func NewBleveOCRRetriever(pool *sql.DB, index *bleveocr.Index, weight float64) *BleveOCRRetriever {
-	return &BleveOCRRetriever{pool: pool, index: index, weight: weight}
+func NewBleveOCRRetriever(reader *catalogtx.Reader, index *bleveocr.Index, weight float64) *BleveOCRRetriever {
+	return &BleveOCRRetriever{reader: reader, index: index, weight: weight}
 }
 
 func (r *BleveOCRRetriever) Source() string  { return SourceOCR }
 func (r *BleveOCRRetriever) Weight() float64 { return r.weight }
 
 func (r *BleveOCRRetriever) Retrieve(ctx context.Context, req Request) ([]Candidate, error) {
-	if r == nil || r.pool == nil || r.index == nil {
+	if r == nil || r.reader == nil || r.index == nil {
 		return nil, fmt.Errorf("OCR Bleve retriever is not configured")
 	}
 	if req.TopK <= 0 || strings.TrimSpace(req.Query) == "" {
@@ -375,7 +376,7 @@ func (r *BleveOCRRetriever) filterCandidates(ctx context.Context, hits []bleveoc
 		idsPlaceholder,
 	))
 	query := fmt.Sprintf("SELECT a.asset_id FROM assets a WHERE %s", joinConditions(conditions))
-	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
+	rows, err := r.reader.Statements().QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("post-filter OCR Bleve candidates: %w", err)
 	}
@@ -419,8 +420,9 @@ func collectCandidates(rows *sql.Rows, source string) ([]Candidate, error) {
 }
 
 // HydrateAssets loads ranked Assets in rank order, keeping only those in
-// lifecycleState ("" means active).
-func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, lifecycleState string) ([]repo.Asset, error) {
+// lifecycleState ("" means active), through the query-only reader's
+// queries.
+func HydrateAssets(ctx context.Context, queries *repo.Queries, rankedIDs []uuid.UUID, lifecycleState string) ([]repo.Asset, error) {
 	if len(rankedIDs) == 0 {
 		return []repo.Asset{}, nil
 	}
@@ -435,7 +437,6 @@ func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, lif
 		return []repo.Asset{}, nil
 	}
 
-	queries := repo.New(pool)
 	var assets []repo.Asset
 	var err error
 	if lifecycleState == "" || lifecycleState == LifecycleActive {

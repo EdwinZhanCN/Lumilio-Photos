@@ -48,7 +48,7 @@ func (f *fixture) exec(query string, args ...any) {
 }
 
 func (f *fixture) reader() *Reader {
-	return NewReader(f.database.ReaderSQL, f.database.ReaderSQL)
+	return NewReader(f.database.Reader, f.database.Reader)
 }
 
 type assetRow struct {

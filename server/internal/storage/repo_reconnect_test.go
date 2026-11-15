@@ -188,7 +188,7 @@ func TestReconnectRepositoryIsJournaledReplayedAndRecovered(t *testing.T) {
 		t.Fatalf("replayed reconnect = %#v err=%v", replayed, err)
 	}
 	var count int
-	if err := manager.readerDatabase.QueryRowContext(ctx, `SELECT count(*) FROM lifecycle_operations WHERE kind = ?`, lifecycleKindReconnectRepository).Scan(&count); err != nil || count != 1 {
+	if err := manager.writer.Pool().QueryRowContext(ctx, `SELECT count(*) FROM lifecycle_operations WHERE kind = ?`, lifecycleKindReconnectRepository).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("reconnect operations after replay = %d err=%v", count, err)
 	}
 	if _, err := manager.ReconnectRepository(ctx, repository.RepoID.String(), filepath.Join(diskA.Path, "journal"), request); !errors.Is(err, ErrLifecycleRequestConflict) {

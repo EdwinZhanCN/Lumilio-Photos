@@ -121,8 +121,7 @@ func newRecoveryQueueClient(t *testing.T, queueDatabase *catalog.QueueDB) *river
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &queue.IngestMacroWorker{})
 	client, err := queue.New(
-		queueDatabase.SQL,
-		queueDatabase.ReaderSQL,
+		queueDatabase.RiverDriver(),
 		workers,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		8,

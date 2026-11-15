@@ -42,7 +42,7 @@ VALUES (1, ?, 0, 1);
 	index, err := bleveocr.Open(ctx, database.Path, database.Queries, false, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
-	retriever := NewBleveOCRRetriever(database.SQL, index, 0.7)
+	retriever := NewBleveOCRRetriever(database.Reader, index, 0.7)
 
 	ownerID := int32(1)
 	candidates, err := retriever.Retrieve(ctx, Request{

@@ -20,11 +20,6 @@ import (
 
 var ErrInvalidSystemSettings = errors.New("invalid system settings")
 
-type SettingsRuntime struct {
-	DB     *sql.DB
-	Writer *catalogtx.Writer
-}
-
 type SystemSettings struct {
 	LLM       LLMSettings
 	ML        MLSettings
@@ -147,7 +142,6 @@ type SettingsService interface {
 
 type settingsService struct {
 	queries          *repo.Queries
-	db               *sql.DB
 	writer           *catalogtx.Writer
 	secretPath       string
 	defaults         settings.Settings
@@ -158,16 +152,13 @@ type settingsService struct {
 
 // NewSettingsService wires the settings service. defaults supplies the
 // program-fixed seed values for the runtime-mutable settings; secretKeyPath is
-// the encryption key file. Repository defaults are owned by the storage package.
-func NewSettingsService(queries *repo.Queries, defaults settings.Settings, secretKeyPath string) SettingsService {
-	return NewSettingsServiceWithRuntime(queries, defaults, secretKeyPath, SettingsRuntime{})
-}
-
-func NewSettingsServiceWithRuntime(queries *repo.Queries, defaults settings.Settings, secretKeyPath string, runtime SettingsRuntime) SettingsService {
+// the encryption key file; writer runs the geocoding update transaction and
+// may be nil where geocoding settings are never changed. Repository defaults
+// are owned by the storage package.
+func NewSettingsService(queries *repo.Queries, defaults settings.Settings, secretKeyPath string, writer *catalogtx.Writer) SettingsService {
 	return &settingsService{
 		queries:    queries,
-		db:         runtime.DB,
-		writer:     runtime.Writer,
+		writer:     writer,
 		secretPath: strings.TrimSpace(secretKeyPath),
 		defaults:   defaults,
 	}
@@ -445,7 +436,7 @@ func (s *settingsService) updateGeocodingSettings(
 	previous settings.Geocoding,
 	candidate settings.Geocoding,
 ) (SystemSettings, error) {
-	if s.db == nil || s.writer == nil {
+	if s.writer == nil {
 		return SystemSettings{}, errors.New("geocoding settings runtime dependencies are not configured")
 	}
 

@@ -98,16 +98,22 @@ type ConstructsRule struct {
 }
 
 // ForbidTypesRule: a field, parameter, result, or variable declared in
-// scope whose type mentions a target type is a finding.
+// scope whose type mentions a target type is a finding. Except carves
+// packages or files out of In. With Expressions, every expression in scope
+// whose type mentions a target is a finding too, so a value reached through
+// another package's field or a call result counts as much as one declared.
 type ForbidTypesRule struct {
-	In    []string `yaml:"in" json:"in"`
-	Types []string `yaml:"types" json:"types"`
+	In          []string `yaml:"in" json:"in"`
+	Except      []string `yaml:"except" json:"except,omitempty"`
+	Types       []string `yaml:"types" json:"types"`
+	Expressions bool     `yaml:"expressions" json:"expressions,omitempty"`
 }
 
 // ForbidImportsRule: an import of one of Imports (paths or path/**) by a
-// file in From is a finding.
+// file in From, and not in Except, is a finding.
 type ForbidImportsRule struct {
 	From    []string `yaml:"from" json:"from"`
+	Except  []string `yaml:"except" json:"except,omitempty"`
 	Imports []string `yaml:"imports" json:"imports"`
 }
 
@@ -139,11 +145,17 @@ type TxPurityRule struct {
 	Allow []string `yaml:"allow" json:"allow,omitempty"`
 }
 
-// BudgetsRule: a package whose production lines exceed Default (or its
-// recorded ceiling) is a finding. Ceilings live in atlas.lock.json and
-// only fall.
+// BudgetsRule: a package whose measure exceeds Default (or its recorded
+// ceiling) is a finding. Ceilings live in atlas.lock.json and only fall.
+// Measure is "lines" (production lines, the default) or "sql" (hand-written
+// SQL call sites: every call to a sql.executors method outside the sqlc
+// package, whether its SQL is a constant or not). In and Except scope the
+// rule to package directories; an empty In means every package.
 type BudgetsRule struct {
-	Default int `yaml:"default" json:"default"`
+	Default int      `yaml:"default" json:"default"`
+	Measure string   `yaml:"measure" json:"measure,omitempty"`
+	In      []string `yaml:"in" json:"in,omitempty"`
+	Except  []string `yaml:"except" json:"except,omitempty"`
 }
 
 // Finding is one violation of a rule. Key identifies it by symbols, never by

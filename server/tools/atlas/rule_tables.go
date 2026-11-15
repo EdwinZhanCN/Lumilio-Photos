@@ -55,6 +55,9 @@ type sqlUse struct {
 type sqlFacts struct {
 	uses       []sqlUse
 	unresolved []Finding
+	// sites counts, per package directory, the executor calls that pass
+	// hand-written SQL, constant or not.
+	sites map[string]int
 	// queries maps a query method key to its statements.
 	queries map[string][]sqlStatement
 }
@@ -63,7 +66,7 @@ func (a *Atlas) sqlFacts() *sqlFacts {
 	if a.sql != nil {
 		return a.sql
 	}
-	facts := &sqlFacts{queries: map[string][]sqlStatement{}}
+	facts := &sqlFacts{queries: map[string][]sqlStatement{}, sites: map[string]int{}}
 	a.sql = facts
 	index := a.typed()
 	config := a.Config.SQL
@@ -149,6 +152,7 @@ func (a *Atlas) sqlFacts() *sqlFacts {
 			if argument == nil {
 				continue
 			}
+			facts.sites[fn.pkg.dir]++
 			value := info.Types[argument].Value
 			if value == nil || value.Kind() != constant.String {
 				facts.unresolved = append(facts.unresolved, Finding{

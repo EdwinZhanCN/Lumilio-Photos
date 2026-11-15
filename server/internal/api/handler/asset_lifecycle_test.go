@@ -8,15 +8,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"testing"
+
 	"server/config"
 	"server/internal/api/problem"
 	"server/internal/catalog"
 	"server/internal/foundation/testutil"
-	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
 	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage/trash"
@@ -116,7 +118,7 @@ func TestAssetAvailabilityUsesAllCopiesAndAuthorizesBeforeState(t *testing.T) {
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `INSERT INTO repository_entries(entry_id,repository_id,path,path_key,parent_key,kind,size,mtime_ns,stat_checked_ns,state,asset_id,content_id,revision,updated_at) VALUES(?,?,'copy.jpg','copy.jpg','','file',0,1,1,'present',?,?,1,1)`, uuid.New(), second, assetID, seed.ContentID)
 	require.NoError(t, err)
-	h := &AssetHandler{readerDatabase: catalog.ReaderSQL, assetService: stubAssetService{getAssetFn: func(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
+	h := &AssetHandler{readQueries: catalog.ReaderQueries, reader: catalog.Reader, assetService: stubAssetService{getAssetFn: func(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
 		asset, err := catalog.ReaderQueries.GetAssetByIDAny(ctx, id)
 		return &asset, err
 	}}}

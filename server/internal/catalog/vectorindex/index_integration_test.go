@@ -81,7 +81,7 @@ func TestTrainANNInstallsQueryableModel(t *testing.T) {
 	if err := trainANN(ctx, catalogtx.NewWriter(database, nil), database, 512); err != nil {
 		t.Fatal(err)
 	}
-	if mode, err := CurrentMode(ctx, database); err != nil || mode != ModeANN {
+	if mode, err := CurrentMode(ctx, catalogtx.NewReader(database, nil)); err != nil || mode != ModeANN {
 		t.Fatalf("Vec1 mode = %q, error = %v", mode, err)
 	}
 

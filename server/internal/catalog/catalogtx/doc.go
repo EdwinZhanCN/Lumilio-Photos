@@ -9,6 +9,10 @@
 // The Atlas catalog-transactions rule rejects raw production Begin, BeginTx,
 // and standalone writer Exec calls outside the migration and driver boundary.
 //
+// Code above the catalog holds a Writer or a Reader, never a *sql.DB. A
+// hand-written read with no named operation goes through Reader.Statements,
+// which keeps it on the query-only pool under the unknown-read label.
+//
 // A write transaction contains only bounded SQL and in-memory validation.
 // Multi-statement planning that needs one snapshot uses a short reader
 // transaction and closes all rows before CPU, filesystem, media, network,

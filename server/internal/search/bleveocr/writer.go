@@ -2,7 +2,6 @@ package bleveocr
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"server/internal/catalog/catalogtx"
@@ -18,7 +17,6 @@ const (
 )
 
 type Writer struct {
-	pool       *sql.DB
 	writer     *catalogtx.Writer
 	queries    *repo.Queries
 	index      *Index
@@ -42,8 +40,8 @@ type PreparedBatch struct {
 	More      bool
 }
 
-func NewWriter(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, index *Index) *Writer {
-	return &Writer{pool: pool, writer: writer, queries: queries, index: index}
+func NewWriter(writer *catalogtx.Writer, queries *repo.Queries, index *Index) *Writer {
+	return &Writer{writer: writer, queries: queries, index: index}
 }
 
 func (w *Writer) Drain(ctx context.Context, batchSize, maxBatches int) (int, error) {
@@ -101,7 +99,7 @@ func (w *Writer) ProcessBatch(ctx context.Context, batchSize int) (int, error) {
 // PrepareBatch reads one bounded OCR outbox page and builds deterministic
 // Bleve mutations without touching either catalog or external index state.
 func (w *Writer) PrepareBatch(ctx context.Context, batchSize int) (PreparedBatch, error) {
-	if w == nil || w.pool == nil || w.queries == nil || w.index == nil {
+	if w == nil || w.writer == nil || w.queries == nil || w.index == nil {
 		return PreparedBatch{}, fmt.Errorf("OCR Bleve writer is not configured")
 	}
 	if batchSize <= 0 {

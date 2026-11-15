@@ -30,7 +30,7 @@ flowchart TB
     n_service -->|"1"| n_agent
     n_service -->|"2"| n_storage
     n_storage -->|"3"| n_domain
-    n_work -->|"1"| n_catalog
+    n_work -->|"2"| n_catalog
     linkStyle 2 stroke:#d9480f,stroke-width:1.5px
     classDef external stroke-dasharray:4 3
 ```
@@ -62,7 +62,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `catalog` → `foundation`: 5 package import(s), declared
 - `catalog` → `media`: 1 package import(s), declared
 - `catalog` → `storage`: 2 package import(s), reviewed exception
-- `domain` → `catalog`: 5 package import(s), declared
+- `domain` → `catalog`: 6 package import(s), declared
 - `domain` → `foundation`: 3 package import(s), declared
 - `domain` → `work`: 1 package import(s), declared
 - `http` → `agent`: 5 package import(s), declared
@@ -99,8 +99,8 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `service` → `media`: 3 package import(s), declared
 - `service` → `storage`: 2 package import(s), declared
 - `service` → `work`: 2 package import(s), declared
-- `storage` → `catalog`: 11 package import(s), declared
+- `storage` → `catalog`: 12 package import(s), declared
 - `storage` → `domain`: 3 package import(s), declared
 - `storage` → `foundation`: 7 package import(s), declared
 - `storage` → `media`: 3 package import(s), declared
-- `work` → `catalog`: 1 package import(s), declared
+- `work` → `catalog`: 2 package import(s), declared

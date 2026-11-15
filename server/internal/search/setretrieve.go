@@ -146,7 +146,7 @@ const setInitialPoolSize = maxANNAssetCandidateSet
 // RetrieveSet returns every candidate within the calibrated relevance
 // cutoff, in relevance order, up to maxResults.
 func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, strictness SetStrictness, maxResults int) ([]Candidate, SetMeta, error) {
-	if r == nil || r.pool == nil || r.resolveSpace == nil {
+	if r == nil || r.reader == nil || r.resolveSpace == nil {
 		return nil, SetMeta{}, fmt.Errorf("embedding retriever is not configured")
 	}
 	if req.QueryEmbedding == nil && r.embed == nil {
@@ -162,7 +162,7 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	}
 	queryVector := dbtypes.NewVector(embedding.Vector)
 
-	indexMode, err := vectorindex.CurrentMode(ctx, r.pool)
+	indexMode, err := vectorindex.CurrentMode(ctx, r.reader)
 	if err != nil {
 		return nil, SetMeta{}, err
 	}
@@ -314,7 +314,7 @@ ORDER BY raw_score, asset_id DESC
 LIMIT %s
 `, distanceSquaredExpr, joinConditions(conditions), cutoffSquaredPlaceholder, limitPlaceholder)
 
-	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
+	rows, err := r.reader.Statements().QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, false, fmt.Errorf("exact embedding retrieve: %w", err)
 	}

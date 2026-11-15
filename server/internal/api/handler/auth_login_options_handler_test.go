@@ -20,7 +20,7 @@ func TestGetLoginOptions_InvalidUsername(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
-	svc, err := service.NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
+	svc, err := service.NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)
 	h := NewAuthHandler(svc, nil, time.Hour, nil)
 
@@ -45,7 +45,7 @@ func TestGetLoginOptions_MissingUsername(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
-	svc, err := service.NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
+	svc, err := service.NewAuthService(nil, nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)
 	h := NewAuthHandler(svc, nil, time.Hour, nil)
 

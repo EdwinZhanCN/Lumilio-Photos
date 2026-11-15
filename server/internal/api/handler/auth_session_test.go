@@ -22,7 +22,7 @@ import (
 
 func newAuthSessionTestHandler(t *testing.T) *AuthHandler {
 	t.Helper()
-	authService, err := service.NewAuthService(nil, nil, config.AuthConfig{
+	authService, err := service.NewAuthService(nil, nil, nil, config.AuthConfig{
 		SecretKeyFile: filepath.Join(t.TempDir(), "lumilio-secret"),
 	})
 	require.NoError(t, err)

@@ -223,24 +223,23 @@ type RepositoryManager interface {
 
 // DefaultRepositoryManager implements the RepositoryManager interface
 type DefaultRepositoryManager struct {
-	lockProvider   RepositoryLockProvider
-	database       *sql.DB
-	writer         *catalogtx.Writer
-	readerDatabase *sql.DB
-	queries        *repo.Queries
-	readerQueries  *repo.Queries
-	dirManager     DirectoryManager
-	files          *RepositoryFSFactory
-	logger         *zap.Logger
-	observer       StorageObserver
-	consentOnce    sync.Once
-	consentKey     []byte
-	auditProvider  logging.RepositoryAuditProvider
-	initialScan    func(context.Context, string) error
-	markerFiles    marker.AtomicFS
-	ownershipMu    sync.Mutex
-	ownershipOn    bool
-	ownership      map[string]runtimeOwnership
+	lockProvider  RepositoryLockProvider
+	writer        *catalogtx.Writer
+	reader        *catalogtx.Reader
+	queries       *repo.Queries
+	readerQueries *repo.Queries
+	dirManager    DirectoryManager
+	files         *RepositoryFSFactory
+	logger        *zap.Logger
+	observer      StorageObserver
+	consentOnce   sync.Once
+	consentKey    []byte
+	auditProvider logging.RepositoryAuditProvider
+	initialScan   func(context.Context, string) error
+	markerFiles   marker.AtomicFS
+	ownershipMu   sync.Mutex
+	ownershipOn   bool
+	ownership     map[string]runtimeOwnership
 	// volumeQualifier measures the name comparison rule of a repository tree
 	// at registration and reconnect; nil means pathsemantics.Qualify over the
 	// root and its private directory. Tests inject foreign-volume rules on an
@@ -297,33 +296,14 @@ func (rm *DefaultRepositoryManager) ScheduleInitialRepositoryScan(ctx context.Co
 	return rm.initialScan(ctx, repositoryID)
 }
 
-// NewRepositoryManager creates a new repository manager instance
+// NewRepositoryManager creates a new repository manager instance. Mutations
+// run through writer and queries; status reads use the query-only reader and
+// readerQueries, which falls back to queries when nil.
 func NewRepositoryManager(
-	database *sql.DB,
-	queries *repo.Queries,
-	logger *zap.Logger,
-	auditProvider logging.RepositoryAuditProvider,
-	files *RepositoryFSFactory,
-) (*DefaultRepositoryManager, error) {
-	return NewRepositoryManagerWithReader(database, database, queries, logger, auditProvider, files)
-}
-
-func NewRepositoryManagerWithReader(
-	database *sql.DB,
-	readerDatabase *sql.DB,
-	queries *repo.Queries,
-	logger *zap.Logger,
-	auditProvider logging.RepositoryAuditProvider,
-	files *RepositoryFSFactory,
-) (*DefaultRepositoryManager, error) {
-	return NewRepositoryManagerWithCatalog(database, catalogtx.NewWriter(database, nil), readerDatabase, queries, logger, auditProvider, files)
-}
-
-func NewRepositoryManagerWithCatalog(
-	database *sql.DB,
 	writer *catalogtx.Writer,
-	readerDatabase *sql.DB,
+	reader *catalogtx.Reader,
 	queries *repo.Queries,
+	readerQueries *repo.Queries,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 	files *RepositoryFSFactory,
@@ -335,20 +315,18 @@ func NewRepositoryManagerWithCatalog(
 		files = NewRepositoryFSFactory(nil, queries)
 	}
 
-	readerQueries := queries
-	if readerDatabase != nil {
-		readerQueries = repo.New(readerDatabase)
+	if readerQueries == nil {
+		readerQueries = queries
 	}
 	rm := &DefaultRepositoryManager{
-		database:       database,
-		writer:         writer,
-		readerDatabase: readerDatabase,
-		queries:        queries,
-		readerQueries:  readerQueries,
-		dirManager:     NewDirectoryManager(),
-		files:          files,
-		logger:         logger.With(zap.String("component", "repository")),
-		auditProvider:  auditProvider,
+		writer:        writer,
+		reader:        reader,
+		queries:       queries,
+		readerQueries: readerQueries,
+		dirManager:    NewDirectoryManager(),
+		files:         files,
+		logger:        logger.With(zap.String("component", "repository")),
+		auditProvider: auditProvider,
 	}
 	return rm, nil
 }
@@ -923,7 +901,7 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 	impact := RepositoryRemovalImpact{
 		RepositoryID: existing.RepoID.String(), RepositoryName: existing.Name,
 	}
-	if err := rm.readerDatabase.QueryRowContext(ctx, `
+	if err := rm.reader.Statements().QueryRowContext(ctx, `
 		WITH repository_assets AS (
 			SELECT occurrence.asset_id, max(occurrence.file_size) AS file_size
 			FROM active_asset_occurrences occurrence
@@ -935,7 +913,7 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 	`, repoUUID).Scan(&impact.AssetCount, &impact.CatalogMediaBytes); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository assets: %w", err)
 	}
-	if err := rm.readerDatabase.QueryRowContext(ctx, `
+	if err := rm.reader.Statements().QueryRowContext(ctx, `
 		SELECT count(DISTINCT album_assets.album_id)
 		FROM album_assets
 		JOIN active_asset_occurrences occurrence
@@ -944,13 +922,13 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 	`, repoUUID).Scan(&impact.AlbumCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count affected albums: %w", err)
 	}
-	if err := rm.readerDatabase.QueryRowContext(ctx, `
+	if err := rm.reader.Statements().QueryRowContext(ctx, `
 		SELECT count(*) FROM repository_scans
 		WHERE repository_id=? AND status IN ('queued','walking','sweeping')
 	`, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository catalog work: %w", err)
 	}
-	if err := rm.readerDatabase.QueryRowContext(ctx, `
+	if err := rm.reader.Statements().QueryRowContext(ctx, `
 		SELECT count(*) FROM cloud_import_runs WHERE repository_id = ?
 	`, repoUUID).Scan(&impact.CloudImportCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository cloud import receipts: %w", err)

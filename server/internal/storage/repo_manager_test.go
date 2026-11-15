@@ -3,8 +3,9 @@ package storage
 import (
 	"os"
 	"path/filepath"
-	"server/internal/storage/repocfg"
 	"testing"
+
+	"server/internal/storage/repocfg"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestValidateRepository(t *testing.T) {
-	manager, _ := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
+	manager, _ := NewRepositoryManager(nil, nil, nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
 
 	t.Run("valid repository", func(t *testing.T) {
 		testDir := t.TempDir()
@@ -65,7 +66,7 @@ func TestValidateRepository(t *testing.T) {
 }
 
 func TestIsNestedRepository(t *testing.T) {
-	manager, _ := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
+	manager, _ := NewRepositoryManager(nil, nil, nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
 	testDir := canonicalTempDir(t)
 
 	// Create parent repository
@@ -98,7 +99,7 @@ func TestIsNestedRepository(t *testing.T) {
 }
 
 func TestRepositoryWorkflow_Integration(t *testing.T) {
-	manager, _ := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
+	manager, _ := NewRepositoryManager(nil, nil, nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
 	dirManager := NewDirectoryManager()
 	testRoot := canonicalTempDir(t)
 

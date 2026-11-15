@@ -12,6 +12,10 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/problem"
@@ -24,9 +28,6 @@ import (
 	"server/internal/media/hash"
 	"server/internal/storage"
 	"server/internal/work/pipeline"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -917,11 +918,7 @@ func (h *AssetHandler) loadUploadOperationStatuses(c *gin.Context, raw string) (
 	for _, id := range ids {
 		var status dto.UploadOperationStatusDTO
 		var terminalError sql.NullString
-		reader := h.readerDatabase
-		if reader == nil {
-			reader = h.database
-		}
-		err := reader.QueryRowContext(c, `SELECT receipt.receipt_id, staging_commit.original_filename, receipt.state, receipt.terminal_error FROM catalog_operation_receipts receipt JOIN repository_staging_commits staging_commit ON staging_commit.commit_id = receipt.subject_id WHERE receipt.receipt_id = ? AND receipt.kind = 'ingest' AND staging_commit.owner_id = ?`, id.String(), *callerID).Scan(&status.ReceiptID, &status.FileName, &status.Status, &terminalError)
+		err := h.reader.Statements().QueryRowContext(c, `SELECT receipt.receipt_id, staging_commit.original_filename, receipt.state, receipt.terminal_error FROM catalog_operation_receipts receipt JOIN repository_staging_commits staging_commit ON staging_commit.commit_id = receipt.subject_id WHERE receipt.receipt_id = ? AND receipt.kind = 'ingest' AND staging_commit.owner_id = ?`, id.String(), *callerID).Scan(&status.ReceiptID, &status.FileName, &status.Status, &terminalError)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}

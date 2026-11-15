@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"server/internal/catalog/catalogtx"
 )
 
 func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
@@ -43,7 +45,7 @@ func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	catalogSnapshot, err := readCatalogPipelineObservation(context.Background(), catalog, startedAt, endedAt)
+	catalogSnapshot, err := readCatalogPipelineObservation(context.Background(), catalogtx.NewReader(catalog, nil), startedAt, endedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +72,7 @@ func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	queueSnapshot, err := readMacroQueueObservation(context.Background(), queueDatabase, startedAt, endedAt)
+	queueSnapshot, err := readMacroQueueObservation(context.Background(), catalogtx.NewReader(queueDatabase, nil), startedAt, endedAt)
 	if err != nil {
 		t.Fatal(err)
 	}

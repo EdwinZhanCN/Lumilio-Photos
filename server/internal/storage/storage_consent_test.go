@@ -48,7 +48,7 @@ func newConsentHarness(t *testing.T) *consentHarness {
 		t.Fatal(err)
 	}
 	files := storage.NewRepositoryFSFactory(storage.NewRepositoryAccessCoordinator(), catalog.Queries)
-	manager, err := storage.NewRepositoryManager(catalog.SQL, catalog.Queries, zap.NewNop(), nil, files)
+	manager, err := storage.NewRepositoryManager(catalog.Writer, catalog.Reader, catalog.Queries, catalog.ReaderQueries, zap.NewNop(), nil, files)
 	if err != nil {
 		t.Fatal(err)
 	}

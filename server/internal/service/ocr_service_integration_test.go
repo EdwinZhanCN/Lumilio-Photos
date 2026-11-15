@@ -25,9 +25,9 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	index, err := bleveocr.Open(ctx, database.Path, database.Queries, false, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
-	writer := bleveocr.NewWriter(database.SQL, database.Writer, database.Queries, index)
+	writer := bleveocr.NewWriter(database.Writer, database.Queries, index)
 	notifier := &recordingOCRIndexNotifier{}
-	ocrService := NewOCRServiceWithNotifier(database.Queries, database.SQL, database.Writer, notifier)
+	ocrService := NewOCRService(database.Queries, database.Writer, notifier)
 
 	require.NoError(t, ocrService.SaveOCRResults(ctx, assetID, ocrFixture("Running invoice 2025", 0.95), 12))
 	require.Equal(t, int32(1), notifier.Count())

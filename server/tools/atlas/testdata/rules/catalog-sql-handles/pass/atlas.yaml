@@ -1,0 +1,12 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: catalog-sql-handles
+    why: code above the catalog reaches the database only through narrow handles
+    forbid_types:
+      in: [fx/**]
+      except: [fx/catalog/**]
+      types: ["*database/sql.DB"]
+      expressions: true

@@ -104,7 +104,7 @@ func TestSummaryWithoutQueueDBStillReportsCatalogWork(t *testing.T) {
 	f.stage(failed, "transcode", 1, 0, "corrupt")
 	f.stage(f.asset(false), "transcode", 1, 0, "")
 
-	summary, err := NewReader(f.database.ReaderSQL, nil).Summary(t.Context())
+	summary, err := NewReader(f.database.Reader, nil).Summary(t.Context())
 	require.NoError(t, err)
 	video := stageByID(t, summary, StageVideo)
 	require.Equal(t, int64(1), video.Failed)

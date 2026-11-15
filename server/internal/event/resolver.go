@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"server/internal/catalog/catalogtx"
 )
 
 var ErrNotFound = errors.New("event not found")
@@ -34,10 +36,11 @@ type ResolvedAsset struct {
 }
 
 type Resolver struct {
-	db *sql.DB
+	db catalogtx.Statements
 }
 
-func NewResolver(db *sql.DB) *Resolver { return &Resolver{db: db} }
+// NewResolver resolves Events through the catalog's query-only reader.
+func NewResolver(reader *catalogtx.Reader) *Resolver { return &Resolver{db: reader.Statements()} }
 
 func (r *Resolver) Resolve(ctx context.Context, ownerID int32, eventID string) (Summary, error) {
 	return resolveWith(ctx, r.db, ownerID, eventID)

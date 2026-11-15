@@ -73,20 +73,13 @@ type UserService interface {
 
 type userService struct {
 	queries *repo.Queries
-	db      *sql.DB
 	writer  *catalogtx.Writer
 }
 
-func NewUserService(queries *repo.Queries, db *sql.DB) UserService {
-	return NewUserServiceWithWriter(queries, db, catalogtx.NewWriter(db, nil))
-}
-
-func NewUserServiceWithWriter(queries *repo.Queries, db *sql.DB, writer *catalogtx.Writer) UserService {
-	return &userService{
-		queries: queries,
-		db:      db,
-		writer:  writer,
-	}
+// NewUserService runs multi-statement mutations in named writer
+// transactions, or straight on queries when writer is nil.
+func NewUserService(queries *repo.Queries, writer *catalogtx.Writer) UserService {
+	return &userService{queries: queries, writer: writer}
 }
 
 func (s *userService) GetUserByID(ctx context.Context, userID int) (UserResponse, error) {
@@ -467,7 +460,7 @@ func cloneOptionalString(value *string) *string {
 }
 
 func (s *userService) withTx(ctx context.Context, fn func(*repo.Queries) error) error {
-	if s.db == nil {
+	if s.writer == nil {
 		return fn(s.queries)
 	}
 

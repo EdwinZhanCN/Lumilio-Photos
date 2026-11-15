@@ -141,14 +141,14 @@ func (e *StorageLocationActionUnavailableError) Is(target error) bool {
 // read of the registered root marker into policy facts.
 func (rm *DefaultRepositoryManager) storageLocationActionFacts(ctx context.Context, storageLocation repo.StorageLocation) (StorageLocationActionFacts, error) {
 	facts := StorageLocationActionFacts{Kind: storageLocation.Kind, Status: storageLocation.Status}
-	if rm.readerDatabase != nil {
-		if err := rm.readerDatabase.QueryRowContext(ctx,
+	if rm.reader != nil {
+		if err := rm.reader.Statements().QueryRowContext(ctx,
 			"SELECT count(*) FROM repositories WHERE storage_location_id = ?", storageLocation.StorageLocationID,
 		).Scan(&facts.RepositoryCount); err != nil {
 			return facts, fmt.Errorf("count Storage Location repositories: %w", err)
 		}
 		var running int
-		if err := rm.readerDatabase.QueryRowContext(ctx, `
+		if err := rm.reader.Statements().QueryRowContext(ctx, `
 			SELECT count(*) FROM lifecycle_operations
 			WHERE target_type = 'storage_location' AND target_id = ? AND status = 'running'
 		`, storageLocation.StorageLocationID.String()).Scan(&running); err != nil {

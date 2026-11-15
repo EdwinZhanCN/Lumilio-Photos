@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"server/internal/catalog/catalogtx"
 	"server/internal/catalog/vectorindex"
 	migrations "server/migrations"
 
@@ -44,10 +45,11 @@ func preReleaseCatalogError() error {
 }
 
 // UpgradeBackup snapshots a catalog before the first forward step runs and
-// returns the snapshot path. It receives the catalog's read pool, the version
-// found on disk, and the version the steps will reach. The db package cannot
-// own backups (the backup package depends on it), so the runtime supplies it.
-type UpgradeBackup func(ctx context.Context, source *sql.DB, from, to int) (string, error)
+// returns the snapshot path. It receives the catalog's query-only reader, the
+// version found on disk, and the version the steps will reach. The catalog
+// package cannot own backups (the backup package depends on it), so the
+// runtime supplies it.
+type UpgradeBackup func(ctx context.Context, source *catalogtx.Reader, from, to int) (string, error)
 
 // catalogStep upgrades a catalog from Version-1 to Version. The runner applies
 // it and stamps PRAGMA user_version = Version in one transaction.
@@ -103,7 +105,7 @@ func (d *DB) migrateCatalog(ctx context.Context, steps []catalogStep, current in
 		if backup == nil {
 			return fmt.Errorf("catalog schema version %d needs an upgrade to %d, but no pre-upgrade backup is configured", version, current)
 		}
-		backupPath, err = backup(ctx, d.ReaderSQL, version, current)
+		backupPath, err = backup(ctx, d.Reader, version, current)
 		if err != nil {
 			return fmt.Errorf("back up catalog before upgrading schema version %d to %d: %w", version, current, err)
 		}

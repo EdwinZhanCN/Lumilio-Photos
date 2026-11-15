@@ -94,7 +94,7 @@ func (c *Cleaner) cleanRepository(ctx context.Context, repository repo.Repositor
 
 func (c *Cleaner) references(ctx context.Context, repository repo.Repository) (map[string]struct{}, error) {
 	referenced := make(map[string]struct{})
-	thumbnails, err := c.database.ReaderSQL.QueryContext(ctx, `
+	thumbnails, err := c.database.Reader.Statements().QueryContext(ctx, `
 		SELECT storage_path FROM thumbnails WHERE repository_id = ?`, repository.RepoID.String())
 	if err != nil {
 		return nil, fmt.Errorf("read thumbnail artifact references: %w", err)
@@ -115,7 +115,7 @@ func (c *Cleaner) references(ctx context.Context, repository repo.Repository) (m
 	// repository, active, missing, or trashed: a restored or returning file
 	// needs no re-transcode. PurgeEntries deletes the Asset, and with it the
 	// reference.
-	transcodes, err := c.database.ReaderSQL.QueryContext(ctx, `
+	transcodes, err := c.database.Reader.Statements().QueryContext(ctx, `
 		SELECT DISTINCT a.content_id, state.pipeline_version, a.type
 		FROM asset_pipeline_state state
 		JOIN assets a ON a.asset_id = state.asset_id

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"server/internal/catalog/dbtypes"
-	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
 )
 
@@ -65,7 +64,7 @@ func TestStorageRuntimeStatusDegradesOnlyForMissingBootstrapAnchors(t *testing.T
 	if status.State != StorageRuntimeStateActive {
 		t.Fatalf("reconciled primary unavailability degraded instance: %+v", status)
 	}
-	if _, err = manager.database.ExecContext(ctx, `DELETE FROM repositories WHERE repo_id = ?`, primary.RepoID); err != nil {
+	if _, err = manager.writer.Pool().ExecContext(ctx, `DELETE FROM repositories WHERE repo_id = ?`, primary.RepoID); err != nil {
 		t.Fatal(err)
 	}
 	status, err = manager.StorageRuntimeStatus(ctx)
@@ -82,8 +81,6 @@ func TestStorageRuntimeStatusStaysAvailableWhileWriterIsBusy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	manager.readerDatabase = catalog.ReaderSQL
-	manager.readerQueries = repo.New(catalog.ReaderSQL)
 
 	writer, err := catalog.SQL.BeginTx(ctx, nil)
 	if err != nil {
@@ -175,7 +172,7 @@ func TestReconnectStorageLocationIsAllOrNothing(t *testing.T) {
 		t.Fatalf("stable relocate retry: %v", err)
 	}
 	var stableOperations int
-	if err := manager.database.QueryRowContext(ctx, `
+	if err := manager.writer.Pool().QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_operations WHERE request_id = ?
 	`, relocateRequest.RequestID).Scan(&stableOperations); err != nil {
 		t.Fatal(err)

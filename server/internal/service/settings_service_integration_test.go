@@ -32,6 +32,7 @@ func TestSettingsServiceUpdatesFreshSQLiteCatalog(t *testing.T) {
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	semanticEnabled := true
 	videoSemanticEnabled := true
@@ -65,6 +66,7 @@ func TestSettingsServiceDoesNotReuseCredentialAcrossProviders(t *testing.T) {
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	provider := "openai"
 	model := "gpt-4.1-mini"
@@ -132,6 +134,7 @@ func TestSettingsServiceRejectsEnablingIncompleteAgentConfiguration(t *testing.T
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	enabled := true
 	provider := "openai"
@@ -162,6 +165,7 @@ func TestSettingsServiceClearsAgentFieldsWhenProviderIsUnset(t *testing.T) {
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	provider := "openai"
 	model := "gpt-4.1-mini"
@@ -202,11 +206,11 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
 
-	settingsService := NewSettingsServiceWithRuntime(
+	settingsService := NewSettingsService(
 		database.Queries,
 		runtimesettings.Default("production"),
 		filepath.Join(catalogDir, "lumilio_secret_key"),
-		SettingsRuntime{DB: database.SQL, Writer: database.Writer},
+		database.Writer,
 	)
 
 	row, err := database.Queries.GetSettings(ctx)

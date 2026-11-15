@@ -18,7 +18,7 @@ import (
 
 func reconcileTestManager(t *testing.T) *DefaultRepositoryManager {
 	t.Helper()
-	manager, err := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil)
+	manager, err := NewRepositoryManager(nil, nil, nil, nil, zap.NewNop(), nil, nil)
 	if err != nil {
 		t.Fatalf("NewRepositoryManager: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestInspectRepositoryOnDiskRecoversFromOffline(t *testing.T) {
 func reconcileLeaseTestManager(t *testing.T) (*DefaultRepositoryManager, *RepositoryAccessCoordinator) {
 	t.Helper()
 	coordinator := NewRepositoryAccessCoordinator()
-	manager, err := NewRepositoryManager(nil, nil, zap.NewNop(), nil, NewRepositoryFSFactory(coordinator, nil))
+	manager, err := NewRepositoryManager(nil, nil, nil, nil, zap.NewNop(), nil, NewRepositoryFSFactory(coordinator, nil))
 	if err != nil {
 		t.Fatalf("NewRepositoryManager: %v", err)
 	}

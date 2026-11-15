@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
 	"server/internal/foundation/fsprivacy"
 
 	"github.com/mattn/go-sqlite3"
@@ -74,10 +75,27 @@ type Compatibility struct {
 	MaxRiverMigration   int64
 }
 
-// CreateSnapshot uses SQLite's Online Backup API to create a transactionally
-// consistent standalone database, validates it through an independent
-// connection, writes a checksum manifest, and atomically finalizes both files.
+// CreateSnapshot uses SQLite's Online Backup API to copy the catalog through
+// its query-only reader into a transactionally consistent standalone
+// database, validates it through an independent connection, writes a
+// checksum manifest, and atomically finalizes both files.
 func CreateSnapshot(
+	ctx context.Context,
+	source *catalogtx.Reader,
+	destDir string,
+	prefix string,
+	metadata SnapshotMetadata,
+	logf Logf,
+) (Snapshot, error) {
+	if source == nil {
+		return Snapshot{}, errors.New("SQLite backup source is nil")
+	}
+	return createSnapshot(ctx, source.Pool(), destDir, prefix, metadata, logf)
+}
+
+// createSnapshot is CreateSnapshot over any pool, for the restore point
+// taken from a drained catalog file that has no runtime reader.
+func createSnapshot(
 	ctx context.Context,
 	source *sql.DB,
 	destDir string,

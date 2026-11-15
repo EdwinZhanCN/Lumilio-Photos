@@ -92,7 +92,7 @@ func TestAudioNeverSeedsOrBridgesEvents(t *testing.T) {
 			// Visuals are far enough apart to split; an audio every hour would bridge them.
 			add("photo", eventRepoOne, ptrMicros(0), 1)
 			add("video", eventRepoTwo, ptrMicros(4*time.Hour), 1)
-			service := event.NewService(database.SQL)
+			service := event.NewService(database.Writer, database.Reader)
 			baseline, err := service.RebuildOwner(ctx, 1, false)
 			if err != nil {
 				t.Fatal(err)
@@ -138,7 +138,7 @@ func TestAudioOnlyProducesNoEvents(t *testing.T) {
 	database, add := audioEventCatalog(t)
 	add("audio", eventRepoAudio, nil, 1)
 	add("audio", eventRepoAudio, ptrMicros(time.Hour), 1)
-	service := event.NewService(database.SQL)
+	service := event.NewService(database.Writer, database.Reader)
 	result, err := service.RebuildOwner(ctx, 1, false)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestMixedEventResolutionAndRebuildExcludeAudio(t *testing.T) {
 	database, add := audioEventCatalog(t)
 	photo := add("photo", eventRepoOne, ptrMicros(time.Second), 1)
 	video := add("video", eventRepoTwo, ptrMicros(2*time.Second), 1)
-	service := event.NewService(database.SQL)
+	service := event.NewService(database.Writer, database.Reader)
 	if _, err := service.RebuildOwner(ctx, 1, false); err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ VALUES(?,1,'include',?,?,1,1);
 `, eventID, eventID, audio.mediaID, audio.mediaID, eventID, uuid.NewString(), eventID, audio.mediaID); err != nil {
 		t.Fatal(err)
 	}
-	service := event.NewService(database.SQL)
+	service := event.NewService(database.Writer, database.Reader)
 	if _, err := service.Resolver().Resolve(ctx, 1, eventID); !errors.Is(err, event.ErrNotFound) {
 		t.Fatalf("audio-only resolve = %v", err)
 	}

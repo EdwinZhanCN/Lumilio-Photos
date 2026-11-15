@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/problem"
@@ -15,8 +16,8 @@ import (
 )
 
 func (h *AssetHandler) lifecycleQueries() *repo.Queries {
-	if h.readerDatabase != nil {
-		return repo.New(h.readerDatabase)
+	if h.readQueries != nil {
+		return h.readQueries
 	}
 	return h.queries
 }

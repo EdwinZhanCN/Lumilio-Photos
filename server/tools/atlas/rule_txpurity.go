@@ -303,43 +303,80 @@ func callsMethod(info *types.Info, statement ast.Stmt, txType types.Type, method
 	return found
 }
 
-// budgetsFindings reports every package over its line ceiling: the
-// recorded ceiling if it has one, else the default.
+// budgetMeasure returns what a budgets rule counts for a package, and
+// whether the package exists inside the rule's scope.
+func (a *Atlas) budgetMeasure(rule Rule, dir string) (int, bool) {
+	if a.Modules[dir] == nil {
+		return 0, false
+	}
+	if scope := rule.Budgets; (len(scope.In) > 0 && !inScope(scope.In, dir, "")) || inScope(scope.Except, dir, "") {
+		return 0, false
+	}
+	if rule.Budgets.Measure == "sql" {
+		return a.sqlFacts().sites[dir], true
+	}
+	return a.Modules[dir].Lines, true
+}
+
+func budgetUnit(rule Rule) string {
+	if rule.Budgets.Measure == "sql" {
+		return "hand-written SQL call sites"
+	}
+	return "production lines"
+}
+
+// budgetsFindings reports every package over its ceiling: the recorded
+// ceiling if it has one, else the default.
 func (a *Atlas) budgetsFindings(rule Rule) []Finding {
-	if rule.Budgets.Default <= 0 {
-		a.ruleProblem(rule, "budgets needs a positive default")
+	switch rule.Budgets.Measure {
+	case "", "lines":
+		if rule.Budgets.Default <= 0 {
+			a.ruleProblem(rule, "budgets needs a positive default")
+			return nil
+		}
+	case "sql":
+		if rule.Budgets.Default < 0 {
+			a.ruleProblem(rule, "budgets needs a default of zero or more")
+			return nil
+		}
+	default:
+		a.ruleProblem(rule, "budgets measure %q is neither lines nor sql", rule.Budgets.Measure)
 		return nil
 	}
 	ceilings := a.Ceilings[rule.ID]
+	advice := "split the package or move code out"
+	if rule.Budgets.Measure == "sql" {
+		advice = "write a sqlc query, or move the SQL to the package that owns the table"
+	}
 	var findings []Finding
 	for _, pkg := range a.goPackages {
-		module := a.Modules[pkg.dir]
-		if module == nil {
+		measured, ok := a.budgetMeasure(rule, pkg.dir)
+		if !ok {
 			continue
 		}
 		limit := rule.Budgets.Default
 		if ceiling, ok := ceilings[pkg.dir]; ok {
 			limit = ceiling
 		}
-		if module.Lines > limit {
-			findings = append(findings, Finding{Key: pkg.dir, Where: pkg.dir, Message: fmt.Sprintf("has %d production lines, over its ceiling of %d; split the package or move code out", module.Lines, limit)})
+		if measured > limit {
+			findings = append(findings, Finding{Key: pkg.dir, Where: pkg.dir, Message: fmt.Sprintf("has %d %s, over its ceiling of %d; %s", measured, budgetUnit(rule), limit, advice)})
 		}
 	}
 	for _, dir := range sortedKeys(ceilings) {
-		module := a.Modules[dir]
+		measured, ok := a.budgetMeasure(rule, dir)
 		switch {
-		case module == nil:
+		case !ok:
 			a.StaleBaselines = append(a.StaleBaselines, Problem{Where: "atlas.lock.json", Rule: rule.ID, Message: fmt.Sprintf("ceiling for %s, which no longer exists", dir)})
-		case module.Lines < ceilings[dir]:
-			a.StaleBaselines = append(a.StaleBaselines, Problem{Where: "atlas.lock.json", Rule: rule.ID, Message: fmt.Sprintf("ceiling %d for %s is above its %d lines; ceilings only fall", ceilings[dir], dir, module.Lines)})
+		case measured < ceilings[dir]:
+			a.StaleBaselines = append(a.StaleBaselines, Problem{Where: "atlas.lock.json", Rule: rule.ID, Message: fmt.Sprintf("ceiling %d for %s is above its %d %s; ceilings only fall", ceilings[dir], dir, measured, budgetUnit(rule))})
 		}
 	}
 	return findings
 }
 
 // lockedCeilings is what `atlas lock` writes for budgets rules: every
-// ceiling lowered to the package's current size, and dropped once the
-// package is back under the default. It never raises one.
+// ceiling lowered to the package's current measure, and dropped once the
+// package is back at or under the default. It never raises one.
 func (a *Atlas) lockedCeilings() map[string]map[string]int {
 	return a.shrunkCeilings(false)
 }
@@ -352,18 +389,18 @@ func (a *Atlas) shrunkCeilings(existingOnly bool) map[string]map[string]int {
 		}
 		kept := map[string]int{}
 		for dir, ceiling := range a.Ceilings[rule.ID] {
-			module := a.Modules[dir]
-			if module == nil || module.Lines <= rule.Budgets.Default {
+			measured, ok := a.budgetMeasure(rule, dir)
+			if !ok || measured <= rule.Budgets.Default {
 				continue
 			}
-			kept[dir] = min(ceiling, module.Lines)
+			kept[dir] = min(ceiling, measured)
 		}
 		out[rule.ID] = kept
 	}
 	return out
 }
 
-// baselineCeilings records the current size of every package over the
+// baselineCeilings records the current measure of every Go package over the
 // default, for a budgets rule that has no ceilings yet.
 func (a *Atlas) baselineCeilings(rule Rule) (map[string]map[string]int, error) {
 	if _, ok := a.Ceilings[rule.ID]; ok {
@@ -371,9 +408,9 @@ func (a *Atlas) baselineCeilings(rule Rule) (map[string]map[string]int, error) {
 	}
 	out := a.shrunkCeilings(true)
 	kept := map[string]int{}
-	for _, module := range a.Modules {
-		if module.Side != "web" && module.Lines > rule.Budgets.Default && !strings.HasPrefix(module.ID, "web/") {
-			kept[module.ID] = module.Lines
+	for _, pkg := range a.goPackages {
+		if measured, ok := a.budgetMeasure(rule, pkg.dir); ok && measured > rule.Budgets.Default {
+			kept[pkg.dir] = measured
 		}
 	}
 	out[rule.ID] = kept
