@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -20,7 +20,7 @@ func TestBreakGlassSQLiteIntegration(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "breakglass.sqlite"),
 	})
 	require.NoError(t, err)

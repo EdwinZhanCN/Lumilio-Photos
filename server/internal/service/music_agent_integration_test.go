@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"server/internal/agent/core"
 	"server/internal/agent/tools"
-	"server/internal/testutil"
+	"server/internal/foundation/testutil"
 	"testing"
 )
 

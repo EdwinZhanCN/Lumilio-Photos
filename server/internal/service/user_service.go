@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

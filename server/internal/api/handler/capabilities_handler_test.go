@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"server/internal/api/dto"
+	"server/internal/foundation/settings"
 	"server/internal/service"
-	"server/internal/settings"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	pb "github.com/edwinzhancn/lumen-sdk/proto"

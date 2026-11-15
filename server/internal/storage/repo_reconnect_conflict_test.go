@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 )
 
 // A reconnect whose destination path another repository row already claims

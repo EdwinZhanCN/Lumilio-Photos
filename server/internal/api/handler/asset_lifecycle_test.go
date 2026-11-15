@@ -10,14 +10,14 @@ import (
 	"path/filepath"
 	"server/config"
 	"server/internal/api/problem"
-	"server/internal/db"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage/trash"
 )
@@ -101,7 +101,7 @@ func TestAssetAvailabilityUsesAllCopiesAndAuthorizesBeforeState(t *testing.T) {
 	ctx := context.Background()
 	directory := t.TempDir()
 	require.NoError(t, os.Chmod(directory, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(directory, "catalog.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(directory, "catalog.sqlite3")})
 	require.NoError(t, err)
 	require.NoError(t, catalog.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, catalog.Close(context.Background())) })

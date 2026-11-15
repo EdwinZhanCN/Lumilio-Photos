@@ -11,8 +11,8 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/utils/file/validator.go
-- server/internal/utils/imaging/process.go
+- server/internal/media/file/validator.go
+- server/internal/media/imaging/process.go
 - web/src/features/studio/flows/editor/export/ExportPanel.tsx
 -->
 

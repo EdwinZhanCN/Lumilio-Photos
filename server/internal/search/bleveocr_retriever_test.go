@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 	"server/internal/search/bleveocr"
-	"server/internal/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -87,11 +87,11 @@ VALUES (1, ?, 0, 1);
 	require.Equal(t, []uuid.UUID{deleted}, candidateUUIDs(candidates))
 }
 
-func openRetrieverTestDatabase(t *testing.T) *db.DB {
+func openRetrieverTestDatabase(t *testing.T) *catalog.DB {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	database, err := db.Open(context.Background(), config.DatabaseConfig{
+	database, err := catalog.Open(context.Background(), config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -108,7 +108,7 @@ INSERT INTO users (
 	return database
 }
 
-func insertRetrieverRepositories(t *testing.T, database *db.DB, repositoryA, repositoryB uuid.UUID) {
+func insertRetrieverRepositories(t *testing.T, database *catalog.DB, repositoryA, repositoryB uuid.UUID) {
 	t.Helper()
 	storageLocationID := uuid.New()
 	_, err := database.SQL.Exec(`
@@ -126,7 +126,7 @@ INSERT INTO repositories (
 
 func insertRetrieverOCRAsset(
 	t *testing.T,
-	database *db.DB,
+	database *catalog.DB,
 	ownerID int32,
 	repositoryID uuid.UUID,
 	text string,

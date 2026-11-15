@@ -17,9 +17,9 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
 	"server/internal/storage"
 	"server/internal/storage/scan"

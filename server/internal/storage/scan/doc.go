@@ -44,7 +44,7 @@
 // with backoff retries for startup failures. Full scans avoid unchanged writes
 // and hashes, rather than relying on native journal cursors. Writer batches
 // adapt toward 10 ms within the 25 ms hold budget through
-// [server/internal/commit.ScanWriter], capped at [MaxBatchRows] (256). Scans
+// [server/internal/ingest/commit.ScanWriter], capped at [MaxBatchRows] (256). Scans
 // never unlink, trash, or purge Assets; returning files can rebind their Asset.
 //
 // [ChangeWatchBackend] makes recursive hints replaceable; the default

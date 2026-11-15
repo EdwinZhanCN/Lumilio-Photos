@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/locations"
 	"server/internal/storage/repocfg"

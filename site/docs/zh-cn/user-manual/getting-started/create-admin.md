@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/service/credential_policy.go
 - server/internal/service/auth_passkeys.go
 - server/internal/service/user_service.go
-- server/internal/db/repo/queries/repositories.sql
+- server/internal/catalog/repo/queries/repositories.sql
 -->
 
 # 创建第一位管理员

@@ -1,6 +1,6 @@
 # Server structure: capability packages and Atlas as the only architecture gate
 
-Status: active, created 2026-10-19; nothing has landed. Owner decisions
+Status: active, created 2026-10-19; B1 done 2026-11-14 (#275), next B2. Owner decisions
 (2026-10-19): the cleanest structure wins over a move-only refactor, so code,
 Go type names, and OpenAPI schema names may change; Atlas replaces
 `server/tools/architecturecheck`; Huma replaces swag, so the HTTP contract is
@@ -158,7 +158,10 @@ they are.
      import no other `server` package; this one rule replaces the
      per-package `exceptions` in `atlas.yaml` (B13).
 - **Directory is group.** From B1 on, a Server package's Atlas group is
-  derived from its path; `//atlas:group` directives are removed in A1.
+  derived from its path; `//atlas:group` directives are removed in A1. One
+  exception until B13: `catalog/dbtypes` stays in `foundation`, because
+  `media/exif` and `media/file` import it and `catalog/repo` imports
+  `media/file`; the B13 split ends it.
 - **Docs travel with code.** A moved package keeps its `doc.go`; Atlas view
   anchors, `docs/architecture.md`, the `CLAUDE.md` repository map, and skills
   that name moved paths are updated in the same PR. Stale views are re-read

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 )
@@ -18,7 +18,7 @@ import (
 // primary child was created by an earlier catalog and then lost: the marker
 // and the private state are on disk, the catalog knows neither. It is the
 // state a reinstall finds (R3). The returned catalog has no primary.
-func leftoverPrimaryForTest(t *testing.T, catalog *db.DB, manager *DefaultRepositoryManager) (repositoryPath, repositoryID string) {
+func leftoverPrimaryForTest(t *testing.T, catalog *catalog.DB, manager *DefaultRepositoryManager) (repositoryPath, repositoryID string) {
 	t.Helper()
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")

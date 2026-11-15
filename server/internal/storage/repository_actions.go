@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 // RepositoryAction is one command an administrator may run against a

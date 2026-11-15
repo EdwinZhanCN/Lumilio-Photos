@@ -13,13 +13,13 @@ flowchart LR
         n_in_runtime[/"Server runtime"/]
     end
     subgraph n_g_Ingest_and_execution["Ingest and execution"]
-        n_server_internal_cloud["cloud"]
-        n_server_internal_cloud_icloud["cloud/icloud"]
-        n_server_internal_commit["commit"]
-        n_server_internal_processors["processors"]
-        n_server_internal_queue["queue"]
-        n_server_internal_sourcing["sourcing"]
-        n_server_internal_utils_upload["utils/upload"]
+        n_server_internal_ingest_cloud["ingest/cloud"]
+        n_server_internal_ingest_cloud_icloud["ingest/cloud/icloud"]
+        n_server_internal_ingest_commit["ingest/commit"]
+        n_server_internal_ingest_processors["ingest/processors"]
+        n_server_internal_ingest_queue["ingest/queue"]
+        n_server_internal_ingest_sourcing["ingest/sourcing"]
+        n_server_internal_ingest_upload["ingest/upload"]
     end
     subgraph n_g_Depends_on["Depends on"]
         n_out_catalog[/"Catalog"/]
@@ -32,11 +32,11 @@ flowchart LR
     end
     n_in_http -.-> n_g_Ingest_and_execution
     n_in_runtime -.-> n_g_Ingest_and_execution
-    n_server_internal_cloud --> n_server_internal_cloud_icloud
-    n_server_internal_cloud --> n_server_internal_sourcing
-    n_server_internal_queue --> n_server_internal_commit
-    n_server_internal_queue --> n_server_internal_processors
-    n_server_internal_sourcing --> n_server_internal_commit
+    n_server_internal_ingest_cloud --> n_server_internal_ingest_cloud_icloud
+    n_server_internal_ingest_cloud --> n_server_internal_ingest_sourcing
+    n_server_internal_ingest_queue --> n_server_internal_ingest_commit
+    n_server_internal_ingest_queue --> n_server_internal_ingest_processors
+    n_server_internal_ingest_sourcing --> n_server_internal_ingest_commit
     n_g_Ingest_and_execution -.-> n_out_catalog
     n_g_Ingest_and_execution -.-> n_out_domain
     n_g_Ingest_and_execution -.-> n_out_foundation
@@ -54,13 +54,13 @@ flowchart LR
 | --- | --- | --- |
 | HTTP API |  | `group:http` |
 | Server runtime |  | `group:runtime` |
-| cloud | Package cloud provides the cloud storage abstraction layer for importing remote assets into a local Lumilio repository (Cloud → Local sync). | `mod:server/internal/cloud` [`server/internal/cloud/doc.go`](../../../../server/internal/cloud/doc.go) |
-| cloud/icloud | Package icloud is a native iCloud Photos client adapted from an open-source project (see LICENSE and README.md in this directory). | `mod:server/internal/cloud/icloud` [`server/internal/cloud/icloud/doc.go`](../../../../server/internal/cloud/icloud/doc.go) |
-| commit | Package commit is the sole catalog-write capability for asynchronous work. | `mod:server/internal/commit` [`server/internal/commit/doc.go`](../../../../server/internal/commit/doc.go) |
-| processors | Package processors runs the read/compute stages of asset processing: ingest of a staged source, metadata extraction (exiftool and ffprobe), thumbnails and video frames, transcodes, and ML inputs. | `mod:server/internal/processors` [`server/internal/processors/doc.go`](../../../../server/internal/processors/doc.go) |
-| queue | Package queue adapts River to Lumilio's catalog-owned work model. | `mod:server/internal/queue` [`server/internal/queue/doc.go`](../../../../server/internal/queue/doc.go) |
-| sourcing | Package sourcing materializes staged uploads and cloud imports into a repository without losing them to a crash. | `mod:server/internal/sourcing` [`server/internal/sourcing/doc.go`](../../../../server/internal/sourcing/doc.go) |
-| utils/upload | Package upload implements the HTTP upload wire protocol for batch and chunked transfers. | `mod:server/internal/utils/upload` [`server/internal/utils/upload/doc.go`](../../../../server/internal/utils/upload/doc.go) |
+| ingest/cloud | Package cloud provides the cloud storage abstraction layer for importing remote assets into a local Lumilio repository (Cloud → Local sync). | `mod:server/internal/ingest/cloud` [`server/internal/ingest/cloud/doc.go`](../../../../server/internal/ingest/cloud/doc.go) |
+| ingest/cloud/icloud | Package icloud is a native iCloud Photos client adapted from an open-source project (see LICENSE and README.md in this directory). | `mod:server/internal/ingest/cloud/icloud` [`server/internal/ingest/cloud/icloud/doc.go`](../../../../server/internal/ingest/cloud/icloud/doc.go) |
+| ingest/commit | Package commit is the sole catalog-write capability for asynchronous work. | `mod:server/internal/ingest/commit` [`server/internal/ingest/commit/doc.go`](../../../../server/internal/ingest/commit/doc.go) |
+| ingest/processors | Package processors runs the read/compute stages of asset processing: ingest of a staged source, metadata extraction (exiftool and ffprobe), thumbnails and video frames, transcodes, and ML inputs. | `mod:server/internal/ingest/processors` [`server/internal/ingest/processors/doc.go`](../../../../server/internal/ingest/processors/doc.go) |
+| ingest/queue | Package queue adapts River to Lumilio's catalog-owned work model. | `mod:server/internal/ingest/queue` [`server/internal/ingest/queue/doc.go`](../../../../server/internal/ingest/queue/doc.go) |
+| ingest/sourcing | Package sourcing materializes staged uploads and cloud imports into a repository without losing them to a crash. | `mod:server/internal/ingest/sourcing` [`server/internal/ingest/sourcing/doc.go`](../../../../server/internal/ingest/sourcing/doc.go) |
+| ingest/upload | Package upload implements the HTTP upload wire protocol for batch and chunked transfers. | `mod:server/internal/ingest/upload` [`server/internal/ingest/upload/doc.go`](../../../../server/internal/ingest/upload/doc.go) |
 | Catalog |  | `group:catalog` |
 | Domain semantics |  | `group:domain` |
 | Foundation |  | `group:foundation` |

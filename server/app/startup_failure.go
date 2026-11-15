@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
 )
 
 // StartupFailureCode classifies why the Server could not start. The Server
@@ -77,9 +77,9 @@ func ClassifyStartupFailure(err error) *StartupFailure {
 	}
 	code := StartupFailureUnclassified
 	switch {
-	case errors.Is(err, db.ErrPreReleaseCatalog):
+	case errors.Is(err, catalog.ErrPreReleaseCatalog):
 		code = StartupFailureCatalogLineageUnsupported
-	case errors.Is(err, db.ErrCatalogNewer):
+	case errors.Is(err, catalog.ErrCatalogNewer):
 		code = StartupFailureCatalogNewer
 	case errors.Is(err, config.ErrManifestIncompatible):
 		code = StartupFailureConfigurationIncompatible

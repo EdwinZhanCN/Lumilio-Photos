@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
 	"server/internal/classify"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"

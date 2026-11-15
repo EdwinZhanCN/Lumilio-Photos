@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"server/config"
+	"server/internal/api/httporigin"
 	"server/internal/api/problem"
-	"server/internal/httporigin"
-	"server/internal/version"
+	"server/internal/foundation/version"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"

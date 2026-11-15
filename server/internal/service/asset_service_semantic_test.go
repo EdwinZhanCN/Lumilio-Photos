@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"server/internal/db/repo"
-	"server/internal/utils/imagesource"
+	"server/internal/catalog/repo"
+	"server/internal/media/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"

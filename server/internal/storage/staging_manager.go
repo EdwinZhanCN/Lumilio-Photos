@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"

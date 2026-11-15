@@ -53,11 +53,11 @@ sequenceDiagram
 | AssetHandler | `go:handler.AssetHandler` [`server/internal/api/handler/asset_handler.go`](../../../../server/internal/api/handler/asset_handler.go) |
 | Repository staging | `go:server/internal/storage.StagingManager` [`server/internal/storage/staging_manager.go`](../../../../server/internal/storage/staging_manager.go) |
 | Catalog (SQLite) | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
-| River (QueueDB) | `go:queue.IngestMacroWorker` [`server/internal/queue/macro_asset_workers.go`](../../../../server/internal/queue/macro_asset_workers.go) |
-| SourceMaterializer | `go:sourcing.SourceMaterializer` [`server/internal/sourcing/materializer.go`](../../../../server/internal/sourcing/materializer.go) |
+| Catalog scheduler | `go:queue.Scheduler` [`server/internal/ingest/queue/scheduler.go`](../../../../server/internal/ingest/queue/scheduler.go) |
+| River (QueueDB) | `go:queue.IngestMacroWorker` [`server/internal/ingest/queue/macro_asset_workers.go`](../../../../server/internal/ingest/queue/macro_asset_workers.go) |
+| SourceMaterializer | `go:sourcing.SourceMaterializer` [`server/internal/ingest/sourcing/materializer.go`](../../../../server/internal/ingest/sourcing/materializer.go) |
 | Repository scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go`](../../../../server/internal/storage/scan/scanner.go) |
-| Commit coordinator | `go:commit.Coordinator` [`server/internal/commit/coordinator.go`](../../../../server/internal/commit/coordinator.go) |
+| Commit coordinator | `go:commit.Coordinator` [`server/internal/ingest/commit/coordinator.go`](../../../../server/internal/ingest/commit/coordinator.go) |
 
 ## Steps
 
@@ -73,13 +73,13 @@ sequenceDiagram
 | 8 | api → catalog | one transaction — staging commit + pending ingest receipt | `go:handler.AssetHandler.enqueueStagingCommit` [`server/internal/api/handler/asset_upload_handler.go`](../../../../server/internal/api/handler/asset_upload_handler.go) |
 | 9 | api → web | receipt_id per file ("processing") |  |
 | 10 | web → api | follow receipts (SSE, falls back to polling) | `ts:waitForUploadOperations` [`web/src/lib/upload/uploadLifecycle.ts`](../../../../web/src/lib/upload/uploadLifecycle.ts) |
-| 11 | scheduler → catalog | read pending ingest receipts | `go:queue.Scheduler.ScheduleOnce` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
-| 12 | scheduler → river | insert IngestAssetArgs{CommitID, ReceiptID} | `go:jobs.IngestAssetArgs` [`server/internal/queue/jobs/macro.go`](../../../../server/internal/queue/jobs/macro.go) |
+| 11 | scheduler → catalog | read pending ingest receipts | `go:queue.Scheduler.ScheduleOnce` [`server/internal/ingest/queue/scheduler.go`](../../../../server/internal/ingest/queue/scheduler.go) |
+| 12 | scheduler → river | insert IngestAssetArgs{CommitID, ReceiptID} | `go:jobs.IngestAssetArgs` [`server/internal/work/jobs/macro.go`](../../../../server/internal/work/jobs/macro.go) |
 | 13 | river → materializer | run under the execution governor | `go:server/app.pipelineRuntime.ingest` [`server/app/pipeline_runtime.go`](../../../../server/app/pipeline_runtime.go) |
-| 14 | materializer → staging | claim commit, verify bytes, move staging file into inbox/ | `go:sourcing.SourceMaterializer.MaterializeCommit` [`server/internal/sourcing/materializer.go`](../../../../server/internal/sourcing/materializer.go) |
+| 14 | materializer → staging | claim commit, verify bytes, move staging file into inbox/ | `go:sourcing.SourceMaterializer.MaterializeCommit` [`server/internal/ingest/sourcing/materializer.go`](../../../../server/internal/ingest/sourcing/materializer.go) |
 | 15 | materializer → scanner | bind the on-disk file as known content | `go:scan.Scanner.BindKnownContent` [`server/internal/storage/scan/known.go`](../../../../server/internal/storage/scan/known.go) |
 | 16 | scanner → catalog | repository entry + Asset, request analyze/derivatives/transcode/enrich | `go:service.ApplyAssetActivationTx` [`server/internal/service/asset_activation.go`](../../../../server/internal/service/asset_activation.go) |
-| 17 | river → commits | acknowledge the ingest receipt | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/commit/typed_catalog.go`](../../../../server/internal/commit/typed_catalog.go) |
+| 17 | river → commits | acknowledge the ingest receipt | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
 | 18 | commits → catalog | receipt becomes terminal; wake the scheduler |  |
 | 19 | api → web | terminal status for every receipt — refresh asset queries | `go:handler.AssetHandler.StreamUploadOperationStatus` [`server/internal/api/handler/asset_upload_handler.go`](../../../../server/internal/api/handler/asset_upload_handler.go) |
 

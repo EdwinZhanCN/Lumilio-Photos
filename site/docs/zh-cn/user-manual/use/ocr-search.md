@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/service/ocr_service.go
-- server/internal/queue/jobs/types.go
+- server/internal/work/jobs/types.go
 - server/app/app.go
 - web/src/features/settings
 -->

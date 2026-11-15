@@ -42,7 +42,7 @@ exclude:
   - server/docs
   - desktop/cmd/**
   - desktop/internal/resources/cmd/**
-  - server/internal/db/sqlitespike/sqlcfixture/**
+  - server/internal/catalog/conformance/sqlcfixture/**
 
 groups:
   # ---------------------------------------------------------------- Server
@@ -51,72 +51,60 @@ groups:
     side: server
     match:
       - server/config
-      - server/internal/db/dbtypes
-      - server/internal/logging
-      - server/internal/secretbox
-      - server/internal/settings
-      - server/internal/testutil
-      - server/internal/utils/memory
-      - server/internal/utils/sysproc
-      - server/internal/version
-      - server/internal/workqos
-      - server/platform/fsprivacy
-      - server/platform/sqliteuri
+      - server/internal/foundation/**
+      # The one package outside its group's directory: media and the catalog
+      # both use these value types, and the catalog uses media. B13 splits it
+      # into column codecs (catalog) and product vocabulary (leaf packages).
+      - server/internal/catalog/dbtypes
     summary: >-
       Dependency-free primitives every layer may use: the strict TOML
       configuration loader, runtime-mutable settings types, logging, version,
-      work QoS classes, catalog value types, secret sealing, and OS/SQLite
-      platform helpers. Nothing here knows about Assets, repositories, or HTTP.
+      catalog value types, secret sealing, memory and process helpers, and the
+      owner-only filesystem policy. Nothing here knows about Assets,
+      repositories, or HTTP.
 
   - id: media
     title: Media utilities
     side: server
-    match:
-      - server/internal/utils/exif
-      - server/internal/utils/file
-      - server/internal/utils/geohash
-      - server/internal/utils/hash
-      - server/internal/utils/imagesource
-      - server/internal/utils/imaging
-      - server/internal/utils/phash
-      - server/internal/utils/raw
+    match: [server/internal/media/**]
     uses: [foundation]
     summary: >-
       Stateless file and media mechanics: content hashing, EXIF extraction,
-      libvips imaging, LibRaw decoding, perceptual hashes, geohash, and
-      process helpers. Pure functions over bytes and paths; no catalog access.
+      libvips imaging, LibRaw decoding, perceptual hashes, and geohash. Pure
+      functions over bytes and paths; no catalog access.
 
   - id: catalog
     title: Catalog
     side: server
     match:
-      - server/internal/db
-      - server/internal/db/backup
-      - server/internal/db/catalogtx
-      - server/internal/db/repo
-      - server/internal/db/sqlitespike
-      - server/internal/db/vec1ext
-      - server/internal/db/vectorindex
+      # Every package under server/internal/catalog except dbtypes (see
+      # foundation).
+      - server/internal/catalog
+      - server/internal/catalog/backup
+      - server/internal/catalog/catalogtx
+      - server/internal/catalog/conformance
+      - server/internal/catalog/repo
+      - server/internal/catalog/sqliteuri
+      - server/internal/catalog/vec1ext
+      - server/internal/catalog/vectorindex
       - server/migrations
     uses: [foundation, media]
     summary: >-
       The embedded SQLite catalog and its QueueDB sibling: the single-writer
       runtime, named transactions, sqlc queries, the Vec1 vector index,
-      migrations, and verified backups. The catalog is product truth.
+      SQLite file URIs, migrations, verified backups, and the driver
+      conformance tests. The catalog is product truth.
 
   - id: work
     title: Work contracts
     side: server
-    match:
-      - server/internal/execution
-      - server/internal/pipeline
-      - server/internal/processing
-      - server/internal/queue/jobs
-    uses: [foundation, catalog]
+    match: [server/internal/work/**]
+    uses: [catalog]
     summary: >-
       Catalog-owned asynchronous work vocabulary: desired/applied pipeline
-      contracts, the closed River macro-job catalog, the process-wide execution
-      governor, and the administrator processing read model.
+      contracts, the closed River macro-job catalog, work QoS classes, the
+      process-wide execution governor, and the administrator processing read
+      model.
 
   - id: domain
     title: Domain semantics
@@ -137,18 +125,7 @@ groups:
   - id: storage
     title: Storage
     side: server
-    match:
-      - server/internal/artifact
-      - server/internal/storage
-      - server/internal/storage/locations
-      - server/internal/storage/marker
-      - server/internal/storage/pathsemantics
-      - server/internal/storage/recovery
-      - server/internal/storage/repocfg
-      - server/internal/storage/rootcfg
-      - server/internal/storage/scan
-      - server/internal/storage/testfixture
-      - server/internal/storage/trash
+    match: [server/internal/storage/**]
     uses: [foundation, media, catalog, domain]
     summary: >-
       Storage Locations and Repositories on disk: repository lifecycle and
@@ -159,13 +136,7 @@ groups:
   - id: agent
     title: Lumilio Agent
     side: server
-    match:
-      - server/internal/agent/core
-      - server/internal/agent/facets
-      - server/internal/agent/inject
-      - server/internal/agent/pins
-      - server/internal/agent/ref
-      - server/internal/agent/tools
+    match: [server/internal/agent/**]
     uses: [foundation, media, catalog, domain]
     summary: >-
       The in-app assistant: the agent run loop, typed references and facets,
@@ -186,14 +157,7 @@ groups:
   - id: ingest
     title: Ingest and execution
     side: server
-    match:
-      - server/internal/cloud
-      - server/internal/cloud/icloud
-      - server/internal/commit
-      - server/internal/processors
-      - server/internal/queue
-      - server/internal/sourcing
-      - server/internal/utils/upload
+    match: [server/internal/ingest/**]
     uses: [foundation, media, catalog, work, domain, storage, service]
     summary: >-
       Everything that moves bytes and background results into the catalog:
@@ -204,14 +168,7 @@ groups:
   - id: http
     title: HTTP API
     side: server
-    match:
-      - server/internal/api
-      - server/internal/api/dto
-      - server/internal/api/handler
-      - server/internal/api/problem
-      - server/internal/api/ratelimit
-      - server/internal/httporigin
-      - server/internal/servertransport
+    match: [server/internal/api/**]
     uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest]
     summary: >-
       The transport edge: router and auth boundaries, handlers, DTOs, RFC 9457
@@ -385,16 +342,16 @@ rules:
         - (*database/sql.Conn).BeginTx
         - (*database/sql.DB).Exec
         - (*database/sql.DB).ExecContext
-      # sqlitespike is the SQLite conformance harness; it opens its own
+      # conformance is the SQLite conformance harness; it opens its own
       # throwaway databases.
-      only: [server/internal/db/catalogtx, server/internal/db, server/internal/db/sqlitespike]
+      only: [server/internal/catalog/catalogtx, server/internal/catalog, server/internal/catalog/conformance]
 
   - id: tx-purity
     why: no filesystem, network, hashing, sleeping, or table-wide COUNT inside a transaction, which holds the single writer or a read snapshot
     tx_purity:
-      tx_types: ["*database/sql.Tx", "*server/internal/db/catalogtx.Tx"]
-      begin: [(*server/internal/db/catalogtx.Writer).BeginTx]
-      forbid_packages: [os, io, io/fs, io/ioutil, net, net/http, server/internal/utils/hash, github.com/zeebo/blake3]
+      tx_types: ["*database/sql.Tx", "*server/internal/catalog/catalogtx.Tx"]
+      begin: [(*server/internal/catalog/catalogtx.Writer).BeginTx]
+      forbid_packages: [os, io, io/fs, io/ioutil, net, net/http, server/internal/media/hash, github.com/zeebo/blake3]
       forbid_calls:
         - time.Sleep
         - time.After
@@ -412,9 +369,9 @@ rules:
         - os.IsPermission
         - io/fs.ValidPath
         # Bounded by a unique key: one trash ID per trashed file.
-        - (*server/internal/db/repo.Queries).CountRepositoryEntriesWithTrashID
+        - (*server/internal/catalog/repo.Queries).CountRepositoryEntriesWithTrashID
         # Bounded by its key set: the media items of one Live Photo pair.
-        - (*server/internal/db/repo.Queries).CountStackedMediaItems
+        - (*server/internal/catalog/repo.Queries).CountStackedMediaItems
 
   - id: static-sql
     why: every SQL statement is a constant or a sqlc query, so the table rules see every read and write
@@ -430,27 +387,27 @@ rules:
     tables:
       river_job:
         read:
-          - server/internal/queue
-          - server/internal/queue/jobs
+          - server/internal/ingest/queue
+          - server/internal/work/jobs
           - server/internal/api/handler/queue_handler.go
           - server/app/sqlite_diagnostics.go
-        write: [server/internal/queue]
+        write: [server/internal/ingest/queue]
 
   # ------------------------------------------------------ asynchronous work
   - id: producer-capabilities
     why: asynchronous preparers own only narrow read and compute interfaces; catalog mutation belongs to the commit coordinator
     forbid_types:
       in:
-        - server/internal/sourcing/materializer.go
+        - server/internal/ingest/sourcing/materializer.go
         - server/internal/storage/locations/resolver.go
-        - server/internal/processors/asset_processor.go
-        - server/internal/queue/asset_work_fence.go
-        - server/internal/queue/enrichment_runner.go
-        - server/internal/queue/ml_image_loader.go
-        - server/internal/queue/projection_preparer.go
+        - server/internal/ingest/processors/asset_processor.go
+        - server/internal/ingest/queue/asset_work_fence.go
+        - server/internal/ingest/queue/enrichment_runner.go
+        - server/internal/ingest/queue/ml_image_loader.go
+        - server/internal/ingest/queue/projection_preparer.go
       types:
         - "*database/sql.DB"
-        - "*server/internal/db/repo.Queries"
+        - "*server/internal/catalog/repo.Queries"
         - server/internal/service.SettingsService
         - server/internal/service.LumenService
         - server/internal/service.ClassifierService
@@ -461,20 +418,20 @@ rules:
     why: preparers and the scan index never hold the catalog database; they write through the commit coordinator
     forbid_imports:
       from:
-        - server/internal/sourcing/materializer.go
+        - server/internal/ingest/sourcing/materializer.go
         - server/internal/storage/locations/resolver.go
-        - server/internal/processors/asset_processor.go
-        - server/internal/queue/asset_work_fence.go
-        - server/internal/queue/enrichment_runner.go
-        - server/internal/queue/ml_image_loader.go
-        - server/internal/queue/projection_preparer.go
+        - server/internal/ingest/processors/asset_processor.go
+        - server/internal/ingest/queue/asset_work_fence.go
+        - server/internal/ingest/queue/enrichment_runner.go
+        - server/internal/ingest/queue/ml_image_loader.go
+        - server/internal/ingest/queue/projection_preparer.go
         - server/internal/storage/scan
-      imports: [server/internal/db]
+      imports: [server/internal/catalog]
 
   - id: scan-index-query-set
     why: the scan index writes only through its Writer; it never builds its own catalog query set
     calls:
-      targets: [server/internal/db/repo.New]
+      targets: [server/internal/catalog/repo.New]
       forbid: [server/internal/storage/scan]
 
   - id: river-child-jobs
@@ -487,41 +444,41 @@ rules:
         - (*github.com/riverqueue/river.Client).InsertManyTx
         - (*github.com/riverqueue/river.Client).InsertManyFast
         - (*github.com/riverqueue/river.Client).InsertManyFastTx
-      only: [server/internal/queue/scheduler.go]
+      only: [server/internal/ingest/queue/scheduler.go]
 
   - id: execution-governor
     why: one process-wide execution governor, built by the execution package from the budget
     calls:
-      targets: [server/internal/execution.NewGovernor]
-      only: [server/internal/execution]
+      targets: [server/internal/work/execution.NewGovernor]
+      only: [server/internal/work/execution]
 
   - id: execution-resources
     why: resource demands come from the execution package's demand table, never from literals scattered through the pipeline
     constructs:
-      types: [server/internal/execution.Resources]
-      only: [server/internal/execution]
+      types: [server/internal/work/execution.Resources]
+      only: [server/internal/work/execution]
 
   - id: scheduling-algorithms
     why: the composition root only constructs and runs; macro work runs in the pipeline runtime and the ingest packages
     calls:
       targets:
-        - (*server/internal/processors.AssetProcessor).ComputeMetadataTask
-        - (*server/internal/processors.AssetProcessor).LoadThumbnailTask
-        - (*server/internal/processors.AssetProcessor).ComputeThumbnailCodec
-        - (*server/internal/processors.AssetProcessor).ComputeThumbnailScale
-        - (*server/internal/processors.AssetProcessor).LoadTranscodeTask
-        - (*server/internal/processors.AssetProcessor).ComputeTranscodeTask
-        - (*server/internal/processors.AssetProcessor).ProcessVideoFramesTask
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeMetadataTask
+        - (*server/internal/ingest/processors.AssetProcessor).LoadThumbnailTask
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeThumbnailCodec
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeThumbnailScale
+        - (*server/internal/ingest/processors.AssetProcessor).LoadTranscodeTask
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeTranscodeTask
+        - (*server/internal/ingest/processors.AssetProcessor).ProcessVideoFramesTask
         - server/app.runAssetEnrichment
         - (*server/app.pipelineRuntime).prepareProjection
         - github.com/riverqueue/river.AddWorker
       only:
-        - server/internal/cloud/**
-        - server/internal/commit
-        - server/internal/processors
-        - server/internal/queue/**
-        - server/internal/sourcing
-        - server/internal/utils/upload
+        - server/internal/ingest/cloud/**
+        - server/internal/ingest/commit
+        - server/internal/ingest/processors
+        - server/internal/ingest/queue/**
+        - server/internal/ingest/sourcing
+        - server/internal/ingest/upload
         - server/app/pipeline_runtime.go
 
   # ------------------------------------------------------ storage
@@ -559,10 +516,10 @@ invariants:
       enforced_by:
         - rule:catalog-transactions
         - rule:river-tables
-        - go:server/internal/db.TestOpenMigrateAndReopenSQLiteCatalog
-        - go:server/internal/db.TestQueryOnlyReaderPoolStaysAvailableDuringWriterTransaction
-        - go:server/internal/db.TestReaderStaysReadOnlyWhenQueryOnlyIsSwitchedOff
-        - go:server/internal/db.TestConnectionPolicySurvivesPhysicalConnectionReplacement
+        - go:server/internal/catalog.TestOpenMigrateAndReopenSQLiteCatalog
+        - go:server/internal/catalog.TestQueryOnlyReaderPoolStaysAvailableDuringWriterTransaction
+        - go:server/internal/catalog.TestReaderStaysReadOnlyWhenQueryOnlyIsSwitchedOff
+        - go:server/internal/catalog.TestConnectionPolicySurvivesPhysicalConnectionReplacement
         - go:server/app.TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery
     - title: No work inside write transactions.
       enforced_by:
@@ -576,14 +533,14 @@ invariants:
         - rule:scan-index-query-set
         - rule:river-child-jobs
         - go:server/app.TestProductionWorkersAreTheMacroCatalog
-        - go:server/internal/commit.TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop
+        - go:server/internal/ingest/commit.TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop
     - title: Foreground reads never write.
       enforced_by:
         - rule:storage-reconciliation
         - go:server/app.TestForegroundReadsAnswerWhileTheWriterIsHeld
         - go:server/app.TestSetupStatusAnswersWhileTheWriterIsHeldBeforeSetupFinishes
         - go:server/app.TestProductionCatalogWiring
-        - go:server/internal/db.TestForegroundReadStaysAvailableWithQueuedWriter
+        - go:server/internal/catalog.TestForegroundReadStaysAvailableWithQueuedWriter
     - title: Originals are never rewritten; deletion follows explicit lifecycle policy.
       enforced_by:
         - rule:asset-purge
@@ -617,26 +574,26 @@ invariants:
 
 sql:
   queries:
-    - files: [server/internal/db/repo/queries/*.sql]
-      type: "*server/internal/db/repo.Queries"
+    - files: [server/internal/catalog/repo/queries/*.sql]
+      type: "*server/internal/catalog/repo.Queries"
   executors:
     - "*database/sql.DB"
     - "*database/sql.Tx"
     - "*database/sql.Conn"
-    - "*server/internal/db/catalogtx.Tx"
-    - "*server/internal/db/catalogtx.Writer"
-    - "*server/internal/db/catalogtx.Reader"
-    - "*server/internal/db.queryRouter"
+    - "*server/internal/catalog/catalogtx.Tx"
+    - "*server/internal/catalog/catalogtx.Writer"
+    - "*server/internal/catalog/catalogtx.Reader"
+    - "*server/internal/catalog.queryRouter"
   triggers: [server/migrations/*.up.sql]
 
 exceptions:
-  - from: server/internal/db/repo
+  - from: server/internal/catalog/repo
     to: server/internal/storage/repocfg
     reason: >-
       sqlc maps the repositories.config column to repocfg.RepositoryConfig so
       the catalog stores a typed per-repository configuration. repocfg is
       dependency-free, so this cannot create a cycle.
-  - from: server/internal/db/repo
+  - from: server/internal/catalog/repo
     to: server/internal/storage/pathsemantics
     reason: >-
       sqlc maps repositories.path_case and path_normalization to the

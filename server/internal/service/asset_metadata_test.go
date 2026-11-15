@@ -1,8 +1,8 @@
 package service
 
 import (
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"testing"
 
 	"github.com/stretchr/testify/require"

@@ -11,9 +11,9 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 // Foreground reads never touch SQLite's sole writer: while a writer
@@ -22,11 +22,11 @@ import (
 // promptly, and so does opening an agent ref. A read bound to the writer pool, or a read that persists
 // something on the way, waits behind the held writer and times out.
 func TestForegroundReadsAnswerWhileTheWriterIsHeld(t *testing.T) {
-	catalog := make(chan *db.DB, 1)
+	catalogDB := make(chan *catalog.DB, 1)
 	server := startBlackboxServerWith(t, blackboxOptions{
-		catalogOpened: func(database *db.DB) { catalog <- database },
+		catalogOpened: func(database *catalog.DB) { catalogDB <- database },
 	})
-	database := <-catalog
+	database := <-catalogDB
 	// One Asset, so opening the agent ref reads it through the authorized
 	// library.
 	const filename = "foreground-read.jpg"
@@ -52,7 +52,7 @@ func TestForegroundReadsAnswerWhileTheWriterIsHeld(t *testing.T) {
 // as an agent run in another process generation would have, and returns the
 // path the Web uses to open it. Opening it reads the catalog row and builds
 // facets through the authorized library.
-func storedAgentRef(t *testing.T, database *db.DB, assetIDs ...uuid.UUID) string {
+func storedAgentRef(t *testing.T, database *catalog.DB, assetIDs ...uuid.UUID) string {
 	t.Helper()
 	ctx := context.Background()
 	admin, err := database.Queries.GetUserByUsername(ctx, blackboxAdminUsername)
@@ -80,15 +80,15 @@ func storedAgentRef(t *testing.T, database *db.DB, assetIDs ...uuid.UUID) string
 // Before setup finishes, setup status derives the phase on every request;
 // it still never persists that phase through the writer.
 func TestSetupStatusAnswersWhileTheWriterIsHeldBeforeSetupFinishes(t *testing.T) {
-	catalog := make(chan *db.DB, 1)
+	catalogDB := make(chan *catalog.DB, 1)
 	server := startBlackboxServerWith(t, blackboxOptions{
 		skipPrimary:   true,
-		catalogOpened: func(database *db.DB) { catalog <- database },
+		catalogOpened: func(database *catalog.DB) { catalogDB <- database },
 	})
-	readsWhileWriterHeld(t, server, <-catalog, []string{"/api/v1/setup/status"})
+	readsWhileWriterHeld(t, server, <-catalogDB, []string{"/api/v1/setup/status"})
 }
 
-func readsWhileWriterHeld(t *testing.T, server *blackboxServer, database *db.DB, reads []string) {
+func readsWhileWriterHeld(t *testing.T, server *blackboxServer, database *catalog.DB, reads []string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

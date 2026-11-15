@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"server/internal/settings"
+	"server/internal/foundation/settings"
 
 	"github.com/cloudwego/eino/schema"
 )

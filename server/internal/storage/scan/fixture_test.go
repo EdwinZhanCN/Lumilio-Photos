@@ -13,15 +13,15 @@ import (
 	"github.com/google/uuid"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	hashutil "server/internal/media/hash"
 	"server/internal/storage"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
-	hashutil "server/internal/utils/hash"
 )
 
 // recordingWriter measures every catalog write transaction the scanner opens,
@@ -30,7 +30,7 @@ import (
 // audit triggers installEntryWriteAudit installs: the structural writer
 // budget (#222 invariant 6) is at most MaxBatchRows rows per transaction.
 type recordingWriter struct {
-	database  *db.DB
+	database  *catalog.DB
 	mu        sync.Mutex
 	durations []time.Duration
 	rowsPerTx []int
@@ -92,7 +92,7 @@ func countEntryWrites(ctx context.Context, database queryRower) (int, error) {
 // installEntryWriteAudit records every row written to repository_entries,
 // by the SQLite engine itself, so a test can prove a scan wrote nothing
 // without trusting the scanner's own counters.
-func installEntryWriteAudit(ctx context.Context, tb testing.TB, database *db.DB) {
+func installEntryWriteAudit(ctx context.Context, tb testing.TB, database *catalog.DB) {
 	tb.Helper()
 	statements := []string{
 		`CREATE TABLE scan_test_entry_writes (operation TEXT NOT NULL, kind TEXT NOT NULL, path TEXT NOT NULL)`,
@@ -147,7 +147,7 @@ func (c *clock) advance(by time.Duration) {
 type fixture struct {
 	t        testing.TB
 	ctx      context.Context
-	database *db.DB
+	database *catalog.DB
 	writer   *recordingWriter
 	files    *storage.RepositoryFSFactory
 	clock    *clock
@@ -168,7 +168,7 @@ func newFixture(tb testing.TB, settle time.Duration) *fixture {
 	if err := os.Chmod(databaseDirectory, 0o700); err != nil {
 		tb.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(databaseDirectory, "catalog.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(databaseDirectory, "catalog.sqlite3")})
 	if err != nil {
 		tb.Fatal(err)
 	}

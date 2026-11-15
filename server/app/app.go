@@ -22,32 +22,32 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/handler"
-	"server/internal/artifact"
-	"server/internal/cloud"
-	"server/internal/commit"
-	"server/internal/db"
-	dbbackup "server/internal/db/backup"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/api/httporigin"
+	"server/internal/api/servertransport"
+	"server/internal/catalog"
+	dbbackup "server/internal/catalog/backup"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
-	"server/internal/execution"
-	"server/internal/httporigin"
-	"server/internal/logging"
-	"server/internal/processors"
-	"server/internal/queue"
+	"server/internal/foundation/logging"
+	"server/internal/foundation/settings"
+	"server/internal/foundation/version"
+	"server/internal/ingest/cloud"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/processors"
+	"server/internal/ingest/queue"
+	"server/internal/ingest/sourcing"
+	"server/internal/media/imaging"
 	"server/internal/search/bleveocr"
-	"server/internal/servertransport"
 	"server/internal/service"
-	"server/internal/settings"
-	"server/internal/sourcing"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 	"server/internal/storage/locations"
 	"server/internal/storage/recovery"
 	"server/internal/storage/scan"
 	"server/internal/storage/trash"
-	"server/internal/utils/imaging"
-	"server/internal/version"
+	"server/internal/work/execution"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -91,7 +91,7 @@ type OperatorControls struct {
 	ChangeWatchBackend scan.ChangeWatchBackend
 	// catalogOpened hands the opened catalog to an in-package test; hosts
 	// cannot set it.
-	catalogOpened func(*db.DB)
+	catalogOpened func(*catalog.DB)
 }
 
 // RuntimeInfo describes the listener published by one server generation. It
@@ -267,7 +267,7 @@ func run(
 	}
 
 	catalogScheduleWake := queue.NewSchedulerWake()
-	database, err := db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))
+	database, err := catalog.Open(ctx, dbConfig, catalog.WithTransactionObserver(catalogScheduleWake))
 	if err != nil {
 		return fmt.Errorf("open SQLite database: %w", err)
 	}
@@ -316,7 +316,7 @@ func run(
 		)
 		return fmt.Errorf("run database migrations: %w", err)
 	}
-	queueDatabase, quarantinedQueuePath, err := db.OpenQueueWithRecovery(ctx, dbConfig)
+	queueDatabase, quarantinedQueuePath, err := catalog.OpenQueueWithRecovery(ctx, dbConfig)
 	if err != nil {
 		return fmt.Errorf("open SQLite queue database: %w", err)
 	}
@@ -723,7 +723,7 @@ func run(
 	// (enabled/interval/retention) is read from runtime settings on every tick,
 	// so the periodic job below can stay a fixed hourly heartbeat.
 	backupLogger := appLogger.Named("db_backup").Sugar()
-	catalogInfo, err := db.InspectCatalog(ctx, database.Path)
+	catalogInfo, err := catalog.InspectCatalog(ctx, database.Path)
 	if err != nil {
 		return fmt.Errorf("inspect SQLite catalog for backup runtime: %w", err)
 	}
@@ -1105,8 +1105,8 @@ const (
 // It does no SQLite work while the WAL is below the threshold.
 func monitorSQLiteWriter(
 	ctx context.Context,
-	database *db.DB,
-	queueDatabase *db.QueueDB,
+	database *catalog.DB,
+	queueDatabase *catalog.QueueDB,
 	commitCoordinator *commit.Coordinator,
 	governor *execution.Governor,
 	logDir string,
@@ -1121,9 +1121,9 @@ func monitorSQLiteWriter(
 	if queueDatabase != nil && queueDatabase.SQL != nil {
 		previousQueue = queueDatabase.SQL.Stats()
 	}
-	var checkpointedWAL db.WALState
+	var checkpointedWAL catalog.WALState
 	hasCheckpointedWAL := false
-	var checkpointedQueueWAL db.WALState
+	var checkpointedQueueWAL catalog.WALState
 	hasCheckpointedQueueWAL := false
 	var lastCheckpoint *sqliteCheckpointObservation
 	var lastQueueCheckpoint *sqliteCheckpointObservation
@@ -1147,8 +1147,8 @@ func monitorSQLiteWriter(
 		previous = current
 		walState, walErr := database.InspectWAL()
 		var queueStats sql.DBStats
-		var queueTelemetry db.QueueTelemetrySnapshot
-		var queueWAL db.WALState
+		var queueTelemetry catalog.QueueTelemetrySnapshot
+		var queueWAL catalog.WALState
 		var queueWALErr error
 		if queueDatabase != nil {
 			queueTelemetry = queueDatabase.TelemetrySnapshot()
@@ -1222,9 +1222,9 @@ func monitorSQLiteWriter(
 	}
 	checkpointWAL := func(
 		name string,
-		inspect func() (db.WALState, error),
-		passiveCheckpoint func(context.Context) (db.CheckpointResult, error),
-		checkpointed *db.WALState,
+		inspect func() (catalog.WALState, error),
+		passiveCheckpoint func(context.Context) (catalog.CheckpointResult, error),
+		checkpointed *catalog.WALState,
 		hasCheckpointed *bool,
 		lastCheckpoint **sqliteCheckpointObservation,
 	) {
@@ -1308,7 +1308,7 @@ func runSQLiteWriterMonitor(
 	}
 }
 
-func walStateAlreadyCheckpointed(current, checkpointed db.WALState, hasCheckpointed bool) bool {
+func walStateAlreadyCheckpointed(current, checkpointed catalog.WALState, hasCheckpointed bool) bool {
 	return hasCheckpointed &&
 		current.SizeBytes == checkpointed.SizeBytes &&
 		current.ModifiedAt.Equal(checkpointed.ModifiedAt)

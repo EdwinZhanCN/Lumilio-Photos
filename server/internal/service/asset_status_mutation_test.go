@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/catalogtx"
+	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
 
 	"github.com/google/uuid"
 )
@@ -16,7 +16,7 @@ import (
 func TestForegroundAssetMutationUsesNamedWriterOperation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(t.TempDir(), "app-state", "library.sqlite3"),
 	})
 	if err != nil {

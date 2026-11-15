@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 
 	"go.uber.org/zap"
 )

@@ -54,7 +54,7 @@ COPY server/. .
 ARG VERSION=dev
 
 # Build API binary
-RUN go build -tags=sqlite_fts5 -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
+RUN go build -tags=sqlite_fts5 -ldflags "-X server/internal/foundation/version.Version=${VERSION}" -o /out/server ./cmd
 
 # Build the bind-mount permission and privilege-drop entrypoint.
 RUN go build -o /out/lumilio-entrypoint ./docker-entrypoint.go

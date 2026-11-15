@@ -16,17 +16,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"server/config"
-	"server/internal/commit"
-	"server/internal/db"
-	"server/internal/db/catalogtx"
-	"server/internal/pipeline"
-	"server/internal/queue"
-	"server/internal/queue/jobs"
-	"server/internal/workqos"
+	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/queue"
+	"server/internal/work/jobs"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 )
 
 type failureFixture struct {
-	database  *db.DB
+	database  *catalog.DB
 	runtime   *pipelineRuntime
 	args      jobs.AnalyzeAssetArgs
 	receiptID uuid.UUID
@@ -39,7 +39,7 @@ func newFailureFixture(t *testing.T) failureFixture {
 	if err := os.Chmod(root, 0700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(root, "catalog.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(root, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func newFailureFixture(t *testing.T) failureFixture {
 				return err
 			}
 		}
-		return pipeline.RequestAssetStagesTx(ctx, tx, assetID, fence, []pipeline.Stage{pipeline.StageAnalyze}, pipeline.AssetPipelineVersion, workqos.Background, receiptID)
+		return pipeline.RequestAssetStagesTx(ctx, tx, assetID, fence, []pipeline.Stage{pipeline.StageAnalyze}, pipeline.AssetPipelineVersion, qos.Background, receiptID)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -112,13 +112,13 @@ func TestCatalogFailureBudgetSurvivesFreshQueueAndExplicitRetryRecovers(t *testi
 	f := newFailureFixture(t)
 	ctx := context.Background()
 	executions := 0
-	guarded := guardAssetExecution(f.runtime, func(context.Context, workqos.Class, jobs.AnalyzeAssetArgs) error {
+	guarded := guardAssetExecution(f.runtime, func(context.Context, qos.Class, jobs.AnalyzeAssetArgs) error {
 		executions++
 		return errors.New("temporary processor failure")
 	})
 	for attempt := 1; attempt <= pipeline.AssetFailureLimit; attempt++ {
 		f.expireRetry(t)
-		if err := guarded(ctx, workqos.Background, f.args); err != nil {
+		if err := guarded(ctx, qos.Background, f.args); err != nil {
 			t.Fatal(err)
 		}
 		var failures int
@@ -127,7 +127,7 @@ func TestCatalogFailureBudgetSurvivesFreshQueueAndExplicitRetryRecovers(t *testi
 		}
 		f.freshQueueSchedules(t, 0)
 		if attempt < pipeline.AssetFailureLimit {
-			if err := guarded(ctx, workqos.Background, f.args); err == nil {
+			if err := guarded(ctx, qos.Background, f.args); err == nil {
 				t.Fatal("cooldown did not defer old delivery")
 			}
 			if executions != attempt {
@@ -145,23 +145,23 @@ func TestCatalogFailureBudgetSurvivesFreshQueueAndExplicitRetryRecovers(t *testi
 	if err := f.database.ReaderSQL.QueryRow(`SELECT state FROM catalog_operation_receipts WHERE receipt_id=?`, f.receiptID.String()).Scan(&receiptState); err != nil || receiptState != "failed" {
 		t.Fatalf("receipt=%q: %v", receiptState, err)
 	}
-	if err := guarded(ctx, workqos.Background, f.args); err != nil || executions != pipeline.AssetFailureLimit {
+	if err := guarded(ctx, qos.Background, f.args); err != nil || executions != pipeline.AssetFailureLimit {
 		t.Fatalf("terminal replay reran compute: executions=%d error=%v", executions, err)
 	}
 	if err := f.database.Writer.Transact(ctx, catalogtx.OperationAssetStagingCommit, nil, func(tx *sql.Tx) error {
-		return pipeline.RequestAssetStagesTx(ctx, tx, f.args.AssetID, f.args.SourceFence, []pipeline.Stage{pipeline.StageAnalyze}, pipeline.AssetPipelineVersion, workqos.Interactive, uuid.New())
+		return pipeline.RequestAssetStagesTx(ctx, tx, f.args.AssetID, f.args.SourceFence, []pipeline.Stage{pipeline.StageAnalyze}, pipeline.AssetPipelineVersion, qos.Interactive, uuid.New())
 	}); err != nil {
 		t.Fatal(err)
 	}
 	f.freshQueueSchedules(t, 1)
-	if err := guarded(ctx, workqos.Background, f.args); err != nil || executions != pipeline.AssetFailureLimit {
+	if err := guarded(ctx, qos.Background, f.args); err != nil || executions != pipeline.AssetFailureLimit {
 		t.Fatal("superseded delivery ran compute")
 	}
 	f.args.DesiredVersion++
-	recovered := guardAssetExecution(f.runtime, func(ctx context.Context, _ workqos.Class, args jobs.AnalyzeAssetArgs) error {
+	recovered := guardAssetExecution(f.runtime, func(ctx context.Context, _ qos.Class, args jobs.AnalyzeAssetArgs) error {
 		return f.runtime.submitAssetStage(ctx, args.AssetID, args.SourceFence, "analyze", args.PipelineVersion, args.DesiredVersion)
 	})
-	if err := recovered(ctx, workqos.Background, f.args); err != nil {
+	if err := recovered(ctx, qos.Background, f.args); err != nil {
 		t.Fatal(err)
 	}
 	var applied uint64
@@ -205,8 +205,8 @@ func TestAssetFailureClassificationAndCancellation(t *testing.T) {
 			if kind == "cancelled" {
 				computeErr = context.Canceled
 			}
-			guarded := guardAssetExecution(f.runtime, func(context.Context, workqos.Class, jobs.AnalyzeAssetArgs) error { return computeErr })
-			err := guarded(context.Background(), workqos.Background, f.args)
+			guarded := guardAssetExecution(f.runtime, func(context.Context, qos.Class, jobs.AnalyzeAssetArgs) error { return computeErr })
+			err := guarded(context.Background(), qos.Background, f.args)
 			if kind == "cancelled" {
 				if !errors.Is(err, context.Canceled) {
 					t.Fatalf("cancel error=%v", err)
@@ -237,10 +237,10 @@ func TestAssetGuardDoesNotAcknowledgeFailedCatalogCommit(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	guarded := guardAssetExecution(f.runtime, func(ctx context.Context, _ workqos.Class, args jobs.AnalyzeAssetArgs) error {
+	guarded := guardAssetExecution(f.runtime, func(ctx context.Context, _ qos.Class, args jobs.AnalyzeAssetArgs) error {
 		return f.runtime.submitAssetStage(ctx, args.AssetID, args.SourceFence, "analyze", args.PipelineVersion, args.DesiredVersion)
 	})
-	if err := guarded(ctx, workqos.Background, f.args); err == nil {
+	if err := guarded(ctx, qos.Background, f.args); err == nil {
 		t.Fatal("failed Catalog commit was acknowledged as a completed delivery")
 	}
 	var count int
@@ -253,7 +253,7 @@ func TestAssetGuardDoesNotAcknowledgeFailedCatalogCommit(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := guarded(ctx, workqos.Background, f.args); err != nil {
+	if err := guarded(ctx, qos.Background, f.args); err != nil {
 		t.Fatal(err)
 	}
 	var applied int

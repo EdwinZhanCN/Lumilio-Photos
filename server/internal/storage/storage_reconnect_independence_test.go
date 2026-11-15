@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage/repocfg"
 )
 
@@ -29,7 +29,7 @@ func sha256FileHex(path string) (string, error) {
 
 // seedRelocationScanState gives a repository a running scan and one present
 // entry whose change time and file ID were recorded on the old volume.
-func seedRelocationScanState(t *testing.T, catalog *db.DB, repositoryID uuid.UUID) (entryID, runningScanID uuid.UUID) {
+func seedRelocationScanState(t *testing.T, catalog *catalog.DB, repositoryID uuid.UUID) (entryID, runningScanID uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 	now := dbtypes.NewTimestamp(time.Now().UTC())

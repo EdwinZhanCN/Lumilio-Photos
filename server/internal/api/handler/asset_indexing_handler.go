@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/pipeline"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
 	"server/internal/service"
-	"server/internal/workqos"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 	"strings"
 	"time"
 
@@ -335,7 +335,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if err := pipeline.RequestAssetStagesTx(ctx, tx.Raw(), asset.AssetID, asset.ContentID, stages, pipeline.AssetPipelineVersion, workqos.Interactive, receiptID); err != nil {
+	if err := pipeline.RequestAssetStagesTx(ctx, tx.Raw(), asset.AssetID, asset.ContentID, stages, pipeline.AssetPipelineVersion, qos.Interactive, receiptID); err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	fileutil "server/internal/utils/file"
+	fileutil "server/internal/media/file"
 )
 
 // DirectoryListing is one complete user-media directory as the scan index

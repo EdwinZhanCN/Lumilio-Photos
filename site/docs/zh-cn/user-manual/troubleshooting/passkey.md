@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/service/auth_passkeys.go
-- server/internal/httporigin/policy.go
+- server/internal/api/httporigin/policy.go
 - server/internal/service/auth_mfa.go
 -->
 

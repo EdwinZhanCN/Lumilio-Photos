@@ -8,8 +8,8 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/httporigin"
 	"server/internal/api/problem"
-	"server/internal/httporigin"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"

@@ -58,8 +58,8 @@ flowchart LR
 | transcode | Browser-playable video and audio renditions (ffmpeg). | `go:server/app.pipelineRuntime.transcode` [`server/app/pipeline_runtime.go`](../../../../server/app/pipeline_runtime.go) |
 | enrich | pHash, semantic embedding, BioCLIP, OCR, faces, zero-shot tags, video frames. | `go:server/app.pipelineRuntime.enrich` [`server/app/pipeline_runtime.go`](../../../../server/app/pipeline_runtime.go) |
 | Lumen Hub |  | `go:service.LumenService` [`server/internal/service/lumen_service.go`](../../../../server/internal/service/lumen_service.go) |
-| Derived artifacts | Immutable files under the repository's .lumilio area. | `go:artifact.Store` [`server/internal/artifact/store.go`](../../../../server/internal/artifact/store.go) |
-| Commit coordinator |  | `go:commit.Coordinator` [`server/internal/commit/coordinator.go`](../../../../server/internal/commit/coordinator.go) |
+| Derived artifacts | Immutable files under the repository's .lumilio area. | `go:artifact.Store` [`server/internal/storage/artifact/store.go`](../../../../server/internal/storage/artifact/store.go) |
+| Commit coordinator |  | `go:commit.Coordinator` [`server/internal/ingest/commit/coordinator.go`](../../../../server/internal/ingest/commit/coordinator.go) |
 | assets metadata, stacks, media items |  | `sql:media_items` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | thumbnails |  | `sql:thumbnails` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | embeddings + Vec1 index |  | `sql:search_embeddings` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
@@ -71,12 +71,12 @@ flowchart LR
 
 | From → To | Label | Anchor |
 | --- | --- | --- |
-| thumbs → enrich | medium thumbnail as model input | `go:queue.NewDBMLImageLoader` [`server/internal/queue/ml_image_loader.go`](../../../../server/internal/queue/ml_image_loader.go) |
-| derivatives → artifacts | publish | `go:processors.AssetProcessor.PublishThumbnailTask` [`server/internal/processors/thumbnail_task.go`](../../../../server/internal/processors/thumbnail_task.go) |
-| transcode → artifacts | publish | `go:processors.AssetProcessor.PublishTranscodeTask` [`server/internal/processors/transcode_task.go`](../../../../server/internal/processors/transcode_task.go) |
-| analyze → coordinator |  | `go:commit.Coordinator.ApplyAssetMetadata` [`server/internal/commit/typed_catalog.go`](../../../../server/internal/commit/typed_catalog.go) |
-| derivatives → coordinator |  | `go:commit.Coordinator.ApplyAssetDerivatives` [`server/internal/commit/typed_catalog.go`](../../../../server/internal/commit/typed_catalog.go) |
-| enrich → coordinator |  | `go:commit.Coordinator.ApplyEnrichment` [`server/internal/commit/typed_catalog.go`](../../../../server/internal/commit/typed_catalog.go) |
+| thumbs → enrich | medium thumbnail as model input | `go:queue.NewDBMLImageLoader` [`server/internal/ingest/queue/ml_image_loader.go`](../../../../server/internal/ingest/queue/ml_image_loader.go) |
+| derivatives → artifacts | publish | `go:processors.AssetProcessor.PublishThumbnailTask` [`server/internal/ingest/processors/thumbnail_task.go`](../../../../server/internal/ingest/processors/thumbnail_task.go) |
+| transcode → artifacts | publish | `go:processors.AssetProcessor.PublishTranscodeTask` [`server/internal/ingest/processors/transcode_task.go`](../../../../server/internal/ingest/processors/transcode_task.go) |
+| analyze → coordinator |  | `go:commit.Coordinator.ApplyAssetMetadata` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
+| derivatives → coordinator |  | `go:commit.Coordinator.ApplyAssetDerivatives` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
+| enrich → coordinator |  | `go:commit.Coordinator.ApplyEnrichment` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
 | faces → bleve | ocr_index_outbox | `go:bleveocr.Writer` [`server/internal/search/bleveocr/writer.go`](../../../../server/internal/search/bleveocr/writer.go) |
 
 ## Fences

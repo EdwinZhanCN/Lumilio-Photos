@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 )
 
 func TestRemovalMutationsRollbackWhenLifecycleAuditInsertFails(t *testing.T) {

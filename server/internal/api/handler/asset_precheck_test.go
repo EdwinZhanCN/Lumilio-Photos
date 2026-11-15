@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
-	"server/internal/db/repo"
-	"server/internal/utils/hash"
+	"server/internal/catalog/repo"
+	"server/internal/media/hash"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

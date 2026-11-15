@@ -10,13 +10,13 @@ import (
 	"strconv"
 	"strings"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
-	"server/internal/logging"
-	"server/internal/pipeline"
-	"server/internal/settings"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/logging"
+	"server/internal/foundation/settings"
 	"server/internal/storage"
-	"server/internal/workqos"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -538,7 +538,7 @@ func (s *assetIndexingService) ApplyPreparedReindexTx(ctx context.Context, tx *s
 		if candidate.AssetID == uuid.Nil || candidate.ContentID == uuid.Nil {
 			return errors.New("invalid reindex candidate")
 		}
-		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, workqos.Maintenance, prepared.ReceiptID); err != nil {
+		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, qos.Maintenance, prepared.ReceiptID); err != nil {
 			return err
 		}
 	}

@@ -10,18 +10,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 )
 
-func musicTestCatalog(t *testing.T) (*db.DB, *musicService, uuid.UUID) {
+func musicTestCatalog(t *testing.T) (*catalog.DB, *musicService, uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "catalog.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "catalog.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
 	require.NoError(t, catalog.Migrate(ctx))
@@ -35,7 +35,7 @@ func musicTestCatalog(t *testing.T) (*db.DB, *musicService, uuid.UUID) {
 	return catalog, NewMusicService(catalog.Queries, catalog.Queries, catalog.Writer).(*musicService), repositoryID
 }
 
-func seedMusicTrack(t *testing.T, catalog *db.DB, service *musicService, repositoryID uuid.UUID, metadata string) uuid.UUID {
+func seedMusicTrack(t *testing.T, catalog *catalog.DB, service *musicService, repositoryID uuid.UUID, metadata string) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.New()

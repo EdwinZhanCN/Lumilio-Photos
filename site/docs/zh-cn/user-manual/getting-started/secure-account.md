@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/internal/service/auth_mfa.go
 - server/internal/service/auth_passkeys.go
-- server/internal/httporigin/policy.go
+- server/internal/api/httporigin/policy.go
 - web/src/features/auth/components/ui/SecurityPanels.tsx
 -->
 

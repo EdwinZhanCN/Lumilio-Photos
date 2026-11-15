@@ -48,7 +48,7 @@ sequenceDiagram
 | Vec1 vector index | `sql:search_embeddings_vec` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | Bleve OCR retriever | `go:search.BleveOCRRetriever` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
 | Place retriever (FTS5) | `sql:location_search_fts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Catalog reader | `go:repo.Queries` [`server/internal/db/repo/db.go`](../../../../server/internal/db/repo/db.go) |
+| Catalog reader | `go:repo.Queries` [`server/internal/catalog/repo/db.go`](../../../../server/internal/catalog/repo/db.go) |
 
 ## Steps
 
@@ -61,7 +61,7 @@ sequenceDiagram
 | 5 | semantic → vec | _par every channel is self-thresholded_ — KNN in the active embedding space, cosine floor |  |
 | 6 | service → ocr | _else OCR_ — strict-then-relaxed Bleve match | `go:search.BleveOCRRetriever.Retrieve` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
 | 7 | service → place | _else place_ — FTS match on place names | `go:search.NewPlaceRetriever` [`server/internal/search/retrievers.go`](../../../../server/internal/search/retrievers.go) |
-| 8 | service → catalog | _else filename_ — filename match, one primary per media item | `go:repo.Queries.GetMediaItemRefsUnified` [`server/internal/db/repo/assets_01.sql.go`](../../../../server/internal/db/repo/assets_01.sql.go) |
+| 8 | service → catalog | _else filename_ — filename match, one primary per media item | `go:repo.Queries.GetMediaItemRefsUnified` [`server/internal/catalog/repo/assets_01.sql.go`](../../../../server/internal/catalog/repo/assets_01.sql.go) |
 | 9 | service → service | weighted RRF (semantic 1.0, place 0.8, OCR 0.7, filename 0.6) | `go:search.FuseSet` [`server/internal/search/setretrieve.go`](../../../../server/internal/search/setretrieve.go) |
 | 10 | service → catalog | hydrate the ranked media items in the requested lifecycle state | `go:service.assetService.browseItemsForMediaRefs` [`server/internal/service/asset_browse_service.go`](../../../../server/internal/service/asset_browse_service.go) |
 | 11 | handler → web | best results (top-N by confidence) + full set under the chosen sort |  |

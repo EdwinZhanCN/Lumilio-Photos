@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage/pathsemantics"
 
 	"github.com/google/uuid"

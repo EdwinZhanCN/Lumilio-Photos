@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"server/internal/db/backup"
-	"server/internal/db/catalogtx"
-	"server/internal/pipeline"
+	"server/internal/catalog/backup"
+	"server/internal/catalog/catalogtx"
+	"server/internal/work/pipeline"
 
 	"github.com/google/uuid"
 )

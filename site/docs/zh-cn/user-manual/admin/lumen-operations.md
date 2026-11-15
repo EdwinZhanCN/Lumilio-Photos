@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/service/lumen_service.go
 - desktop/internal/lumen
 - deploy/compose/lumen-cpu.compose.yml
-- server/internal/queue/jobs
+- server/internal/work/jobs
 -->
 
 # Lumen Intelligence 运维

@@ -14,7 +14,7 @@ code-evidence:
 - site/docs/.vitepress/sidebar/zh-cn.ts
 - server/config
 - server/internal/storage
-- server/internal/utils/file/validator.go
+- server/internal/media/file/validator.go
 -->
 
 # 参考

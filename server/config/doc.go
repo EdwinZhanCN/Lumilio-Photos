@@ -20,7 +20,7 @@
 // result to pass the strict load, and keeps the original as a .bak file.
 //
 // Runtime-mutable settings — ML and LLM features, reverse geocoding — are not
-// configuration; they live in the catalog (see [server/internal/settings]).
+// configuration; they live in the catalog (see [server/internal/foundation/settings]).
 //
 // repository_trash.retention_days is required and positive, with no code
 // default; generated manifests write 30. It sets repository Trash retention

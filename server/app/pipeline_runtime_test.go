@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 
-	"server/internal/commit"
-	"server/internal/db/catalogtx"
-	"server/internal/execution"
+	"server/internal/catalog/catalogtx"
+	"server/internal/ingest/commit"
+	"server/internal/work/execution"
 )
 
 func TestCommitQueuePressureStopsExecutionAdmission(t *testing.T) {

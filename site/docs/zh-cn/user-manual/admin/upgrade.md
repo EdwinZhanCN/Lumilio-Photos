@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/app/app.go
-- server/internal/db/migration.go
+- server/internal/catalog/migration.go
 - server/cmd/config_cli.go
 - desktop/internal/update
 - deploy/compose/compose.yml

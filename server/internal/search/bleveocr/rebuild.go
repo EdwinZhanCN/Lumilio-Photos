@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/google/uuid"

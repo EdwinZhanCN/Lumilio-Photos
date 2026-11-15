@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"server/internal/api/problem"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 // UploadAssetRequestDTO represents the request structure for asset upload

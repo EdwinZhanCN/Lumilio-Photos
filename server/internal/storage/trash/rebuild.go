@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage"
 	"server/internal/storage/scan"
 )

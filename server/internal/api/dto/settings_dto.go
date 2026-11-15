@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"server/config"
+	settingsdomain "server/internal/foundation/settings"
 	"server/internal/service"
-	settingsdomain "server/internal/settings"
 )
 
 type SystemSettingsDTO struct {

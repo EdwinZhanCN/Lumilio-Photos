@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
+	fileutil "server/internal/media/file"
 	"server/internal/storage"
-	fileutil "server/internal/utils/file"
 )
 
 // bindKnown indexes a file the way an upload commit does: the content hash

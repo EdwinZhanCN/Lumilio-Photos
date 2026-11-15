@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage/marker"
 
 	"github.com/google/uuid"

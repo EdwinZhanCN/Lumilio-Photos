@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 )
 

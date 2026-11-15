@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -53,12 +53,12 @@ type authorizedLibraryOCRIDs struct {
 	ownerVideo      uuid.UUID
 }
 
-func openAuthorizedLibraryOCRTestCatalog(t *testing.T) (*db.DB, authorizedLibraryOCRIDs) {
+func openAuthorizedLibraryOCRTestCatalog(t *testing.T) (*catalog.DB, authorizedLibraryOCRIDs) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)

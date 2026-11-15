@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 
 	"github.com/google/uuid"
@@ -220,7 +220,7 @@ func TestProductURLUsesLoopbackForDesktopListeners(t *testing.T) {
 }
 
 func TestWALStateOnlyRearmsCheckpointAfterFileChanges(t *testing.T) {
-	checkpointed := db.WALState{SizeBytes: 8 << 20, ModifiedAt: time.Unix(10, 20)}
+	checkpointed := catalog.WALState{SizeBytes: 8 << 20, ModifiedAt: time.Unix(10, 20)}
 	if !walStateAlreadyCheckpointed(checkpointed, checkpointed, true) {
 		t.Fatal("identical WAL version must not schedule another passive checkpoint")
 	}

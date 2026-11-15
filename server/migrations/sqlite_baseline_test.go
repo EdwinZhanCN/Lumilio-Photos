@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"server/internal/db"
-	"server/internal/db/sqlitespike"
+	"server/internal/catalog"
+	"server/internal/catalog/conformance"
 	"server/migrations"
 )
 
@@ -79,7 +79,7 @@ func readEmbeddedBaseline(t *testing.T) []byte {
 func openBaselineCatalog(t *testing.T) *sql.DB {
 	t.Helper()
 	ctx := context.Background()
-	database, err := sqlitespike.Open(ctx, t.TempDir()+"/library.sqlite3")
+	database, err := conformance.Open(ctx, t.TempDir()+"/library.sqlite3")
 	if err != nil {
 		t.Fatalf("open SQLite: %v", err)
 	}
@@ -100,10 +100,10 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&userVersion); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if int64(userVersion) != db.SchemaVersion {
-		t.Fatalf("baseline user_version = %d, want runtime schema version %d", userVersion, db.SchemaVersion)
+	if int64(userVersion) != catalog.SchemaVersion {
+		t.Fatalf("baseline user_version = %d, want runtime schema version %d", userVersion, catalog.SchemaVersion)
 	}
-	if stamp := fmt.Sprintf("PRAGMA user_version = %d;", db.SchemaVersion); !strings.HasSuffix(strings.TrimSpace(string(readEmbeddedBaseline(t))), stamp) {
+	if stamp := fmt.Sprintf("PRAGMA user_version = %d;", catalog.SchemaVersion); !strings.HasSuffix(strings.TrimSpace(string(readEmbeddedBaseline(t))), stamp) {
 		t.Fatalf("baseline does not end with %q", stamp)
 	}
 

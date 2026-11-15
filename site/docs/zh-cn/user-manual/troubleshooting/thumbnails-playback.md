@@ -12,9 +12,9 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/directory_manager.go
-- server/internal/queue/jobs
-- server/internal/utils/imaging
-- server/internal/processors/transcode_task.go
+- server/internal/work/jobs
+- server/internal/media/imaging
+- server/internal/ingest/processors/transcode_task.go
 - server/config/schema/lumilio-server.schema.json
 -->
 

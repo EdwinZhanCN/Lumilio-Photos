@@ -4,7 +4,7 @@
 
 _architecture · source: `derived: atlas.yaml group media + imports`_
 
-Stateless file and media mechanics: content hashing, EXIF extraction, libvips imaging, LibRaw decoding, perceptual hashes, geohash, and process helpers. Pure functions over bytes and paths; no catalog access.
+Stateless file and media mechanics: content hashing, EXIF extraction, libvips imaging, LibRaw decoding, perceptual hashes, and geohash. Pure functions over bytes and paths; no catalog access.
 
 ```mermaid
 flowchart LR
@@ -18,14 +18,14 @@ flowchart LR
         n_in_storage[/"Storage"/]
     end
     subgraph n_g_Media_utilities["Media utilities"]
-        n_server_internal_utils_exif["utils/exif"]
-        n_server_internal_utils_file["utils/file"]
-        n_server_internal_utils_geohash["utils/geohash"]
-        n_server_internal_utils_hash["utils/hash"]
-        n_server_internal_utils_imagesource["utils/imagesource"]
-        n_server_internal_utils_imaging["utils/imaging"]
-        n_server_internal_utils_phash["utils/phash"]
-        n_server_internal_utils_raw["utils/raw"]
+        n_server_internal_media_exif["media/exif"]
+        n_server_internal_media_file["media/file"]
+        n_server_internal_media_geohash["media/geohash"]
+        n_server_internal_media_hash["media/hash"]
+        n_server_internal_media_imagesource["media/imagesource"]
+        n_server_internal_media_imaging["media/imaging"]
+        n_server_internal_media_phash["media/phash"]
+        n_server_internal_media_raw["media/raw"]
     end
     subgraph n_g_Depends_on["Depends on"]
         n_out_foundation[/"Foundation"/]
@@ -37,9 +37,9 @@ flowchart LR
     n_in_runtime -.-> n_g_Media_utilities
     n_in_service -.-> n_g_Media_utilities
     n_in_storage -.-> n_g_Media_utilities
-    n_server_internal_utils_imagesource --> n_server_internal_utils_raw
-    n_server_internal_utils_raw --> n_server_internal_utils_file
-    n_server_internal_utils_raw --> n_server_internal_utils_imaging
+    n_server_internal_media_imagesource --> n_server_internal_media_raw
+    n_server_internal_media_raw --> n_server_internal_media_file
+    n_server_internal_media_raw --> n_server_internal_media_imaging
     n_g_Media_utilities -.-> n_out_foundation
     classDef external stroke-dasharray:4 3
     class n_in_agent,n_in_catalog,n_in_http,n_in_ingest,n_in_runtime,n_in_service,n_in_storage,n_out_foundation external
@@ -56,12 +56,12 @@ flowchart LR
 | Server runtime |  | `group:runtime` |
 | Services |  | `group:service` |
 | Storage |  | `group:storage` |
-| utils/exif | Package exif extracts photo, video, and audio metadata by streaming file bytes through an external exiftool process. | `mod:server/internal/utils/exif` [`server/internal/utils/exif/doc.go`](../../../../server/internal/utils/exif/doc.go) |
-| utils/file | Package file classifies media files: it maps filenames and MIME types to a catalog Asset type ([DetermineAssetType], [DetermineAssetTypeWithFilename]), owns the supported-extension registry ([IsSupported], [GetSupportedExtensions]), and validates uploads ([ValidateFile]). | `mod:server/internal/utils/file` [`server/internal/utils/file/doc.go`](../../../../server/internal/utils/file/doc.go) |
-| utils/geohash | Package geohash encodes coordinates as geohash strings with [Encode]. | `mod:server/internal/utils/geohash` [`server/internal/utils/geohash/doc.go`](../../../../server/internal/utils/geohash/doc.go) |
-| utils/hash | Package hash computes content identity. | `mod:server/internal/utils/hash` [`server/internal/utils/hash/doc.go`](../../../../server/internal/utils/hash/doc.go) |
-| utils/imagesource | Package imagesource turns a stored photo into the decodable image every consumer needs. | `mod:server/internal/utils/imagesource` [`server/internal/utils/imagesource/doc.go`](../../../../server/internal/utils/imagesource/doc.go) |
-| utils/imaging | Package imaging is the libvips boundary. | `mod:server/internal/utils/imaging` [`server/internal/utils/imaging/doc.go`](../../../../server/internal/utils/imaging/doc.go) |
-| utils/phash | Package phash computes perceptual hashes for near-duplicate detection. | `mod:server/internal/utils/phash` [`server/internal/utils/phash/doc.go`](../../../../server/internal/utils/phash/doc.go) |
-| utils/raw | Package raw is the CGo LibRaw boundary for camera RAW files. | `mod:server/internal/utils/raw` [`server/internal/utils/raw/doc.go`](../../../../server/internal/utils/raw/doc.go) |
+| media/exif | Package exif extracts photo, video, and audio metadata by streaming file bytes through an external exiftool process. | `mod:server/internal/media/exif` [`server/internal/media/exif/doc.go`](../../../../server/internal/media/exif/doc.go) |
+| media/file | Package file classifies media files: it maps filenames and MIME types to a catalog Asset type ([DetermineAssetType], [DetermineAssetTypeWithFilename]), owns the supported-extension registry ([IsSupported], [GetSupportedExtensions]), and validates uploads ([ValidateFile]). | `mod:server/internal/media/file` [`server/internal/media/file/doc.go`](../../../../server/internal/media/file/doc.go) |
+| media/geohash | Package geohash encodes coordinates as geohash strings with [Encode]. | `mod:server/internal/media/geohash` [`server/internal/media/geohash/doc.go`](../../../../server/internal/media/geohash/doc.go) |
+| media/hash | Package hash computes content identity. | `mod:server/internal/media/hash` [`server/internal/media/hash/doc.go`](../../../../server/internal/media/hash/doc.go) |
+| media/imagesource | Package imagesource turns a stored photo into the decodable image every consumer needs. | `mod:server/internal/media/imagesource` [`server/internal/media/imagesource/doc.go`](../../../../server/internal/media/imagesource/doc.go) |
+| media/imaging | Package imaging is the libvips boundary. | `mod:server/internal/media/imaging` [`server/internal/media/imaging/doc.go`](../../../../server/internal/media/imaging/doc.go) |
+| media/phash | Package phash computes perceptual hashes for near-duplicate detection. | `mod:server/internal/media/phash` [`server/internal/media/phash/doc.go`](../../../../server/internal/media/phash/doc.go) |
+| media/raw | Package raw is the CGo LibRaw boundary for camera RAW files. | `mod:server/internal/media/raw` [`server/internal/media/raw/doc.go`](../../../../server/internal/media/raw/doc.go) |
 | Foundation |  | `group:foundation` |

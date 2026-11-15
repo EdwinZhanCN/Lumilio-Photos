@@ -11,12 +11,12 @@ import (
 
 	"server/config"
 	"server/internal/api/dto"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 	"server/internal/service"
 	"server/internal/storage"
-	"server/internal/testutil"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -50,7 +50,7 @@ func TestStorageViewCountsActiveRepositoryAssets(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "library.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "library.sqlite3")})
 	require.NoError(t, err)
 	require.NoError(t, catalog.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, catalog.Close(context.Background())) })

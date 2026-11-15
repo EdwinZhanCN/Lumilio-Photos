@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/media/hash"
 	"server/internal/storage"
-	"server/internal/utils/hash"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

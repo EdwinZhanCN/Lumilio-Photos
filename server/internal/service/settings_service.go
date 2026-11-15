@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/secretbox"
+	"server/internal/foundation/settings"
 	"server/internal/llm"
-	"server/internal/pipeline"
-	"server/internal/secretbox"
-	"server/internal/settings"
+	"server/internal/work/pipeline"
 )
 
 var ErrInvalidSystemSettings = errors.New("invalid system settings")

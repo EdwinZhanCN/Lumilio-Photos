@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/storage/rootcfg/root_config.go
 - server/internal/storage/repocfg/repo_config.go
 - web/src/locales/zh/translation.json
-- server/internal/db/backup/backup.go
+- server/internal/catalog/backup/backup.go
 -->
 
 # 术语表

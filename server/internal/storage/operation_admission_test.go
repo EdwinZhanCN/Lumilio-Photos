@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 func TestOpenOriginalAdmissionIgnoresPauseAndWritePolicy(t *testing.T) {

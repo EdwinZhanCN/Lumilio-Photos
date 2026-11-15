@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - web/src/features/assets/flows/viewer/info
 - server/internal/service/asset_service.go
-- server/internal/db/repo/queries
+- server/internal/catalog/repo/queries
 -->
 
 # 媒体信息与组件

@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
 
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ func TestQueueHandlerLoadQueueSummariesRunsAgainstMigratedSQLiteSchema(t *testin
 
 	directory := t.TempDir()
 	require.NoError(t, os.Chmod(directory, 0o700))
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(directory, "queue-handler.sqlite3"),
 	})
 	require.NoError(t, err)

@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"server/internal/api/dto"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/recovery"

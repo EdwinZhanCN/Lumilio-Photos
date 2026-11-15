@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/internal/api/router.go
 - server/internal/api/handler/queue_handler.go
-- server/internal/queue
+- server/internal/ingest/queue
 - web/src/features/monitor
 -->
 

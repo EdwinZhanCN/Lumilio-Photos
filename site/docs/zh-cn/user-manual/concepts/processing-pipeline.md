@@ -11,9 +11,9 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/sourcing
-- server/internal/queue/jobs
-- server/internal/processors/transcode_task.go
+- server/internal/ingest/sourcing
+- server/internal/work/jobs
+- server/internal/ingest/processors/transcode_task.go
 - server/internal/service/lumen_service.go
 -->
 

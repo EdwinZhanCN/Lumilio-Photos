@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/pipeline"
-	"server/internal/workqos"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 )
 
 // ApplyAssetActivationTx publishes the logical media item and requests the
@@ -85,11 +85,11 @@ func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queri
 	}
 	if reset {
 		return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, stages,
-			pipeline.AssetPipelineVersion, workqos.Background, entryID)
+			pipeline.AssetPipelineVersion, qos.Background, entryID)
 	}
 	if len(missing) == 0 {
 		return nil
 	}
 	return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, missing,
-		pipeline.AssetPipelineVersion, workqos.Background, entryID)
+		pipeline.AssetPipelineVersion, qos.Background, entryID)
 }

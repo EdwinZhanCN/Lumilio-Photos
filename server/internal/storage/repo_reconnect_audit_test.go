@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 )
 
 // A reconnect whose command audit cannot be persisted rolls its catalog

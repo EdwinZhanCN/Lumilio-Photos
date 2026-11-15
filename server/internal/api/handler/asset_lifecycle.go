@@ -9,7 +9,7 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/problem"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage/trash"
 )

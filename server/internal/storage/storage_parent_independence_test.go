@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage/repocfg"
 )
 

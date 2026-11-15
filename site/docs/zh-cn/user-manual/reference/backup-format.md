@@ -11,8 +11,8 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/db/backup/backup.go
-- server/internal/db/backup/restore.go
+- server/internal/catalog/backup/backup.go
+- server/internal/catalog/backup/restore.go
 - server/internal/api/dto/backup_dto.go
 - server/internal/api/handler/backup_handler.go
 - server/internal/service/backup_service.go

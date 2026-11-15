@@ -14,8 +14,8 @@ import (
 
 	"server/internal/api/dto"
 	"server/internal/api/problem"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/scan"

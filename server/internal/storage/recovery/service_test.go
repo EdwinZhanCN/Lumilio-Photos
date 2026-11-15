@@ -17,9 +17,9 @@ import (
 	"go.uber.org/zap"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/scan"
 	"server/internal/storage/testfixture"
@@ -31,7 +31,7 @@ import (
 type fixture struct {
 	t        *testing.T
 	ctx      context.Context
-	database *db.DB
+	database *catalog.DB
 	files    *storage.RepositoryFSFactory
 	manager  *storage.DefaultRepositoryManager
 	scanner  *scan.Scanner
@@ -47,7 +47,7 @@ func newFixture(t *testing.T) *fixture {
 	if err := os.Chmod(databaseDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(databaseDirectory, "catalog.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(databaseDirectory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}

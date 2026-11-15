@@ -60,10 +60,10 @@ flowchart LR
 | TOML manifest | Complete, schema-versioned, runtime-immutable configuration. | `go:config.LoadAppConfig` [`server/config/config.go`](../../../../server/config/config.go) |
 | HTTP API + SPA | Auth, origin, setup, and rate-limit boundaries; RFC 9457 Problems. | `go:api.NewRouter` [`server/internal/api/router.go`](../../../../server/internal/api/router.go) |
 | Services |  | `mod:server/internal/service` [`server/internal/service/doc.go`](../../../../server/internal/service/doc.go) |
-| Scheduler, River workers, commit coordinator |  | `go:queue.Scheduler` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
+| Scheduler, River workers, commit coordinator |  | `go:queue.Scheduler` [`server/internal/ingest/queue/scheduler.go`](../../../../server/internal/ingest/queue/scheduler.go) |
 | server/app.Run | The only composition root; owns startup and graceful shutdown. | `go:server/app.Run` [`server/app/app.go`](../../../../server/app/app.go) |
-| Catalog (SQLite + FTS5 + Vec1) | Product truth. One writer, bounded query-only readers. | `go:db.DB` [`server/internal/db/db.go`](../../../../server/internal/db/db.go) |
-| QueueDB (River) | Disposable delivery state; may be recreated. | `go:db.QueueDB` [`server/internal/db/queue.go`](../../../../server/internal/db/queue.go) |
+| Catalog (SQLite + FTS5 + Vec1) | Product truth. One writer, bounded query-only readers. | `go:catalog.DB` [`server/internal/catalog/db.go`](../../../../server/internal/catalog/db.go) |
+| QueueDB (River) | Disposable delivery state; may be recreated. | `go:catalog.QueueDB` [`server/internal/catalog/queue.go`](../../../../server/internal/catalog/queue.go) |
 | Bleve OCR index | Rebuildable sidecar fed by a catalog outbox. | `go:bleveocr.Index` [`server/internal/search/bleveocr/index.go`](../../../../server/internal/search/bleveocr/index.go) |
 | Storage Locations and Repositories | User media on disk. Originals are never rewritten. | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go`](../../../../server/internal/storage/repository_fs.go) |
 | Lumen Hub (ML) | Optional. Semantic, face, OCR, and BioCLIP inference over mDNS or a configured URL. | `ext:Lumen Hub` |
@@ -76,11 +76,11 @@ flowchart LR
 | --- | --- | --- |
 | web → http | HTTPS JSON, SSE | `go:api.RegisterSPA` [`server/internal/api/spa.go`](../../../../server/internal/api/spa.go) |
 | desktop → runtime | in-process | `go:desktop/internal/runtime.Controller.Start` [`desktop/internal/runtime/controller.go`](../../../../desktop/internal/runtime/controller.go) |
-| work → catalog | commit coordinator | `go:commit.Coordinator` [`server/internal/commit/coordinator.go`](../../../../server/internal/commit/coordinator.go) |
+| work → catalog | commit coordinator | `go:commit.Coordinator` [`server/internal/ingest/commit/coordinator.go`](../../../../server/internal/ingest/commit/coordinator.go) |
 | catalog → ocr | outbox | `go:bleveocr.Writer` [`server/internal/search/bleveocr/writer.go`](../../../../server/internal/search/bleveocr/writer.go) |
 | work → lumen | inference | `go:service.LumenService` [`server/internal/service/lumen_service.go`](../../../../server/internal/service/lumen_service.go) |
 | services → llm | agent runs | `go:llm.NewChatModel` [`server/internal/llm/chat_model.go`](../../../../server/internal/llm/chat_model.go) |
-| services → icloud | import | `go:icloud.NewClient` [`server/internal/cloud/icloud/client.go`](../../../../server/internal/cloud/icloud/client.go) |
+| services → icloud | import | `go:icloud.NewClient` [`server/internal/ingest/cloud/icloud/client.go`](../../../../server/internal/ingest/cloud/icloud/client.go) |
 
 ## Three configuration owners
 

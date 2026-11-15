@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
 )
 
 // The facade classifies the fatal startup causes a reinstall or an upgrade
@@ -18,8 +18,8 @@ func TestClassifyStartupFailureNamesEveryCompatibilityCause(t *testing.T) {
 		err  error
 		code StartupFailureCode
 	}{
-		{fmt.Errorf("open SQLite database: %w", fmt.Errorf("%w: move it aside", db.ErrPreReleaseCatalog)), StartupFailureCatalogLineageUnsupported},
-		{fmt.Errorf("run database migrations: %w", fmt.Errorf("%w: schema 9", db.ErrCatalogNewer)), StartupFailureCatalogNewer},
+		{fmt.Errorf("open SQLite database: %w", fmt.Errorf("%w: move it aside", catalog.ErrPreReleaseCatalog)), StartupFailureCatalogLineageUnsupported},
+		{fmt.Errorf("run database migrations: %w", fmt.Errorf("%w: schema 9", catalog.ErrCatalogNewer)), StartupFailureCatalogNewer},
 		{fmt.Errorf("runtime manifest /x: %w", fmt.Errorf("%w: schema_version = 9", config.ErrManifestIncompatible)), StartupFailureConfigurationIncompatible},
 		{fmt.Errorf("runtime manifest /x: %w", config.ErrManifestUpgradeRequired), StartupFailureConfigurationUpgradeRequired},
 		{fmt.Errorf("validate default storage location migration: %w", ErrDefaultStorageMigrationRejected), StartupFailureDefaultStorageMigrationRejected},
@@ -48,7 +48,7 @@ func TestClassifyStartupFailureNamesEveryCompatibilityCause(t *testing.T) {
 		t.Fatal("nil error classified")
 	}
 	// An already classified error keeps its code through further wrapping.
-	wrapped := fmt.Errorf("desktop generation: %w", ClassifyStartupFailure(fmt.Errorf("x: %w", db.ErrCatalogNewer)))
+	wrapped := fmt.Errorf("desktop generation: %w", ClassifyStartupFailure(fmt.Errorf("x: %w", catalog.ErrCatalogNewer)))
 	if ClassifyStartupFailure(wrapped).Code != StartupFailureCatalogNewer {
 		t.Fatal("classification lost through wrapping")
 	}

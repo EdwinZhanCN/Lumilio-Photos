@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"server/internal/settings"
+	"server/internal/foundation/settings"
 )
 
 func TestNewChatModelRejectsAmbientCredentials(t *testing.T) {

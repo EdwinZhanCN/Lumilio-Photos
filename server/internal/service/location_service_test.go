@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/settings"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/settings"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -131,7 +131,7 @@ func TestLocationRevisionCheckPropagatesDatabaseErrors(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -224,7 +224,7 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -356,7 +356,7 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
 )
 
@@ -291,7 +291,7 @@ func canonicalTestPath(t *testing.T, p string) string {
 	return canonical
 }
 
-func createHostActionAdmin(t *testing.T, catalog *db.DB, username string) repo.User {
+func createHostActionAdmin(t *testing.T, catalog *catalog.DB, username string) repo.User {
 	t.Helper()
 	actor, err := catalog.Queries.CreateUser(context.Background(), repo.CreateUserParams{
 		Username: username, Password: "test", DisplayName: "Admin", Role: "admin",

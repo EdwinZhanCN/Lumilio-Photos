@@ -34,7 +34,7 @@ States are exactly the members of `ts:FileUploadStatus` [`web/src/features/uploa
 | pending | Queued; hashing in the worker. | `ts:features/upload#FileUploadStatus` [`web/src/features/upload/modules/process/types.ts`](../../../../web/src/features/upload/modules/process/types.ts) |
 | uploading | Batch or chunked transport in flight. | `ts:features/upload#createUploadTransport` [`web/src/features/upload/modules/process/transport.ts`](../../../../web/src/features/upload/modules/process/transport.ts) |
 | processing | Bytes accepted; following the ingest receipt. | `ts:waitForUploadOperations` [`web/src/lib/upload/uploadLifecycle.ts`](../../../../web/src/lib/upload/uploadLifecycle.ts) |
-| completed | The server ingest receipt is terminal and successful. | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/commit/typed_catalog.go`](../../../../server/internal/commit/typed_catalog.go) |
+| completed | The server ingest receipt is terminal and successful. | `go:commit.Coordinator.ApplyIngestReceipt` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
 | duplicate | Precheck found the same content; the file was never sent. | `ts:DUPLICATE_STATUS` [`web/src/features/upload/modules/process/results.ts`](../../../../web/src/features/upload/modules/process/results.ts) |
 | failed | Transport or ingest failed; the File stays queued for retry. | `ts:features/upload#runUploadProcess` [`web/src/features/upload/modules/process/runner.ts`](../../../../web/src/features/upload/modules/process/runner.ts) |
 

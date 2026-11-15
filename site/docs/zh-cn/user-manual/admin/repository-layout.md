@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/storage/repocfg/repo_config.go
 - server/internal/storage/directory_manager.go
 - server/internal/storage/repo_provisioning.go
-- server/internal/sourcing/materializer.go
+- server/internal/ingest/sourcing/materializer.go
 -->
 
 # 资源库目录与布局策略

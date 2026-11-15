@@ -6,14 +6,14 @@ import (
 	"slices"
 	"testing"
 
-	"server/internal/commit"
-	"server/internal/execution"
-	"server/internal/pipeline"
-	"server/internal/processors"
-	"server/internal/queue"
-	"server/internal/queue/jobs"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/processors"
+	"server/internal/ingest/queue"
 	"server/internal/storage"
 	"server/internal/storage/scan"
+	"server/internal/work/execution"
+	"server/internal/work/jobs"
+	"server/internal/work/pipeline"
 
 	"github.com/riverqueue/river"
 )

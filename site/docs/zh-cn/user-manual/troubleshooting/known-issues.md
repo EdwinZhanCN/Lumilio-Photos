@@ -17,7 +17,7 @@ code-evidence:
 - server/internal/api/router.go
 - server/internal/api/handler/share_link_handler.go
 - server/internal/api/handler/backup_handler.go
-- server/internal/cloud/provider_registry.go
+- server/internal/ingest/cloud/provider_registry.go
 - server/internal/storage/pathsemantics
 - server/internal/storage/repo_manager.go
 - docs/exec-plans/tech-debt-tracker.md

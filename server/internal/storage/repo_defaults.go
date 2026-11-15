@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 )
 
 // RepoDefaults is the storage-owned, runtime-mutable behaviour applied to newly

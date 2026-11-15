@@ -12,17 +12,17 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
-	"server/internal/artifact"
-	"server/internal/commit"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/execution"
-	"server/internal/queue"
-	"server/internal/queue/jobs"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/queue"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 	"server/internal/storage/repocfg"
-	"server/internal/workqos"
+	"server/internal/work/execution"
+	"server/internal/work/jobs"
+	"server/internal/work/qos"
 )
 
 func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t *testing.T) {
@@ -80,7 +80,7 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 	args := jobs.GenerateAssetDerivativesArgs{
 		AssetID: assetID, SourceFence: sourceFence, DesiredVersion: 1, PipelineVersion: "asset-v1",
 	}
-	worker := queue.NewGenerateAssetDerivativesWorker(func(ctx context.Context, _ workqos.Class, args jobs.GenerateAssetDerivativesArgs) error {
+	worker := queue.NewGenerateAssetDerivativesWorker(func(ctx context.Context, _ qos.Class, args jobs.GenerateAssetDerivativesArgs) error {
 		return runtime.engine.Run(ctx, execution.ClassBackground, runtime.demand.Demand(execution.StepDerivativesComputeThumb, execution.MediaPhoto), func(stepCtx context.Context) error {
 			published, err := store.Publish(stepCtx, identity, bytes.NewReader(candidateBody))
 			if err != nil {
@@ -98,7 +98,7 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 			return runtime.submitAssetStage(stepCtx, args.AssetID, args.SourceFence, "derivatives", args.PipelineVersion, args.DesiredVersion)
 		})
 	})
-	priority, err := workqos.Background.Priority()
+	priority, err := qos.Background.Priority()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ code-evidence:
 - server/internal/storage/roe/changefeed
 - server/internal/storage/roe/materializer
 - server/config/config.go
-- server/internal/db/repo/queries
+- server/internal/catalog/repo/queries
 -->
 
 # 扫描已有目录

@@ -10,8 +10,8 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"

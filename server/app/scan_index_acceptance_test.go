@@ -9,7 +9,7 @@ import (
 
 	"github.com/syncthing/notify"
 
-	hashutil "server/internal/utils/hash"
+	hashutil "server/internal/media/hash"
 )
 
 // #222: "An upload followed by a scan does not rehash." The upload commit

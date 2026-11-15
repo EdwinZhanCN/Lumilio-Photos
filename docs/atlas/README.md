@@ -108,12 +108,16 @@ package scan
 ```
 
 The package joins its group through a `match` path in `atlas.yaml`, never a
-directive in the file. Server and Desktop groups list explicit package paths
-today; the server-structure plan turns them into directory globs once each
-group owns one directory.
+directive in the file. A Server group that owns one directory matches it with
+a glob (`server/internal/ingest/**`), so a new package there joins without an
+`atlas.yaml` edit. The catalog lists its packages because
+`server/internal/catalog/dbtypes` belongs to foundation until the
+server-structure plan splits it; domain and services list theirs until the
+capability moves give them directories. Desktop groups list explicit package
+paths.
 
 Write what the package **owns**, its **invariants**, and the **entry points**
-as doc links (`[Name]`, `[Type.Method]`, `[server/internal/db.DB]`). Do not
+as doc links (`[Name]`, `[Type.Method]`, `[server/internal/catalog.DB]`). Do not
 write who imports it or what it imports — that is derived and shown next to the
 doc. Web features follow [docts.md](../docts.md).
 

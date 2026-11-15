@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"server/internal/api"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"

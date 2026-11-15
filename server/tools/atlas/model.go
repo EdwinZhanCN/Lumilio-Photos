@@ -78,7 +78,7 @@ type Rule struct {
 }
 
 // A scope is a list of patterns, each a package directory
-// (server/internal/db), a directory glob (server/internal/storage/**), or a
+// (server/internal/catalog), a directory glob (server/internal/storage/**), or a
 // file (server/app/app.go).
 
 // CallsRule: every reference to a target outside Only, or inside Forbid,

@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	hashutil "server/internal/utils/hash"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	hashutil "server/internal/media/hash"
 
 	"github.com/google/uuid"
 )

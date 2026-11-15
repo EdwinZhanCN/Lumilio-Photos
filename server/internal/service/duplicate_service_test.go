@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/testutil"
-	"server/internal/utils/phash"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/foundation/testutil"
+	"server/internal/media/phash"
 
 	"github.com/corona10/goimagehash"
 	"github.com/google/uuid"
@@ -21,7 +21,7 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)

@@ -17,20 +17,20 @@ import (
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 
-	"server/internal/commit"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 	"server/internal/event"
-	"server/internal/execution"
-	"server/internal/pipeline"
-	"server/internal/processors"
-	"server/internal/queue"
-	"server/internal/queue/jobs"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/processors"
+	"server/internal/ingest/queue"
 	"server/internal/search/bleveocr"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/recovery"
 	"server/internal/storage/scan"
-	"server/internal/workqos"
+	"server/internal/work/execution"
+	"server/internal/work/jobs"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 )
 
 // scanDeliveryBudget bounds the work one scan macro performs before it
@@ -49,7 +49,7 @@ func runRepositoryScanBatch(
 	scanner *scan.Scanner,
 	engine *execution.Engine,
 	demand execution.DemandCatalog,
-	qos workqos.Class,
+	qos qos.Class,
 	args jobs.ScanRepositoryBatchArgs,
 ) (bool, error) {
 	if scanner == nil || engine == nil {
@@ -109,7 +109,7 @@ func runAssetEnrichment(
 	repositoryFiles *storage.RepositoryFSFactory,
 	engine *execution.Engine,
 	demand execution.DemandCatalog,
-	qos workqos.Class,
+	qos qos.Class,
 	args jobs.EnrichAssetArgs,
 ) (queue.EnrichmentResult, error) {
 	if reader == nil || repositoryFiles == nil || engine == nil {
@@ -209,7 +209,7 @@ func (runtime *pipelineRuntime) registerBackup(workers *river.Workers, execute f
 	if runtime == nil || workers == nil || runtime.engine == nil || runtime.commits == nil || execute == nil {
 		return errors.New("backup pipeline runtime is not configured")
 	}
-	river.AddWorker[jobs.BackupCatalogArgs](workers, &queue.BackupCatalogWorker{Execute: func(ctx context.Context, qos workqos.Class, args jobs.BackupCatalogArgs) error {
+	river.AddWorker[jobs.BackupCatalogArgs](workers, &queue.BackupCatalogWorker{Execute: func(ctx context.Context, qos qos.Class, args jobs.BackupCatalogArgs) error {
 		class, err := execution.ClassFromQoS(qos)
 		if err != nil {
 			return err
@@ -225,7 +225,7 @@ func (runtime *pipelineRuntime) registerBackup(workers *river.Workers, execute f
 	return nil
 }
 
-func (runtime *pipelineRuntime) ingest(ctx context.Context, qos workqos.Class, args jobs.IngestAssetArgs) error {
+func (runtime *pipelineRuntime) ingest(ctx context.Context, qos qos.Class, args jobs.IngestAssetArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -239,7 +239,7 @@ func (runtime *pipelineRuntime) ingest(ctx context.Context, qos workqos.Class, a
 	})
 }
 
-func (runtime *pipelineRuntime) analyze(ctx context.Context, qos workqos.Class, args jobs.AnalyzeAssetArgs) error {
+func (runtime *pipelineRuntime) analyze(ctx context.Context, qos qos.Class, args jobs.AnalyzeAssetArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -272,7 +272,7 @@ func (runtime *pipelineRuntime) analyze(ctx context.Context, qos workqos.Class, 
 	})
 }
 
-func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Class, args jobs.GenerateAssetDerivativesArgs) error {
+func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos qos.Class, args jobs.GenerateAssetDerivativesArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -344,7 +344,7 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Cla
 	})
 }
 
-func (runtime *pipelineRuntime) transcode(ctx context.Context, qos workqos.Class, args jobs.TranscodeMediaArgs) error {
+func (runtime *pipelineRuntime) transcode(ctx context.Context, qos qos.Class, args jobs.TranscodeMediaArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -387,7 +387,7 @@ func (runtime *pipelineRuntime) transcode(ctx context.Context, qos workqos.Class
 	})
 }
 
-func (runtime *pipelineRuntime) enrich(ctx context.Context, qos workqos.Class, args jobs.EnrichAssetArgs) error {
+func (runtime *pipelineRuntime) enrich(ctx context.Context, qos qos.Class, args jobs.EnrichAssetArgs) error {
 	result, err := runAssetEnrichment(
 		ctx,
 		runtime.processor,
@@ -436,7 +436,7 @@ func (runtime *pipelineRuntime) enrich(ctx context.Context, qos workqos.Class, a
 	})
 }
 
-func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos workqos.Class, args jobs.ScanRepositoryBatchArgs) (bool, error) {
+func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos qos.Class, args jobs.ScanRepositoryBatchArgs) (bool, error) {
 	more, err := runRepositoryScanBatch(ctx, runtime.scanner, runtime.engine, runtime.demand, qos, args)
 	if err != nil || more || runtime.recovery == nil {
 		return more, err
@@ -450,7 +450,7 @@ func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos workqos.
 	return false, nil
 }
 
-func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, qos workqos.Class, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {
+func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, qos qos.Class, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {
 	var result queue.ProjectionExecution
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {

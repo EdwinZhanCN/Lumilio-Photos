@@ -11,8 +11,8 @@ verification_status: "verified-with-todo"
 
 <!--
 code-evidence:
-- server/internal/db/backup/restore.go
-- server/internal/db/migration.go
+- server/internal/catalog/backup/restore.go
+- server/internal/catalog/migration.go
 - server/internal/api/handler/capabilities_handler.go
 - lumen.lock.json
 -->

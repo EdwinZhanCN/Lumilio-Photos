@@ -25,7 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
 	"server/internal/storage/scan"
 )
 
@@ -101,7 +101,7 @@ type blackboxOptions struct {
 	// seam the Desktop host uses; setting it also enables the native tasks.
 	repositoryControl func(RepositoryControl)
 	// catalogOpened receives the Server's catalog handle.
-	catalogOpened func(*db.DB)
+	catalogOpened func(*catalog.DB)
 }
 
 const (

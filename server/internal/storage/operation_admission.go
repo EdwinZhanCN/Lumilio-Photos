@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 var (

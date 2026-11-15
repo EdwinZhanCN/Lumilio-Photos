@@ -44,7 +44,7 @@ func packageApp(ctx context.Context, root string, args []string) error {
 		"GOFLAGS=-buildvcs=false "+goTags,
 		"LUMILIO_VERSION="+version,
 		// The Server and the Desktop report the same version as the bundle.
-		"MYGO_LDFLAGS=-X server/internal/version.Version="+version+" -X desktop/internal/buildinfo.Version="+version,
+		"MYGO_LDFLAGS=-X server/internal/foundation/version.Version="+version+" -X desktop/internal/buildinfo.Version="+version,
 	)
 	if len(stage.cgoLDFlags) > 0 {
 		env = append(env, "CGO_LDFLAGS="+strings.Join(stage.cgoLDFlags, " "))

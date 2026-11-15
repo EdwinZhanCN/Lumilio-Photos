@@ -1,7 +1,7 @@
 version: "2"
 sql:
     - engine: "sqlite"
-      queries: "internal/db/repo/queries"
+      queries: "internal/catalog/repo/queries"
       # sqlc parses the single standalone catalog baseline. The baseline is a
       # runtime asset, edited in place; there is no migration sequence.
       schema:
@@ -9,7 +9,7 @@ sql:
       gen:
           go:
               package: "repo"
-              out: "internal/db/repo"
+              out: "internal/catalog/repo"
               sql_package: "database/sql"
               emit_interface: true
               emit_json_tags: true
@@ -40,13 +40,13 @@ sql:
                   - column: "repository_entries.asset_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_entries.missing_since"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "repository_entries.trash_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_entries.trashed_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "repository_scans.not_before"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "repository_staging_commits.entry_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_staging_commits.asset_id"
@@ -188,65 +188,65 @@ sql:
 
                   # UTC Unix-microsecond INTEGER values.
                   - column: "*.created_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.updated_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.expires_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.upload_time"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.taken_time"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.deleted_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.last_login"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.last_sync"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.last_used_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.used_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.enabled_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.added_time"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.started_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.finished_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.detected_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.resolved_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.geocoded_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.geocode_next_attempt_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.queried_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.synced_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.prototype_built_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.hidden_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.revoked_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.last_viewed_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.last_accessed_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.cancel_requested_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.committed_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
                   - column: "*.last_successful_refresh_at"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Timestamp" }
 
                   # JSON TEXT and JSON-backed collections.
                   - column: "assets.specific_metadata"
-                    go_type: { import: "server/internal/db/dbtypes", type: "SpecificMetadata" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "SpecificMetadata" }
                   - column: "repositories.config"
                     go_type: { import: "server/internal/storage/repocfg", type: "RepositoryConfig" }
                   # The repository's measured volume name rule, typed so no
@@ -256,75 +256,75 @@ sql:
                   - column: "repositories.path_normalization"
                     go_type: { import: "server/internal/storage/pathsemantics", type: "Normalization" }
                   - column: "*.asset_ids"
-                    go_type: { import: "server/internal/db/dbtypes", type: "UUIDs" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "UUIDs" }
                   - column: "*.membership_snapshot"
-                    go_type: { import: "server/internal/db/dbtypes", type: "UUIDs" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "UUIDs" }
                   - column: "classifier_definitions.positive_prompts"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Strings" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Strings" }
                   - column: "classifier_definitions.negative_prompts"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Strings" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Strings" }
                   - column: "user_webauthn_credentials.transports"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Strings" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Strings" }
                   - column: "assets.status"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "assets.exif_raw"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "face_items.bounding_box"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "face_items.pose_angles"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "ocr_text_items.bounding_box"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "reverse_geocode_cache.raw_response"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_pins.plan"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "cloud_credentials.public_config"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "repository_cloud_bindings.remote_scope"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_threads.context_bindings"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_threads.mention_bindings"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_refs.plan"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_pending_effects.payload"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_pending_effects.target"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "agent_pending_effects.receipt"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "lifecycle_operations.payload"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON" }
                   - column: "lifecycle_operations.result"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON", pointer: true }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON", pointer: true }
                   - column: "lifecycle_operations.rollback_data"
-                    go_type: { import: "server/internal/db/dbtypes", type: "JSON", pointer: true }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "JSON", pointer: true }
 
                   # Authoritative vector BLOBs.
                   - column: "embeddings.vector"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Vector" }
                   - column: "search_embeddings.vector"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Vector" }
                   - column: "face_items.embedding"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Vector" }
                   - column: "classifier_definitions.positive_prototype"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Vector" }
                   - column: "classifier_definitions.negative_prototype"
-                    go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "Vector" }
 
                   # Preserve existing domain and API-width types.
                   - column: "repositories.reachability"
-                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryReachability" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "RepositoryReachability" }
                   - column: "repositories.activity"
-                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryActivity" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "RepositoryActivity" }
                   - column: "repositories.role"
-                    go_type: { import: "server/internal/db/dbtypes", type: "RepoRole" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "RepoRole" }
                   - column: "storage_locations.kind"
-                    go_type: { import: "server/internal/db/dbtypes", type: "StorageLocationKind" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "StorageLocationKind" }
                   - column: "storage_locations.status"
-                    go_type: { import: "server/internal/db/dbtypes", type: "StorageLocationStatus" }
+                    go_type: { import: "server/internal/catalog/dbtypes", type: "StorageLocationStatus" }
                   - column: "*.user_id"
                     go_type: "int32"
                   - column: "*.owner_id"

@@ -8,8 +8,8 @@ import (
 
 	"server/internal/agent/facets"
 	"server/internal/agent/ref"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
 	"server/internal/search"
 

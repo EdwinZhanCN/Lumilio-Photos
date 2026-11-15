@@ -16,8 +16,8 @@ flowchart LR
         n_in_service[/"Services"/]
     end
     subgraph n_g_Storage["Storage"]
-        n_server_internal_artifact["artifact"]
         n_server_internal_storage["storage"]
+        n_server_internal_storage_artifact["storage/artifact"]
         n_server_internal_storage_locations["storage/locations"]
         n_server_internal_storage_marker["storage/marker"]
         n_server_internal_storage_pathsemantics["storage/pathsemantics"]
@@ -39,10 +39,10 @@ flowchart LR
     n_in_ingest -.-> n_g_Storage
     n_in_runtime -.-> n_g_Storage
     n_in_service -.-> n_g_Storage
-    n_server_internal_artifact --> n_server_internal_storage
     n_server_internal_storage --> n_server_internal_storage_pathsemantics
     n_server_internal_storage --> n_server_internal_storage_repocfg
     n_server_internal_storage --> n_server_internal_storage_rootcfg
+    n_server_internal_storage_artifact --> n_server_internal_storage
     n_server_internal_storage_locations --> n_server_internal_storage
     n_server_internal_storage_recovery --> n_server_internal_storage_trash
     n_server_internal_storage_repocfg --> n_server_internal_storage_marker
@@ -67,8 +67,8 @@ flowchart LR
 | Ingest and execution |  | `group:ingest` |
 | Server runtime |  | `group:runtime` |
 | Services |  | `group:service` |
-| artifact | Package artifact owns the one immutable publication contract for derived pipeline files inside a registered repository. | `mod:server/internal/artifact` [`server/internal/artifact/doc.go`](../../../../server/internal/artifact/doc.go) |
 | storage | Package storage owns Lumilio's on-disk media layout and the lifecycle of repositories. | `mod:server/internal/storage` [`server/internal/storage/doc.go`](../../../../server/internal/storage/doc.go) |
+| storage/artifact | Package artifact owns the one immutable publication contract for derived pipeline files inside a registered repository. | `mod:server/internal/storage/artifact` [`server/internal/storage/artifact/doc.go`](../../../../server/internal/storage/artifact/doc.go) |
 | storage/locations | Package locations resolves logical Assets to a present physical file immediately before media I/O. It holds the RepositoryFS lifecycle lease for the lifetime of the returned capability and falls through unavailable copies without changing catalog state. | `mod:server/internal/storage/locations` [`server/internal/storage/locations/doc.go`](../../../../server/internal/storage/locations/doc.go) |
 | storage/marker | Package marker owns typed portable-marker readings and guarded atomic replacement. | `mod:server/internal/storage/marker` [`server/internal/storage/marker/doc.go`](../../../../server/internal/storage/marker/doc.go) |
 | storage/pathsemantics | Package pathsemantics turns filesystem-specific name comparison rules into durable repository name keys. | `mod:server/internal/storage/pathsemantics` [`server/internal/storage/pathsemantics/doc.go`](../../../../server/internal/storage/pathsemantics/doc.go) |

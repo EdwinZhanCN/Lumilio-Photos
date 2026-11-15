@@ -1,6 +1,6 @@
 /**
  * Pure upload file validation rules.
- * Matches backend validation logic from server/internal/utils/file/validator.go
+ * Matches backend validation logic from server/internal/media/file/validator.go
  */
 
 import {

@@ -53,10 +53,10 @@ sequenceDiagram
 | RepositoryScanHandler | `go:handler.RepositoryScanHandler` [`server/internal/api/handler/repository_scan_handler.go`](../../../../server/internal/api/handler/repository_scan_handler.go) |
 | Scanner | `go:scan.Scanner` [`server/internal/storage/scan/scanner.go`](../../../../server/internal/storage/scan/scanner.go) |
 | repository_scans / repository_entries | `sql:repository_entries` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Catalog scheduler | `go:queue.Scheduler` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
-| ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/queue/macro_boundary_workers.go`](../../../../server/internal/queue/macro_boundary_workers.go) |
+| Catalog scheduler | `go:queue.Scheduler` [`server/internal/ingest/queue/scheduler.go`](../../../../server/internal/ingest/queue/scheduler.go) |
+| ScanRepositoryBatchWorker | `go:queue.ScanRepositoryBatchWorker` [`server/internal/ingest/queue/macro_boundary_workers.go`](../../../../server/internal/ingest/queue/macro_boundary_workers.go) |
 | Repository files | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go`](../../../../server/internal/storage/repository_fs.go) |
-| ScanWriter (commit coordinator) | `go:commit.ScanWriter` [`server/internal/commit/scan_writer.go`](../../../../server/internal/commit/scan_writer.go) |
+| ScanWriter (commit coordinator) | `go:commit.ScanWriter` [`server/internal/ingest/commit/scan_writer.go`](../../../../server/internal/ingest/commit/scan_writer.go) |
 
 ## Steps
 
@@ -67,7 +67,7 @@ sequenceDiagram
 | 3 | watcher → scanner | _else filesystem events (batched, 10 s)_ — request a subtree scan, or a full scan above 512 events | `go:scan.Watcher.Run` [`server/internal/storage/scan/watcher.go`](../../../../server/internal/storage/scan/watcher.go) |
 | 4 | scanner → scanner | _else periodic timer (jittered)_ — RequestAllPeriodic | `go:scan.Scanner.RequestAllPeriodic` [`server/internal/storage/scan/commands.go`](../../../../server/internal/storage/scan/commands.go) |
 | 5 | scanner → catalog | insert or coalesce a queued scan |  |
-| 6 | scheduler → worker | one unique ScanRepositoryBatchArgs per repository | `go:jobs.ScanRepositoryBatchArgs` [`server/internal/queue/jobs/macro.go`](../../../../server/internal/queue/jobs/macro.go) |
+| 6 | scheduler → worker | one unique ScanRepositoryBatchArgs per repository | `go:jobs.ScanRepositoryBatchArgs` [`server/internal/work/jobs/macro.go`](../../../../server/internal/work/jobs/macro.go) |
 | 7 | worker → scanner | _loop walk turns, up to the delivery budget_ — RunTurn | `go:scan.Scanner.RunTurn` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
 | 8 | scanner → disk | _loop walk turns, up to the delivery budget_ — list one directory completely (sorted, stat cache); key names under the repository's own volume rule | `go:scan.walkTurn.processDirectory` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |
 | 9 | scanner → writer | _loop walk turns, up to the delivery budget_ — write only the diff — new, changed (pending_hash), restored, missing | `go:scan.walkTurn.flush` [`server/internal/storage/scan/walk.go`](../../../../server/internal/storage/scan/walk.go) |

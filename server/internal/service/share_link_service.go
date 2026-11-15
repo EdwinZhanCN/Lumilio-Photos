@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"server/internal/agent/pins"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/secretbox"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/secretbox"
 
 	"github.com/google/uuid"
 )

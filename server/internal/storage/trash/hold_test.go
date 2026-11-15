@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/repo"
 	"server/internal/lifecycle"
 )
 

@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
-	"server/internal/logging"
+	"server/internal/foundation/logging"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
