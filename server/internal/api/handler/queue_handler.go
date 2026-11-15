@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"server/internal/api"
-	"server/internal/db/catalogtx"
-	"server/internal/processing"
+	"server/internal/catalog/catalogtx"
+	"server/internal/work/processing"
 
 	"github.com/gin-gonic/gin"
 )

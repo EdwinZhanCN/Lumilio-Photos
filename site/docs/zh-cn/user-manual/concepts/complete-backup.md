@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/db/backup/backup.go
+- server/internal/catalog/backup/backup.go
 - server/internal/storage/directory_manager.go
 - server/internal/storage/doc.go
 - server/internal/api/handler/asset_media_handler.go

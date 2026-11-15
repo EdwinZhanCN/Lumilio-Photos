@@ -11,12 +11,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	fileutil "server/internal/media/file"
 	"server/internal/storage"
 	"server/internal/storage/pathsemantics"
-	fileutil "server/internal/utils/file"
 )
 
 // TrashedFile is one file the repository trash took, as its entry records it.

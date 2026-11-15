@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/golang-jwt/jwt/v5"
 )

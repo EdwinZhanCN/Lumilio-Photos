@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 )
 
 // Bootstrap phases. SQLite is already open and migrated when reconciliation

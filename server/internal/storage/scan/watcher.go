@@ -13,8 +13,8 @@ import (
 	"github.com/syncthing/notify"
 	"go.uber.org/zap"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 // Watcher turns filesystem events into scan requests. It is only a hint:

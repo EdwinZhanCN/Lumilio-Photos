@@ -350,7 +350,7 @@ func (a *Atlas) loadContracts() {
 		}
 	}
 	files, _ := filepath.Glob(filepath.Join(a.Root, "server/migrations/*.sql"))
-	queueFiles, _ := filepath.Glob(filepath.Join(a.Root, "server/internal/db/**/*.sql"))
+	queueFiles, _ := filepath.Glob(filepath.Join(a.Root, "server/internal/catalog/**/*.sql"))
 	for _, filename := range append(files, queueFiles...) {
 		data, err := os.ReadFile(filename)
 		if err != nil {

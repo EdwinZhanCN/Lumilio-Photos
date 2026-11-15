@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 )
 
 // forgetDelete returns the catalog to what a backup taken before the Delete

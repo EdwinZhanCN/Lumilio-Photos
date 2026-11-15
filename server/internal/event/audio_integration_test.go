@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
 	"server/internal/event"
-	"server/internal/testutil"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 )
@@ -24,14 +24,14 @@ type eventMediaFixture struct {
 	assetID, mediaID, repositoryID string
 }
 
-func audioEventCatalog(t *testing.T) (*db.DB, func(string, string, *int64, int64) eventMediaFixture) {
+func audioEventCatalog(t *testing.T) (*catalog.DB, func(string, string, *int64, int64) eventMediaFixture) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "events.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "events.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}

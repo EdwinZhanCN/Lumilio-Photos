@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/vectorindex"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/vectorindex"
 
 	"github.com/google/uuid"
 )

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 
 	"github.com/google/uuid"

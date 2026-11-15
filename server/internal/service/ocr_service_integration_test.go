@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 	"server/internal/search/bleveocr"
-	"server/internal/testutil"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -86,11 +86,11 @@ func (n *recordingOCRIndexNotifier) Count() int32 {
 	return n.count.Load()
 }
 
-func openOCRServiceTestDatabase(t *testing.T) (*db.DB, uuid.UUID) {
+func openOCRServiceTestDatabase(t *testing.T) (*catalog.DB, uuid.UUID) {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	database, err := db.Open(context.Background(), config.DatabaseConfig{
+	database, err := catalog.Open(context.Background(), config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func drainOCRWriter(t *testing.T, writer *bleveocr.Writer) {
 	require.Equal(t, 1, processed)
 }
 
-func ocrRevision(t *testing.T, database *db.DB, assetID uuid.UUID) int64 {
+func ocrRevision(t *testing.T, database *catalog.DB, assetID uuid.UUID) int64 {
 	t.Helper()
 	var revision int64
 	require.NoError(t, database.SQL.QueryRow(
@@ -150,7 +150,7 @@ func ocrRevision(t *testing.T, database *db.DB, assetID uuid.UUID) int64 {
 	return revision
 }
 
-func serviceOutboxCount(t *testing.T, database *db.DB) int {
+func serviceOutboxCount(t *testing.T, database *catalog.DB) int {
 	t.Helper()
 	var count int
 	require.NoError(t, database.SQL.QueryRow("SELECT count(*) FROM ocr_index_outbox").Scan(&count))

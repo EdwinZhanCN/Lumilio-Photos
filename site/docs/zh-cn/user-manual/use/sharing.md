@@ -15,7 +15,7 @@ code-evidence:
 - server/internal/api/router.go
 - server/internal/api/handler/share_link_handler.go
 - web/src/features/share
-- server/internal/db/repo/queries/share_links.sql
+- server/internal/catalog/repo/queries/share_links.sql
 -->
 
 # 创建与管理分享链接

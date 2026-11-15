@@ -12,8 +12,8 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/app/app.go
-- server/internal/db/migration.go
-- server/internal/db/backup/restore.go
+- server/internal/catalog/migration.go
+- server/internal/catalog/backup/restore.go
 - server/config
 -->
 

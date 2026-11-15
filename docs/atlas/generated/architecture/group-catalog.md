@@ -4,7 +4,7 @@
 
 _architecture · source: `derived: atlas.yaml group catalog + imports`_
 
-The embedded SQLite catalog and its QueueDB sibling: the single-writer runtime, named transactions, sqlc queries, the Vec1 vector index, migrations, and verified backups. The catalog is product truth.
+The embedded SQLite catalog and its QueueDB sibling: the single-writer runtime, named transactions, sqlc queries, the Vec1 vector index, SQLite file URIs, migrations, verified backups, and the driver conformance tests. The catalog is product truth.
 
 ```mermaid
 flowchart LR
@@ -19,13 +19,14 @@ flowchart LR
         n_in_work[/"Work contracts"/]
     end
     subgraph n_g_Catalog["Catalog"]
-        n_server_internal_db["db"]
-        n_server_internal_db_backup["db/backup"]
-        n_server_internal_db_catalogtx["db/catalogtx"]
-        n_server_internal_db_repo["db/repo"]
-        n_server_internal_db_sqlitespike["db/sqlitespike"]
-        n_server_internal_db_vec1ext["db/vec1ext"]
-        n_server_internal_db_vectorindex["db/vectorindex"]
+        n_server_internal_catalog["catalog"]
+        n_server_internal_catalog_backup["catalog/backup"]
+        n_server_internal_catalog_catalogtx["catalog/catalogtx"]
+        n_server_internal_catalog_conformance["catalog/conformance"]
+        n_server_internal_catalog_repo["catalog/repo"]
+        n_server_internal_catalog_sqliteuri["catalog/sqliteuri"]
+        n_server_internal_catalog_vec1ext["catalog/vec1ext"]
+        n_server_internal_catalog_vectorindex["catalog/vectorindex"]
         n_server_migrations["migrations"]
     end
     subgraph n_g_Depends_on["Depends on"]
@@ -41,14 +42,16 @@ flowchart LR
     n_in_service -.-> n_g_Catalog
     n_in_storage -.-> n_g_Catalog
     n_in_work -.-> n_g_Catalog
-    n_server_internal_db --> n_server_internal_db_repo
-    n_server_internal_db --> n_server_internal_db_vec1ext
-    n_server_internal_db --> n_server_internal_db_vectorindex
-    n_server_internal_db --> n_server_migrations
-    n_server_internal_db_backup --> n_server_internal_db
-    n_server_internal_db_repo --> n_server_internal_db_catalogtx
-    n_server_internal_db_sqlitespike --> n_server_internal_db_vec1ext
-    n_server_internal_db_vectorindex --> n_server_internal_db_catalogtx
+    n_server_internal_catalog --> n_server_internal_catalog_repo
+    n_server_internal_catalog --> n_server_internal_catalog_sqliteuri
+    n_server_internal_catalog --> n_server_internal_catalog_vec1ext
+    n_server_internal_catalog --> n_server_internal_catalog_vectorindex
+    n_server_internal_catalog --> n_server_migrations
+    n_server_internal_catalog_backup --> n_server_internal_catalog
+    n_server_internal_catalog_conformance --> n_server_internal_catalog_sqliteuri
+    n_server_internal_catalog_conformance --> n_server_internal_catalog_vec1ext
+    n_server_internal_catalog_repo --> n_server_internal_catalog_catalogtx
+    n_server_internal_catalog_vectorindex --> n_server_internal_catalog_catalogtx
     n_g_Catalog -.-> n_out_foundation
     n_g_Catalog -.-> n_out_media
     n_g_Catalog -.-> n_out_storage
@@ -68,13 +71,14 @@ flowchart LR
 | Services |  | `group:service` |
 | Storage |  | `group:storage` |
 | Work contracts |  | `group:work` |
-| db | Package db owns the catalog and queue SQLite runtimes. | `mod:server/internal/db` [`server/internal/db/doc.go`](../../../../server/internal/db/doc.go) |
-| db/backup | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | `mod:server/internal/db/backup` [`server/internal/db/backup/doc.go`](../../../../server/internal/db/backup/doc.go) |
-| db/catalogtx | Package catalogtx is the closed application transaction capability for the catalog. | `mod:server/internal/db/catalogtx` [`server/internal/db/catalogtx/doc.go`](../../../../server/internal/db/catalogtx/doc.go) |
-| db/repo | Package repo is the sqlc-generated query layer over the catalog baseline (server/migrations/000001_storage_baseline.up.sql), plus a few hand-written helpers for query plans and model extensions. | `mod:server/internal/db/repo` [`server/internal/db/repo/doc.go`](../../../../server/internal/db/repo/doc.go) |
-| db/sqlitespike | Package sqlitespike contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | `mod:server/internal/db/sqlitespike` [`server/internal/db/sqlitespike/doc.go`](../../../../server/internal/db/sqlitespike/doc.go) |
-| db/vec1ext | Package vec1ext statically registers the vendored SQLite Vec1 extension. | `mod:server/internal/db/vec1ext` [`server/internal/db/vec1ext/doc.go`](../../../../server/internal/db/vec1ext/doc.go) |
-| db/vectorindex | Package vectorindex owns the rebuildable Vec1 semantic index. | `mod:server/internal/db/vectorindex` [`server/internal/db/vectorindex/doc.go`](../../../../server/internal/db/vectorindex/doc.go) |
+| catalog | Package db owns the catalog and queue SQLite runtimes. | `mod:server/internal/catalog` [`server/internal/catalog/doc.go`](../../../../server/internal/catalog/doc.go) |
+| catalog/backup | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | `mod:server/internal/catalog/backup` [`server/internal/catalog/backup/doc.go`](../../../../server/internal/catalog/backup/doc.go) |
+| catalog/catalogtx | Package catalogtx is the closed application transaction capability for the catalog. | `mod:server/internal/catalog/catalogtx` [`server/internal/catalog/catalogtx/doc.go`](../../../../server/internal/catalog/catalogtx/doc.go) |
+| catalog/conformance | Package conformance contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | `mod:server/internal/catalog/conformance` [`server/internal/catalog/conformance/doc.go`](../../../../server/internal/catalog/conformance/doc.go) |
+| catalog/repo | Package repo is the sqlc-generated query layer over the catalog baseline (server/migrations/000001_storage_baseline.up.sql), plus a few hand-written helpers for query plans and model extensions. | `mod:server/internal/catalog/repo` [`server/internal/catalog/repo/doc.go`](../../../../server/internal/catalog/repo/doc.go) |
+| catalog/sqliteuri | Package sqliteuri builds cross-platform SQLite file URIs. | `mod:server/internal/catalog/sqliteuri` [`server/internal/catalog/sqliteuri/doc.go`](../../../../server/internal/catalog/sqliteuri/doc.go) |
+| catalog/vec1ext | Package vec1ext statically registers the vendored SQLite Vec1 extension. | `mod:server/internal/catalog/vec1ext` [`server/internal/catalog/vec1ext/doc.go`](../../../../server/internal/catalog/vec1ext/doc.go) |
+| catalog/vectorindex | Package vectorindex owns the rebuildable Vec1 semantic index. | `mod:server/internal/catalog/vectorindex` [`server/internal/catalog/vectorindex/doc.go`](../../../../server/internal/catalog/vectorindex/doc.go) |
 | migrations | Package migrations embeds the catalog baseline (000001_storage_baseline.up.sql, schema version 1, the v26.1.0-rc.1 compatibility baseline) and its numbered forward steps, so they apply without depending on the working directory — the Desktop bundle has no repository checkout and an unpredictable CWD. | `mod:server/migrations` [`server/migrations/doc.go`](../../../../server/migrations/doc.go) |
 | Foundation |  | `group:foundation` |
 | Media utilities |  | `group:media` |

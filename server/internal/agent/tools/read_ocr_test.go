@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 
 	"server/internal/agent/ref"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

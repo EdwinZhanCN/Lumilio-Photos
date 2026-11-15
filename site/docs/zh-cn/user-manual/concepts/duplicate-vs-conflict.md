@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/api/handler/asset_upload_handler.go
 - server/internal/service/duplicate_service.go
 - server/internal/storage/repocfg/repo_config.go
-- server/internal/sourcing/materializer.go
+- server/internal/ingest/sourcing/materializer.go
 -->
 
 # 内容重复与同名冲突

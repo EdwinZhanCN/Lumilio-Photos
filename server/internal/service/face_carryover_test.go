@@ -10,10 +10,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 )
 
 func TestFaceBoxIoU(t *testing.T) {
@@ -47,7 +47,7 @@ func createFaceItem(t *testing.T, ctx context.Context, queries *repo.Queries, as
 	return item
 }
 
-func faceMembership(t *testing.T, ctx context.Context, database *db.DB, faceID int32) (int32, bool, bool) {
+func faceMembership(t *testing.T, ctx context.Context, database *catalog.DB, faceID int32) (int32, bool, bool) {
 	t.Helper()
 	var clusterID int32
 	var manual bool

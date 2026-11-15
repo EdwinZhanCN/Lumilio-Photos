@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"server/internal/api"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/gin-gonic/gin"
 )

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	runtimesettings "server/internal/settings"
+	"server/internal/catalog"
+	runtimesettings "server/internal/foundation/settings"
 
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func TestSettingsServiceUpdatesFreshSQLiteCatalog(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "settings.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestSettingsServiceDoesNotReuseCredentialAcrossProviders(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -123,7 +123,7 @@ func TestSettingsServiceRejectsEnablingIncompleteAgentConfiguration(t *testing.T
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -153,7 +153,7 @@ func TestSettingsServiceClearsAgentFieldsWhenProviderIsUnset(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -197,7 +197,7 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))

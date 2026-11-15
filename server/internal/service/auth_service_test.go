@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"

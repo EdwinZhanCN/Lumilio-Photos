@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	aggregatesearch "server/internal/search"
 
 	"github.com/google/uuid"

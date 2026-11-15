@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
 )
 

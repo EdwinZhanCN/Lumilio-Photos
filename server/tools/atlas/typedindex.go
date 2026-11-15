@@ -240,7 +240,7 @@ func funcKey(fn *types.Func) string {
 }
 
 // typeKey names a type with full package paths and no type arguments:
-// "*database/sql.DB", "server/internal/execution.Resources".
+// "*database/sql.DB", "server/internal/work/execution.Resources".
 func typeKey(t types.Type) string {
 	switch typed := t.(type) {
 	case *types.Pointer:

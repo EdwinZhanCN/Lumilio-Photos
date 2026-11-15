@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"server/internal/settings"
+	"server/internal/foundation/settings"
 
 	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino-ext/components/model/claude"

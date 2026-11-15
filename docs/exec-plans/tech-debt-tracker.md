@@ -16,7 +16,7 @@ Last aligned with the codebase: 2026-09-23.
   Docker Desktop virtiofs/osxfs bind topologies are not this fixture.
 
 - **Music embedded covers are not materialized as thumbnails.** Owner:
-  `server/internal/processors/audio_helpers.go` and
+  `server/internal/ingest/processors/audio_helpers.go` and
   `web/src/features/music/components/MusicArtwork.tsx`. Bandcamp audio retains
   embedded artwork, but the audio pipeline does not generate image thumbnails;
   assigning an audio asset as album cover produces a 404. Demo albums use the

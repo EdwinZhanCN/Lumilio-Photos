@@ -27,7 +27,9 @@ configuration that boots and diagnoses cleanly.
 - `server/`: Go API and embedded SQLite runtime. `server/cmd/main.go` is the thin
   entry point; bootstrap lives in `server/app`, configuration in
   `server/config`, business logic in `server/internal`, and migrations in
-  `server/migrations`.
+  `server/migrations`. `server/internal` is layered, lowest first:
+  `foundation`, `media`, `catalog` (SQLite), `work`, the business packages,
+  `ingest`, and `api`.
 - `web/`: React 19 and TypeScript on Vite+. Feature code lives in
   `web/src/features`; shared runtime code belongs in `web/src/lib`,
   `web/src/components`, or `web/src/contexts`.

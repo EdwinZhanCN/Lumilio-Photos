@@ -21,7 +21,7 @@ and “Server contract” in [web/ARCHITECTURE.md](../../../web/ARCHITECTURE.md)
    annotation (`@Success ... {data=dto.X}`), and behavior together. Do not
    add frontend work against a stale type.
 2. SQL schema or queries changed? `task server:sqlc` (generated repo layer
-   lives under `server/internal/db/repo`). Until the `v26.1.0-rc.1` tag the
+   lives under `server/internal/catalog/repo`). Until the `v26.1.0-rc.1` tag the
    catalog baseline `server/migrations/000001_storage_baseline.up.sql` is
    edited in place. From the tag on it and every released step are frozen: a
    schema change is a new forward step in `server/migrations/steps/` plus a

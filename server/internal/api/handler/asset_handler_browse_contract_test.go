@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"

@@ -12,7 +12,7 @@ verification_status: "verified-with-todo"
 <!--
 code-evidence:
 - web/src/features/collections
-- server/internal/db/repo/queries/albums.sql
+- server/internal/catalog/repo/queries/albums.sql
 - server/internal/service/asset_service.go
 -->
 

@@ -42,7 +42,7 @@ nodes:
     note: The scheduler blocks on this channel between passes. Committed writes coalesce into one wake-up; the periodic tick is the recovery path.
   - id: catalogjobs
     label: Macro job catalog
-    anchor: mod:server/internal/queue/jobs
+    anchor: mod:server/internal/work/jobs
     note: The closed set of job kinds; payloads carry identities and fences only.
   - id: river
     label: River on QueueDB

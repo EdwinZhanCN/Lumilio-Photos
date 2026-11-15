@@ -13,9 +13,9 @@ verification_status: "verified"
 code-evidence:
 - web/src/features/manage
 - server/internal/api/handler/asset_upload_handler.go
-- server/internal/sourcing/materializer.go
+- server/internal/ingest/sourcing/materializer.go
 - server/internal/storage/roe/controller/controller.go
-- server/internal/cloud/icloud
+- server/internal/ingest/cloud/icloud
 -->
 
 # 导入第一批媒体

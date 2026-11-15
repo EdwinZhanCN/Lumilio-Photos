@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"server/internal/agent/ref"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 )

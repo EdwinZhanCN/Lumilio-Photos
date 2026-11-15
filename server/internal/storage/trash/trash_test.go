@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 func (f *fixture) setRating(assetID uuid.UUID, rating int) {

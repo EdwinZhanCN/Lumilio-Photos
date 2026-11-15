@@ -55,20 +55,20 @@ flowchart TB
 
 | Element | Description | Anchor |
 | --- | --- | --- |
-| Requests (upload, scan, retry, reindex) | Write desired state in the same transaction as the product change. | `go:pipeline.RequestAssetStagesTx` [`server/internal/pipeline/catalog.go`](../../../../server/internal/pipeline/catalog.go) |
+| Requests (upload, scan, retry, reindex) | Write desired state in the same transaction as the product change. | `go:pipeline.RequestAssetStagesTx` [`server/internal/work/pipeline/catalog.go`](../../../../server/internal/work/pipeline/catalog.go) |
 | asset_pipeline_state · desired_version | One row per Asset and stage (analyze, derivatives, transcode, enrich); work exists while desired_version > applied_version. | `sql:asset_pipeline_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | catalog_operation_receipts · pending | Durable ingest, reindex, and other operation receipts the browser can follow. | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | repository_scans · queued | Queued scans and pending_hash entries drive repository work. | `sql:repository_scans` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| Catalog scheduler | Bounded pass that derives work only from catalog state, never from River. | `go:queue.Scheduler` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
-| SchedulerWake | The scheduler blocks on this channel between passes. Committed writes coalesce into one wake-up; the periodic tick is the recovery path. | `go:queue.SchedulerWake` [`server/internal/queue/scheduler_wake.go`](../../../../server/internal/queue/scheduler_wake.go) |
-| Macro job catalog | The closed set of job kinds; payloads carry identities and fences only. | `mod:server/internal/queue/jobs` [`server/internal/queue/jobs/doc.go`](../../../../server/internal/queue/jobs/doc.go) |
+| Catalog scheduler | Bounded pass that derives work only from catalog state, never from River. | `go:queue.Scheduler` [`server/internal/ingest/queue/scheduler.go`](../../../../server/internal/ingest/queue/scheduler.go) |
+| SchedulerWake | The scheduler blocks on this channel between passes. Committed writes coalesce into one wake-up; the periodic tick is the recovery path. | `go:queue.SchedulerWake` [`server/internal/ingest/queue/scheduler_wake.go`](../../../../server/internal/ingest/queue/scheduler_wake.go) |
+| Macro job catalog | The closed set of job kinds; payloads carry identities and fences only. | `mod:server/internal/work/jobs` [`server/internal/work/jobs/doc.go`](../../../../server/internal/work/jobs/doc.go) |
 | River on QueueDB | Disposable delivery state with uniqueness over active deliveries. | `ext:River` |
-| Macro workers |  | `go:queue.AnalyzeAssetWorker` [`server/internal/queue/macro_asset_workers.go`](../../../../server/internal/queue/macro_asset_workers.go) |
-| Execution governor | Process-wide admission by QoS class (interactive, background, maintenance) against CPU, disk I/O, image and video codec, inference, and memory budgets. | `go:execution.Governor` [`server/internal/execution/governor.go`](../../../../server/internal/execution/governor.go) |
-| Processors | Read/compute only; publish derived files, never catalog rows. | `go:processors.AssetProcessor` [`server/internal/processors/asset_processor.go`](../../../../server/internal/processors/asset_processor.go) |
+| Macro workers |  | `go:queue.AnalyzeAssetWorker` [`server/internal/ingest/queue/macro_asset_workers.go`](../../../../server/internal/ingest/queue/macro_asset_workers.go) |
+| Execution governor | Process-wide admission by QoS class (interactive, background, maintenance) against CPU, disk I/O, image and video codec, inference, and memory budgets. | `go:execution.Governor` [`server/internal/work/execution/governor.go`](../../../../server/internal/work/execution/governor.go) |
+| Processors | Read/compute only; publish derived files, never catalog rows. | `go:processors.AssetProcessor` [`server/internal/ingest/processors/asset_processor.go`](../../../../server/internal/ingest/processors/asset_processor.go) |
 | Lumen Hub (optional ML) |  | `ext:Lumen Hub` |
 | Repository files and artifacts |  | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go`](../../../../server/internal/storage/repository_fs.go) |
-| Commit coordinator | Batches results into bounded writer transactions and checks fences. | `go:commit.Coordinator` [`server/internal/commit/coordinator.go`](../../../../server/internal/commit/coordinator.go) |
+| Commit coordinator | Batches results into bounded writer transactions and checks fences. | `go:commit.Coordinator` [`server/internal/ingest/commit/coordinator.go`](../../../../server/internal/ingest/commit/coordinator.go) |
 | asset_pipeline_state · applied_version | The same rows as desired state; applied_version catches up, or the result is stale and the work is derived again. | `sql:asset_pipeline_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | catalog_operation_receipts · terminal | What the browser's upload queue and the processing monitor wait for. | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 
@@ -77,8 +77,8 @@ flowchart TB
 | From → To | Label | Anchor |
 | --- | --- | --- |
 | scheduler → wake | waits on | `go:server/app.run` [`server/app/app.go`](../../../../server/app/app.go) |
-| catalogjobs → river | InsertMany (priority from QoS) | `go:queue.Scheduler.ScheduleOnce` [`server/internal/queue/scheduler.go`](../../../../server/internal/queue/scheduler.go) |
-| workers → governor | admit step | `go:execution.Engine.Run` [`server/internal/execution/governor.go`](../../../../server/internal/execution/governor.go) |
+| catalogjobs → river | InsertMany (priority from QoS) | `go:queue.Scheduler.ScheduleOnce` [`server/internal/ingest/queue/scheduler.go`](../../../../server/internal/ingest/queue/scheduler.go) |
+| workers → governor | admit step | `go:execution.Engine.Run` [`server/internal/work/execution/governor.go`](../../../../server/internal/work/execution/governor.go) |
 | processors → coordinator | immutable result + fence | `go:server/app.pipelineRuntime.analyze` [`server/app/pipeline_runtime.go`](../../../../server/app/pipeline_runtime.go) |
 
 ## The invariant

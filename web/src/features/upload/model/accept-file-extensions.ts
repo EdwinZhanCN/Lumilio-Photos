@@ -1,6 +1,6 @@
 /**
  * Pure upload format metadata based on backend definitions.
- * Reference: server/internal/utils/file/validator.go
+ * Reference: server/internal/media/file/validator.go
  */
 
 // Standard photo/image formats

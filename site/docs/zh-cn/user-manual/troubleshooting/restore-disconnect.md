@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/api/dto/backup_dto.go
-- server/internal/db/backup/restore.go
+- server/internal/catalog/backup/restore.go
 - server/app/app.go
 - web/src/features/settings
 -->

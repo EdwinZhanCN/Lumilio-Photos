@@ -7,8 +7,8 @@ import (
 	"math"
 	"testing"
 
-	"server/internal/db/dbtypes"
-	"server/internal/utils/imaging"
+	"server/internal/catalog/dbtypes"
+	"server/internal/media/imaging"
 
 	"github.com/davidbyttow/govips/v2/vips"
 )

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 )
@@ -112,13 +112,13 @@ func TestFaceRebuildReleasesWriterBeforeDerivedConvergence(t *testing.T) {
 	}
 }
 
-func openFaceClusteringDatabase(t *testing.T, ctx context.Context) *db.DB {
+func openFaceClusteringDatabase(t *testing.T, ctx context.Context) *catalog.DB {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(dir, "face-rebuild.sqlite3"),
 	})
 	if err != nil {
@@ -131,7 +131,7 @@ func openFaceClusteringDatabase(t *testing.T, ctx context.Context) *db.DB {
 	return database
 }
 
-func seedFaceClusteringRepository(t *testing.T, ctx context.Context, database *db.DB) uuid.UUID {
+func seedFaceClusteringRepository(t *testing.T, ctx context.Context, database *catalog.DB) uuid.UUID {
 	t.Helper()
 	storageLocationID := uuid.New()
 	repositoryID := uuid.New()

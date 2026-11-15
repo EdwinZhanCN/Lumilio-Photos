@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - desktop/internal/platform/paths.go
 - server/internal/storage/repo_reconnect.go
-- server/internal/db/backup/restore.go
+- server/internal/catalog/backup/restore.go
 - deploy/compose/compose.yml
 -->
 

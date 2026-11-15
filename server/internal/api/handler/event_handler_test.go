@@ -15,10 +15,10 @@ import (
 
 	"server/config"
 	"server/internal/api/dto"
-	"server/internal/db"
+	"server/internal/catalog"
 	"server/internal/event"
+	"server/internal/foundation/testutil"
 	"server/internal/service"
-	"server/internal/testutil"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,7 +30,7 @@ func TestEventHandlerListEventsProjectsToRepository(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "events.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "events.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -193,7 +193,7 @@ func TestEventHandlerPatchFencesInFlightProjection(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "events.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "events.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))

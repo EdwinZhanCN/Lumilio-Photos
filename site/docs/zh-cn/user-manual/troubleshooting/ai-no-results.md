@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/api/handler/capabilities_handler.go
-- server/internal/queue/jobs/types.go
+- server/internal/work/jobs/types.go
 - server/internal/service/face_service.go
 - server/internal/event
 -->

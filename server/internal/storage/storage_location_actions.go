@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 // StorageLocationAction is one command an administrator may run against a

@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 )
@@ -24,7 +24,7 @@ func TestEmbeddingRetrieverUsesVec1FiltersAndExactReranking(t *testing.T) {
 	if err := os.Chmod(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(directory, "search.sqlite3"),
 	})
 	if err != nil {

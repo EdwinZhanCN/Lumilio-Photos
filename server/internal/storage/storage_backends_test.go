@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
 )
 

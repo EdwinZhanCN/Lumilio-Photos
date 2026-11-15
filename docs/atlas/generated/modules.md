@@ -29,10 +29,10 @@ Uses: `foundation`, `media`, `catalog`, `work`, `domain`, `storage`, `agent`, `s
 | `server/internal/api` | Package api is the HTTP transport root. | [`server/internal/api/doc.go`](../../../server/internal/api/doc.go) |
 | `server/internal/api/dto` | Package dto defines the HTTP request and response shapes. | [`server/internal/api/dto/doc.go`](../../../server/internal/api/dto/doc.go) |
 | `server/internal/api/handler` | Package handler implements the HTTP controllers that server/internal/api.NewRouter mounts: one handler type per domain ([AssetHandler], [AuthHandler], [AlbumHandler], [StorageHandler], [SetupHandler], [AgentHandler], [MusicHandler], [CloudHandler], and others). | [`server/internal/api/handler/doc.go`](../../../server/internal/api/handler/doc.go) |
+| `server/internal/api/httporigin` | Package httporigin derives the request-facing browser origin, so operators never configure one canonical public URL. | [`server/internal/api/httporigin/doc.go`](../../../server/internal/api/httporigin/doc.go) |
 | `server/internal/api/problem` | Package problem is the closed RFC 9457 vocabulary of the API. | [`server/internal/api/problem/doc.go`](../../../server/internal/api/problem/doc.go) |
 | `server/internal/api/ratelimit` | Package ratelimit provides the bounded, in-memory fixed-window [Limiter] with lockout used for authentication endpoints. | [`server/internal/api/ratelimit/doc.go`](../../../server/internal/api/ratelimit/doc.go) |
-| `server/internal/httporigin` | Package httporigin derives the request-facing browser origin, so operators never configure one canonical public URL. | [`server/internal/httporigin/doc.go`](../../../server/internal/httporigin/doc.go) |
-| `server/internal/servertransport` | Package servertransport owns the HTTP/TLS listeners for one application runtime generation. | [`server/internal/servertransport/doc.go`](../../../server/internal/servertransport/doc.go) |
+| `server/internal/api/servertransport` | Package servertransport owns the HTTP/TLS listeners for one application runtime generation. | [`server/internal/api/servertransport/doc.go`](../../../server/internal/api/servertransport/doc.go) |
 
 ### Ingest and execution (`ingest`)
 
@@ -42,13 +42,13 @@ Uses: `foundation`, `media`, `catalog`, `work`, `domain`, `storage`, `service`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `server/internal/cloud` | Package cloud provides the cloud storage abstraction layer for importing remote assets into a local Lumilio repository (Cloud → Local sync). | [`server/internal/cloud/doc.go`](../../../server/internal/cloud/doc.go) |
-| `server/internal/cloud/icloud` | Package icloud is a native iCloud Photos client adapted from an open-source project (see LICENSE and README.md in this directory). | [`server/internal/cloud/icloud/doc.go`](../../../server/internal/cloud/icloud/doc.go) |
-| `server/internal/commit` | Package commit is the sole catalog-write capability for asynchronous work. | [`server/internal/commit/doc.go`](../../../server/internal/commit/doc.go) |
-| `server/internal/processors` | Package processors runs the read/compute stages of asset processing: ingest of a staged source, metadata extraction (exiftool and ffprobe), thumbnails and video frames, transcodes, and ML inputs. | [`server/internal/processors/doc.go`](../../../server/internal/processors/doc.go) |
-| `server/internal/queue` | Package queue adapts River to Lumilio's catalog-owned work model. | [`server/internal/queue/doc.go`](../../../server/internal/queue/doc.go) |
-| `server/internal/sourcing` | Package sourcing materializes staged uploads and cloud imports into a repository without losing them to a crash. | [`server/internal/sourcing/doc.go`](../../../server/internal/sourcing/doc.go) |
-| `server/internal/utils/upload` | Package upload implements the HTTP upload wire protocol for batch and chunked transfers. | [`server/internal/utils/upload/doc.go`](../../../server/internal/utils/upload/doc.go) |
+| `server/internal/ingest/cloud` | Package cloud provides the cloud storage abstraction layer for importing remote assets into a local Lumilio repository (Cloud → Local sync). | [`server/internal/ingest/cloud/doc.go`](../../../server/internal/ingest/cloud/doc.go) |
+| `server/internal/ingest/cloud/icloud` | Package icloud is a native iCloud Photos client adapted from an open-source project (see LICENSE and README.md in this directory). | [`server/internal/ingest/cloud/icloud/doc.go`](../../../server/internal/ingest/cloud/icloud/doc.go) |
+| `server/internal/ingest/commit` | Package commit is the sole catalog-write capability for asynchronous work. | [`server/internal/ingest/commit/doc.go`](../../../server/internal/ingest/commit/doc.go) |
+| `server/internal/ingest/processors` | Package processors runs the read/compute stages of asset processing: ingest of a staged source, metadata extraction (exiftool and ffprobe), thumbnails and video frames, transcodes, and ML inputs. | [`server/internal/ingest/processors/doc.go`](../../../server/internal/ingest/processors/doc.go) |
+| `server/internal/ingest/queue` | Package queue adapts River to Lumilio's catalog-owned work model. | [`server/internal/ingest/queue/doc.go`](../../../server/internal/ingest/queue/doc.go) |
+| `server/internal/ingest/sourcing` | Package sourcing materializes staged uploads and cloud imports into a repository without losing them to a crash. | [`server/internal/ingest/sourcing/doc.go`](../../../server/internal/ingest/sourcing/doc.go) |
+| `server/internal/ingest/upload` | Package upload implements the HTTP upload wire protocol for batch and chunked transfers. | [`server/internal/ingest/upload/doc.go`](../../../server/internal/ingest/upload/doc.go) |
 
 ### Services (`service`)
 
@@ -68,8 +68,8 @@ Uses: `foundation`, `media`, `catalog`, `domain`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `server/internal/artifact` | Package artifact owns the one immutable publication contract for derived pipeline files inside a registered repository. | [`server/internal/artifact/doc.go`](../../../server/internal/artifact/doc.go) |
 | `server/internal/storage` | Package storage owns Lumilio's on-disk media layout and the lifecycle of repositories. | [`server/internal/storage/doc.go`](../../../server/internal/storage/doc.go) |
+| `server/internal/storage/artifact` | Package artifact owns the one immutable publication contract for derived pipeline files inside a registered repository. | [`server/internal/storage/artifact/doc.go`](../../../server/internal/storage/artifact/doc.go) |
 | `server/internal/storage/locations` | Package locations resolves logical Assets to a present physical file immediately before media I/O. It holds the RepositoryFS lifecycle lease for the lifetime of the returned capability and falls through unavailable copies without changing catalog state. | [`server/internal/storage/locations/doc.go`](../../../server/internal/storage/locations/doc.go) |
 | `server/internal/storage/marker` | Package marker owns typed portable-marker readings and guarded atomic replacement. | [`server/internal/storage/marker/doc.go`](../../../server/internal/storage/marker/doc.go) |
 | `server/internal/storage/pathsemantics` | Package pathsemantics turns filesystem-specific name comparison rules into durable repository name keys. | [`server/internal/storage/pathsemantics/doc.go`](../../../server/internal/storage/pathsemantics/doc.go) |
@@ -112,69 +112,69 @@ Uses: `foundation`, `catalog`, `work`
 
 ### Work contracts (`work`)
 
-Catalog-owned asynchronous work vocabulary: desired/applied pipeline contracts, the closed River macro-job catalog, the process-wide execution governor, and the administrator processing read model.
+Catalog-owned asynchronous work vocabulary: desired/applied pipeline contracts, the closed River macro-job catalog, work QoS classes, the process-wide execution governor, and the administrator processing read model.
 
-Uses: `foundation`, `catalog`
+Uses: `catalog`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `server/internal/execution` | Package execution owns process-wide admission for fine-grained pipeline work. | [`server/internal/execution/doc.go`](../../../server/internal/execution/doc.go) |
-| `server/internal/pipeline` | Package pipeline defines catalog-owned asynchronous work contracts. | [`server/internal/pipeline/doc.go`](../../../server/internal/pipeline/doc.go) |
-| `server/internal/processing` | Package processing is the administrator read model for background work: one closed catalog of user-facing stages, each counted in one declared unit from Catalog desired/applied facts, with River contributing only the execution facts (running and retryable deliveries). | [`server/internal/processing/doc.go`](../../../server/internal/processing/doc.go) |
-| `server/internal/queue/jobs` | Package jobs is the closed River macro-job catalog. | [`server/internal/queue/jobs/doc.go`](../../../server/internal/queue/jobs/doc.go) |
+| `server/internal/work/execution` | Package execution owns process-wide admission for fine-grained pipeline work. | [`server/internal/work/execution/doc.go`](../../../server/internal/work/execution/doc.go) |
+| `server/internal/work/jobs` | Package jobs is the closed River macro-job catalog. | [`server/internal/work/jobs/doc.go`](../../../server/internal/work/jobs/doc.go) |
+| `server/internal/work/pipeline` | Package pipeline defines catalog-owned asynchronous work contracts. | [`server/internal/work/pipeline/doc.go`](../../../server/internal/work/pipeline/doc.go) |
+| `server/internal/work/processing` | Package processing is the administrator read model for background work: one closed catalog of user-facing stages, each counted in one declared unit from Catalog desired/applied facts, with River contributing only the execution facts (running and retryable deliveries). | [`server/internal/work/processing/doc.go`](../../../server/internal/work/processing/doc.go) |
+| `server/internal/work/qos` | Package qos defines the durable service class of catalog-owned work. | [`server/internal/work/qos/doc.go`](../../../server/internal/work/qos/doc.go) |
 
 ### Catalog (`catalog`)
 
-The embedded SQLite catalog and its QueueDB sibling: the single-writer runtime, named transactions, sqlc queries, the Vec1 vector index, migrations, and verified backups. The catalog is product truth.
+The embedded SQLite catalog and its QueueDB sibling: the single-writer runtime, named transactions, sqlc queries, the Vec1 vector index, SQLite file URIs, migrations, verified backups, and the driver conformance tests. The catalog is product truth.
 
 Uses: `foundation`, `media`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `server/internal/db` | Package db owns the catalog and queue SQLite runtimes. | [`server/internal/db/doc.go`](../../../server/internal/db/doc.go) |
-| `server/internal/db/backup` | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | [`server/internal/db/backup/doc.go`](../../../server/internal/db/backup/doc.go) |
-| `server/internal/db/catalogtx` | Package catalogtx is the closed application transaction capability for the catalog. | [`server/internal/db/catalogtx/doc.go`](../../../server/internal/db/catalogtx/doc.go) |
-| `server/internal/db/repo` | Package repo is the sqlc-generated query layer over the catalog baseline (server/migrations/000001_storage_baseline.up.sql), plus a few hand-written helpers for query plans and model extensions. | [`server/internal/db/repo/doc.go`](../../../server/internal/db/repo/doc.go) |
-| `server/internal/db/sqlitespike` | Package sqlitespike contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | [`server/internal/db/sqlitespike/doc.go`](../../../server/internal/db/sqlitespike/doc.go) |
-| `server/internal/db/vec1ext` | Package vec1ext statically registers the vendored SQLite Vec1 extension. | [`server/internal/db/vec1ext/doc.go`](../../../server/internal/db/vec1ext/doc.go) |
-| `server/internal/db/vectorindex` | Package vectorindex owns the rebuildable Vec1 semantic index. | [`server/internal/db/vectorindex/doc.go`](../../../server/internal/db/vectorindex/doc.go) |
+| `server/internal/catalog` | Package db owns the catalog and queue SQLite runtimes. | [`server/internal/catalog/doc.go`](../../../server/internal/catalog/doc.go) |
+| `server/internal/catalog/backup` | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | [`server/internal/catalog/backup/doc.go`](../../../server/internal/catalog/backup/doc.go) |
+| `server/internal/catalog/catalogtx` | Package catalogtx is the closed application transaction capability for the catalog. | [`server/internal/catalog/catalogtx/doc.go`](../../../server/internal/catalog/catalogtx/doc.go) |
+| `server/internal/catalog/conformance` | Package conformance contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | [`server/internal/catalog/conformance/doc.go`](../../../server/internal/catalog/conformance/doc.go) |
+| `server/internal/catalog/repo` | Package repo is the sqlc-generated query layer over the catalog baseline (server/migrations/000001_storage_baseline.up.sql), plus a few hand-written helpers for query plans and model extensions. | [`server/internal/catalog/repo/doc.go`](../../../server/internal/catalog/repo/doc.go) |
+| `server/internal/catalog/sqliteuri` | Package sqliteuri builds cross-platform SQLite file URIs. | [`server/internal/catalog/sqliteuri/doc.go`](../../../server/internal/catalog/sqliteuri/doc.go) |
+| `server/internal/catalog/vec1ext` | Package vec1ext statically registers the vendored SQLite Vec1 extension. | [`server/internal/catalog/vec1ext/doc.go`](../../../server/internal/catalog/vec1ext/doc.go) |
+| `server/internal/catalog/vectorindex` | Package vectorindex owns the rebuildable Vec1 semantic index. | [`server/internal/catalog/vectorindex/doc.go`](../../../server/internal/catalog/vectorindex/doc.go) |
 | `server/migrations` | Package migrations embeds the catalog baseline (000001_storage_baseline.up.sql, schema version 1, the v26.1.0-rc.1 compatibility baseline) and its numbered forward steps, so they apply without depending on the working directory — the Desktop bundle has no repository checkout and an unpredictable CWD. | [`server/migrations/doc.go`](../../../server/migrations/doc.go) |
 
 ### Media utilities (`media`)
 
-Stateless file and media mechanics: content hashing, EXIF extraction, libvips imaging, LibRaw decoding, perceptual hashes, geohash, and process helpers. Pure functions over bytes and paths; no catalog access.
+Stateless file and media mechanics: content hashing, EXIF extraction, libvips imaging, LibRaw decoding, perceptual hashes, and geohash. Pure functions over bytes and paths; no catalog access.
 
 Uses: `foundation`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `server/internal/utils/exif` | Package exif extracts photo, video, and audio metadata by streaming file bytes through an external exiftool process. | [`server/internal/utils/exif/doc.go`](../../../server/internal/utils/exif/doc.go) |
-| `server/internal/utils/file` | Package file classifies media files: it maps filenames and MIME types to a catalog Asset type ([DetermineAssetType], [DetermineAssetTypeWithFilename]), owns the supported-extension registry ([IsSupported], [GetSupportedExtensions]), and validates uploads ([ValidateFile]). | [`server/internal/utils/file/doc.go`](../../../server/internal/utils/file/doc.go) |
-| `server/internal/utils/geohash` | Package geohash encodes coordinates as geohash strings with [Encode]. | [`server/internal/utils/geohash/doc.go`](../../../server/internal/utils/geohash/doc.go) |
-| `server/internal/utils/hash` | Package hash computes content identity. | [`server/internal/utils/hash/doc.go`](../../../server/internal/utils/hash/doc.go) |
-| `server/internal/utils/imagesource` | Package imagesource turns a stored photo into the decodable image every consumer needs. | [`server/internal/utils/imagesource/doc.go`](../../../server/internal/utils/imagesource/doc.go) |
-| `server/internal/utils/imaging` | Package imaging is the libvips boundary. | [`server/internal/utils/imaging/doc.go`](../../../server/internal/utils/imaging/doc.go) |
-| `server/internal/utils/phash` | Package phash computes perceptual hashes for near-duplicate detection. | [`server/internal/utils/phash/doc.go`](../../../server/internal/utils/phash/doc.go) |
-| `server/internal/utils/raw` | Package raw is the CGo LibRaw boundary for camera RAW files. | [`server/internal/utils/raw/doc.go`](../../../server/internal/utils/raw/doc.go) |
+| `server/internal/media/exif` | Package exif extracts photo, video, and audio metadata by streaming file bytes through an external exiftool process. | [`server/internal/media/exif/doc.go`](../../../server/internal/media/exif/doc.go) |
+| `server/internal/media/file` | Package file classifies media files: it maps filenames and MIME types to a catalog Asset type ([DetermineAssetType], [DetermineAssetTypeWithFilename]), owns the supported-extension registry ([IsSupported], [GetSupportedExtensions]), and validates uploads ([ValidateFile]). | [`server/internal/media/file/doc.go`](../../../server/internal/media/file/doc.go) |
+| `server/internal/media/geohash` | Package geohash encodes coordinates as geohash strings with [Encode]. | [`server/internal/media/geohash/doc.go`](../../../server/internal/media/geohash/doc.go) |
+| `server/internal/media/hash` | Package hash computes content identity. | [`server/internal/media/hash/doc.go`](../../../server/internal/media/hash/doc.go) |
+| `server/internal/media/imagesource` | Package imagesource turns a stored photo into the decodable image every consumer needs. | [`server/internal/media/imagesource/doc.go`](../../../server/internal/media/imagesource/doc.go) |
+| `server/internal/media/imaging` | Package imaging is the libvips boundary. | [`server/internal/media/imaging/doc.go`](../../../server/internal/media/imaging/doc.go) |
+| `server/internal/media/phash` | Package phash computes perceptual hashes for near-duplicate detection. | [`server/internal/media/phash/doc.go`](../../../server/internal/media/phash/doc.go) |
+| `server/internal/media/raw` | Package raw is the CGo LibRaw boundary for camera RAW files. | [`server/internal/media/raw/doc.go`](../../../server/internal/media/raw/doc.go) |
 
 ### Foundation (`foundation`)
 
-Dependency-free primitives every layer may use: the strict TOML configuration loader, runtime-mutable settings types, logging, version, work QoS classes, catalog value types, secret sealing, and OS/SQLite platform helpers. Nothing here knows about Assets, repositories, or HTTP.
+Dependency-free primitives every layer may use: the strict TOML configuration loader, runtime-mutable settings types, logging, version, catalog value types, secret sealing, memory and process helpers, and the owner-only filesystem policy. Nothing here knows about Assets, repositories, or HTTP.
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
 | `server/config` | Package config is the strict runtime-immutable configuration boundary. | [`server/config/doc.go`](../../../server/config/doc.go) |
-| `server/internal/db/dbtypes` | Package dbtypes holds the value types the catalog persists in JSON and text columns: [AssetType], per-type metadata ([PhotoSpecificMetadata], [VideoSpecificMetadata], [AudioSpecificMetadata]), ML result payloads (faces, OCR, classification), [StackKind], vectors, and nullable collection types. | [`server/internal/db/dbtypes/doc.go`](../../../server/internal/db/dbtypes/doc.go) |
-| `server/internal/logging` | Package logging builds the process logger. | [`server/internal/logging/doc.go`](../../../server/internal/logging/doc.go) |
-| `server/internal/secretbox` | Package secretbox seals small application secrets (cloud credentials and encrypted settings values) with AES keys derived per scope from one root secret. | [`server/internal/secretbox/doc.go`](../../../server/internal/secretbox/doc.go) |
-| `server/internal/settings` | Package settings defines the runtime-mutable settings domain: typed values whose single source of truth is the catalog settings row, changed through the Settings and Setup APIs, never through TOML. | [`server/internal/settings/doc.go`](../../../server/internal/settings/doc.go) |
-| `server/internal/testutil` | Package testutil seeds catalog fixtures for tests. | [`server/internal/testutil/doc.go`](../../../server/internal/testutil/doc.go) |
-| `server/internal/utils/memory` | Package memory adapts upload behaviour to host memory. | [`server/internal/utils/memory/doc.go`](../../../server/internal/utils/memory/doc.go) |
-| `server/internal/utils/sysproc` | Package sysproc holds process-spawning helpers shared by media tools. | [`server/internal/utils/sysproc/doc.go`](../../../server/internal/utils/sysproc/doc.go) |
-| `server/internal/version` | Package version carries the product version stamped at build time: | [`server/internal/version/doc.go`](../../../server/internal/version/doc.go) |
-| `server/internal/workqos` | Package workqos defines the durable service class of catalog-owned work. | [`server/internal/workqos/doc.go`](../../../server/internal/workqos/doc.go) |
-| `server/platform/fsprivacy` | Package fsprivacy applies owner-only filesystem access policies using the native mechanism of the host operating system. | [`server/platform/fsprivacy/doc.go`](../../../server/platform/fsprivacy/doc.go) |
-| `server/platform/sqliteuri` | Package sqliteuri builds cross-platform SQLite file URIs. | [`server/platform/sqliteuri/doc.go`](../../../server/platform/sqliteuri/doc.go) |
+| `server/internal/catalog/dbtypes` | Package dbtypes holds the value types the catalog persists in JSON and text columns: [AssetType], per-type metadata ([PhotoSpecificMetadata], [VideoSpecificMetadata], [AudioSpecificMetadata]), ML result payloads (faces, OCR, classification), [StackKind], vectors, and nullable collection types. | [`server/internal/catalog/dbtypes/doc.go`](../../../server/internal/catalog/dbtypes/doc.go) |
+| `server/internal/foundation/fsprivacy` | Package fsprivacy applies owner-only filesystem access policies using the native mechanism of the host operating system. | [`server/internal/foundation/fsprivacy/doc.go`](../../../server/internal/foundation/fsprivacy/doc.go) |
+| `server/internal/foundation/logging` | Package logging builds the process logger. | [`server/internal/foundation/logging/doc.go`](../../../server/internal/foundation/logging/doc.go) |
+| `server/internal/foundation/memory` | Package memory adapts upload behaviour to host memory. | [`server/internal/foundation/memory/doc.go`](../../../server/internal/foundation/memory/doc.go) |
+| `server/internal/foundation/secretbox` | Package secretbox seals small application secrets (cloud credentials and encrypted settings values) with AES keys derived per scope from one root secret. | [`server/internal/foundation/secretbox/doc.go`](../../../server/internal/foundation/secretbox/doc.go) |
+| `server/internal/foundation/settings` | Package settings defines the runtime-mutable settings domain: typed values whose single source of truth is the catalog settings row, changed through the Settings and Setup APIs, never through TOML. | [`server/internal/foundation/settings/doc.go`](../../../server/internal/foundation/settings/doc.go) |
+| `server/internal/foundation/sysproc` | Package sysproc holds process-spawning helpers shared by media tools. | [`server/internal/foundation/sysproc/doc.go`](../../../server/internal/foundation/sysproc/doc.go) |
+| `server/internal/foundation/testutil` | Package testutil seeds catalog fixtures for tests. | [`server/internal/foundation/testutil/doc.go`](../../../server/internal/foundation/testutil/doc.go) |
+| `server/internal/foundation/version` | Package version carries the product version stamped at build time: | [`server/internal/foundation/version/doc.go`](../../../server/internal/foundation/version/doc.go) |
 
 ## Desktop
 

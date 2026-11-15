@@ -93,9 +93,9 @@ tasks:
         -race
         -shuffle=on
         -count=3
-        ./internal/cloud
-        ./internal/commit
-        ./internal/servertransport
+        ./internal/ingest/cloud
+        ./internal/ingest/commit
+        ./internal/api/servertransport
         ./internal/storage
 
   dev:
@@ -130,6 +130,6 @@ tasks:
       - go run ./tools/configgen
 
   sqlc:
-    desc: Regenerate SQL code from the queries in internal/db/repo/queries
+    desc: Regenerate SQL code from the queries in internal/catalog/repo/queries
     cmds:
       - sqlc generate

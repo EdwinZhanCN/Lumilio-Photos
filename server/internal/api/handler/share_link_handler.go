@@ -12,8 +12,8 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage"
 	roelocations "server/internal/storage/locations"

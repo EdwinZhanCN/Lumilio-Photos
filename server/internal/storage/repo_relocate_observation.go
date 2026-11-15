@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 )
 
 type catalogSQLExec interface {

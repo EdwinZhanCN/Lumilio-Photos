@@ -24,7 +24,7 @@ func TestProductionCatalogWiring(t *testing.T) {
 		snippet string
 	}{
 		{name: "River executor on queue writer and listener on queue readers", snippet: "queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers"},
-		{name: "Catalog commit scheduling wake", snippet: "db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))"},
+		{name: "Catalog commit scheduling wake", snippet: "catalog.Open(ctx, dbConfig, catalog.WithTransactionObserver(catalogScheduleWake))"},
 		{name: "Catalog-derived scheduler", snippet: "queue.NewScheduler(database.Reader, database.Writer, queueClient"},
 		{name: "Catalog scheduler wake consumption", snippet: "catalogScheduleWake.Signals()"},
 		{name: "writer wait and WAL monitor", snippet: "monitorSQLiteWriter(\n\t\tctx,\n\t\tdatabase"},

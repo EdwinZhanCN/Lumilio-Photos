@@ -9,7 +9,7 @@ A schema change is a new step:
 
 1. Add `NNNN_<name>.sql` here, where `NNNN` is the version the step produces
    (`0002` is the first). Versions run 2..`SchemaVersion` with no gaps.
-2. Bump `SchemaVersion` in `server/internal/db/migration.go` to `NNNN`.
+2. Bump `SchemaVersion` in `server/internal/catalog/migration.go` to `NNNN`.
 3. Do not set `PRAGMA user_version`: the runner stamps it in the same
    transaction as the step. `PRAGMA foreign_keys` cannot change inside a
    transaction, so a table rebuild must keep foreign keys valid on its own.

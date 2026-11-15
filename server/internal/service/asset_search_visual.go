@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"server/internal/media/imagesource"
 	aggregatesearch "server/internal/search"
-	"server/internal/utils/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"

@@ -14,12 +14,12 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/foundation/testutil"
+	"server/internal/media/imagesource"
+	"server/internal/media/imaging"
 	aggregatesearch "server/internal/search"
-	"server/internal/testutil"
-	"server/internal/utils/imagesource"
-	"server/internal/utils/imaging"
 
 	"github.com/google/uuid"
 )
@@ -204,14 +204,14 @@ func browsePrimaryIDs(result SearchBrowseResult) []uuid.UUID {
 	return ids
 }
 
-func openVisualSearchCatalog(t *testing.T) *db.DB {
+func openVisualSearchCatalog(t *testing.T) *catalog.DB {
 	t.Helper()
 	ctx := context.Background()
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(directory, "visual-search.sqlite3"),
 	})
 	if err != nil {

@@ -8,14 +8,14 @@ import (
 
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
-	"server/internal/commit"
-	"server/internal/pipeline"
-	"server/internal/queue/jobs"
-	"server/internal/workqos"
+	"server/internal/ingest/commit"
+	"server/internal/work/jobs"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 )
 
-func guardAssetExecution[T any](runtime *pipelineRuntime, execute func(context.Context, workqos.Class, T) error) func(context.Context, workqos.Class, T) error {
-	return func(ctx context.Context, qos workqos.Class, args T) error {
+func guardAssetExecution[T any](runtime *pipelineRuntime, execute func(context.Context, qos.Class, T) error) func(context.Context, qos.Class, T) error {
+	return func(ctx context.Context, qos qos.Class, args T) error {
 		identity, err := assetExecutionIdentity(args)
 		if err != nil {
 			return err

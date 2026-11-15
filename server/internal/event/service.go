@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"server/internal/db/catalogtx"
-	"server/internal/pipeline"
+	"server/internal/catalog/catalogtx"
+	"server/internal/work/pipeline"
 )
 
 var (

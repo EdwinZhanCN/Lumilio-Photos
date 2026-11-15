@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/api/handler/asset_media_handler.go
 - server/internal/storage/directory_manager.go
 - web/src/features/studio
-- server/internal/utils/imaging/process.go
+- server/internal/media/imaging/process.go
 -->
 
 # 工作室与非破坏性编辑

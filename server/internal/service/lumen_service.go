@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"server/config"
-	"server/internal/utils/imagesource"
+	"server/internal/media/imagesource"
 )
 
 // PoolStats mirrors client.PoolStats so callers don't need the SDK import.

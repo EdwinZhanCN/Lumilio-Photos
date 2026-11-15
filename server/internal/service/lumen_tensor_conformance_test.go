@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"server/internal/utils/imagesource"
+	"server/internal/media/imagesource"
 )
 
 // Opt-in end-to-end conformance check for the Photos tensor fast path.

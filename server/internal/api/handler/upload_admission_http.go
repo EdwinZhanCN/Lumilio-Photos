@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"server/internal/api"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"

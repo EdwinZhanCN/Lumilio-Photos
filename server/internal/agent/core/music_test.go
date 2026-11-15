@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/stretchr/testify/require"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 	"testing"
 )
 

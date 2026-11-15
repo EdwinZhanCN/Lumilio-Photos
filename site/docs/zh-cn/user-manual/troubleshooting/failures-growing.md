@@ -11,8 +11,8 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/queue
-- server/internal/logging
+- server/internal/ingest/queue
+- server/internal/foundation/logging
 - server/internal/api/handler/capabilities_handler.go
 - web/src/features/monitor
 -->

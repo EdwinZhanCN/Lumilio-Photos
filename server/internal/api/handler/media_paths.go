@@ -16,11 +16,11 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/problem"
-	"server/internal/artifact"
-	"server/internal/db/repo"
-	"server/internal/pipeline"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 	"server/internal/storage/locations"
+	"server/internal/work/pipeline"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

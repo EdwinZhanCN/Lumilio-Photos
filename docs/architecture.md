@@ -74,7 +74,7 @@ invariant with no enforcement.
 - **No work inside write transactions.** Filesystem, media, network, hashing,
   and unbounded CPU work happen before a transaction begins. Writer
   transactions are named, bounded, and admitted through
-  `internal/db/catalogtx` (the Atlas `catalog-transactions` rule rejects raw
+  `internal/catalog/catalogtx` (the Atlas `catalog-transactions` rule rejects raw
   ones; `tx-purity` rejects slow work inside them).
 - **Background results have one writer.** Workers compute; the commit
   coordinator alone applies their results and checks each result's fence.

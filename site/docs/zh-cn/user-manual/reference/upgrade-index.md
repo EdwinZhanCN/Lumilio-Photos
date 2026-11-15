@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/app/app.go
-- server/internal/db/backup/restore.go
+- server/internal/catalog/backup/restore.go
 - desktop/internal/update
 - deploy/compose/compose.yml
 -->

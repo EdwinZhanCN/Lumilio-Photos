@@ -12,10 +12,10 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/db/catalogtx"
+	"server/internal/catalog/catalogtx"
 	"server/internal/event"
-	"server/internal/pipeline"
 	"server/internal/service"
+	"server/internal/work/pipeline"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

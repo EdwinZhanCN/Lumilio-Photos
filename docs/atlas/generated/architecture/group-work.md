@@ -4,7 +4,7 @@
 
 _architecture · source: `derived: atlas.yaml group work + imports`_
 
-Catalog-owned asynchronous work vocabulary: desired/applied pipeline contracts, the closed River macro-job catalog, the process-wide execution governor, and the administrator processing read model.
+Catalog-owned asynchronous work vocabulary: desired/applied pipeline contracts, the closed River macro-job catalog, work QoS classes, the process-wide execution governor, and the administrator processing read model.
 
 ```mermaid
 flowchart LR
@@ -16,26 +16,27 @@ flowchart LR
         n_in_service[/"Services"/]
     end
     subgraph n_g_Work_contracts["Work contracts"]
-        n_server_internal_execution["execution"]
-        n_server_internal_pipeline["pipeline"]
-        n_server_internal_processing["processing"]
-        n_server_internal_queue_jobs["queue/jobs"]
+        n_server_internal_work_execution["work/execution"]
+        n_server_internal_work_jobs["work/jobs"]
+        n_server_internal_work_pipeline["work/pipeline"]
+        n_server_internal_work_processing["work/processing"]
+        n_server_internal_work_qos["work/qos"]
     end
     subgraph n_g_Depends_on["Depends on"]
         n_out_catalog[/"Catalog"/]
-        n_out_foundation[/"Foundation"/]
     end
     n_in_domain -.-> n_g_Work_contracts
     n_in_http -.-> n_g_Work_contracts
     n_in_ingest -.-> n_g_Work_contracts
     n_in_runtime -.-> n_g_Work_contracts
     n_in_service -.-> n_g_Work_contracts
-    n_server_internal_processing --> n_server_internal_pipeline
-    n_server_internal_processing --> n_server_internal_queue_jobs
+    n_server_internal_work_execution --> n_server_internal_work_qos
+    n_server_internal_work_pipeline --> n_server_internal_work_qos
+    n_server_internal_work_processing --> n_server_internal_work_jobs
+    n_server_internal_work_processing --> n_server_internal_work_pipeline
     n_g_Work_contracts -.-> n_out_catalog
-    n_g_Work_contracts -.-> n_out_foundation
     classDef external stroke-dasharray:4 3
-    class n_in_domain,n_in_http,n_in_ingest,n_in_runtime,n_in_service,n_out_catalog,n_out_foundation external
+    class n_in_domain,n_in_http,n_in_ingest,n_in_runtime,n_in_service,n_out_catalog external
 ```
 
 ## Elements
@@ -47,9 +48,9 @@ flowchart LR
 | Ingest and execution |  | `group:ingest` |
 | Server runtime |  | `group:runtime` |
 | Services |  | `group:service` |
-| execution | Package execution owns process-wide admission for fine-grained pipeline work. | `mod:server/internal/execution` [`server/internal/execution/doc.go`](../../../../server/internal/execution/doc.go) |
-| pipeline | Package pipeline defines catalog-owned asynchronous work contracts. | `mod:server/internal/pipeline` [`server/internal/pipeline/doc.go`](../../../../server/internal/pipeline/doc.go) |
-| processing | Package processing is the administrator read model for background work: one closed catalog of user-facing stages, each counted in one declared unit from Catalog desired/applied facts, with River contributing only the execution facts (running and retryable deliveries). | `mod:server/internal/processing` [`server/internal/processing/doc.go`](../../../../server/internal/processing/doc.go) |
-| queue/jobs | Package jobs is the closed River macro-job catalog. | `mod:server/internal/queue/jobs` [`server/internal/queue/jobs/doc.go`](../../../../server/internal/queue/jobs/doc.go) |
+| work/execution | Package execution owns process-wide admission for fine-grained pipeline work. | `mod:server/internal/work/execution` [`server/internal/work/execution/doc.go`](../../../../server/internal/work/execution/doc.go) |
+| work/jobs | Package jobs is the closed River macro-job catalog. | `mod:server/internal/work/jobs` [`server/internal/work/jobs/doc.go`](../../../../server/internal/work/jobs/doc.go) |
+| work/pipeline | Package pipeline defines catalog-owned asynchronous work contracts. | `mod:server/internal/work/pipeline` [`server/internal/work/pipeline/doc.go`](../../../../server/internal/work/pipeline/doc.go) |
+| work/processing | Package processing is the administrator read model for background work: one closed catalog of user-facing stages, each counted in one declared unit from Catalog desired/applied facts, with River contributing only the execution facts (running and retryable deliveries). | `mod:server/internal/work/processing` [`server/internal/work/processing/doc.go`](../../../../server/internal/work/processing/doc.go) |
+| work/qos | Package qos defines the durable service class of catalog-owned work. | `mod:server/internal/work/qos` [`server/internal/work/qos/doc.go`](../../../../server/internal/work/qos/doc.go) |
 | Catalog |  | `group:catalog` |
-| Foundation |  | `group:foundation` |

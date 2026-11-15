@@ -14,7 +14,7 @@ code-evidence:
 - !.github/ISSUE_TEMPLATE
 - !SECURITY.md
 - CONTRIBUTING.md
-- server/internal/logging/logger.go
+- server/internal/foundation/logging/logger.go
 -->
 
 # 获得帮助与提交 Issue

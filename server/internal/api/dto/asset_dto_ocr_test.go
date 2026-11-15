@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -78,12 +78,12 @@ func ocrTextContents(items []AssetOCRTextItemDTO) []string {
 	return contents
 }
 
-func openAssetDetailOCRTestCatalog(t *testing.T) (*db.DB, uuid.UUID) {
+func openAssetDetailOCRTestCatalog(t *testing.T) (*catalog.DB, uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)

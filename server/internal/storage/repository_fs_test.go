@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/media/hash"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
-	"server/internal/utils/hash"
 
 	"github.com/google/uuid"
 )
@@ -251,7 +251,7 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	if err := os.Chmod(catalogDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}

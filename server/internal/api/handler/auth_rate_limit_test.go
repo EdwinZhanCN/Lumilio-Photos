@@ -10,8 +10,8 @@ import (
 
 	"server/config"
 	"server/internal/api"
+	"server/internal/api/httporigin"
 	"server/internal/api/problem"
-	"server/internal/httporigin"
 
 	"github.com/gin-gonic/gin"
 )

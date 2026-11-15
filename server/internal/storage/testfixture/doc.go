@@ -1,5 +1,5 @@
 // Package testfixture builds deterministic Storage Location and Repository
-// trees for tests. It follows the shared internal/testutil convention: only
+// trees for tests. It follows the shared internal/foundation/testutil convention: only
 // tests import it; production code must not depend on these builders.
 //
 // [NewLocation] and [Location.Repository] use the portable marker writers.

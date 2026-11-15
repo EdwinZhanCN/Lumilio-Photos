@@ -10,19 +10,19 @@ import (
 	"github.com/google/uuid"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 )
 
-func openPurgeTestDatabase(t *testing.T) (*db.DB, uuid.UUID, uuid.UUID) {
+func openPurgeTestDatabase(t *testing.T) (*catalog.DB, uuid.UUID, uuid.UUID) {
 	t.Helper()
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(context.Background(), config.DatabaseConfig{Path: filepath.Join(directory, "catalog.sqlite3")})
+	database, err := catalog.Open(context.Background(), config.DatabaseConfig{Path: filepath.Join(directory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,14 +44,14 @@ func openPurgeTestDatabase(t *testing.T) (*db.DB, uuid.UUID, uuid.UUID) {
 	return database, first, second
 }
 
-func exec(t *testing.T, database *db.DB, query string, args ...any) {
+func exec(t *testing.T, database *catalog.DB, query string, args ...any) {
 	t.Helper()
 	if _, err := database.SQL.Exec(query, args...); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func purge(t *testing.T, database *db.DB, entries ...uuid.UUID) PurgeResult {
+func purge(t *testing.T, database *catalog.DB, entries ...uuid.UUID) PurgeResult {
 	t.Helper()
 	var result PurgeResult
 	err := database.WithTx(context.Background(), catalogtx.OperationRepositoryRemove, func(tx *sql.Tx, _ *repo.Queries) error {
@@ -65,7 +65,7 @@ func purge(t *testing.T, database *db.DB, entries ...uuid.UUID) PurgeResult {
 	return result
 }
 
-func count(t *testing.T, database *db.DB, query string, args ...any) int {
+func count(t *testing.T, database *catalog.DB, query string, args ...any) int {
 	t.Helper()
 	var value int
 	if err := database.SQL.QueryRow(query, args...).Scan(&value); err != nil {

@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/service/lumen_service.go
-- server/internal/queue/jobs/types.go
+- server/internal/work/jobs/types.go
 - lumen.lock.json
 -->
 

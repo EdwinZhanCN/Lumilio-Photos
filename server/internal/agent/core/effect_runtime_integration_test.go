@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 )
@@ -20,7 +20,7 @@ func TestAgentBulkMembershipUsesSetBasedWriterStatements(t *testing.T) {
 	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "agent-bulk.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "agent-bulk.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}

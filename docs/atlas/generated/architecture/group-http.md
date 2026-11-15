@@ -15,10 +15,10 @@ flowchart LR
         n_server_internal_api["api"]
         n_server_internal_api_dto["api/dto"]
         n_server_internal_api_handler["api/handler"]
+        n_server_internal_api_httporigin["api/httporigin"]
         n_server_internal_api_problem["api/problem"]
         n_server_internal_api_ratelimit["api/ratelimit"]
-        n_server_internal_httporigin["httporigin"]
-        n_server_internal_servertransport["servertransport"]
+        n_server_internal_api_servertransport["api/servertransport"]
     end
     subgraph n_g_Depends_on["Depends on"]
         n_out_agent[/"Lumilio Agent"/]
@@ -32,8 +32,8 @@ flowchart LR
         n_out_work[/"Work contracts"/]
     end
     n_in_runtime -.-> n_g_HTTP_API
+    n_server_internal_api --> n_server_internal_api_httporigin
     n_server_internal_api --> n_server_internal_api_problem
-    n_server_internal_api --> n_server_internal_httporigin
     n_server_internal_api_dto --> n_server_internal_api_problem
     n_server_internal_api_handler --> n_server_internal_api
     n_server_internal_api_handler --> n_server_internal_api_dto
@@ -59,10 +59,10 @@ flowchart LR
 | api | Package api is the HTTP transport root. | `mod:server/internal/api` [`server/internal/api/doc.go`](../../../../server/internal/api/doc.go) |
 | api/dto | Package dto defines the HTTP request and response shapes. | `mod:server/internal/api/dto` [`server/internal/api/dto/doc.go`](../../../../server/internal/api/dto/doc.go) |
 | api/handler | Package handler implements the HTTP controllers that server/internal/api.NewRouter mounts: one handler type per domain ([AssetHandler], [AuthHandler], [AlbumHandler], [StorageHandler], [SetupHandler], [AgentHandler], [MusicHandler], [CloudHandler], and others). | `mod:server/internal/api/handler` [`server/internal/api/handler/doc.go`](../../../../server/internal/api/handler/doc.go) |
+| api/httporigin | Package httporigin derives the request-facing browser origin, so operators never configure one canonical public URL. | `mod:server/internal/api/httporigin` [`server/internal/api/httporigin/doc.go`](../../../../server/internal/api/httporigin/doc.go) |
 | api/problem | Package problem is the closed RFC 9457 vocabulary of the API. | `mod:server/internal/api/problem` [`server/internal/api/problem/doc.go`](../../../../server/internal/api/problem/doc.go) |
 | api/ratelimit | Package ratelimit provides the bounded, in-memory fixed-window [Limiter] with lockout used for authentication endpoints. | `mod:server/internal/api/ratelimit` [`server/internal/api/ratelimit/doc.go`](../../../../server/internal/api/ratelimit/doc.go) |
-| httporigin | Package httporigin derives the request-facing browser origin, so operators never configure one canonical public URL. | `mod:server/internal/httporigin` [`server/internal/httporigin/doc.go`](../../../../server/internal/httporigin/doc.go) |
-| servertransport | Package servertransport owns the HTTP/TLS listeners for one application runtime generation. | `mod:server/internal/servertransport` [`server/internal/servertransport/doc.go`](../../../../server/internal/servertransport/doc.go) |
+| api/servertransport | Package servertransport owns the HTTP/TLS listeners for one application runtime generation. | `mod:server/internal/api/servertransport` [`server/internal/api/servertransport/doc.go`](../../../../server/internal/api/servertransport/doc.go) |
 | Lumilio Agent |  | `group:agent` |
 | Catalog |  | `group:catalog` |
 | Domain semantics |  | `group:domain` |

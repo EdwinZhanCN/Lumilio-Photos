@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/internal/api/router.go
 - server/internal/storage/storage_assessment.go
-- server/internal/cloud/provider_registry.go
+- server/internal/ingest/cloud/provider_registry.go
 - server/internal/api/handler/backup_handler.go
 - server/internal/api/handler/share_link_handler.go
 - desktop/internal/update/controller.go

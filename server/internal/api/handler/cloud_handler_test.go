@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"server/internal/cloud"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
+	"server/internal/ingest/cloud"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"

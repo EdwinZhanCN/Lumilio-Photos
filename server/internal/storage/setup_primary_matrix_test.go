@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage"
 	"server/internal/storage/testfixture"
 
@@ -29,7 +29,7 @@ func freshCatalogManager(t *testing.T, location testfixture.Location) *storage.D
 	if err := os.Chmod(catalogDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
@@ -25,7 +25,7 @@ import (
 type fixture struct {
 	t        *testing.T
 	ctx      context.Context
-	database *db.DB
+	database *catalog.DB
 	files    *storage.RepositoryFSFactory
 	scanner  *scan.Scanner
 	trash    *Service
@@ -41,7 +41,7 @@ func newFixture(t *testing.T) *fixture {
 	if err := os.Chmod(databaseDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(databaseDirectory, "catalog.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(databaseDirectory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}

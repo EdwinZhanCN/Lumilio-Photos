@@ -49,13 +49,13 @@ nodes:
     note: The only composition root; owns startup and graceful shutdown.
   - id: catalog
     label: Catalog (SQLite + FTS5 + Vec1)
-    anchor: go:db.DB
+    anchor: go:catalog.DB
     shape: store
     group: App-private state
     note: Product truth. One writer, bounded query-only readers.
   - id: queue
     label: QueueDB (River)
-    anchor: go:db.QueueDB
+    anchor: go:catalog.QueueDB
     shape: store
     group: App-private state
     note: Disposable delivery state; may be recreated.

@@ -12,8 +12,8 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/doc.go
-- server/internal/sourcing
-- server/internal/db/backup
+- server/internal/ingest/sourcing
+- server/internal/catalog/backup
 - server/internal/agent
 -->
 

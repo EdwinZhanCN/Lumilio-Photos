@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/settings"
+	"server/internal/catalog"
+	"server/internal/foundation/settings"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/summarization"
@@ -503,7 +503,7 @@ func newLifecycleCheckpointStore(t *testing.T) *CheckpointStore {
 	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatalf("chmod test catalog: %v", err)
 	}
-	database, err := db.Open(context.Background(), config.DatabaseConfig{
+	database, err := catalog.Open(context.Background(), config.DatabaseConfig{
 		Path: filepath.Join(dir, "agent-lifecycle.sqlite3"),
 	})
 	if err != nil {

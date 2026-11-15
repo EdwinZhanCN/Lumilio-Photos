@@ -6,12 +6,12 @@ import (
 	"context"
 	"testing"
 
-	"server/internal/db/sqlitespike"
+	"server/internal/catalog/conformance"
 )
 
 func TestRepositoryCloudBindingsAllowMultipleScopedSources(t *testing.T) {
 	ctx := context.Background()
-	database, err := sqlitespike.Open(ctx, t.TempDir()+"/cloud-sources.sqlite3")
+	database, err := conformance.Open(ctx, t.TempDir()+"/cloud-sources.sqlite3")
 	if err != nil {
 		t.Fatal(err)
 	}

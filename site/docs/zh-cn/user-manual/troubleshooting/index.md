@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/internal/api/handler/health_handler.go
 - server/internal/api/handler/queue_handler.go
-- server/internal/logging
+- server/internal/foundation/logging
 - web/src/features/monitor
 -->
 
