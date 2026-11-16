@@ -70,6 +70,16 @@ function parseOptions(args: string[]): DemoOptions {
   return options;
 }
 
+/** A non-2xx API response, with the Problem body it returned. */
+class ApiError extends Error {
+  readonly payload: Record<string, unknown>;
+
+  constructor(message: string, payload: Record<string, unknown>) {
+    super(message);
+    this.payload = payload;
+  }
+}
+
 async function api<T = Record<string, unknown>>(
   pathname: string,
   { method = "GET", body, token, form }: ApiOptions = {},
@@ -86,7 +96,10 @@ async function api<T = Record<string, unknown>>(
   const response = await fetch(`${baseURL}${pathname}`, request);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`${method} ${pathname}: ${response.status} ${JSON.stringify(payload)}`);
+    throw new ApiError(
+      `${method} ${pathname}: ${response.status} ${JSON.stringify(payload)}`,
+      payload,
+    );
   }
   return payload as T;
 }
@@ -120,18 +133,32 @@ async function ensureRepository(token: string): Promise<Repository> {
   const status = await api<{ primary_repository_initialized: boolean }>("/api/v1/setup/status");
 
   if (!status.primary_repository_initialized) {
+    const createPrimary = (acknowledgement = {}) =>
+      api<CreateRepositoryResponse>("/api/v1/setup/primary-repository", {
+        method: "POST",
+        token,
+        body: JSON.stringify({
+          name: repositoryName,
+          storage_strategy: "date",
+          ...acknowledgement,
+        }),
+      });
     try {
-      const { repository } = await api<CreateRepositoryResponse>(
-        "/api/v1/setup/primary-repository",
-        {
-          method: "POST",
-          token,
-          body: JSON.stringify({
-            name: repositoryName,
-            storage_strategy: "date",
-          }),
-        },
-      );
+      let created: CreateRepositoryResponse;
+      try {
+        created = await createPrimary();
+      } catch (error) {
+        // A dev tree on an external or removable disk needs the reviewed
+        // risks acknowledged, as a developer would in the setup wizard.
+        const problem = error instanceof ApiError ? error.payload : {};
+        if (!String(problem.type).endsWith("/storage/confirmation-required")) throw error;
+        console.log(`Acknowledging storage risks for the demo: ${JSON.stringify(problem.risks)}`);
+        created = await createPrimary({
+          assessment_token: problem.assessment_token,
+          acknowledged_risks: problem.risks,
+        });
+      }
+      const { repository } = created;
       if (!repository?.id) throw new Error("primary repository creation returned no repository");
       return repository;
     } catch (error) {

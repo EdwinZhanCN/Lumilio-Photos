@@ -2,7 +2,7 @@
 
 Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #278).
 Phase 1 landed 2026-11-16 (RL1, #279). Phase 2 landed 2026-11-16 (RL2, #280).
-Next: Phase 3 (RL3). The layout below
+Phase 3 landed 2026-11-16 (RL3). Next: Phase 4 (RL4). The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
 "fix what is found" contract in [rc-release.md](rc-release.md).
 
@@ -339,6 +339,39 @@ Landed in RL2 (2026-11-16):
   changes.
 - Rebuild `.local/dev`, then re-seed the demo with `task web:demo:seed`.
   Nothing converts an existing tree.
+
+Landed in RL3 (2026-11-16):
+
+- `thumbnails` stores `artifact_fence`, `artifact_version`, and
+  `artifact_name` in place of `storage_path`. `face_items` stores
+  `crop_fence`, `crop_version`, and `crop_name` in place of
+  `face_image_path`, all set or all null. The table implies the stage
+  (`derivatives` or `faces`), so no row stores it; `artifact.ThumbnailIdentity`
+  and the stage constants rebuild the identity, and only `layout` turns it
+  into a path. `layout.ParseArtifact` had no caller left and is deleted.
+- The derivatives commit receives each thumbnail's full identity and rejects
+  one whose stage, fence, or pipeline version differs from the result it
+  belongs to. The ML loaders compare identities instead of path strings.
+- API: `AssetThumbnailDTO.storage_path` is dropped. `PersonSummaryDTO`
+  replaces `cover_face_image_path` with `has_cover`. The cover endpoint now
+  serves the cover face through the face crop lookup.
+- Found and fixed: a person's cover could pair one face's asset with another
+  face's crop path, and a representative face that was not a member of the
+  person still supplied the cover. The cover is now a member face with a
+  crop: the representative face if it qualifies, else the best one. A person
+  without one has no cover (`TestPersonCoverIsAMemberFaceWithACrop`).
+- Found and fixed: the asset detail's `thumbnails` relation never decoded,
+  because `AssetThumbnailDTO.thumbnail_id` was a string and the catalog
+  emits an integer, so the field was always absent
+  (`TestAssetDetailThumbnailsDecode`).
+- The demo seed now acknowledges the storage risks setup reports, such as
+  `removable_storage` for a checkout on an external disk, as a developer would
+  in the setup wizard; before, it stopped at the confirmation. `.local/dev`
+  was purged and re-seeded (301 imports); every thumbnail row is an identity
+  under `cache/artifacts/`.
+- Dead code removed with the columns: the `GetThumbnailByID`,
+  `GetThumbnailsByAsset`, and `GetAssetWithThumbnails` queries and the
+  unused `AssetService.CreateThumbnail` and `GetThumbnailByID`.
 
 ### Phase 4 — Policies
 

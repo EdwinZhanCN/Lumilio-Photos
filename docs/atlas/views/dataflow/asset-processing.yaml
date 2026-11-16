@@ -105,6 +105,11 @@ edges:
     label: publish
     anchor: go:processors.AssetProcessor.PublishTranscodeTask
     via: [go:processors.AssetProcessor.PublishTranscodeTask, go:processors.copyAudioForWeb, go:processors.saveAudioVersion, go:processors.publishDerived]
+  - from: enrich
+    to: artifacts
+    label: publish face crops
+    anchor: go:service.PublishFaceCrops
+    via: [go:server/app.runAssetEnrichment, go:queue.EnrichmentRunner, go:service.PublishFaceCrops]
   - from: analyze
     to: coordinator
     anchor: go:commit.Coordinator.ApplyAssetMetadata
@@ -132,6 +137,12 @@ edges:
     label: ocr_index_outbox
     anchor: go:bleveocr.Writer
 notes:
+  - title: Catalog rows name artifacts by identity
+    body: >-
+      A thumbnail row and a face item store the artifact's source fence,
+      pipeline version, and name; the table implies the stage. The layout
+      package resolves the identity to a path under .lumilio/cache/artifacts/,
+      so no catalog row holds a private path.
   - title: Fences
     body: >-
       Every result carries the source content it was computed from and the

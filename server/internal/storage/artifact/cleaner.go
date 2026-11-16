@@ -98,20 +98,26 @@ func (c *Cleaner) references(ctx context.Context, repository repo.Repository) (m
 	// A thumbnail or face crop is kept while a catalog row in this
 	// repository names it.
 	stored, err := c.database.Reader.Statements().QueryContext(ctx, `
-		SELECT storage_path FROM thumbnails WHERE repository_id = ?1
+		SELECT artifact_fence, 'derivatives', artifact_version, artifact_name
+		FROM thumbnails WHERE repository_id = ?1
 		UNION
-		SELECT face_image_path FROM face_items
-		WHERE repository_id = ?1 AND face_image_path IS NOT NULL`, repository.RepoID.String())
+		SELECT crop_fence, 'faces', crop_version, crop_name FROM face_items
+		WHERE repository_id = ?1 AND crop_name IS NOT NULL`, repository.RepoID.String())
 	if err != nil {
 		return nil, fmt.Errorf("read thumbnail and face crop artifact references: %w", err)
 	}
 	for stored.Next() {
-		var storagePath string
-		if err := stored.Scan(&storagePath); err != nil {
+		var identity Identity
+		if err := stored.Scan(&identity.SourceFence, &identity.Stage, &identity.PipelineVersion, &identity.Name); err != nil {
 			stored.Close()
 			return nil, err
 		}
-		referenced[storagePath] = struct{}{}
+		artifactPath, err := identity.Path()
+		if err != nil {
+			stored.Close()
+			return nil, err
+		}
+		referenced[artifactPath.String()] = struct{}{}
 	}
 	if err := stored.Close(); err != nil {
 		return nil, err
@@ -151,7 +157,7 @@ func (c *Cleaner) references(ctx context.Context, repository repo.Repository) (m
 		if name == "" {
 			continue
 		}
-		artifactPath, err := (Identity{SourceFence: contentID, Stage: "transcode", PipelineVersion: pipelineVersion, Name: name}).Path()
+		artifactPath, err := (Identity{SourceFence: contentID, Stage: StageTranscode, PipelineVersion: pipelineVersion, Name: name}).Path()
 		if err != nil {
 			return nil, err
 		}

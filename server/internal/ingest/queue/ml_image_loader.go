@@ -85,11 +85,8 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 		return nil, fmt.Errorf("get %s thumbnail: %w", thumbnailSize, err)
 	}
 
-	thumbnailPath, err := layout.ParseArtifact(thumbnail.StoragePath)
+	artifactPath, err := thumbnailPath(asset, thumbnailSize, thumbnail)
 	if err != nil {
-		return nil, err
-	}
-	if err := validateThumbnailContent(asset, thumbnailSize, thumbnailPath); err != nil {
 		return nil, err
 	}
 	if thumbnail.RepositoryID == uuid.Nil {
@@ -104,7 +101,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 		return nil, err
 	}
 	defer repositoryFS.Close()
-	file, err := repositoryFS.OpenPrivate(thumbnailPath)
+	file, err := repositoryFS.OpenPrivate(artifactPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrDerivedAssetNotReady
 	}
@@ -121,21 +118,13 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 	return imageData, nil
 }
 
-func validateThumbnailContent(asset repo.Asset, size string, thumbnailPath layout.Path) error {
-	expected, err := derivedThumbnailPath(asset.ContentID, size)
-	if err != nil || thumbnailPath.String() != expected {
-		return fmt.Errorf("%w: asset=%s size=%s", ErrDerivedAssetStale, asset.AssetID, size)
+// thumbnailPath returns where a thumbnail row's artifact lives, or
+// ErrDerivedAssetStale when the row names another content or pipeline.
+func thumbnailPath(asset repo.Asset, size string, thumbnail repo.Thumbnail) (layout.Path, error) {
+	identity := artifact.ThumbnailIdentity(thumbnail)
+	expected := artifact.Identity{SourceFence: asset.ContentID.String(), Stage: artifact.StageDerivatives, PipelineVersion: pipeline.AssetPipelineVersion, Name: size + ".webp"}
+	if asset.ContentID == uuid.Nil || identity != expected {
+		return layout.Path{}, fmt.Errorf("%w: asset=%s size=%s", ErrDerivedAssetStale, asset.AssetID, size)
 	}
-	return nil
-}
-
-func derivedThumbnailPath(contentID uuid.UUID, size string) (string, error) {
-	if contentID == uuid.Nil {
-		return "", ErrDerivedAssetStale
-	}
-	p, err := (artifact.Identity{SourceFence: contentID.String(), Stage: "derivatives", PipelineVersion: pipeline.AssetPipelineVersion, Name: size + ".webp"}).Path()
-	if err != nil {
-		return "", err
-	}
-	return p.String(), nil
+	return identity.Path()
 }

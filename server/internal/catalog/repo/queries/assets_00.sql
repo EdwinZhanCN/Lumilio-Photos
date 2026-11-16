@@ -251,30 +251,20 @@ WHERE content_id IN (
 LIMIT 1;
 
 -- name: CreateThumbnail :one
-INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, repository_id, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
+INSERT INTO thumbnails (asset_id, size, artifact_fence, artifact_version, artifact_name, mime_type, repository_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, size) DO UPDATE
-SET storage_path = EXCLUDED.storage_path,
+SET artifact_fence = EXCLUDED.artifact_fence,
+    artifact_version = EXCLUDED.artifact_version,
+    artifact_name = EXCLUDED.artifact_name,
     mime_type = EXCLUDED.mime_type,
     repository_id = EXCLUDED.repository_id,
     created_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING *;
 
--- name: GetThumbnailByID :one
-SELECT * FROM thumbnails WHERE thumbnail_id = ?1;
-
 -- name: GetThumbnailByAssetAndSize :one
 SELECT * FROM thumbnails
 WHERE asset_id = ?1 AND size = ?2;
-
--- name: GetThumbnailsByAsset :many
-SELECT * FROM thumbnails
-WHERE asset_id = ?1
-ORDER BY CASE size
-    WHEN 'small' THEN 1
-    WHEN 'medium' THEN 2
-    WHEN 'large' THEN 3
-END, thumbnail_id;
 
 -- name: AddAssetToAlbum :exec
 INSERT INTO album_assets (asset_id, album_id, position, added_time)

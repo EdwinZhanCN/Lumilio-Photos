@@ -412,29 +412,35 @@ func (q *Queries) CreateMediaItemForAsset(ctx context.Context, arg CreateMediaIt
 }
 
 const createThumbnail = `-- name: CreateThumbnail :one
-INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, repository_id, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
+INSERT INTO thumbnails (asset_id, size, artifact_fence, artifact_version, artifact_name, mime_type, repository_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, size) DO UPDATE
-SET storage_path = EXCLUDED.storage_path,
+SET artifact_fence = EXCLUDED.artifact_fence,
+    artifact_version = EXCLUDED.artifact_version,
+    artifact_name = EXCLUDED.artifact_name,
     mime_type = EXCLUDED.mime_type,
     repository_id = EXCLUDED.repository_id,
     created_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-RETURNING thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id
+RETURNING thumbnail_id, asset_id, size, artifact_fence, artifact_version, artifact_name, mime_type, created_at, repository_id
 `
 
 type CreateThumbnailParams struct {
-	AssetID      uuid.UUID `db:"asset_id" json:"asset_id"`
-	Size         string    `db:"size" json:"size"`
-	StoragePath  string    `db:"storage_path" json:"storage_path"`
-	MimeType     string    `db:"mime_type" json:"mime_type"`
-	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	AssetID         uuid.UUID `db:"asset_id" json:"asset_id"`
+	Size            string    `db:"size" json:"size"`
+	ArtifactFence   string    `db:"artifact_fence" json:"artifact_fence"`
+	ArtifactVersion string    `db:"artifact_version" json:"artifact_version"`
+	ArtifactName    string    `db:"artifact_name" json:"artifact_name"`
+	MimeType        string    `db:"mime_type" json:"mime_type"`
+	RepositoryID    uuid.UUID `db:"repository_id" json:"repository_id"`
 }
 
 func (q *Queries) CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error) {
 	row := q.db.QueryRowContext(ctx, createThumbnail,
 		arg.AssetID,
 		arg.Size,
-		arg.StoragePath,
+		arg.ArtifactFence,
+		arg.ArtifactVersion,
+		arg.ArtifactName,
 		arg.MimeType,
 		arg.RepositoryID,
 	)
@@ -443,7 +449,9 @@ func (q *Queries) CreateThumbnail(ctx context.Context, arg CreateThumbnailParams
 		&i.ThumbnailID,
 		&i.AssetID,
 		&i.Size,
-		&i.StoragePath,
+		&i.ArtifactFence,
+		&i.ArtifactVersion,
+		&i.ArtifactName,
 		&i.MimeType,
 		&i.CreatedAt,
 		&i.RepositoryID,
@@ -2182,7 +2190,7 @@ func (q *Queries) GetRepositoryAssetStats(ctx context.Context, arg GetRepository
 }
 
 const getThumbnailByAssetAndSize = `-- name: GetThumbnailByAssetAndSize :one
-SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id FROM thumbnails
+SELECT thumbnail_id, asset_id, size, artifact_fence, artifact_version, artifact_name, mime_type, created_at, repository_id FROM thumbnails
 WHERE asset_id = ?1 AND size = ?2
 `
 
@@ -2198,72 +2206,14 @@ func (q *Queries) GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbna
 		&i.ThumbnailID,
 		&i.AssetID,
 		&i.Size,
-		&i.StoragePath,
+		&i.ArtifactFence,
+		&i.ArtifactVersion,
+		&i.ArtifactName,
 		&i.MimeType,
 		&i.CreatedAt,
 		&i.RepositoryID,
 	)
 	return i, err
-}
-
-const getThumbnailByID = `-- name: GetThumbnailByID :one
-SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id FROM thumbnails WHERE thumbnail_id = ?1
-`
-
-func (q *Queries) GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error) {
-	row := q.db.QueryRowContext(ctx, getThumbnailByID, thumbnailID)
-	var i Thumbnail
-	err := row.Scan(
-		&i.ThumbnailID,
-		&i.AssetID,
-		&i.Size,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.CreatedAt,
-		&i.RepositoryID,
-	)
-	return i, err
-}
-
-const getThumbnailsByAsset = `-- name: GetThumbnailsByAsset :many
-SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id FROM thumbnails
-WHERE asset_id = ?1
-ORDER BY CASE size
-    WHEN 'small' THEN 1
-    WHEN 'medium' THEN 2
-    WHEN 'large' THEN 3
-END, thumbnail_id
-`
-
-func (q *Queries) GetThumbnailsByAsset(ctx context.Context, assetID uuid.UUID) ([]Thumbnail, error) {
-	rows, err := q.db.QueryContext(ctx, getThumbnailsByAsset, assetID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Thumbnail
-	for rows.Next() {
-		var i Thumbnail
-		if err := rows.Scan(
-			&i.ThumbnailID,
-			&i.AssetID,
-			&i.Size,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.CreatedAt,
-			&i.RepositoryID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getTopRatedAssets = `-- name: GetTopRatedAssets :many

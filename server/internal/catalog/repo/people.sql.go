@@ -73,10 +73,12 @@ WITH scoped AS (
     GROUP BY fcm.cluster_id
 ),
 representative_faces AS (
-    SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
+    SELECT fi.id, fcm.cluster_id, fi.asset_id
     FROM face_items fi
+    JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (?3 IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id
@@ -86,9 +88,8 @@ representative_faces AS (
 ranked_faces AS (
     SELECT
         fcm.cluster_id,
-        fi.face_image_path,
+        fi.id,
         fi.asset_id,
-        fi.repository_id,
         ROW_NUMBER() OVER (
             PARTITION BY fcm.cluster_id
             ORDER BY COALESCE(fi.is_primary, false) DESC,
@@ -100,6 +101,7 @@ ranked_faces AS (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (?3 IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id
@@ -114,14 +116,13 @@ SELECT
     fc.hidden_at,
     scoped.member_count,
     scoped.asset_count,
-    COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
+    COALESCE(rep.id, best.id, 0) AS cover_face_id,
     COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
-    COALESCE(rep.repository_id, best.repository_id) AS cover_repository_id,
     fc.created_at,
     fc.updated_at
 FROM face_clusters fc
 JOIN scoped ON scoped.cluster_id = fc.cluster_id AND scoped.member_count > 0
-LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id AND rep.cluster_id = fc.cluster_id
 LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 WHERE fc.cluster_id = ?1
   AND (
@@ -144,9 +145,8 @@ type GetPersonByIDScopedRow struct {
 	HiddenAt              dbtypes.Timestamp `db:"hidden_at" json:"hidden_at"`
 	MemberCount           int64             `db:"member_count" json:"member_count"`
 	AssetCount            int64             `db:"asset_count" json:"asset_count"`
-	CoverFaceImagePath    *string           `db:"cover_face_image_path" json:"cover_face_image_path"`
+	CoverFaceID           int64             `db:"cover_face_id" json:"cover_face_id"`
 	RepresentativeAssetID uuid.UUID         `db:"representative_asset_id" json:"representative_asset_id"`
-	CoverRepositoryID     uuid.UUID         `db:"cover_repository_id" json:"cover_repository_id"`
 	CreatedAt             dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt             dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
@@ -162,9 +162,8 @@ func (q *Queries) GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScop
 		&i.HiddenAt,
 		&i.MemberCount,
 		&i.AssetCount,
-		&i.CoverFaceImagePath,
+		&i.CoverFaceID,
 		&i.RepresentativeAssetID,
-		&i.CoverRepositoryID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -204,10 +203,12 @@ WITH page_people AS (
     LIMIT ?5 OFFSET ?4
 ),
 representative_faces AS (
-    SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
+    SELECT fi.id, fcm.cluster_id, fi.asset_id
     FROM face_items fi
+    JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (?2 IS NULL OR a.owner_id = ?2)
       AND (?3 IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
@@ -218,9 +219,8 @@ representative_faces AS (
 ranked_faces AS (
     SELECT
         fcm.cluster_id,
-        fi.face_image_path,
+        fi.id,
         fi.asset_id,
-        fi.repository_id,
         ROW_NUMBER() OVER (
             PARTITION BY fcm.cluster_id
             ORDER BY COALESCE(fi.is_primary, false) DESC,
@@ -232,6 +232,7 @@ ranked_faces AS (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (?2 IS NULL OR a.owner_id = ?2)
       AND (?3 IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
@@ -247,14 +248,13 @@ SELECT
     fc.hidden_at,
     pp.member_count,
     pp.asset_count,
-    COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
+    COALESCE(rep.id, best.id, 0) AS cover_face_id,
     COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
-    COALESCE(rep.repository_id, best.repository_id) AS cover_repository_id,
     fc.created_at,
     fc.updated_at
 FROM page_people pp
 JOIN face_clusters fc ON fc.cluster_id = pp.cluster_id
-LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id AND rep.cluster_id = fc.cluster_id
 LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 ORDER BY
     COALESCE(fc.is_confirmed, false) DESC,
@@ -279,9 +279,8 @@ type ListPeopleScopedRow struct {
 	HiddenAt              dbtypes.Timestamp `db:"hidden_at" json:"hidden_at"`
 	MemberCount           int64             `db:"member_count" json:"member_count"`
 	AssetCount            int64             `db:"asset_count" json:"asset_count"`
-	CoverFaceImagePath    *string           `db:"cover_face_image_path" json:"cover_face_image_path"`
+	CoverFaceID           int64             `db:"cover_face_id" json:"cover_face_id"`
 	RepresentativeAssetID uuid.UUID         `db:"representative_asset_id" json:"representative_asset_id"`
-	CoverRepositoryID     uuid.UUID         `db:"cover_repository_id" json:"cover_repository_id"`
 	CreatedAt             dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt             dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
@@ -309,9 +308,8 @@ func (q *Queries) ListPeopleScoped(ctx context.Context, arg ListPeopleScopedPara
 			&i.HiddenAt,
 			&i.MemberCount,
 			&i.AssetCount,
-			&i.CoverFaceImagePath,
+			&i.CoverFaceID,
 			&i.RepresentativeAssetID,
-			&i.CoverRepositoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

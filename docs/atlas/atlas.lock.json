@@ -42,19 +42,20 @@
       "go:processors.AssetProcessor.PublishThumbnailTask": "bd22c154f5211b7d",
       "go:processors.AssetProcessor.PublishTranscodeTask": "08e04c5ce833e8c2",
       "go:processors.AssetProcessor.resolveCurrentAssetSource": "084b647c801a9d92",
-      "go:processors.AssetProcessor.saveThumbnail": "408c6c6f20c158c3",
+      "go:processors.AssetProcessor.saveThumbnail": "df0081724b3fd48d",
       "go:processors.copyAudioForWeb": "8544eadc5886cd84",
-      "go:processors.publishDerived": "46e384ebf035a026",
-      "go:processors.saveAudioVersion": "058a1a8df17e4a7b",
+      "go:processors.publishDerived": "a8f70c42fdd9f891",
+      "go:processors.saveAudioVersion": "981620e2022f6df5",
       "go:queue.EnrichmentRunner": "8d313852edc3ca47",
       "go:queue.NewDBMLImageLoader": "d6d1d2105da7a23b",
       "go:server/app.pipelineRuntime.analyze": "4d9d8ddb6b0ee596",
-      "go:server/app.pipelineRuntime.derivatives": "4c1959734b71e7f2",
+      "go:server/app.pipelineRuntime.derivatives": "3a939024c897e800",
       "go:server/app.pipelineRuntime.enrich": "5f178616cf01ea84",
       "go:server/app.pipelineRuntime.transcode": "ddde075de23b1374",
       "go:server/app.runAssetEnrichment": "32d56296789d9c70",
       "go:server/internal/storage.RepositoryFS": "33ecd8a928f607fa",
-      "go:service.LumenService": "4d2efa8e41ea1092"
+      "go:service.LumenService": "4d2efa8e41ea1092",
+      "go:service.PublishFaceCrops": "c9e238dcdc39f12d"
     },
     "background-work": {
       "go:catalogtx.Writer": "1961aa3eaa1e8fe0",
@@ -111,7 +112,7 @@
       "go:search.EmbeddingRetriever.RetrieveSet": "8f537e0bc8bd5399",
       "go:search.FuseSet": "646c4391b1acb2da",
       "go:search.NewPlaceRetriever": "1b4fdda0734ba679",
-      "go:service.AssetService": "2f8b867e5923edfb",
+      "go:service.AssetService": "84f48ab9df02ea69",
       "go:service.AssetService.SearchBrowseItems": "191c2596bd033455",
       "go:service.LumenService": "4d2efa8e41ea1092",
       "go:service.LumenService.SemanticTextEmbed": "f97221087c8f1675",
@@ -269,9 +270,9 @@
       "server/internal/work/processing": 13
     },
     "package-size": {
-      "server/internal/api/handler": 18054,
-      "server/internal/catalog/repo": 31442,
-      "server/internal/service": 19945,
+      "server/internal/api/handler": 18029,
+      "server/internal/catalog/repo": 31342,
+      "server/internal/service": 19926,
       "server/internal/storage": 14378
     }
   }

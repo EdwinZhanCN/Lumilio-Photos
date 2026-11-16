@@ -525,9 +525,8 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 // AssetThumbnailDTO mirrors one entry of the `thumbnails` aggregate built by
 // GetAssetWithRelations.
 type AssetThumbnailDTO struct {
-	ThumbnailID string `json:"thumbnail_id"`
+	ThumbnailID int64  `json:"thumbnail_id"`
 	Size        string `json:"size"`
-	StoragePath string `json:"storage_path"`
 	MimeType    string `json:"mime_type"`
 }
 

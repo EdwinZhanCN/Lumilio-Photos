@@ -545,7 +545,9 @@ type FaceItem struct {
 	Ethnicity      *string           `db:"ethnicity" json:"ethnicity"`
 	Expression     *string           `db:"expression" json:"expression"`
 	FaceSize       *int64            `db:"face_size" json:"face_size"`
-	FaceImagePath  *string           `db:"face_image_path" json:"face_image_path"`
+	CropFence      *string           `db:"crop_fence" json:"crop_fence"`
+	CropVersion    *string           `db:"crop_version" json:"crop_version"`
+	CropName       *string           `db:"crop_name" json:"crop_name"`
 	Embedding      dbtypes.Vector    `db:"embedding" json:"embedding"`
 	EmbeddingModel *string           `db:"embedding_model" json:"embedding_model"`
 	IsPrimary      bool              `db:"is_primary" json:"is_primary"`
@@ -1171,13 +1173,15 @@ type Tag struct {
 }
 
 type Thumbnail struct {
-	ThumbnailID  int32             `db:"thumbnail_id" json:"thumbnail_id"`
-	AssetID      uuid.UUID         `db:"asset_id" json:"asset_id"`
-	Size         string            `db:"size" json:"size"`
-	StoragePath  string            `db:"storage_path" json:"storage_path"`
-	MimeType     string            `db:"mime_type" json:"mime_type"`
-	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	ThumbnailID     int32             `db:"thumbnail_id" json:"thumbnail_id"`
+	AssetID         uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Size            string            `db:"size" json:"size"`
+	ArtifactFence   string            `db:"artifact_fence" json:"artifact_fence"`
+	ArtifactVersion string            `db:"artifact_version" json:"artifact_version"`
+	ArtifactName    string            `db:"artifact_name" json:"artifact_name"`
+	MimeType        string            `db:"mime_type" json:"mime_type"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	RepositoryID    uuid.UUID         `db:"repository_id" json:"repository_id"`
 }
 
 type User struct {

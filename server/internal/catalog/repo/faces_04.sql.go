@@ -122,7 +122,6 @@ SELECT
     fi.id,
     fi.asset_id,
     fi.confidence,
-    fi.face_image_path,
     fi.repository_id,
     a.owner_id
 FROM face_items fi
@@ -145,12 +144,11 @@ type GetFaceForCorrectionScopedParams struct {
 }
 
 type GetFaceForCorrectionScopedRow struct {
-	ID            int32     `db:"id" json:"id"`
-	AssetID       uuid.UUID `db:"asset_id" json:"asset_id"`
-	Confidence    float64   `db:"confidence" json:"confidence"`
-	FaceImagePath *string   `db:"face_image_path" json:"face_image_path"`
-	RepositoryID  uuid.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID       *int32    `db:"owner_id" json:"owner_id"`
+	ID           int32     `db:"id" json:"id"`
+	AssetID      uuid.UUID `db:"asset_id" json:"asset_id"`
+	Confidence   float64   `db:"confidence" json:"confidence"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32    `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetFaceForCorrectionScoped(ctx context.Context, arg GetFaceForCorrectionScopedParams) (GetFaceForCorrectionScopedRow, error) {
@@ -160,7 +158,6 @@ func (q *Queries) GetFaceForCorrectionScoped(ctx context.Context, arg GetFaceFor
 		&i.ID,
 		&i.AssetID,
 		&i.Confidence,
-		&i.FaceImagePath,
 		&i.RepositoryID,
 		&i.OwnerID,
 	)
@@ -232,7 +229,9 @@ SELECT
     fi.asset_id,
     fi.confidence,
     fi.is_primary,
-    fi.face_image_path,
+    fi.crop_fence,
+    fi.crop_version,
+    fi.crop_name,
     fi.repository_id,
     a.owner_id
 FROM face_cluster_members fcm
@@ -258,13 +257,15 @@ type GetPersonFaceScopedParams struct {
 }
 
 type GetPersonFaceScopedRow struct {
-	ID            int32     `db:"id" json:"id"`
-	AssetID       uuid.UUID `db:"asset_id" json:"asset_id"`
-	Confidence    float64   `db:"confidence" json:"confidence"`
-	IsPrimary     bool      `db:"is_primary" json:"is_primary"`
-	FaceImagePath *string   `db:"face_image_path" json:"face_image_path"`
-	RepositoryID  uuid.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID       *int32    `db:"owner_id" json:"owner_id"`
+	ID           int32     `db:"id" json:"id"`
+	AssetID      uuid.UUID `db:"asset_id" json:"asset_id"`
+	Confidence   float64   `db:"confidence" json:"confidence"`
+	IsPrimary    bool      `db:"is_primary" json:"is_primary"`
+	CropFence    *string   `db:"crop_fence" json:"crop_fence"`
+	CropVersion  *string   `db:"crop_version" json:"crop_version"`
+	CropName     *string   `db:"crop_name" json:"crop_name"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32    `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error) {
@@ -280,7 +281,9 @@ func (q *Queries) GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScop
 		&i.AssetID,
 		&i.Confidence,
 		&i.IsPrimary,
-		&i.FaceImagePath,
+		&i.CropFence,
+		&i.CropVersion,
+		&i.CropName,
 		&i.RepositoryID,
 		&i.OwnerID,
 	)
@@ -332,7 +335,7 @@ SELECT
     fi.asset_id,
     fi.confidence,
     fi.is_primary,
-    fi.face_image_path,
+    fi.crop_name,
     COALESCE(fcm.is_manual, false) AS is_manual,
     a.original_filename,
     a.taken_time,
@@ -365,7 +368,7 @@ type ListPersonFacesScopedRow struct {
 	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Confidence       float64           `db:"confidence" json:"confidence"`
 	IsPrimary        bool              `db:"is_primary" json:"is_primary"`
-	FaceImagePath    *string           `db:"face_image_path" json:"face_image_path"`
+	CropName         *string           `db:"crop_name" json:"crop_name"`
 	IsManual         bool              `db:"is_manual" json:"is_manual"`
 	OriginalFilename string            `db:"original_filename" json:"original_filename"`
 	TakenTime        dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
@@ -392,7 +395,7 @@ func (q *Queries) ListPersonFacesScoped(ctx context.Context, arg ListPersonFaces
 			&i.AssetID,
 			&i.Confidence,
 			&i.IsPrimary,
-			&i.FaceImagePath,
+			&i.CropName,
 			&i.IsManual,
 			&i.OriginalFilename,
 			&i.TakenTime,

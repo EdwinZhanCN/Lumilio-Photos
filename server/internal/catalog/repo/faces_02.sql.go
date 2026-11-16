@@ -14,7 +14,7 @@ import (
 
 const getFaceClusteringCandidates = `-- name: GetFaceClusteringCandidates :many
 SELECT
-    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id,
+    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.crop_fence, fi.crop_version, fi.crop_name, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id,
     occurrence.repository_id,
     a.owner_id
 FROM face_items fi
@@ -52,7 +52,9 @@ type GetFaceClusteringCandidatesRow struct {
 	Ethnicity      *string           `db:"ethnicity" json:"ethnicity"`
 	Expression     *string           `db:"expression" json:"expression"`
 	FaceSize       *int64            `db:"face_size" json:"face_size"`
-	FaceImagePath  *string           `db:"face_image_path" json:"face_image_path"`
+	CropFence      *string           `db:"crop_fence" json:"crop_fence"`
+	CropVersion    *string           `db:"crop_version" json:"crop_version"`
+	CropName       *string           `db:"crop_name" json:"crop_name"`
 	Embedding      dbtypes.Vector    `db:"embedding" json:"embedding"`
 	EmbeddingModel *string           `db:"embedding_model" json:"embedding_model"`
 	IsPrimary      bool              `db:"is_primary" json:"is_primary"`
@@ -90,7 +92,9 @@ func (q *Queries) GetFaceClusteringCandidates(ctx context.Context, arg GetFaceCl
 			&i.Ethnicity,
 			&i.Expression,
 			&i.FaceSize,
-			&i.FaceImagePath,
+			&i.CropFence,
+			&i.CropVersion,
+			&i.CropName,
 			&i.Embedding,
 			&i.EmbeddingModel,
 			&i.IsPrimary,
@@ -314,7 +318,7 @@ func (q *Queries) GetFaceStatsByModel(ctx context.Context) ([]GetFaceStatsByMode
 }
 
 const getFacesByExpression = `-- name: GetFacesByExpression :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, crop_fence, crop_version, crop_name, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE expression = ?1
 AND confidence >= ?2
 ORDER BY confidence DESC
@@ -347,7 +351,9 @@ func (q *Queries) GetFacesByExpression(ctx context.Context, arg GetFacesByExpres
 			&i.Ethnicity,
 			&i.Expression,
 			&i.FaceSize,
-			&i.FaceImagePath,
+			&i.CropFence,
+			&i.CropVersion,
+			&i.CropName,
 			&i.Embedding,
 			&i.EmbeddingModel,
 			&i.IsPrimary,
@@ -371,7 +377,7 @@ func (q *Queries) GetFacesByExpression(ctx context.Context, arg GetFacesByExpres
 }
 
 const getPrimaryFaces = `-- name: GetPrimaryFaces :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, crop_fence, crop_version, crop_name, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE is_primary = true
 AND confidence >= ?1
 ORDER BY confidence DESC
@@ -403,7 +409,9 @@ func (q *Queries) GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams
 			&i.Ethnicity,
 			&i.Expression,
 			&i.FaceSize,
-			&i.FaceImagePath,
+			&i.CropFence,
+			&i.CropVersion,
+			&i.CropName,
 			&i.Embedding,
 			&i.EmbeddingModel,
 			&i.IsPrimary,
@@ -427,7 +435,7 @@ func (q *Queries) GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams
 }
 
 const getTopFacesByQuality = `-- name: GetTopFacesByQuality :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, crop_fence, crop_version, crop_name, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE quality_score >= ?1
 ORDER BY quality_score DESC, confidence DESC
 LIMIT ?2
@@ -458,7 +466,9 @@ func (q *Queries) GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQua
 			&i.Ethnicity,
 			&i.Expression,
 			&i.FaceSize,
-			&i.FaceImagePath,
+			&i.CropFence,
+			&i.CropVersion,
+			&i.CropName,
 			&i.Embedding,
 			&i.EmbeddingModel,
 			&i.IsPrimary,
@@ -487,7 +497,7 @@ SET
     embedding = ?2,
     embedding_model = ?3
 WHERE id = ?1
-RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id
+RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, crop_fence, crop_version, crop_name, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id
 `
 
 type UpdateFaceItemEmbeddingParams struct {
@@ -510,7 +520,9 @@ func (q *Queries) UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceIte
 		&i.Ethnicity,
 		&i.Expression,
 		&i.FaceSize,
-		&i.FaceImagePath,
+		&i.CropFence,
+		&i.CropVersion,
+		&i.CropName,
 		&i.Embedding,
 		&i.EmbeddingModel,
 		&i.IsPrimary,

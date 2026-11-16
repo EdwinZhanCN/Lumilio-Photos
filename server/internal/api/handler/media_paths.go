@@ -73,8 +73,8 @@ func openRepositoryMedia(factory *storage.RepositoryFSFactory, repository repo.R
 }
 
 // openRepositoryArtifact opens a stored thumbnail or face crop path.
-func openRepositoryArtifact(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
-	repositoryPath, err := layout.ParseArtifact(strings.TrimSpace(rawPath))
+func openRepositoryArtifact(factory *storage.RepositoryFSFactory, repository repo.Repository, identity artifact.Identity) (*storage.RepositoryFS, *os.File, error) {
+	repositoryPath, err := identity.Path()
 	if err != nil {
 		return nil, nil, err
 	}

@@ -10,11 +10,25 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/layout"
 )
 
 type Identity struct{ SourceFence, Stage, PipelineVersion, Name string }
+
+// The stages the catalog names: thumbnail rows are derivatives, face items
+// name face crops, and the applied transcode stage names its transcode.
+const (
+	StageDerivatives = "derivatives"
+	StageFaces       = "faces"
+	StageTranscode   = "transcode"
+)
+
+// ThumbnailIdentity is the artifact a thumbnail row names.
+func ThumbnailIdentity(row repo.Thumbnail) Identity {
+	return Identity{SourceFence: row.ArtifactFence, Stage: StageDerivatives, PipelineVersion: row.ArtifactVersion, Name: row.ArtifactName}
+}
 
 func (i Identity) validate() error {
 	for _, value := range []string{i.SourceFence, i.Stage, i.PipelineVersion, i.Name} {

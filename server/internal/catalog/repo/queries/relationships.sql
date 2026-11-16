@@ -1,30 +1,3 @@
--- name: GetAssetWithThumbnails :one
-SELECT
-    a.*,
-    COALESCE((
-        SELECT json_group_array(
-            json_object(
-                'thumbnail_id', ordered.thumbnail_id,
-                'size', ordered.size,
-                'storage_path', ordered.storage_path,
-                'mime_type', ordered.mime_type,
-                'created_at', ordered.created_at
-            )
-        )
-        FROM (
-            SELECT t.*
-            FROM thumbnails t
-            WHERE t.asset_id = a.asset_id
-            ORDER BY CASE t.size
-                WHEN 'small' THEN 1
-                WHEN 'medium' THEN 2
-                WHEN 'large' THEN 3
-            END, t.thumbnail_id
-        ) AS ordered
-    ), '[]') as thumbnails
-FROM assets a
-WHERE a.asset_id = ?1;
-
 -- name: GetAssetWithTags :one
 SELECT
     a.*,
@@ -58,7 +31,6 @@ SELECT
         SELECT json_group_array(json_object(
             'thumbnail_id', ordered.thumbnail_id,
             'size', ordered.size,
-            'storage_path', ordered.storage_path,
             'mime_type', ordered.mime_type
         ))
         FROM (

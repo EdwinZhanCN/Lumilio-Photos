@@ -7,7 +7,6 @@ import (
 	"image/jpeg"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -18,6 +17,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/media/imaging"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 
@@ -86,19 +86,18 @@ func TestPublishFaceCropsWritesFacesArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if crops.RepositoryID != repository.RepoID || len(crops.Paths) != 2 {
+	if crops.RepositoryID != repository.RepoID || len(crops.Artifacts) != 2 {
 		t.Fatalf("crops = %+v", crops)
 	}
-	for index, stored := range crops.Paths {
-		published, err := layout.ParseArtifact(stored)
+	for index, identity := range crops.Artifacts {
+		if identity.SourceFence != contentID.String() || identity.Stage != artifact.StageFaces || identity.PipelineVersion != faceCropVersion || !strings.HasPrefix(identity.Name, strconv.Itoa(index)+"-") {
+			t.Fatalf("crop %d identity = %+v", index, identity)
+		}
+		stored, err := identity.Path()
 		if err != nil {
-			t.Fatalf("crop %d is not an artifact path: %v", index, err)
+			t.Fatal(err)
 		}
-		want, err := layout.Artifact(layout.ArtifactID{SourceFence: contentID.String(), Stage: "faces", PipelineVersion: faceCropVersion, Name: path.Base(stored)})
-		if err != nil || published != want || !strings.HasPrefix(path.Base(stored), strconv.Itoa(index)+"-") {
-			t.Fatalf("crop %d path = %s", index, stored)
-		}
-		local, err := published.Local()
+		local, err := stored.Local()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +106,7 @@ func TestPublishFaceCropsWritesFacesArtifacts(t *testing.T) {
 		}
 	}
 	again, err := PublishFaceCrops(context.Background(), files, repository, contentID, result, source.Bytes())
-	if err != nil || !slices.Equal(again.Paths, crops.Paths) {
+	if err != nil || !slices.Equal(again.Artifacts, crops.Artifacts) {
 		t.Fatalf("republished crops = %+v, %v", again, err)
 	}
 }

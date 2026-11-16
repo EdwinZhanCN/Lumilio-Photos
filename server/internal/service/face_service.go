@@ -84,16 +84,16 @@ type SimilarFace struct {
 
 // Person is the service-level representation of a face cluster exposed as a person.
 type Person struct {
-	PersonID              int32
-	Name                  *string
-	IsConfirmed           bool
-	IsHidden              bool
-	HiddenAt              *time.Time
-	MemberCount           int64
-	AssetCount            int64
-	CoverFaceImagePath    *string
+	PersonID    int32
+	Name        *string
+	IsConfirmed bool
+	IsHidden    bool
+	HiddenAt    *time.Time
+	MemberCount int64
+	AssetCount  int64
+	// CoverFaceID is the face whose crop is the person's cover, if any.
+	CoverFaceID           *int32
 	RepresentativeAssetID *string
-	CoverRepositoryID     *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -113,11 +113,11 @@ type PersonFace struct {
 	UploadTime       *time.Time
 }
 
-// PersonFaceCrop locates a single face crop on disk for media serving.
+// PersonFaceCrop names a single face crop artifact for media serving.
 type PersonFaceCrop struct {
-	FaceID        int32
-	RepositoryID  string
-	FaceImagePath string
+	FaceID       int32
+	RepositoryID string
+	Artifact     artifact.Identity
 }
 
 // FaceClusterRebuildResult summarizes a full people-cluster rebuild.
@@ -193,7 +193,7 @@ func (s *faceService) ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetI
 // face in order, and the repository whose artifacts hold them.
 type FaceCrops struct {
 	RepositoryID uuid.UUID
-	Paths        []string
+	Artifacts    []artifact.Identity
 }
 
 // PublishFaceCrops cuts every detected face out of the source image and
@@ -207,7 +207,7 @@ func PublishFaceCrops(ctx context.Context, files *storage.RepositoryFSFactory, r
 	if files == nil {
 		return nil, fmt.Errorf("face repository filesystem is unavailable")
 	}
-	crops := &FaceCrops{RepositoryID: repository.RepoID, Paths: make([]string, 0, len(faceV1.Faces))}
+	crops := &FaceCrops{RepositoryID: repository.RepoID, Artifacts: make([]artifact.Identity, 0, len(faceV1.Faces))}
 	if len(faceV1.Faces) == 0 {
 		return crops, nil
 	}
@@ -234,16 +234,16 @@ func PublishFaceCrops(ctx context.Context, files *storage.RepositoryFSFactory, r
 			return nil, fmt.Errorf("face %d: %w", i, err)
 		}
 		box := sha256.Sum256(bboxJSON)
-		published, err := store.Publish(ctx, artifact.Identity{
+		identity := artifact.Identity{
 			SourceFence:     contentID.String(),
-			Stage:           "faces",
+			Stage:           artifact.StageFaces,
 			PipelineVersion: faceCropVersion,
 			Name:            fmt.Sprintf("%d-%s.webp", i, hex.EncodeToString(box[:6])),
-		}, bytes.NewReader(cropBytes))
-		if err != nil {
+		}
+		if _, err := store.Publish(ctx, identity, bytes.NewReader(cropBytes)); err != nil {
 			return nil, fmt.Errorf("publish face crop %d: %w", i, err)
 		}
-		crops.Paths = append(crops.Paths, published.Path)
+		crops.Artifacts = append(crops.Artifacts, identity)
 	}
 	return crops, nil
 }
@@ -256,7 +256,7 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 	if faceV1 == nil {
 		return fmt.Errorf("face result payload is required")
 	}
-	if crops == nil || len(crops.Paths) != len(faceV1.Faces) {
+	if crops == nil || len(crops.Artifacts) != len(faceV1.Faces) {
 		return fmt.Errorf("face result has no published crop for every face")
 	}
 	_, asset, err := s.resolveAssetRepositoryWithQueries(ctx, queries, assetID)
@@ -316,7 +316,7 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 
 		isPrimary := i == primaryFaceIndex
 
-		faceImagePath := crops.Paths[i]
+		crop := crops.Artifacts[i]
 
 		createdItem, err := queries.CreateFaceItem(ctx, repo.CreateFaceItemParams{
 			AssetID:        assetID,
@@ -328,7 +328,9 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 			Ethnicity:      nil,
 			Expression:     nil,
 			FaceSize:       int64Ptr(int64(faceItemMeta.FaceSize)),
-			FaceImagePath:  &faceImagePath,
+			CropFence:      &crop.SourceFence,
+			CropVersion:    &crop.PipelineVersion,
+			CropName:       &crop.Name,
 			Embedding:      embeddingVector,
 			EmbeddingModel: &faceV1.ModelID,
 			IsPrimary:      isPrimary,
@@ -829,7 +831,9 @@ func (s *faceService) FindSimilarFaces(ctx context.Context, embeddingVector []fl
 				Ethnicity:      row.Ethnicity,
 				Expression:     row.Expression,
 				FaceSize:       row.FaceSize,
-				FaceImagePath:  row.FaceImagePath,
+				CropFence:      row.CropFence,
+				CropVersion:    row.CropVersion,
+				CropName:       row.CropName,
 				Embedding:      row.Embedding,
 				EmbeddingModel: row.EmbeddingModel,
 				IsPrimary:      row.IsPrimary,
@@ -986,7 +990,7 @@ func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repo
 			Confidence:       float32(row.Confidence),
 			IsRepresentative: row.ID == representativeFaceID,
 			IsManual:         row.IsManual,
-			HasCrop:          row.FaceImagePath != nil && strings.TrimSpace(*row.FaceImagePath) != "",
+			HasCrop:          row.CropName != nil,
 			Filename:         row.OriginalFilename,
 			TakenTime:        optionalTimestamp(row.TakenTime),
 			UploadTime:       optionalTimestamp(row.UploadTime),
@@ -1007,13 +1011,13 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 	if err != nil {
 		return nil, err
 	}
-	if row.FaceImagePath == nil || strings.TrimSpace(*row.FaceImagePath) == "" {
+	if row.CropFence == nil || row.CropVersion == nil || row.CropName == nil {
 		return nil, sql.ErrNoRows
 	}
 	return &PersonFaceCrop{
-		FaceID:        row.ID,
-		RepositoryID:  row.RepositoryID.String(),
-		FaceImagePath: *row.FaceImagePath,
+		FaceID:       row.ID,
+		RepositoryID: row.RepositoryID.String(),
+		Artifact:     artifact.Identity{SourceFence: *row.CropFence, Stage: artifact.StageFaces, PipelineVersion: *row.CropVersion, Name: *row.CropName},
 	}, nil
 }
 
@@ -1205,9 +1209,8 @@ func personFromListRow(row repo.ListPeopleScopedRow) Person {
 		HiddenAt:              optionalTimestamp(row.HiddenAt),
 		MemberCount:           row.MemberCount,
 		AssetCount:            row.AssetCount,
-		CoverFaceImagePath:    row.CoverFaceImagePath,
+		CoverFaceID:           coverFaceID(row.CoverFaceID),
 		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
-		CoverRepositoryID:     optionalStringFromSQLiteUUID(row.CoverRepositoryID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
@@ -1222,12 +1225,20 @@ func personFromDetailRow(row repo.GetPersonByIDScopedRow) Person {
 		HiddenAt:              optionalTimestamp(row.HiddenAt),
 		MemberCount:           row.MemberCount,
 		AssetCount:            row.AssetCount,
-		CoverFaceImagePath:    row.CoverFaceImagePath,
+		CoverFaceID:           coverFaceID(row.CoverFaceID),
 		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
-		CoverRepositoryID:     optionalStringFromSQLiteUUID(row.CoverRepositoryID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
+}
+
+// coverFaceID maps the query's 0 (no face has a crop) to no cover.
+func coverFaceID(id int64) *int32 {
+	if id == 0 {
+		return nil
+	}
+	value := int32(id)
+	return &value
 }
 
 func optionalTimestamp(value dbtypes.Timestamp) *time.Time {

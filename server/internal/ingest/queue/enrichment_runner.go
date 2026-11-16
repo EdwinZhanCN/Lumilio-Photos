@@ -20,7 +20,6 @@ import (
 	"server/internal/media/phash"
 	"server/internal/service"
 	"server/internal/storage"
-	"server/internal/storage/layout"
 	"server/internal/work/jobs"
 )
 
@@ -249,11 +248,8 @@ func (r *EnrichmentRunner) runPHash(ctx context.Context, asset repo.Asset) (*Emb
 	if err != nil {
 		return nil, fmt.Errorf("get small thumbnail: %w", err)
 	}
-	thumbnailPath, err := layout.ParseArtifact(thumbnail.StoragePath)
+	artifactPath, err := thumbnailPath(asset, "small", thumbnail)
 	if err != nil {
-		return nil, err
-	}
-	if err := validateThumbnailContent(asset, "small", thumbnailPath); err != nil {
 		if errors.Is(err, ErrDerivedAssetStale) {
 			return nil, nil
 		}
@@ -271,7 +267,7 @@ func (r *EnrichmentRunner) runPHash(ctx context.Context, asset repo.Asset) (*Emb
 		return nil, err
 	}
 	defer fs.Close()
-	file, err := fs.OpenPrivate(thumbnailPath)
+	file, err := fs.OpenPrivate(artifactPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrEnrichmentNotReady
 	}

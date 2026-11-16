@@ -84,9 +84,7 @@ export default function PersonPicker({
           filtered.map((person) => {
             const personId = person.person_id ?? 0;
             const selected = selectedIds.includes(personId);
-            const coverUrl = person.cover_face_image_path
-              ? assetUrls.getPersonCoverUrl(personId)
-              : null;
+            const coverUrl = person.has_cover ? assetUrls.getPersonCoverUrl(personId) : null;
             return (
               <button
                 key={personId}

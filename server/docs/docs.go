@@ -4490,11 +4490,8 @@ const docTemplate = `{
                     "size": {
                         "type": "string"
                     },
-                    "storage_path": {
-                        "type": "string"
-                    },
                     "thumbnail_id": {
-                        "type": "string"
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -8660,11 +8657,12 @@ const docTemplate = `{
                     "asset_count": {
                         "type": "integer"
                     },
-                    "cover_face_image_path": {
-                        "type": "string"
-                    },
                     "created_at": {
                         "type": "string"
+                    },
+                    "has_cover": {
+                        "description": "HasCover reports whether GET /people/{id}/cover serves a face crop.",
+                        "type": "boolean"
                     },
                     "hidden_at": {
                         "type": "string"
@@ -8730,11 +8728,12 @@ const docTemplate = `{
                     "asset_count": {
                         "type": "integer"
                     },
-                    "cover_face_image_path": {
-                        "type": "string"
-                    },
                     "created_at": {
                         "type": "string"
+                    },
+                    "has_cover": {
+                        "description": "HasCover reports whether GET /people/{id}/cover serves a face crop.",
+                        "type": "boolean"
                     },
                     "hidden_at": {
                         "type": "string"

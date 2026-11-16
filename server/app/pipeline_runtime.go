@@ -331,7 +331,7 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos qos.Class, 
 		for _, artifact := range result.Artifacts {
 			artifacts = append(artifacts, commit.ThumbnailArtifact{
 				RepositoryID: artifact.RepositoryID, Size: artifact.Size,
-				StoragePath: artifact.StoragePath, MimeType: artifact.MimeType,
+				Artifact: artifact.Artifact, MimeType: artifact.MimeType,
 			})
 		}
 		if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
