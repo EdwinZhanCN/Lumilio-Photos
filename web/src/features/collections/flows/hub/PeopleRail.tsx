@@ -38,9 +38,7 @@ export default function PeopleRail({
             key={personId}
             media={{
               kind: "photo",
-              src: person.cover_face_image_path
-                ? assetUrls.getPersonCoverUrl(personId, repositoryId)
-                : null,
+              src: person.has_cover ? assetUrls.getPersonCoverUrl(personId, repositoryId) : null,
               fallbackIcon: UserRound,
             }}
             title={person.name || t("people.unnamed")}

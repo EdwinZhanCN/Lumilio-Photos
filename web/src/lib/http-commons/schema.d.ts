@@ -16725,8 +16725,7 @@ export interface components {
         "dto.AssetThumbnailDTO": {
             mime_type?: string;
             size?: string;
-            storage_path?: string;
-            thumbnail_id?: string;
+            thumbnail_id?: number;
         };
         "dto.AssetTrashHoldsDTO": {
             asset_ids?: string[];
@@ -18279,8 +18278,9 @@ export interface components {
         };
         "dto.PersonDetailDTO": {
             asset_count?: number;
-            cover_face_image_path?: string;
             created_at?: string;
+            /** @description HasCover reports whether GET /people/{id}/cover serves a face crop. */
+            has_cover?: boolean;
             hidden_at?: string;
             is_confirmed?: boolean;
             is_hidden?: boolean;
@@ -18303,8 +18303,9 @@ export interface components {
         };
         "dto.PersonSummaryDTO": {
             asset_count?: number;
-            cover_face_image_path?: string;
             created_at?: string;
+            /** @description HasCover reports whether GET /people/{id}/cover serves a face crop. */
+            has_cover?: boolean;
             hidden_at?: string;
             is_confirmed?: boolean;
             is_hidden?: boolean;

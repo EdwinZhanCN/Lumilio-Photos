@@ -35,6 +35,7 @@ flowchart LR
     n_enrich -.->|"inference"| n_lumen
     n_derivatives -->|"publish"| n_artifacts
     n_transcode -->|"publish"| n_artifacts
+    n_enrich -->|"publish face crops"| n_artifacts
     n_analyze --> n_coordinator
     n_derivatives --> n_coordinator
     n_enrich --> n_coordinator
@@ -74,10 +75,15 @@ flowchart LR
 | thumbs → enrich | medium thumbnail as model input | `go:queue.NewDBMLImageLoader` [`server/internal/ingest/queue/ml_image_loader.go`](../../../../server/internal/ingest/queue/ml_image_loader.go) |
 | derivatives → artifacts | publish | `go:processors.AssetProcessor.PublishThumbnailTask` [`server/internal/ingest/processors/thumbnail_task.go`](../../../../server/internal/ingest/processors/thumbnail_task.go) |
 | transcode → artifacts | publish | `go:processors.AssetProcessor.PublishTranscodeTask` [`server/internal/ingest/processors/transcode_task.go`](../../../../server/internal/ingest/processors/transcode_task.go) |
+| enrich → artifacts | publish face crops | `go:service.PublishFaceCrops` [`server/internal/service/face_service.go`](../../../../server/internal/service/face_service.go) |
 | analyze → coordinator |  | `go:commit.Coordinator.ApplyAssetMetadata` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
 | derivatives → coordinator |  | `go:commit.Coordinator.ApplyAssetDerivatives` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
 | enrich → coordinator |  | `go:commit.Coordinator.ApplyEnrichment` [`server/internal/ingest/commit/typed_catalog.go`](../../../../server/internal/ingest/commit/typed_catalog.go) |
 | faces → bleve | ocr_index_outbox | `go:bleveocr.Writer` [`server/internal/search/bleveocr/writer.go`](../../../../server/internal/search/bleveocr/writer.go) |
+
+## Catalog rows name artifacts by identity
+
+A thumbnail row and a face item store the artifact's source fence, pipeline version, and name; the table implies the stage. The layout package resolves the identity to a path under .lumilio/cache/artifacts/, so no catalog row holds a private path.
 
 ## Fences
 

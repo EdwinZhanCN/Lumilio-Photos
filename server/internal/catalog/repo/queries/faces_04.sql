@@ -4,7 +4,7 @@ SELECT
     fi.asset_id,
     fi.confidence,
     fi.is_primary,
-    fi.face_image_path,
+    fi.crop_name,
     COALESCE(fcm.is_manual, false) AS is_manual,
     a.original_filename,
     a.taken_time,
@@ -43,7 +43,9 @@ SELECT
     fi.asset_id,
     fi.confidence,
     fi.is_primary,
-    fi.face_image_path,
+    fi.crop_fence,
+    fi.crop_version,
+    fi.crop_name,
     fi.repository_id,
     a.owner_id
 FROM face_cluster_members fcm
@@ -65,7 +67,6 @@ SELECT
     fi.id,
     fi.asset_id,
     fi.confidence,
-    fi.face_image_path,
     fi.repository_id,
     a.owner_id
 FROM face_items fi

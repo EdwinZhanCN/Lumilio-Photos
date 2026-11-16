@@ -128,17 +128,9 @@ func TestConstructorsRejectArgumentsThatLeaveTheirKind(t *testing.T) {
 	}
 }
 
-func TestStoredPathParsersAcceptOnlyTheirKind(t *testing.T) {
+func TestParseStagedAcceptsOnlyStagedFiles(t *testing.T) {
 	t.Parallel()
 	session := "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
-	if _, err := ParseArtifact(".lumilio/cache/artifacts/f/thumbnails/v1/small.webp"); err != nil {
-		t.Fatal(err)
-	}
-	for _, value := range []string{".lumilio/cache/artifacts/f/s/v", ".lumilio/cache/x/f/s/v/n", ".lumilio/work/uploads/" + session + "/x"} {
-		if _, err := ParseArtifact(value); err == nil {
-			t.Errorf("ParseArtifact(%q) succeeded", value)
-		}
-	}
 	for _, value := range []string{".lumilio/work/uploads/" + session + "/IMG.jpg", ".lumilio/quarantine/uploads/" + session + "/IMG.jpg"} {
 		p, err := ParseStaged(value)
 		if id, ok := StagedSession(p); err != nil || !ok || id.String() != session {

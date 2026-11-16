@@ -21,30 +21,32 @@ func (ap *AssetProcessor) saveThumbnail(ctx context.Context, files *storage.Repo
 		extension = "png"
 		mimeType = "image/png"
 	}
-	published, err := publishDerived(ctx, files, reader, asset, "derivatives", pipelineVersion, size+"."+extension)
+	identity, err := publishDerived(ctx, files, reader, asset, artifact.StageDerivatives, pipelineVersion, size+"."+extension)
 	if err != nil {
 		return DerivedArtifact{}, err
 	}
-	return DerivedArtifact{AssetID: asset.AssetID, SourceFence: asset.ContentID, RepositoryID: files.RepositoryID(), Size: size, StoragePath: published.Path, MimeType: mimeType}, nil
+	return DerivedArtifact{AssetID: asset.AssetID, SourceFence: asset.ContentID, RepositoryID: files.RepositoryID(), Size: size, Artifact: identity, MimeType: mimeType}, nil
 }
 
 func saveVideoVersion(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, version string) error {
-	_, err := publishDerived(ctx, files, reader, asset, "transcode", pipelineVersion, version+".mp4")
+	_, err := publishDerived(ctx, files, reader, asset, artifact.StageTranscode, pipelineVersion, version+".mp4")
 	return err
 }
 
 func saveAudioVersion(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, version string) error {
-	_, err := publishDerived(ctx, files, reader, asset, "transcode", pipelineVersion, version+".mp3")
+	_, err := publishDerived(ctx, files, reader, asset, artifact.StageTranscode, pipelineVersion, version+".mp3")
 	return err
 }
 
-func publishDerived(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, stage, pipelineVersion, name string) (artifact.Published, error) {
+func publishDerived(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, stage, pipelineVersion, name string) (artifact.Identity, error) {
 	if files == nil || reader == nil || asset == nil || asset.ContentID.String() == "" || pipelineVersion == "" {
-		return artifact.Published{}, fmt.Errorf("derived artifact destination, reader, asset, and pipeline version are required")
+		return artifact.Identity{}, fmt.Errorf("derived artifact destination, reader, asset, and pipeline version are required")
 	}
 	store, err := artifact.NewStore(files)
 	if err != nil {
-		return artifact.Published{}, err
+		return artifact.Identity{}, err
 	}
-	return store.Publish(ctx, artifact.Identity{SourceFence: asset.ContentID.String(), Stage: stage, PipelineVersion: pipelineVersion, Name: name}, reader)
+	identity := artifact.Identity{SourceFence: asset.ContentID.String(), Stage: stage, PipelineVersion: pipelineVersion, Name: name}
+	_, err = store.Publish(ctx, identity, reader)
+	return identity, err
 }

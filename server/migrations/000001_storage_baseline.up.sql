@@ -603,7 +603,9 @@ CREATE TABLE face_items (
     ethnicity TEXT,
     expression TEXT,
     face_size INTEGER,
-    face_image_path TEXT,
+    crop_fence TEXT,
+    crop_version TEXT,
+    crop_name TEXT,
     embedding BLOB,
     embedding_model TEXT,
     is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
@@ -612,7 +614,8 @@ CREATE TABLE face_items (
     pose_angles TEXT CHECK (pose_angles IS NULL OR json_valid(pose_angles)),
     created_at INTEGER NOT NULL
 , repository_id TEXT
-    REFERENCES repositories(repo_id) ON DELETE CASCADE) STRICT;
+    REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    CHECK ((crop_name IS NULL) = (crop_fence IS NULL) AND (crop_name IS NULL) = (crop_version IS NULL))) STRICT;
 
 CREATE TABLE face_results (
     asset_id TEXT PRIMARY KEY REFERENCES assets(asset_id) ON DELETE CASCADE,
@@ -1370,7 +1373,9 @@ CREATE TABLE thumbnails (
     thumbnail_id INTEGER PRIMARY KEY,
     asset_id TEXT NOT NULL REFERENCES assets(asset_id) ON DELETE CASCADE,
     size TEXT NOT NULL CHECK (size IN ('small', 'medium', 'large', 'waveform')),
-    storage_path TEXT NOT NULL,
+    artifact_fence TEXT NOT NULL,
+    artifact_version TEXT NOT NULL,
+    artifact_name TEXT NOT NULL,
     mime_type TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     repository_id TEXT REFERENCES repositories(repo_id) ON DELETE CASCADE,

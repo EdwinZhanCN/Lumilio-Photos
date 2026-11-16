@@ -60,10 +60,12 @@ WITH page_people AS (
     LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
 ),
 representative_faces AS (
-    SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
+    SELECT fi.id, fcm.cluster_id, fi.asset_id
     FROM face_items fi
+    JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
@@ -74,9 +76,8 @@ representative_faces AS (
 ranked_faces AS (
     SELECT
         fcm.cluster_id,
-        fi.face_image_path,
+        fi.id,
         fi.asset_id,
-        fi.repository_id,
         ROW_NUMBER() OVER (
             PARTITION BY fcm.cluster_id
             ORDER BY COALESCE(fi.is_primary, false) DESC,
@@ -88,6 +89,7 @@ ranked_faces AS (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
@@ -103,14 +105,13 @@ SELECT
     fc.hidden_at,
     pp.member_count,
     pp.asset_count,
-    COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
+    COALESCE(rep.id, best.id, 0) AS cover_face_id,
     COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
-    COALESCE(rep.repository_id, best.repository_id) AS cover_repository_id,
     fc.created_at,
     fc.updated_at
 FROM page_people pp
 JOIN face_clusters fc ON fc.cluster_id = pp.cluster_id
-LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id AND rep.cluster_id = fc.cluster_id
 LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 ORDER BY
     COALESCE(fc.is_confirmed, false) DESC,
@@ -136,10 +137,12 @@ WITH scoped AS (
     GROUP BY fcm.cluster_id
 ),
 representative_faces AS (
-    SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
+    SELECT fi.id, fcm.cluster_id, fi.asset_id
     FROM face_items fi
+    JOIN face_cluster_members fcm ON fcm.face_id = fi.id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id
@@ -149,9 +152,8 @@ representative_faces AS (
 ranked_faces AS (
     SELECT
         fcm.cluster_id,
-        fi.face_image_path,
+        fi.id,
         fi.asset_id,
-        fi.repository_id,
         ROW_NUMBER() OVER (
             PARTITION BY fcm.cluster_id
             ORDER BY COALESCE(fi.is_primary, false) DESC,
@@ -163,6 +165,7 @@ ranked_faces AS (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.lifecycle_state = 'active'
+      AND fi.crop_name IS NOT NULL
       AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
         SELECT 1 FROM active_asset_occurrences occurrence
         WHERE occurrence.asset_id = a.asset_id
@@ -177,14 +180,13 @@ SELECT
     fc.hidden_at,
     scoped.member_count,
     scoped.asset_count,
-    COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
+    COALESCE(rep.id, best.id, 0) AS cover_face_id,
     COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
-    COALESCE(rep.repository_id, best.repository_id) AS cover_repository_id,
     fc.created_at,
     fc.updated_at
 FROM face_clusters fc
 JOIN scoped ON scoped.cluster_id = fc.cluster_id AND scoped.member_count > 0
-LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id
+LEFT JOIN representative_faces rep ON rep.id = fc.representative_face_id AND rep.cluster_id = fc.cluster_id
 LEFT JOIN ranked_faces best ON best.cluster_id = fc.cluster_id AND best.face_rank = 1
 WHERE fc.cluster_id = sqlc.arg('cluster_id')
   AND (

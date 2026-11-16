@@ -102,7 +102,8 @@ func TestCleanerKeepsFaceCropsTheirRepositoryNames(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		crop, err := (Identity{SourceFence: occurrence.ContentID.String(), Stage: "faces", PipelineVersion: "1", Name: "0-face.webp"}).Path()
+		identity := Identity{SourceFence: occurrence.ContentID.String(), Stage: StageFaces, PipelineVersion: "1", Name: "0-face.webp"}
+		crop, err := identity.Path()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,8 +112,8 @@ func TestCleanerKeepsFaceCropsTheirRepositoryNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := database.SQL.ExecContext(ctx, `
-			INSERT INTO face_items (asset_id, bounding_box, confidence, face_image_path, created_at, repository_id)
-			VALUES (?, '{}', 0.9, ?, 1, ?)`, assetID, crop.String(), repositoryID); err != nil {
+			INSERT INTO face_items (asset_id, bounding_box, confidence, crop_fence, crop_version, crop_name, created_at, repository_id)
+			VALUES (?, '{}', 0.9, ?, ?, ?, 1, ?)`, assetID, identity.SourceFence, identity.PipelineVersion, identity.Name, repositoryID); err != nil {
 			t.Fatal(err)
 		}
 	}

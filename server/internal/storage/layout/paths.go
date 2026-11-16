@@ -261,20 +261,6 @@ func (p Path) Child(name string) (Path, error) {
 	return private(p.value + "/" + name)
 }
 
-// ParseArtifact validates an artifact path that was stored as text, such as
-// a thumbnails row. Phase 3 replaces stored artifact paths with identities.
-func ParseArtifact(stored string) (Path, error) {
-	p, err := Parse(stored)
-	if err != nil {
-		return Path{}, err
-	}
-	rest, ok := strings.CutPrefix(p.value, path.Join(PrivateRoot, artifactsDir)+"/")
-	if !ok || strings.Count(rest, "/") != 3 {
-		return Path{}, fmt.Errorf("%w: %q is not an artifact", ErrPathNamespace, stored)
-	}
-	return p, nil
-}
-
 // ParseStaged validates a staged upload file that was stored as text, such
 // as a staging commit row: work/uploads/<session>/<name>, or the same file
 // in quarantine/uploads/ after a failure.

@@ -335,52 +335,20 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if person.RepresentativeAssetID == nil || person.CoverFaceImagePath == nil || person.CoverRepositoryID == nil {
+	if person.CoverFaceID == nil {
 		api.WriteProblem(c, api.NotFound(errors.New("person cover not found")))
 		return
 	}
-
-	if h.repoResolver == nil || h.files == nil {
-		api.WriteProblem(c, api.Internal(errors.New("repository filesystem unavailable")))
-		return
-	}
-
-	repository, err := h.repoResolver.GetRepository(*person.CoverRepositoryID)
+	crop, err := h.faceService.GetPersonFaceCrop(c.Request.Context(), personID, *person.CoverFaceID, repositoryID, ownerID)
 	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-
-	repositoryFS, file, err := openRepositoryArtifact(h.files, *repository, *person.CoverFaceImagePath)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			api.WriteProblem(c, api.NotFound(err))
+		if errors.Is(err, sql.ErrNoRows) {
+			api.WriteProblem(c, api.NotFound(errors.New("person cover not found")))
 			return
 		}
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	fileInfo, err := file.Stat()
-	if err != nil {
-		_ = file.Close()
-		_ = repositoryFS.Close()
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-
-	etag := fmt.Sprintf(`"%d-%d"`, personID, fileInfo.ModTime().Unix())
-	c.Header("ETag", etag)
-	c.Header("Cache-Control", "public, max-age=86400, must-revalidate")
-	c.Header("Vary", "Accept-Encoding")
-	c.Header("Content-Type", "image/webp")
-	if match := c.GetHeader("If-None-Match"); match == etag {
-		_ = file.Close()
-		_ = repositoryFS.Close()
-		c.Status(http.StatusNotModified)
-		return
-	}
-
-	serveRepositoryFile(c, repositoryFS, file, *person.CoverFaceImagePath)
+	h.serveFaceCrop(c, personID, crop)
 }
 
 // ListPersonFaces lists UI-safe face crops belonging to a person.
@@ -474,6 +442,11 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
+	h.serveFaceCrop(c, personID, crop)
+}
+
+// serveFaceCrop serves a face crop artifact from its repository.
+func (h *PeopleHandler) serveFaceCrop(c *gin.Context, personID int32, crop *service.PersonFaceCrop) {
 	if h.repoResolver == nil || h.files == nil {
 		api.WriteProblem(c, api.Internal(errors.New("repository filesystem unavailable")))
 		return
@@ -485,7 +458,7 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 		return
 	}
 
-	repositoryFS, file, err := openRepositoryArtifact(h.files, *repository, crop.FaceImagePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, *repository, crop.Artifact)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -502,7 +475,7 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 		return
 	}
 
-	etag := fmt.Sprintf(`"%d-%d-%d"`, personID, faceID, fileInfo.ModTime().Unix())
+	etag := fmt.Sprintf(`"%d-%d-%d"`, personID, crop.FaceID, fileInfo.ModTime().Unix())
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "public, max-age=86400, must-revalidate")
 	c.Header("Vary", "Accept-Encoding")
@@ -514,7 +487,7 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 		return
 	}
 
-	serveRepositoryFile(c, repositoryFS, file, crop.FaceImagePath)
+	serveRepositoryFile(c, repositoryFS, file, crop.Artifact.Name)
 }
 
 // MergePeople merges one or more source people into the target person.

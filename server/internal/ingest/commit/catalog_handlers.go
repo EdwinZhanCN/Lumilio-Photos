@@ -13,6 +13,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/event"
 	"server/internal/service"
+	storageartifact "server/internal/storage/artifact"
 	"server/internal/work/pipeline"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
@@ -45,7 +46,7 @@ type AssetMetadataApplied struct {
 type ThumbnailArtifact struct {
 	RepositoryID uuid.UUID
 	Size         string
-	StoragePath  string
+	Artifact     storageartifact.Identity
 	MimeType     string
 }
 
@@ -337,7 +338,9 @@ func applyAssetDerivatives(ctx context.Context, tx *sql.Tx, payload AssetDerivat
 		return OutcomeDuplicate, nil
 	}
 	for _, artifact := range payload.Artifacts {
-		if artifact.RepositoryID == uuid.Nil || artifact.Size == "" || artifact.StoragePath == "" || artifact.MimeType == "" {
+		id := artifact.Artifact
+		if artifact.RepositoryID == uuid.Nil || artifact.Size == "" || artifact.MimeType == "" || id.Name == "" ||
+			id.Stage != storageartifact.StageDerivatives || id.SourceFence != payload.SourceFence.String() || id.PipelineVersion != payload.PipelineVersion {
 			return 0, errors.New("invalid thumbnail artifact")
 		}
 		// The artifact identity is immutable per source content; the row per
@@ -346,13 +349,13 @@ func applyAssetDerivatives(ctx context.Context, tx *sql.Tx, payload AssetDerivat
 		// still points at an earlier content's artifact (the Asset was
 		// re-pointed by an in-place edit) is replaced, never left stale.
 		existing, lookupErr := queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{AssetID: payload.AssetID, Size: artifact.Size})
-		if lookupErr == nil && existing.RepositoryID == artifact.RepositoryID && existing.StoragePath == artifact.StoragePath && existing.MimeType == artifact.MimeType {
+		if lookupErr == nil && existing.RepositoryID == artifact.RepositoryID && storageartifact.ThumbnailIdentity(existing) == id && existing.MimeType == artifact.MimeType {
 			continue
 		}
 		if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
 			return 0, lookupErr
 		}
-		if _, err := queries.CreateThumbnail(ctx, repo.CreateThumbnailParams{AssetID: payload.AssetID, Size: artifact.Size, StoragePath: artifact.StoragePath, MimeType: artifact.MimeType, RepositoryID: artifact.RepositoryID}); err != nil {
+		if _, err := queries.CreateThumbnail(ctx, repo.CreateThumbnailParams{AssetID: payload.AssetID, Size: artifact.Size, ArtifactFence: id.SourceFence, ArtifactVersion: id.PipelineVersion, ArtifactName: id.Name, MimeType: artifact.MimeType, RepositoryID: artifact.RepositoryID}); err != nil {
 			return 0, err
 		}
 	}

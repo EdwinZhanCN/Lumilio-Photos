@@ -79,7 +79,7 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `ingest` → `foundation`: 12 package import(s), declared
 - `ingest` → `media`: 8 package import(s), declared
 - `ingest` → `service`: 2 package import(s), declared
-- `ingest` → `storage`: 13 package import(s), declared
+- `ingest` → `storage`: 14 package import(s), declared
 - `ingest` → `work`: 7 package import(s), declared
 - `media` → `foundation`: 3 package import(s), declared
 - `runtime` → `agent`: 5 package import(s), declared

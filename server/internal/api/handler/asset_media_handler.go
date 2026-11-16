@@ -19,6 +19,7 @@ import (
 	"server/internal/media/imagesource"
 	"server/internal/media/imaging"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 	roelocations "server/internal/storage/locations"
 	"strconv"
 	"strings"
@@ -213,7 +214,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	repositoryFS, file, err := openRepositoryArtifact(h.files, repository, thumbnail.StoragePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, repository, artifact.ThumbnailIdentity(*thumbnail))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -254,7 +255,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		return
 	}
 
-	serveRepositoryFile(c, repositoryFS, file, thumbnail.StoragePath)
+	serveRepositoryFile(c, repositoryFS, file, thumbnail.ArtifactName)
 }
 
 // GetOriginalFile serves the original file content by asset ID

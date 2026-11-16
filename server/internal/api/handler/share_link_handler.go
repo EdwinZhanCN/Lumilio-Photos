@@ -16,6 +16,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 	roelocations "server/internal/storage/locations"
 
 	"github.com/gin-gonic/gin"
@@ -446,7 +447,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	repositoryFS, file, err := openRepositoryArtifact(h.files, repository, thumbnail.StoragePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, repository, artifact.ThumbnailIdentity(*thumbnail))
 	if err != nil {
 		api.WriteProblem(c, api.NotFound(err))
 		return
@@ -455,7 +456,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 	// Short private caching only: this is a token-gated asset, not a
 	// permanently public URL, so it must never be cached at a shared proxy.
 	c.Header("Cache-Control", "private, max-age=300")
-	serveRepositoryFile(c, repositoryFS, file, thumbnail.StoragePath)
+	serveRepositoryFile(c, repositoryFS, file, thumbnail.ArtifactName)
 }
 
 // GetPublicShareWebVideo serves a share asset's web-optimized video, falling

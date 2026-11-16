@@ -1,6 +1,8 @@
 package processors
 
 import (
+	"server/internal/storage/artifact"
+
 	"github.com/google/uuid"
 )
 
@@ -21,7 +23,7 @@ type DerivedArtifact struct {
 	SourceFence  uuid.UUID
 	RepositoryID uuid.UUID
 	Size         string
-	StoragePath  string
+	Artifact     artifact.Identity
 	MimeType     string
 }
 

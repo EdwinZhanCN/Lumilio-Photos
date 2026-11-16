@@ -94,12 +94,10 @@ type AssetService interface {
 	// SearchTags returns tag definitions for autocomplete; empty query lists all.
 	SearchTags(ctx context.Context, query string, limit int) ([]repo.Tag, error)
 
-	CreateThumbnail(ctx context.Context, assetID, repositoryID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
 
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*repo.Tag, error)
-	GetThumbnailByID(ctx context.Context, thumbnailID int) (*repo.Thumbnail, error)
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error)
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
@@ -882,34 +880,6 @@ func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, f
 // ================================
 // Thumbnail CRUD Operations
 // ================================
-
-// CreateThumbnail creates or updates a thumbnail record for an asset
-func (s *assetService) CreateThumbnail(ctx context.Context, assetID, repositoryID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
-	params := repo.CreateThumbnailParams{
-		AssetID:      assetID,
-		Size:         size,
-		StoragePath:  thumbnailPath,
-		MimeType:     "image/webp",
-		RepositoryID: repositoryID,
-	}
-
-	dbThumbnail, err := s.queries.CreateThumbnail(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create thumbnail: %w", err)
-	}
-
-	return &dbThumbnail, nil
-}
-
-// GetThumbnailByID retrieves thumbnails by their ID
-func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*repo.Thumbnail, error) {
-	dbThumbnail, err := s.readQueries.GetThumbnailByID(ctx, int32(thumbnailID))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get thumbnail: %w", err)
-	}
-
-	return &dbThumbnail, nil
-}
 
 // GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
 func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error) {

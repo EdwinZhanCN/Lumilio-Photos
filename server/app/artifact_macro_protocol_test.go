@@ -36,7 +36,7 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 	for _, statement := range []string{
 		`CREATE TABLE assets(asset_id TEXT PRIMARY KEY,type TEXT,status TEXT,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
-		`CREATE TABLE thumbnails(thumbnail_id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,size TEXT,storage_path TEXT,mime_type TEXT,created_at INTEGER,repository_id TEXT,UNIQUE(asset_id,size))`,
+		`CREATE TABLE thumbnails(thumbnail_id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,size TEXT,artifact_fence TEXT,artifact_version TEXT,artifact_name TEXT,mime_type TEXT,created_at INTEGER,repository_id TEXT,UNIQUE(asset_id,size))`,
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
 		`CREATE TABLE asset_reindex_requests(receipt_id TEXT PRIMARY KEY,requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
@@ -83,15 +83,14 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 	}
 	worker := queue.NewGenerateAssetDerivativesWorker(func(ctx context.Context, _ qos.Class, args jobs.GenerateAssetDerivativesArgs) error {
 		return runtime.engine.Run(ctx, execution.ClassBackground, runtime.demand.Demand(execution.StepDerivativesComputeThumb, execution.MediaPhoto), func(stepCtx context.Context) error {
-			published, err := store.Publish(stepCtx, identity, bytes.NewReader(candidateBody))
-			if err != nil {
+			if _, err := store.Publish(stepCtx, identity, bytes.NewReader(candidateBody)); err != nil {
 				return err
 			}
 			if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
 				AssetID: args.AssetID, SourceFence: args.SourceFence,
 				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
 				Artifacts: []commit.ThumbnailArtifact{{
-					RepositoryID: repositoryID, Size: "small", StoragePath: published.Path, MimeType: "image/webp",
+					RepositoryID: repositoryID, Size: "small", Artifact: identity, MimeType: "image/webp",
 				}},
 			}); err != nil {
 				return err
