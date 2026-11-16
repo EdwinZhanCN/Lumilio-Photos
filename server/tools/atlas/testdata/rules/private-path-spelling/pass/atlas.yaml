@@ -1,0 +1,13 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: private-path-spelling
+    why: one package spells the private tree
+    literals:
+      in: [fx/**]
+      except: [fx/layout]
+      equal: [.lumilio]
+      prefix: [.lumilio/, .lumilio-]
+      contains: [/.lumilio/]

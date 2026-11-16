@@ -514,6 +514,27 @@ rules:
       # projection it reports is the background reconciler's.
       forbid: [server/internal/storage/runtime_status.go]
 
+  # Repository layout plan: one package, storage/layout, builds and
+  # classifies every path under a Repository's .lumilio/. Both rules land
+  # with today's violations baselined (Phase 0) and fail once Phase 2 moves
+  # every caller onto the layout constructors.
+  - id: private-path-spelling
+    why: one package spells the private tree, so .lumilio/ has one declared layout and every path in it one class
+    literals:
+      in: [server/**, desktop/**]
+      # server/docs is the generated OpenAPI document; server/tools are
+      # developer tools outside the Server.
+      except: [server/internal/storage/layout, server/docs, server/tools/**]
+      equal: [.lumilio]
+      prefix: [.lumilio/, .lumilio-, .lumilio_]
+      contains: [/.lumilio/]
+
+  - id: private-path-construction
+    why: a private RepositoryPath comes from a typed layout constructor, never from a parsed string
+    calls:
+      targets: [server/internal/storage.ParsePrivateRepositoryPath]
+      only: [server/internal/storage/layout]
+
   # ------------------------------------------------------ desktop
   - id: desktop-marker-parsing
     why: the Desktop asks server/app about portable markers; the Server's typed readers are the only marker parsers

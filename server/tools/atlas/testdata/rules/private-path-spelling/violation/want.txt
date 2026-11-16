@@ -1,0 +1,4 @@
+fx/app.Join spells ".lumilio"
+fx/app.Nested spells "repo/.lumilio/work"
+fx/app.Probe spells ".lumilio-probe-"
+fx/app.trashDir spells ".lumilio/trash"

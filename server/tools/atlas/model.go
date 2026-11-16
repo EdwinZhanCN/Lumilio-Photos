@@ -75,6 +75,19 @@ type Rule struct {
 	TxPurity *TxPurityRule `yaml:"tx_purity" json:"txPurity,omitempty"`
 	// Budgets caps the production lines of every package.
 	Budgets *BudgetsRule `yaml:"budgets" json:"budgets,omitempty"`
+	// Literals keeps code in scope from spelling the target strings.
+	Literals *LiteralsRule `yaml:"literals" json:"literals,omitempty"`
+}
+
+// LiteralsRule: a string literal in a production file in In, and not in
+// Except, that equals one of Equal, starts with one of Prefix, or contains
+// one of Contains is a finding. Struct tags are not checked.
+type LiteralsRule struct {
+	In       []string `yaml:"in" json:"in"`
+	Except   []string `yaml:"except" json:"except,omitempty"`
+	Equal    []string `yaml:"equal" json:"equal,omitempty"`
+	Prefix   []string `yaml:"prefix" json:"prefix,omitempty"`
+	Contains []string `yaml:"contains" json:"contains,omitempty"`
 }
 
 // A scope is a list of patterns, each a package directory
