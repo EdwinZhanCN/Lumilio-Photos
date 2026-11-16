@@ -6,8 +6,9 @@ plans and server-structure Phase B in front of rc.1. Q0 done 2026-10-29
 (#267). A1 done 2026-11-14 (#270). A2 done 2026-11-14 (#271). A3 done 2026-11-14 (#272). A4 done 2026-11-14 (#273). Section-A full run done 2026-11-14 on the Radxa
 (Server gate and Docker E2E slices; the gate fix it needed is #274). B1 done
 2026-11-14 (#275). B2 done 2026-11-14 (#276). Section-B2 full run done
-2026-11-14 on the Radxa (Server gate and Docker E2E slices). Next step:
-**RL0**.
+2026-11-14 on the Radxa (Server gate and Docker E2E slices); two music
+specs were flaky there, and the owner made fixing them row F1 (2026-11-15).
+Next step: **F1**.
 Update the row of each step in the PR that lands it.
 
 Goal: every open plan lands on `dev` in the order below, then the
@@ -84,7 +85,8 @@ the plan it names.
 | A4 | **Done 2026-11-14 (#273).** Views that verify arrows; `movecheck` and `split-report` | [atlas-rules.md](atlas-rules.md) | A3 | Every B session's evidence |
 | B1 | **Done 2026-11-14 (#275).** Infrastructure moves, `server/platform` gone | [server-structure.md](server-structure.md) | A4 | Storage code is then written once, at its final path (`catalog`, `storage/artifact`, `ingest`, `work`) |
 | B2 | **Done 2026-11-14 (#276).** Typed catalog handles; `catalog` builds the River driver; database boundary rule 1; rule 4 ceilings recorded | [server-structure.md](server-structure.md) | B1 | New storage SQL obeys the boundary from its first line |
-| RL0 | Layout Phase 0: session-leak test, single-owner rule (Atlas `calls`/`constructs`, report mode), private-path inventory | [repository-layout.md](repository-layout.md) | B2 | Locks the failures first |
+| F1 | Music E2E flakes from the section-B2 run, both on the first Radxa stack, both passing on retry and clean on a fresh stack: (1) `web/e2e/specs/music.spec.ts:136` (`@smoke`, slice `browser`): after the SPA link back to `/music` the `<audio>` `src` is kept but `currentTime` stays exactly at the pre-navigation position (0.02322 s) for the whole 5 s poll, which is the stalled-playback symptom of [postmortem 0003](../../../.agents/postmortems/0003-web-media-url-switched-representation.md); (2) `web/e2e/specs/music-agent.spec.ts:135` (`@agent-runtime`): after Refine, the second "Music selection" region does not render within 5 s. Find each cause before touching a timeout: a product race is fixed in the product with a failing-first test, and a test that waits on the wrong signal waits on the right one. Evidence: both slices run repeatedly on the Radxa (`--repeat-each`) with no flaky result | — | B2 | A section-end failure is fixed before the next section starts; owner decision 2026-11-15: fixed before rc.1 |
+| RL0 | Layout Phase 0: session-leak test, single-owner rule (Atlas `calls`/`constructs`, report mode), private-path inventory | [repository-layout.md](repository-layout.md) | F1 | Locks the failures first |
 | RL1 | Layout Phase 1: the `storage/layout` package | [repository-layout.md](repository-layout.md) | RL0 | |
 | RL2 | Layout Phase 2: every caller moved; single-owner rule fails on violations | [repository-layout.md](repository-layout.md) | RL1 | |
 | RL3 | Layout Phase 3: catalog stores artifact identities; face crops published as artifacts; rebuild `.local/dev` | [repository-layout.md](repository-layout.md) | RL2 | RA3 and SC need `cache/artifacts/` and `user/` |
