@@ -2,7 +2,7 @@
 
 Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #278).
 Phase 1 landed 2026-11-16 (RL1, #279). Phase 2 landed 2026-11-16 (RL2, #280).
-Phase 3 landed 2026-11-16 (RL3). Next: Phase 4 (RL4). The layout below
+Phase 3 landed 2026-11-16 (RL3, #281). Next: Phase 4 (RL4). The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
 "fix what is found" contract in [rc-release.md](rc-release.md).
 
