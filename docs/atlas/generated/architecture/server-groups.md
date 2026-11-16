@@ -101,6 +101,6 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `service` → `work`: 2 package import(s), declared
 - `storage` → `catalog`: 12 package import(s), declared
 - `storage` → `domain`: 3 package import(s), declared
-- `storage` → `foundation`: 7 package import(s), declared
+- `storage` → `foundation`: 8 package import(s), declared
 - `storage` → `media`: 3 package import(s), declared
 - `work` → `catalog`: 2 package import(s), declared

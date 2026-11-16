@@ -58,6 +58,9 @@ func TestRepositoryFSWalkIncludesInboxAndProtectsPrivateTree(t *testing.T) {
 	writeRepositoryFSTestFile(t, repository.Path, ".hidden/secret.png", []byte("hidden"))
 	writeRepositoryFSTestFile(t, repository.Path, ".lumilio/assets/private.jpg", []byte("private"))
 	writeRepositoryFSTestFile(t, repository.Path, "notes.txt", []byte("unsupported"))
+	// Reserved root names are skipped, not reported as invalid media paths.
+	writeRepositoryFSTestFile(t, repository.Path, ".lumiliorepo.lock", nil)
+	writeRepositoryFSTestFile(t, repository.Path, ".lumilio-tmp-probe-1.jpg", []byte("probe"))
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
 	observations, issues := listAllUserMedia(t, repositoryFS)

@@ -1,7 +1,7 @@
 # Repository layout: one class per directory, owned by one package
 
 Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #278).
-Next: Phase 1 (RL1). The layout below
+Phase 1 landed 2026-11-16 (RL1, #PRNUM). Next: Phase 2 (RL2). The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
 "fix what is found" contract in [rc-release.md](rc-release.md).
 
@@ -238,6 +238,29 @@ storage Atlas group:
 
 `RepositoryPath` for private paths becomes constructible only through this
 package.
+
+Landed in RL1 (2026-11-16):
+
+- `storage/layout` holds the class table (`Policies`, `PolicyOf`), the
+  constructors, `Classify`, `IsReserved`, `IsTemp`, `RootTemp`, `Init`,
+  `Validate`, and `CACHEDIR.TAG`. It owns the path type: `layout.Path`
+  replaces the struct behind `storage.RepositoryPath`, which is now an
+  alias. `storage.ParseUserMediaPath` and `storage.ParsePrivateRepositoryPath`
+  are one-line delegates to `layout.ParseMedia` and `layout.Parse`, so no
+  code outside `layout` can build a private path except through `layout`.
+  Phase 2 deletes the alias and both delegates.
+- The trash keeps one directory per trashed file,
+  `trash/files/<trashID>/<original name>`, so the constructors are
+  `TrashDir(id)`, `TrashFile(id, name)`, and `TrashInfo(id)`. The tree above
+  abbreviates this as `files/<trashID>`.
+- `layout.ParseMedia` rejects every name `IsReserved` reports. That is
+  stricter than before: the lock files and `.lumilio-tmp-` names are no
+  longer media. The scan listings and the watcher skip reserved names with
+  `IsReserved`, so a lock file is skipped instead of being reported as an
+  invalid path. The storage trash helpers already delegate to the layout
+  constructors. These moves dropped 11 baselined findings.
+- `Init` and `Validate` are not called yet. Phase 2 replaces
+  `CreateStructure` and `ValidateStructure` with them.
 
 ### Phase 2 — Move every caller
 

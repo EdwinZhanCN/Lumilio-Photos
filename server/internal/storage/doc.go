@@ -20,6 +20,8 @@
 //   - [RepositoryFS] and [RepositoryFSFactory]: every repository file
 //     operation is rooted here and serialized against reconnect and
 //     removal; nothing else opens repository paths.
+//   - [server/internal/storage/layout]: builds, classifies, and validates
+//     every path under .lumilio/; owns the type behind [RepositoryPath].
 //   - [server/internal/storage/scan]: the repository scan index. The catalog
 //     mirrors each repository tree in repository_entries; walks diff
 //     directories against it and a bounded hash pass binds content to Assets.

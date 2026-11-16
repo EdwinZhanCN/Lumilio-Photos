@@ -423,21 +423,21 @@ func portableBase(filename string) (string, error) {
 // an existing destination. The recovery service uses it to give a Studio
 // record its reassociated Asset name.
 func (r *RepositoryFS) MovePrivateFile(source, destination RepositoryPath) error {
-	if !source.isPrivate() || !destination.isPrivate() {
+	if !source.IsPrivate() || !destination.IsPrivate() {
 		return ErrRepositoryPathNamespace
 	}
 	return r.movePrivateNoReplace(source, destination)
 }
 
 func (r *RepositoryFS) movePrivateNoReplace(source, destination RepositoryPath) error {
-	if !source.isPrivate() || (!destination.isPrivate() && !destination.isUserMedia()) {
+	if !source.IsPrivate() || (!destination.IsPrivate() && !destination.IsMedia()) {
 		return ErrRepositoryPathNamespace
 	}
-	sourceLocal, err := source.local()
+	sourceLocal, err := source.Local()
 	if err != nil {
 		return err
 	}
-	destinationLocal, err := destination.local()
+	destinationLocal, err := destination.Local()
 	if err != nil {
 		return err
 	}
@@ -522,7 +522,7 @@ func syncRootDirectory(root *os.Root, directory string) error {
 			return err
 		}
 	}
-	name, err := local.local()
+	name, err := local.Local()
 	if err != nil {
 		return err
 	}

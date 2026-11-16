@@ -8,50 +8,29 @@ import (
 	"path"
 
 	"github.com/google/uuid"
-)
 
-// RepositoryTrashDirectory is the per-repository trash. Deleting an Asset
-// moves its files into files/<trash_id>/<name> and writes a self-describing
-// sidecar to info/<trash_id>.json, so the Trash view can be rebuilt from the
-// repository alone.
-const RepositoryTrashDirectory = ".lumilio/trash"
+	"server/internal/storage/layout"
+)
 
 // ErrRepositoryDestinationExists reports a move whose destination is taken;
 // a lifecycle move never replaces a file.
 var ErrRepositoryDestinationExists = errors.New("repository move destination already exists")
 
+// Trash paths (files/<trash_id>/<name>, info/<trash_id>.json) come from layout.
+
 // TrashFileDirectory is the directory that holds one trashed file.
-func TrashFileDirectory(trashID uuid.UUID) (RepositoryPath, error) {
-	if trashID == uuid.Nil {
-		return RepositoryPath{}, fmt.Errorf("%w: zero trash ID", ErrRepositoryPathInvalid)
-	}
-	return ParsePrivateRepositoryPath(path.Join(RepositoryTrashDirectory, "files", trashID.String()))
-}
+func TrashFileDirectory(trashID uuid.UUID) (RepositoryPath, error) { return layout.TrashDir(trashID) }
 
 // TrashFilePath is where a trashed file lives, under its original name.
 func TrashFilePath(trashID uuid.UUID, name string) (RepositoryPath, error) {
-	directory, err := TrashFileDirectory(trashID)
-	if err != nil {
-		return RepositoryPath{}, err
-	}
-	if name == "" || name == "." || name == ".." || path.Base(name) != name {
-		return RepositoryPath{}, fmt.Errorf("%w: trashed file name %q", ErrRepositoryPathInvalid, name)
-	}
-	return ParsePrivateRepositoryPath(path.Join(directory.String(), name))
+	return layout.TrashFile(trashID, name)
 }
 
 // TrashInfoDirectory holds the trash's info sidecars.
-func TrashInfoDirectory() RepositoryPath {
-	return RepositoryPath{value: path.Join(RepositoryTrashDirectory, "info"), namespace: namespacePrivate}
-}
+func TrashInfoDirectory() RepositoryPath { return layout.TrashInfoDir() }
 
 // TrashInfoPath is the info sidecar of one trashed file.
-func TrashInfoPath(trashID uuid.UUID) (RepositoryPath, error) {
-	if trashID == uuid.Nil {
-		return RepositoryPath{}, fmt.Errorf("%w: zero trash ID", ErrRepositoryPathInvalid)
-	}
-	return ParsePrivateRepositoryPath(path.Join(TrashInfoDirectory().String(), trashID.String()+".json"))
-}
+func TrashInfoPath(trashID uuid.UUID) (RepositoryPath, error) { return layout.TrashInfo(trashID) }
 
 // MoveNoReplace moves one file between the user tree and Lumilio's private
 // tree of the same repository: into the trash or back out of it. It never
@@ -64,14 +43,14 @@ func TrashInfoPath(trashID uuid.UUID) (RepositoryPath, error) {
 // and renames; only a file created at the destination inside that window
 // could be replaced.
 func (r *RepositoryFS) MoveNoReplace(source, destination RepositoryPath) error {
-	if !(source.isUserMedia() && destination.isPrivate()) && !(source.isPrivate() && destination.isUserMedia()) {
+	if !(source.IsMedia() && destination.IsPrivate()) && !(source.IsPrivate() && destination.IsMedia()) {
 		return ErrRepositoryPathNamespace
 	}
-	sourceLocal, err := source.local()
+	sourceLocal, err := source.Local()
 	if err != nil {
 		return err
 	}
-	destinationLocal, err := destination.local()
+	destinationLocal, err := destination.Local()
 	if err != nil {
 		return err
 	}
@@ -133,11 +112,11 @@ func syncParentDirectory(root *os.Root, repositoryPath RepositoryPath) error {
 // move interrupted between its link and its unlink leaves the file under
 // both names; recovery keeps one and never removes a different file.
 func (r *RepositoryFS) DropDuplicateLink(keep, drop RepositoryPath) error {
-	keepLocal, err := keep.local()
+	keepLocal, err := keep.Local()
 	if err != nil {
 		return err
 	}
-	dropLocal, err := drop.local()
+	dropLocal, err := drop.Local()
 	if err != nil {
 		return err
 	}
@@ -165,11 +144,11 @@ func (r *RepositoryFS) DropDuplicateLink(keep, drop RepositoryPath) error {
 
 // SameFile reports whether two repository paths name the same file.
 func (r *RepositoryFS) SameFile(left, right RepositoryPath) (bool, error) {
-	leftLocal, err := left.local()
+	leftLocal, err := left.Local()
 	if err != nil {
 		return false, err
 	}
-	rightLocal, err := right.local()
+	rightLocal, err := right.Local()
 	if err != nil {
 		return false, err
 	}
@@ -191,7 +170,7 @@ func (r *RepositoryFS) SameFile(left, right RepositoryPath) (bool, error) {
 
 // Exists reports whether a repository path names any directory entry.
 func (r *RepositoryFS) Exists(repositoryPath RepositoryPath) (bool, error) {
-	local, err := repositoryPath.local()
+	local, err := repositoryPath.Local()
 	if err != nil {
 		return false, err
 	}

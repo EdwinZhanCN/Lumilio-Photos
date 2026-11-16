@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	fileutil "server/internal/media/file"
+	"server/internal/storage/layout"
 )
 
 // DirectoryListing is one complete user-media directory as the scan index
@@ -42,7 +43,7 @@ func (r *RepositoryFS) ListUserMediaDirectory(ctx context.Context, directory str
 		if err != nil {
 			return listing, err
 		}
-		local, err = parsed.local()
+		local, err = parsed.Local()
 		if err != nil {
 			return listing, err
 		}
@@ -77,7 +78,7 @@ func (r *RepositoryFS) ListUserMediaDirectory(ctx context.Context, directory str
 		if directory != "" {
 			child = directory + "/" + child
 		}
-		if child == ".lumilio" || child == ".lumiliorepo" || child == ".lumilioroot" {
+		if layout.IsReserved(child) {
 			continue
 		}
 		if entry.IsDir() {
@@ -126,10 +127,10 @@ func (r *RepositoryFS) ProbeUserMediaAbsence(ctx context.Context, repositoryPath
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	if !repositoryPath.isUserMedia() {
+	if !repositoryPath.IsMedia() {
 		return false, ErrRepositoryPathNamespace
 	}
-	local, err := repositoryPath.local()
+	local, err := repositoryPath.Local()
 	if err != nil {
 		return false, err
 	}
@@ -179,7 +180,7 @@ func (r *RepositoryFS) ListUserMediaSubdirectories(ctx context.Context, director
 		if err != nil {
 			return nil, err
 		}
-		local, err = parsed.local()
+		local, err = parsed.Local()
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +208,7 @@ func (r *RepositoryFS) ListUserMediaSubdirectories(ctx context.Context, director
 		if directory != "" {
 			child = directory + "/" + child
 		}
-		if child == ".lumilio" {
+		if layout.IsReserved(child) {
 			continue
 		}
 		if _, markerErr := root.Stat(path.Join(child, ".lumiliorepo")); !errors.Is(markerErr, fs.ErrNotExist) {

@@ -15,6 +15,7 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 )
 
 // Watcher turns filesystem events into scan requests. It is only a hint:
@@ -263,15 +264,15 @@ func (w *Watcher) requestScan(ctx context.Context, repositoryID uuid.UUID, scope
 }
 
 // watchedRelative maps an event path to a repository-relative path, dropping
-// Lumilio's own private tree and marker files so its writes cannot feed back.
+// the names layout reserves (the private tree, markers, locks, temporaries)
+// so Lumilio's own writes cannot feed back.
 func watchedRelative(root, eventPath string) (string, bool) {
 	relative, err := filepath.Rel(root, eventPath)
 	if err != nil || relative == "." || strings.HasPrefix(relative, "..") {
 		return "", false
 	}
 	relative = filepath.ToSlash(relative)
-	if relative == ".lumilio" || strings.HasPrefix(relative, ".lumilio/") ||
-		relative == ".lumiliorepo" || relative == ".lumilioroot" {
+	if layout.IsReserved(relative) {
 		return "", false
 	}
 	return relative, true
