@@ -38,6 +38,7 @@ var ruleKinds = []ruleKind{
 	{name: "tables", set: func(r Rule) bool { return r.Tables != nil }, eval: (*Atlas).tablesFindings},
 	{name: "tx_purity", set: func(r Rule) bool { return r.TxPurity != nil }, eval: (*Atlas).txPurityFindings},
 	{name: "budgets", set: func(r Rule) bool { return r.Budgets != nil }, eval: (*Atlas).budgetsFindings},
+	{name: "literals", set: func(r Rule) bool { return r.Literals != nil }, eval: (*Atlas).literalsFindings},
 }
 
 // runRules evaluates every declared rule and reconciles its findings with its

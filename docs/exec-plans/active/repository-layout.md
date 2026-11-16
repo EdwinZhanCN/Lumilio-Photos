@@ -1,6 +1,7 @@
 # Repository layout: one class per directory, owned by one package
 
-Status: active. Created 2026-10-28; nothing has landed yet. The layout below
+Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #278).
+Next: Phase 1 (RL1). The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
 "fix what is found" contract in [rc-release.md](rc-release.md).
 
@@ -180,6 +181,45 @@ Each test must fail on today's code.
   stores a private path. Known so far: `thumbnails.storage_path` and
   `face_items.face_image_path`. Also search the specific metadata, the
   receipts, and the trash info JSON.
+
+Landed in RL0 (2026-11-16):
+
+- The session-leak test is
+  `TestCompletedChunkedUploadLeavesNoSession` in `server/app`. It drives a
+  two-chunk upload over HTTP, then requires that the progress endpoint no
+  longer reports the session and that nothing is left under the private
+  `staging/` or `work/` classes. On today's code it fails: the session stays
+  in memory and its manifest stays under
+  `staging/incoming/upload_sessions/`. It is skipped through
+  `layoutPhase2Pending` until Phase 2 deletes that helper, and
+  `LUMILIO_LAYOUT_PHASE0=1` runs it anyway.
+- The single-owner check is two Atlas rules, both baselined with today's
+  findings. `private-path-spelling` uses the new `literals` rule kind: no
+  production string spells `.lumilio`, `.lumilio/…`, `.lumilio-…`,
+  `.lumilio_…`, or `…/.lumilio/…` outside `storage/layout` (52 findings).
+  `private-path-construction` is a `calls` rule: only `storage/layout`
+  calls `ParsePrivateRepositoryPath` (39 findings). A `calls` rule counts
+  every call, not only calls with a string literal. Phase 2 empties both
+  baselines, so both rules then fail on any new violation.
+- The inventory of stored private paths:
+
+  | Where | Field | Holds | Phase |
+  | --- | --- | --- | --- |
+  | catalog `thumbnails` | `storage_path` | artifact path `.lumilio/artifacts/<fence>/…` | 3: identity |
+  | catalog `face_items` | `face_image_path` | face crop path under `.lumilio/assets/faces/` | 3: identity |
+  | catalog `repository_staging_commits` | `staging_path` | in-flight upload or cloud bytes under `.lumilio/staging/` | 2: a `work/` path from the layout constructors |
+  | API `AssetThumbnailDTO` | `storage_path` | the `thumbnails` value, sent to clients | 3: drop it or send the identity |
+  | API `PersonSummaryDTO` | `cover_face_image_path` | the `face_items` value; the Web uses it only as a has-cover flag | 3: replace it with a flag |
+  | upload session manifest | `chunk_files`, `ChunkInfo.private_path` | chunk paths under `.lumilio/staging/incoming/` | 2: names inside `work/uploads/<session>/` |
+  | `storage.StagingFile` JSON | `private_path` | a staging file | 2 |
+  | recovery receipts | `items[].path`, `moved_to` | the preserved item's old and current private paths | 2: receipts describe the tree, so they keep paths, built by the layout package |
+
+  These hold public or host paths, not private ones, and stay as they
+  are: the trash info JSON (`original_path`, `restored_path`; the trash ID
+  names the private file), the Studio record's `source.storage_path` (the
+  original), `lifecycle_audit_events.old_path` and `new_path`, and
+  `host_actions.selected_path` (Repository and host paths). The specific
+  metadata holds no private path.
 
 ### Phase 1 — The layout package
 

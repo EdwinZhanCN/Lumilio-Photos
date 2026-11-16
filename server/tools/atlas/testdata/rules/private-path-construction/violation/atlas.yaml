@@ -1,0 +1,10 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: private-path-construction
+    why: a private path comes from a typed layout constructor
+    calls:
+      targets: [fx/storage.ParsePrivateRepositoryPath]
+      only: [fx/layout]
