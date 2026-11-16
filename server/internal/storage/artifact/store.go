@@ -7,14 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
 	"strings"
 	"time"
 
 	"server/internal/storage"
+	"server/internal/storage/layout"
 )
-
-const privateRoot = ".lumilio/artifacts"
 
 type Identity struct{ SourceFence, Stage, PipelineVersion, Name string }
 
@@ -27,11 +25,11 @@ func (i Identity) validate() error {
 	return nil
 }
 
-func (i Identity) Path() (storage.RepositoryPath, error) {
+func (i Identity) Path() (layout.Path, error) {
 	if err := i.validate(); err != nil {
-		return storage.RepositoryPath{}, err
+		return layout.Path{}, err
 	}
-	return storage.ParsePrivateRepositoryPath(path.Join(privateRoot, i.SourceFence, i.Stage, i.PipelineVersion, i.Name))
+	return layout.Artifact(layout.ArtifactID(i))
 }
 
 type Published struct {
@@ -70,7 +68,7 @@ func (s *Store) Publish(ctx context.Context, identity Identity, reader io.Reader
 	if err != nil {
 		return Published{}, err
 	}
-	directory, err := storage.ParsePrivateRepositoryPath(path.Dir(finalPath.String()))
+	directory, err := finalPath.Dir()
 	if err != nil {
 		return Published{}, err
 	}
@@ -92,7 +90,7 @@ func (s *Store) Publish(ctx context.Context, identity Identity, reader io.Reader
 	return Published{Path: finalPath.String(), SHA256: hex.EncodeToString(digest.Sum(nil)), Size: written}, nil
 }
 
-func (s *Store) inspectPublished(ctx context.Context, repositoryPath storage.RepositoryPath) (Published, error) {
+func (s *Store) inspectPublished(ctx context.Context, repositoryPath layout.Path) (Published, error) {
 	opened, err := s.files.OpenPrivate(repositoryPath)
 	if err != nil {
 		return Published{}, err
@@ -144,11 +142,7 @@ func (s *Store) RemoveOrphans(ctx context.Context, referenced map[string]struct{
 	if grace < 0 {
 		return 0, errors.New("artifact cleanup grace must be non-negative")
 	}
-	root, err := storage.ParsePrivateRepositoryPath(privateRoot)
-	if err != nil {
-		return 0, err
-	}
-	files, err := s.files.ListPrivateFiles(ctx, root)
+	files, err := s.files.ListPrivateFiles(ctx, layout.ArtifactsDir())
 	if err != nil {
 		return 0, err
 	}

@@ -18,6 +18,7 @@ import (
 	"server/internal/media/exif"
 	fileutil "server/internal/media/file"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/work/execution"
 )
 
@@ -138,7 +139,7 @@ func buildAudioTranscodeArgs(inputPath, outputPath, targetBitrate string, source
 }
 
 // copyAudioForWeb saves the provided audio file as the web version.
-func copyAudioForWeb(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, pipelineVersion, version string) error {
+func copyAudioForWeb(ctx context.Context, files *storage.RepositoryFS, sourcePath layout.Path, asset *repo.Asset, pipelineVersion, version string) error {
 	audioFile, err := files.OpenMedia(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open audio file: %w", err)

@@ -16,27 +16,27 @@ func TestParseFileField(t *testing.T) {
 	}{
 		{
 			name:        "single file format",
-			fieldName:   "single_abc123",
+			fieldName:   "single_11111111-1111-4111-8111-111111111111",
 			wantType:    "single",
-			wantSession: "abc123",
+			wantSession: "11111111-1111-4111-8111-111111111111",
 			wantIndex:   0,
 			wantTotal:   1,
 			wantErr:     false,
 		},
 		{
 			name:        "chunk file format",
-			fieldName:   "chunk_session456_0_10",
+			fieldName:   "chunk_22222222-2222-4222-8222-222222222222_0_10",
 			wantType:    "chunk",
-			wantSession: "session456",
+			wantSession: "22222222-2222-4222-8222-222222222222",
 			wantIndex:   0,
 			wantTotal:   10,
 			wantErr:     false,
 		},
 		{
 			name:        "middle chunk",
-			fieldName:   "chunk_session789_5_20",
+			fieldName:   "chunk_33333333-3333-4333-8333-333333333333_5_20",
 			wantType:    "chunk",
-			wantSession: "session789",
+			wantSession: "33333333-3333-4333-8333-333333333333",
 			wantIndex:   5,
 			wantTotal:   20,
 			wantErr:     false,
@@ -47,13 +47,18 @@ func TestParseFileField(t *testing.T) {
 			wantErr:   true,
 		},
 		{
+			name:      "session id is not a UUID",
+			fieldName: "single_abc123",
+			wantErr:   true,
+		},
+		{
 			name:      "invalid chunk index",
-			fieldName: "chunk_session_abc_10",
+			fieldName: "chunk_22222222-2222-4222-8222-222222222222_abc_10",
 			wantErr:   true,
 		},
 		{
 			name:      "chunk index out of bounds",
-			fieldName: "chunk_session_15_10",
+			fieldName: "chunk_22222222-2222-4222-8222-222222222222_15_10",
 			wantErr:   true,
 		},
 	}
@@ -135,8 +140,8 @@ func TestValidateFieldName(t *testing.T) {
 		fieldName string
 		want      bool
 	}{
-		{"valid single", "single_abc123", true},
-		{"valid chunk", "chunk_session_0_10", true},
+		{"valid single", "single_11111111-1111-4111-8111-111111111111", true},
+		{"valid chunk", "chunk_22222222-2222-4222-8222-222222222222_0_10", true},
 		{"invalid format", "invalid", false},
 		{"empty string", "", false},
 		{"missing parts", "single", false},
@@ -158,8 +163,8 @@ func TestIsSingleUpload(t *testing.T) {
 		fieldName string
 		want      bool
 	}{
-		{"single file", "single_session123", true},
-		{"chunk file", "chunk_session_0_10", false},
+		{"single file", "single_11111111-1111-4111-8111-111111111111", true},
+		{"chunk file", "chunk_22222222-2222-4222-8222-222222222222_0_10", false},
 		{"invalid", "invalid", false},
 	}
 
@@ -178,8 +183,8 @@ func TestIsChunkUpload(t *testing.T) {
 		fieldName string
 		want      bool
 	}{
-		{"chunk file", "chunk_session_0_10", true},
-		{"single file", "single_session123", false},
+		{"chunk file", "chunk_22222222-2222-4222-8222-222222222222_0_10", true},
+		{"single file", "single_11111111-1111-4111-8111-111111111111", false},
 		{"invalid", "invalid", false},
 	}
 
@@ -199,8 +204,8 @@ func TestExtractSessionID(t *testing.T) {
 		want      string
 		wantErr   bool
 	}{
-		{"single file", "single_session123", "session123", false},
-		{"chunk file", "chunk_session456_0_10", "session456", false},
+		{"single file", "single_11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111", false},
+		{"chunk file", "chunk_22222222-2222-4222-8222-222222222222_0_10", "22222222-2222-4222-8222-222222222222", false},
 		{"invalid", "invalid", "", true},
 	}
 
@@ -220,11 +225,11 @@ func TestExtractSessionID(t *testing.T) {
 
 func TestGroupFieldsBySession(t *testing.T) {
 	fieldNames := []string{
-		"single_session1",
-		"chunk_session2_0_5",
-		"chunk_session2_1_5",
-		"single_session3",
-		"chunk_session2_2_5",
+		"single_11111111-1111-4111-8111-111111111111",
+		"chunk_22222222-2222-4222-8222-222222222222_0_5",
+		"chunk_22222222-2222-4222-8222-222222222222_1_5",
+		"single_33333333-3333-4333-8333-333333333333",
+		"chunk_22222222-2222-4222-8222-222222222222_2_5",
 	}
 
 	groups, err := GroupFieldsBySession(fieldNames)
@@ -233,22 +238,22 @@ func TestGroupFieldsBySession(t *testing.T) {
 	}
 
 	// Check session1
-	if len(groups["session1"]) != 1 {
-		t.Errorf("Expected 1 field for session1, got %d", len(groups["session1"]))
+	if len(groups["11111111-1111-4111-8111-111111111111"]) != 1 {
+		t.Errorf("Expected 1 field for session1, got %d", len(groups["11111111-1111-4111-8111-111111111111"]))
 	}
 
 	// Check session2
-	if len(groups["session2"]) != 3 {
-		t.Errorf("Expected 3 fields for session2, got %d", len(groups["session2"]))
+	if len(groups["22222222-2222-4222-8222-222222222222"]) != 3 {
+		t.Errorf("Expected 3 fields for session2, got %d", len(groups["22222222-2222-4222-8222-222222222222"]))
 	}
 
 	// Check session3
-	if len(groups["session3"]) != 1 {
-		t.Errorf("Expected 1 field for session3, got %d", len(groups["session3"]))
+	if len(groups["33333333-3333-4333-8333-333333333333"]) != 1 {
+		t.Errorf("Expected 1 field for session3, got %d", len(groups["33333333-3333-4333-8333-333333333333"]))
 	}
 
 	// Test with invalid field name
-	invalidFields := []string{"single_session1", "invalid_field"}
+	invalidFields := []string{"single_11111111-1111-4111-8111-111111111111", "invalid_field"}
 	_, err = GroupFieldsBySession(invalidFields)
 	if err == nil {
 		t.Error("Expected error for invalid field name, got nil")

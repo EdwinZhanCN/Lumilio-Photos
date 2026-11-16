@@ -446,7 +446,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	repositoryFS, file, err := openRepositoryPrivate(h.files, repository, thumbnail.StoragePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, repository, thumbnail.StoragePath)
 	if err != nil {
 		api.WriteProblem(c, api.NotFound(err))
 		return

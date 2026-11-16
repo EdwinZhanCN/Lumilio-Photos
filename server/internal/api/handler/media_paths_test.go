@@ -12,6 +12,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 	"server/internal/work/pipeline"
 
@@ -44,11 +45,11 @@ func TestServePinnedWebMediaKeepsRangesOnTheRepresentationPlaybackStartedWith(t 
 	require.NoError(t, config.SaveConfigToFile(tempDir))
 	repository := repo.Repository{RepoID: repositoryID, Path: tempDir, Reachability: dbtypes.RepositoryReachabilityActive, Config: *config}
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "track.flac"), original, 0o644))
-	mediaPath, err := storage.ParseUserMediaPath("track.flac")
+	mediaPath, err := layout.ParseMedia("track.flac")
 	require.NoError(t, err)
 	factory := storage.NewRepositoryFSFactory(nil, nil)
 	asset := &repo.Asset{AssetID: uuid.New(), ContentID: uuid.New(), OriginalFilename: "track.flac", MimeType: "audio/flac"}
-	resolver := &zipTestResolver{factory: factory, repository: repository, paths: map[uuid.UUID]storage.RepositoryPath{asset.AssetID: mediaPath}}
+	resolver := &zipTestResolver{factory: factory, repository: repository, paths: map[uuid.UUID]layout.Path{asset.AssetID: mediaPath}}
 
 	serve := func(target, rangeHeader string) *httptest.ResponseRecorder {
 		recorder := httptest.NewRecorder()

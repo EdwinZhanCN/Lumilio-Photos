@@ -530,10 +530,16 @@ rules:
       contains: [/.lumilio/]
 
   - id: private-path-construction
-    why: a private RepositoryPath comes from a typed layout constructor, never from a parsed string
+    why: a private path comes from a typed layout constructor or a parser of one stored kind, never from a parsed string
     calls:
-      targets: [server/internal/storage.ParsePrivateRepositoryPath]
-      only: [server/internal/storage/layout]
+      targets: [server/internal/storage/layout.Parse]
+      # Recovery receipts and the private directory listing read paths of
+      # every class back from disk.
+      only:
+        - server/internal/storage/layout
+        - server/internal/storage/private_recovery.go
+        - server/internal/storage/repository_fs.go
+        - server/internal/storage/recovery
 
   # ------------------------------------------------------ desktop
   - id: desktop-marker-parsing

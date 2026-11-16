@@ -10,6 +10,7 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 )
 
 var ErrAssetUnavailable = errors.New("asset has no available present file")
@@ -35,7 +36,7 @@ type OpenedMedia struct {
 	Repository *storage.RepositoryFS
 	Catalog    repo.Repository
 	Entry      repo.RepositoryEntry
-	Path       storage.RepositoryPath
+	Path       layout.Path
 }
 
 func (opened *OpenedMedia) Close() error {
@@ -80,7 +81,7 @@ func (r *Resolver) OpenAsset(ctx context.Context, assetID uuid.UUID) (*OpenedMed
 	}
 	var unavailable error
 	for _, entry := range entries {
-		repositoryPath, err := storage.ParseUserMediaPath(entry.Path)
+		repositoryPath, err := layout.ParseMedia(entry.Path)
 		if err != nil {
 			unavailable = errors.Join(unavailable, err)
 			continue

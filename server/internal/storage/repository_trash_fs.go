@@ -19,18 +19,18 @@ var ErrRepositoryDestinationExists = errors.New("repository move destination alr
 // Trash paths (files/<trash_id>/<name>, info/<trash_id>.json) come from layout.
 
 // TrashFileDirectory is the directory that holds one trashed file.
-func TrashFileDirectory(trashID uuid.UUID) (RepositoryPath, error) { return layout.TrashDir(trashID) }
+func TrashFileDirectory(trashID uuid.UUID) (layout.Path, error) { return layout.TrashDir(trashID) }
 
 // TrashFilePath is where a trashed file lives, under its original name.
-func TrashFilePath(trashID uuid.UUID, name string) (RepositoryPath, error) {
+func TrashFilePath(trashID uuid.UUID, name string) (layout.Path, error) {
 	return layout.TrashFile(trashID, name)
 }
 
 // TrashInfoDirectory holds the trash's info sidecars.
-func TrashInfoDirectory() RepositoryPath { return layout.TrashInfoDir() }
+func TrashInfoDirectory() layout.Path { return layout.TrashInfoDir() }
 
 // TrashInfoPath is the info sidecar of one trashed file.
-func TrashInfoPath(trashID uuid.UUID) (RepositoryPath, error) { return layout.TrashInfo(trashID) }
+func TrashInfoPath(trashID uuid.UUID) (layout.Path, error) { return layout.TrashInfo(trashID) }
 
 // MoveNoReplace moves one file between the user tree and Lumilio's private
 // tree of the same repository: into the trash or back out of it. It never
@@ -42,9 +42,9 @@ func TrashInfoPath(trashID uuid.UUID) (RepositoryPath, error) { return layout.Tr
 // without them (FAT, exFAT, some network shares) it checks the destination
 // and renames; only a file created at the destination inside that window
 // could be replaced.
-func (r *RepositoryFS) MoveNoReplace(source, destination RepositoryPath) error {
+func (r *RepositoryFS) MoveNoReplace(source, destination layout.Path) error {
 	if !(source.IsMedia() && destination.IsPrivate()) && !(source.IsPrivate() && destination.IsMedia()) {
-		return ErrRepositoryPathNamespace
+		return layout.ErrPathNamespace
 	}
 	sourceLocal, err := source.Local()
 	if err != nil {
@@ -95,7 +95,7 @@ func (r *RepositoryFS) MoveNoReplace(source, destination RepositoryPath) error {
 
 // syncParentDirectory makes a rename in a path's directory durable; the
 // repository root has no repository-relative name of its own.
-func syncParentDirectory(root *os.Root, repositoryPath RepositoryPath) error {
+func syncParentDirectory(root *os.Root, repositoryPath layout.Path) error {
 	directory := path.Dir(repositoryPath.String())
 	if directory != "." {
 		return syncRootDirectory(root, directory)
@@ -111,7 +111,7 @@ func syncParentDirectory(root *os.Root, repositoryPath RepositoryPath) error {
 // DropDuplicateLink removes drop only when it names the same file as keep. A
 // move interrupted between its link and its unlink leaves the file under
 // both names; recovery keeps one and never removes a different file.
-func (r *RepositoryFS) DropDuplicateLink(keep, drop RepositoryPath) error {
+func (r *RepositoryFS) DropDuplicateLink(keep, drop layout.Path) error {
 	keepLocal, err := keep.Local()
 	if err != nil {
 		return err
@@ -143,7 +143,7 @@ func (r *RepositoryFS) DropDuplicateLink(keep, drop RepositoryPath) error {
 }
 
 // SameFile reports whether two repository paths name the same file.
-func (r *RepositoryFS) SameFile(left, right RepositoryPath) (bool, error) {
+func (r *RepositoryFS) SameFile(left, right layout.Path) (bool, error) {
 	leftLocal, err := left.Local()
 	if err != nil {
 		return false, err
@@ -169,7 +169,7 @@ func (r *RepositoryFS) SameFile(left, right RepositoryPath) (bool, error) {
 }
 
 // Exists reports whether a repository path names any directory entry.
-func (r *RepositoryFS) Exists(repositoryPath RepositoryPath) (bool, error) {
+func (r *RepositoryFS) Exists(repositoryPath layout.Path) (bool, error) {
 	local, err := repositoryPath.Local()
 	if err != nil {
 		return false, err

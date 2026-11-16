@@ -12,6 +12,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/ingest/sourcing"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 
 	"github.com/google/uuid"
 )
@@ -182,9 +183,14 @@ func (staging cursorTestStaging) CreateStagingFile(repository repo.Repository, f
 	if err != nil {
 		return nil, nil, err
 	}
+	session := uuid.New()
+	staged, err := layout.UploadFile(session, filepath.Base(opened.Name()))
+	if err != nil {
+		return nil, nil, err
+	}
 	return &storage.StagingFile{
-		ID: uuid.NewString(), RepositoryID: repository.RepoID,
-		PrivatePath: ".lumilio/staging/incoming/" + filepath.Base(opened.Name()), Filename: filename,
+		ID: session.String(), RepositoryID: repository.RepoID,
+		PrivatePath: staged.String(), Filename: filename,
 	}, &storage.RepositoryFile{File: opened}, nil
 }
 

@@ -18,6 +18,7 @@ import (
 	fileutil "server/internal/media/file"
 	"server/internal/media/hash"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/scan"
 )
 
@@ -329,7 +330,7 @@ func hashOpenedStaging(opened *storage.RepositoryFile) (*hash.LayeredHashResult,
 }
 
 func (m *SourceMaterializer) inspectFinal(ctx context.Context, repository repo.Repository, target string, mode storage.HashMode) (storage.FileObservation, bool, error) {
-	repositoryPath, err := storage.ParseUserMediaPath(target)
+	repositoryPath, err := layout.ParseMedia(target)
 	if err != nil {
 		return storage.FileObservation{}, false, err
 	}
@@ -378,12 +379,13 @@ func (m *SourceMaterializer) quarantine(ctx context.Context, repository repo.Rep
 }
 
 func stagingHandle(repositoryID uuid.UUID, privatePath, filename string, createdAt time.Time) (*storage.StagingFile, error) {
-	parsed, err := storage.ParsePrivateRepositoryPath(privatePath)
+	parsed, err := layout.ParseStaged(privatePath)
 	if err != nil {
 		return nil, err
 	}
+	sessionID, _ := layout.StagedSession(parsed)
 	return &storage.StagingFile{
-		ID: path.Base(parsed.String()), RepositoryID: repositoryID,
+		ID: sessionID.String(), RepositoryID: repositoryID,
 		PrivatePath: parsed.String(), Filename: path.Base(strings.ReplaceAll(filename, "\\", "/")),
 		CreatedAt: createdAt,
 	}, nil

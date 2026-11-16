@@ -12,6 +12,7 @@ import (
 	"server/internal/media/imagesource"
 	"server/internal/storage"
 	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
 	"server/internal/work/pipeline"
 
 	"github.com/google/uuid"
@@ -84,7 +85,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 		return nil, fmt.Errorf("get %s thumbnail: %w", thumbnailSize, err)
 	}
 
-	thumbnailPath, err := storage.ParsePrivateRepositoryPath(thumbnail.StoragePath)
+	thumbnailPath, err := layout.ParseArtifact(thumbnail.StoragePath)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 	return imageData, nil
 }
 
-func validateThumbnailContent(asset repo.Asset, size string, thumbnailPath storage.RepositoryPath) error {
+func validateThumbnailContent(asset repo.Asset, size string, thumbnailPath layout.Path) error {
 	expected, err := derivedThumbnailPath(asset.ContentID, size)
 	if err != nil || thumbnailPath.String() != expected {
 		return fmt.Errorf("%w: asset=%s size=%s", ErrDerivedAssetStale, asset.AssetID, size)

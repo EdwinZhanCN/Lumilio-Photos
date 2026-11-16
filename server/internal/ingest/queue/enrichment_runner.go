@@ -20,6 +20,7 @@ import (
 	"server/internal/media/phash"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/work/jobs"
 )
 
@@ -66,13 +67,14 @@ type AestheticResult = commit.EnrichmentAesthetic
 type SpeciesResult = commit.EnrichmentSpecies
 type TagsResult = commit.EnrichmentTags
 
-// FaceResult carries the recognition response and the decoded source bytes
-// needed to publish immutable face crops during the catalog commit.
+// FaceResult carries the recognition response and the face crops this
+// worker published as artifacts before the catalog commit.
 type FaceResult = commit.EnrichmentFace
 
 type EnrichmentReader interface {
 	MLImageReader
 	GetAssetByIDAny(context.Context, uuid.UUID) (repo.Asset, error)
+	GetPreferredActiveAssetOccurrence(context.Context, uuid.UUID) (repo.ActiveAssetOccurrence, error)
 }
 
 type EnrichmentInference interface {
@@ -247,7 +249,7 @@ func (r *EnrichmentRunner) runPHash(ctx context.Context, asset repo.Asset) (*Emb
 	if err != nil {
 		return nil, fmt.Errorf("get small thumbnail: %w", err)
 	}
-	thumbnailPath, err := storage.ParsePrivateRepositoryPath(thumbnail.StoragePath)
+	thumbnailPath, err := layout.ParseArtifact(thumbnail.StoragePath)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +402,25 @@ func (r *EnrichmentRunner) runFace(ctx context.Context, loader MLImageLoader, ar
 		}
 		return nil, err
 	}
-	return &FaceResult{Payload: result, ImageData: imageData.EncodedSource, ProcessingTimeMs: int(time.Since(started).Milliseconds())}, nil
+	crops, err := r.publishFaceCrops(ctx, args, result, imageData.EncodedSource)
+	if err != nil {
+		return nil, err
+	}
+	return &FaceResult{Payload: result, Crops: crops, ProcessingTimeMs: int(time.Since(started).Milliseconds())}, nil
+}
+
+// publishFaceCrops publishes the crops in the repository of the asset's
+// preferred active occurrence, outside any catalog transaction.
+func (r *EnrichmentRunner) publishFaceCrops(ctx context.Context, args jobs.EnrichAssetArgs, result *types.FaceV1, imageData []byte) (*service.FaceCrops, error) {
+	occurrence, err := r.Reader.GetPreferredActiveAssetOccurrence(ctx, args.AssetID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve face crop repository: %w", err)
+	}
+	repository, err := r.Reader.GetRepository(ctx, occurrence.RepositoryID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve face crop repository: %w", err)
+	}
+	return service.PublishFaceCrops(ctx, r.Files, repository, args.SourceFence, result, imageData)
 }
 
 func (r *EnrichmentRunner) runZeroShot(ctx context.Context, args jobs.EnrichAssetArgs, embedding service.PrimaryEmbedding) ([]service.AIGeneratedTag, error) {

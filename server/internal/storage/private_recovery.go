@@ -9,18 +9,20 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"server/internal/storage/layout"
 )
 
-// RepositoryRecoveryDirectory holds the private-recovery receipts of one
-// repository and, under <receipt_id>/, the staging bytes a receipt moved out
-// of the way. The receipt is portable: a catalog that never saw the
+// The private-recovery receipts of one repository live in
+// [layout.RecoveryDir], with the work bytes a receipt moved out of the way
+// under <receipt_id>/. The receipt is portable: a catalog that never saw the
 // repository reads it back and presents the same inventory.
-const RepositoryRecoveryDirectory = ".lumilio/recovery"
 
 // RecoveryReceiptFormat is the receipt format this build writes and reads.
 // Later builds keep reading format 1; this build reports a newer format
@@ -40,21 +42,22 @@ const recoveryItemLimit = 2000
 type PrivateStateClass string
 
 const (
-	// PrivateClassTrash is .lumilio/trash: files Delete moved there and their
-	// format-1 info sidecars. They stay in place; the Trash rebuild adopts them
+	// PrivateClassTrash is the trash class: files Delete moved there and
+	// their format-1 info sidecars. They stay in place; the Trash rebuild adopts them
 	// into the catalog under a hold.
 	PrivateClassTrash PrivateStateClass = "trash"
-	// PrivateClassStudio is a .lumilio/sidecars/*.lumilio-sidecar Studio edit
-	// record. It stays in place and is reassociated only on proven content.
+	// PrivateClassStudio is a Studio edit record under user/studio. It stays
+	// in place and is reassociated only on proven content.
 	PrivateClassStudio PrivateStateClass = "studio"
-	// PrivateClassStaging is an uncommitted upload or import under
-	// .lumilio/staging. It is moved under the receipt so ordinary staging
-	// cleanup cannot discard it, and never resumed automatically.
+	// PrivateClassStaging is an uncommitted upload or import: a file in the
+	// work class, moved under the receipt so ordinary cleanup cannot discard
+	// it and never resumed, or a failed upload already kept in
+	// quarantine/uploads, which stays in place.
 	PrivateClassStaging PrivateStateClass = "staging"
-	// PrivateClassLogs is .lumilio/logs: diagnostic logs, kept in place.
+	// PrivateClassLogs is the logs class: diagnostic logs, kept in place.
 	PrivateClassLogs PrivateStateClass = "logs"
-	// PrivateClassDerived is .lumilio/assets and .lumilio/artifacts:
-	// rebuildable derivatives, kept in place and rederived as needed.
+	// PrivateClassDerived is the cache class: rebuildable derivatives, kept
+	// in place and rederived as needed.
 	PrivateClassDerived PrivateStateClass = "derived"
 	// PrivateClassUnknown is anything else, including content a newer build
 	// wrote. It is preserved unchanged and disclosed.
@@ -199,11 +202,11 @@ func (r RecoveryReceipt) validate() error {
 		return fmt.Errorf("%w: missing recorded_at", ErrRecoveryReceiptFormat)
 	}
 	for _, item := range r.Items {
-		if _, err := ParsePrivateRepositoryPath(item.Path); err != nil {
+		if _, err := layout.Parse(item.Path); err != nil {
 			return fmt.Errorf("%w: item path %q: %v", ErrRecoveryReceiptFormat, item.Path, err)
 		}
 		if item.MovedTo != "" {
-			if _, err := ParsePrivateRepositoryPath(item.MovedTo); err != nil {
+			if _, err := layout.Parse(item.MovedTo); err != nil {
 				return fmt.Errorf("%w: moved path %q: %v", ErrRecoveryReceiptFormat, item.MovedTo, err)
 			}
 		}
@@ -212,19 +215,21 @@ func (r RecoveryReceipt) validate() error {
 }
 
 // RecoveryReceiptPath is the receipt file of one registration.
-func RecoveryReceiptPath(receiptID string) (RepositoryPath, error) {
-	if _, err := uuid.Parse(receiptID); err != nil {
-		return RepositoryPath{}, fmt.Errorf("%w: receipt id %q", ErrRepositoryPathInvalid, receiptID)
+func RecoveryReceiptPath(receiptID string) (layout.Path, error) {
+	id, err := uuid.Parse(receiptID)
+	if err != nil {
+		return layout.Path{}, fmt.Errorf("%w: receipt id %q", layout.ErrPathInvalid, receiptID)
 	}
-	return ParsePrivateRepositoryPath(path.Join(RepositoryRecoveryDirectory, receiptID+".json"))
+	return layout.RecoveryReceipt(id)
 }
 
 // RecoveryReceiptDirectory holds the bytes one receipt moved.
-func RecoveryReceiptDirectory(receiptID string) (RepositoryPath, error) {
-	if _, err := uuid.Parse(receiptID); err != nil {
-		return RepositoryPath{}, fmt.Errorf("%w: receipt id %q", ErrRepositoryPathInvalid, receiptID)
+func RecoveryReceiptDirectory(receiptID string) (layout.Path, error) {
+	id, err := uuid.Parse(receiptID)
+	if err != nil {
+		return layout.Path{}, fmt.Errorf("%w: receipt id %q", layout.ErrPathInvalid, receiptID)
 	}
-	return ParsePrivateRepositoryPath(path.Join(RepositoryRecoveryDirectory, receiptID))
+	return layout.RecoveryReceiptDir(id)
 }
 
 // recoveryItemID derives a stable item identity from the receipt and the
@@ -236,10 +241,7 @@ func recoveryItemID(receiptID, itemPath string) string {
 // ListRecoveryReceipts reads every receipt of an opened repository, oldest
 // first. A receipt this build cannot read is returned by name in unreadable.
 func ListRecoveryReceipts(ctx context.Context, files *RepositoryFS) (receipts []RecoveryReceipt, unreadable []string, err error) {
-	directory, err := ParsePrivateRepositoryPath(RepositoryRecoveryDirectory)
-	if err != nil {
-		return nil, nil, err
-	}
+	directory := layout.RecoveryDir()
 	exists, err := files.Exists(directory)
 	if err != nil || !exists {
 		return nil, nil, err
@@ -260,7 +262,7 @@ func ListRecoveryReceipts(ctx context.Context, files *RepositoryFS) (receipts []
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		receiptPath, err := ParsePrivateRepositoryPath(path.Join(directory.String(), entry.Name()))
+		receiptPath, err := directory.Child(entry.Name())
 		if err != nil {
 			unreadable = append(unreadable, entry.Name())
 			continue
@@ -297,19 +299,15 @@ func WriteRecoveryReceipt(files *RepositoryFS, receipt RecoveryReceipt) error {
 	if err != nil {
 		return err
 	}
-	directory, err := ParsePrivateRepositoryPath(RepositoryRecoveryDirectory)
-	if err != nil {
-		return err
-	}
-	if err := files.MkdirAllPrivate(directory, 0o755); err != nil {
+	if err := files.MkdirAllPrivate(layout.RecoveryDir(), 0o700); err != nil {
 		return err
 	}
 	_, err = files.WritePrivateFileAtomic(target, bytes.NewReader(data), 0o644)
 	return err
 }
 
-// privateStateMove is one staging file the receipt moves out of
-// .lumilio/staging. From and To are private repository paths.
+// privateStateMove is one work file the receipt moves into quarantine.
+// From and To are private repository paths.
 type privateStateMove struct {
 	From string `json:"from"`
 	To   string `json:"to"`
@@ -334,7 +332,7 @@ func (plan privatePreservationPlan) Empty() bool { return plan.Receipt == nil }
 // preservation plan in reverse, and the fresh layout when the tree had none.
 func rollbackPrivateState(repositoryPath string, plan privatePreservationPlan) error {
 	if plan.PrivateRootAbsent {
-		privateRoot := path.Join(repositoryPath, DefaultStructure.SystemDir)
+		privateRoot := filepath.Join(repositoryPath, layout.PrivateRoot)
 		if err := os.RemoveAll(privateRoot); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("remove fresh repository private state: %w", err)
 		}
@@ -367,12 +365,12 @@ type privateWalkEntry struct {
 
 // planPrivatePreservation inventories .lumilio/ of an unregistered tree and
 // plans the class-specific preservation. Nothing is written. Trash, Studio,
-// logs, and derivatives stay in place; staging is planned to move under the
-// receipt directory; unknown and newer content is listed and left alone.
-// Receipts and bytes of earlier registrations are recognized and skipped.
+// logs, derivatives, and quarantine stay in place; work files are planned to
+// move under the receipt directory; unknown and newer content is listed and
+// left alone. Receipts and bytes of earlier registrations are recognized and
+// skipped.
 func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, requestID, sourceRepositoryID, repositoryID string, now time.Time) (privatePreservationPlan, error) {
-	privateRoot := path.Join(repositoryPath, DefaultStructure.SystemDir)
-	root, err := os.OpenRoot(privateRoot)
+	root, err := os.OpenRoot(filepath.Join(repositoryPath, layout.PrivateRoot))
 	if errors.Is(err, fs.ErrNotExist) {
 		return privatePreservationPlan{PrivateRootAbsent: true}, nil
 	}
@@ -381,14 +379,14 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 	}
 	defer root.Close()
 
-	receiptID := uuid.NewString()
+	receiptUUID := uuid.New()
+	receiptID := receiptUUID.String()
 	receipt := RecoveryReceipt{
 		Format: RecoveryReceiptFormat, ReceiptID: receiptID, Event: event, RecordedAt: now.UTC(),
 		Actor: actor, RequestID: requestID, SourceRepositoryID: sourceRepositoryID, RepositoryID: repositoryID,
 		Items: []RecoveryItem{},
 	}
 	var plan privatePreservationPlan
-	knownReceiptDirs := map[string]bool{}
 	topLevel, err := fs.ReadDir(root.FS(), ".")
 	if err != nil {
 		return privatePreservationPlan{}, fmt.Errorf("read repository private state: %w", err)
@@ -396,18 +394,28 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 	if len(topLevel) == 0 {
 		return privatePreservationPlan{}, nil
 	}
-	for _, entry := range topLevel {
-		if entry.Name() == "recovery" && entry.IsDir() {
-			children, err := fs.ReadDir(root.FS(), "recovery")
-			if err != nil {
-				return privatePreservationPlan{}, err
-			}
-			for _, child := range children {
-				if !child.IsDir() && strings.HasSuffix(child.Name(), ".json") {
-					knownReceiptDirs[strings.TrimSuffix(child.Name(), ".json")] = true
-				}
+	recoveryDir := belowPrivate(layout.RecoveryDir())
+	knownReceiptDirs := map[string]bool{}
+	if children, err := fs.ReadDir(root.FS(), recoveryDir); err == nil {
+		for _, child := range children {
+			if !child.IsDir() && strings.HasSuffix(child.Name(), ".json") {
+				knownReceiptDirs[strings.TrimSuffix(child.Name(), ".json")] = true
 			}
 		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return privatePreservationPlan{}, err
+	}
+	// knownReceiptFile reports a receipt, or a directory of moved bytes, an
+	// earlier registration wrote; name is relative to .lumilio.
+	knownReceiptFile := func(name string, dir bool) bool {
+		rest, ok := strings.CutPrefix(name, recoveryDir+"/")
+		if !ok || strings.Contains(rest, "/") {
+			return false
+		}
+		if dir {
+			return knownReceiptDirs[rest]
+		}
+		return strings.HasSuffix(rest, ".json") && knownReceiptDirs[strings.TrimSuffix(rest, ".json")]
 	}
 
 	addItem := func(item RecoveryItem) {
@@ -425,11 +433,8 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 		if name == "." {
 			return nil
 		}
-		first, rest, _ := strings.Cut(name, "/")
-		privatePath := path.Join(DefaultStructure.SystemDir, name)
 		if entry.IsDir() {
-			// Receipts and the bytes earlier registrations moved are theirs.
-			if first == "recovery" && rest != "" && !strings.Contains(rest, "/") && knownReceiptDirs[rest] {
+			if knownReceiptFile(name, true) {
 				return fs.SkipDir
 			}
 			return nil
@@ -438,13 +443,22 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 		if err != nil {
 			return err
 		}
+		privatePath := path.Join(layout.PrivateRoot, name)
+		parsed, parseErr := layout.Parse(privatePath)
 		if !info.Mode().IsRegular() {
 			addItem(RecoveryItem{Class: PrivateClassUnknown, Path: privatePath, Disposition: DispositionPreserved, Detail: "not a regular file"})
 			return nil
 		}
 		item := RecoveryItem{Path: privatePath, Size: info.Size(), MtimeNs: info.ModTime().UnixNano(), Disposition: DispositionPreserved}
-		switch first {
-		case "trash":
+		if parseErr != nil {
+			item.Class = PrivateClassUnknown
+			item.Detail = "path is not portable"
+			addItem(item)
+			return nil
+		}
+		_, rest, _ := strings.Cut(name, "/")
+		switch layout.Classify(parsed) {
+		case layout.Trash:
 			if strings.HasPrefix(rest, "info/") || strings.HasPrefix(rest, "files/") {
 				receipt.Trash.Files++
 				receipt.Trash.Bytes += info.Size()
@@ -452,8 +466,8 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 			}
 			item.Class = PrivateClassUnknown
 			addItem(item)
-		case "sidecars":
-			if strings.Contains(rest, "/") || !strings.HasSuffix(rest, ".lumilio-sidecar") {
+		case layout.User:
+			if !layout.IsStudioRecord(parsed) {
 				item.Class = PrivateClassUnknown
 				addItem(item)
 				return nil
@@ -472,15 +486,9 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 				item.AssetID = header.AssetID
 			}
 			addItem(item)
-		case "staging":
-			if _, err := ParsePrivateRepositoryPath(privatePath); err != nil {
-				item.Class = PrivateClassUnknown
-				item.Detail = "path is not portable"
-				addItem(item)
-				return nil
-			}
-			destination := path.Join(RepositoryRecoveryDirectory, receiptID, name)
-			if _, err := ParsePrivateRepositoryPath(destination); err != nil {
+		case layout.Work:
+			destination, err := layout.RecoveryMoved(receiptUUID, parsed)
+			if err != nil {
 				item.Class = PrivateClassUnknown
 				item.Detail = "path is not portable"
 				addItem(item)
@@ -488,22 +496,28 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 			}
 			item.Class = PrivateClassStaging
 			item.Disposition = DispositionMoved
-			item.MovedTo = destination
-			plan.Moves = append(plan.Moves, privateStateMove{From: privatePath, To: destination})
+			item.MovedTo = destination.String()
+			plan.Moves = append(plan.Moves, privateStateMove{From: privatePath, To: destination.String()})
 			addItem(item)
-		case "logs":
-			receipt.Logs.Files++
-			receipt.Logs.Bytes += info.Size()
-		case "assets", "artifacts":
-			receipt.Derived.Files++
-			receipt.Derived.Bytes += info.Size()
-		case "recovery":
-			if !strings.Contains(rest, "/") && strings.HasSuffix(rest, ".json") && knownReceiptDirs[strings.TrimSuffix(rest, ".json")] {
+		case layout.Quarantine:
+			if knownReceiptFile(name, false) {
+				return nil
+			}
+			if strings.HasPrefix(name, belowPrivate(layout.QuarantineUploadsDir())+"/") {
+				// A failed upload is already kept for a decision.
+				item.Class = PrivateClassStaging
+				addItem(item)
 				return nil
 			}
 			item.Class = PrivateClassUnknown
 			item.Detail = "left by an earlier build"
 			addItem(item)
+		case layout.Logs:
+			receipt.Logs.Files++
+			receipt.Logs.Bytes += info.Size()
+		case layout.Cache:
+			receipt.Derived.Files++
+			receipt.Derived.Bytes += info.Size()
 		default:
 			item.Class = PrivateClassUnknown
 			addItem(item)
@@ -515,6 +529,12 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 	}
 	plan.Receipt = &receipt
 	return plan, nil
+}
+
+// belowPrivate is a private path relative to .lumilio, for os.Root
+// operations rooted there.
+func belowPrivate(p layout.Path) string {
+	return strings.TrimPrefix(p.String(), layout.PrivateRoot+"/")
 }
 
 // studioSidecarHeader is the part of a Studio record preservation reads:
@@ -558,17 +578,24 @@ func applyPrivatePreservation(repositoryPath string, plan privatePreservationPla
 	if plan.Empty() {
 		return nil
 	}
-	privateRoot := path.Join(repositoryPath, DefaultStructure.SystemDir)
-	root, err := os.OpenRoot(privateRoot)
+	root, err := os.OpenRoot(filepath.Join(repositoryPath, layout.PrivateRoot))
 	if err != nil {
 		return fmt.Errorf("open repository private state: %w", err)
 	}
 	defer root.Close()
-	recoveryDir := path.Join("recovery", plan.ReceiptID())
-	if err := root.MkdirAll("recovery", 0o755); err != nil {
+	receiptPath, err := RecoveryReceiptPath(plan.ReceiptID())
+	if err != nil {
+		return err
+	}
+	receiptDir, err := RecoveryReceiptDirectory(plan.ReceiptID())
+	if err != nil {
+		return err
+	}
+	recoveryDir := belowPrivate(receiptDir)
+	if err := root.MkdirAll(belowPrivate(layout.RecoveryDir()), 0o700); err != nil {
 		return fmt.Errorf("create recovery directory: %w", err)
 	}
-	receiptName := path.Join("recovery", plan.ReceiptID()+".json")
+	receiptName := belowPrivate(receiptPath)
 	if _, err := root.Lstat(receiptName); errors.Is(err, fs.ErrNotExist) {
 		data, err := plan.Receipt.Marshal()
 		if err != nil {
@@ -601,6 +628,10 @@ func applyPrivatePreservation(repositoryPath string, plan privatePreservationPla
 		if err := moveRootFileNoReplace(root, from, to); err != nil {
 			return fmt.Errorf("preserve staging %s: %w", move.From, err)
 		}
+		// An emptied upload session directory goes; rollback recreates it.
+		if _, err := layout.ParseStaged(move.From); err == nil {
+			_ = root.Remove(path.Dir(from))
+		}
 		if testHookAfterPrivateStateMove != nil {
 			if err := testHookAfterPrivateStateMove(index + 1); err != nil {
 				return err
@@ -618,8 +649,7 @@ func rollbackPrivatePreservation(repositoryPath string, plan privatePreservation
 	if plan.Empty() {
 		return nil
 	}
-	privateRoot := path.Join(repositoryPath, DefaultStructure.SystemDir)
-	root, err := os.OpenRoot(privateRoot)
+	root, err := os.OpenRoot(filepath.Join(repositoryPath, layout.PrivateRoot))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
@@ -653,29 +683,36 @@ func rollbackPrivatePreservation(repositoryPath string, plan privatePreservation
 	if len(failures) > 0 {
 		return errors.Join(failures...)
 	}
-	receiptName := path.Join("recovery", plan.ReceiptID()+".json")
-	if err := root.Remove(receiptName); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	receiptPath, err := RecoveryReceiptPath(plan.ReceiptID())
+	if err != nil {
+		return err
+	}
+	receiptDir, err := RecoveryReceiptDirectory(plan.ReceiptID())
+	if err != nil {
+		return err
+	}
+	if err := root.Remove(belowPrivate(receiptPath)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("remove recovery receipt: %w", err)
 	}
-	removeEmptyRootDirectories(root, path.Join("recovery", plan.ReceiptID()))
-	_ = root.Remove("recovery")
+	removeEmptyRootDirectories(root, belowPrivate(receiptDir))
+	_ = root.Remove(belowPrivate(layout.RecoveryDir()))
+	_ = root.Remove(string(layout.Quarantine))
 	return nil
 }
 
 func privateMoveNames(from, to string) (string, string, error) {
-	fromPath, err := ParsePrivateRepositoryPath(from)
+	fromPath, err := layout.Parse(from)
 	if err != nil {
 		return "", "", err
 	}
-	toPath, err := ParsePrivateRepositoryPath(to)
+	toPath, err := layout.Parse(to)
 	if err != nil {
 		return "", "", err
 	}
-	prefix := DefaultStructure.SystemDir + "/"
-	if !strings.HasPrefix(fromPath.String(), prefix) || !strings.HasPrefix(toPath.String(), prefix) {
-		return "", "", fmt.Errorf("%w: move outside the private tree", ErrRepositoryPathNamespace)
+	if fromPath == layout.Root() || toPath == layout.Root() {
+		return "", "", fmt.Errorf("%w: move outside the private tree", layout.ErrPathNamespace)
 	}
-	return strings.TrimPrefix(fromPath.String(), prefix), strings.TrimPrefix(toPath.String(), prefix), nil
+	return belowPrivate(fromPath), belowPrivate(toPath), nil
 }
 
 // moveRootFileNoReplace moves one regular file inside a root without ever

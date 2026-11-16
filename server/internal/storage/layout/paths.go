@@ -27,7 +27,6 @@ const (
 	quarantineUpload = "quarantine/uploads"
 	recoveryDir      = "quarantine/recovery"
 	uploadManifest   = "session.json"
-	uploadMerged     = "merged"
 	uploadChunk      = "chunk-"
 )
 
@@ -78,6 +77,12 @@ func StudioAssetID(p Path) (uuid.UUID, bool) {
 	}
 	id, err := uuid.Parse(name)
 	return id, err == nil && id.String() == name
+}
+
+// IsStudioRecord reports whether p names a Studio record file.
+func IsStudioRecord(p Path) bool {
+	return p.IsPrivate() && path.Dir(p.value) == path.Join(PrivateRoot, studioDir) &&
+		strings.HasSuffix(p.value, studioSuffix) && path.Base(p.value) != studioSuffix
 }
 
 // AssetSidecar is the portable sidecar of one media entry:
@@ -153,19 +158,42 @@ func UploadChunk(sessionID uuid.UUID, index int) (Path, error) {
 	return joinSegments(uploadsDir, sessionID.String(), uploadChunk+strconv.Itoa(index))
 }
 
-// UploadMerged is work/uploads/<sessionID>/merged, the assembled upload.
-func UploadMerged(sessionID uuid.UUID) (Path, error) {
-	return joinSegments(uploadsDir, sessionID.String(), uploadMerged)
+// UploadFile is the one file an upload session stages for commit:
+// work/uploads/<sessionID>/<name>. A single-part upload, a merged chunked
+// upload, and a cloud import each stage one file in their own session. A
+// name the session itself owns is staged as upload-<name>.
+func UploadFile(sessionID uuid.UUID, name string) (Path, error) {
+	if name == uploadManifest || isChunkName(name) {
+		name = "upload-" + name
+	}
+	return joinSegments(uploadsDir, sessionID.String(), name)
+}
+
+func isChunkName(name string) bool {
+	digits, ok := strings.CutPrefix(name, uploadChunk)
+	if !ok || digits == "" {
+		return false
+	}
+	_, err := strconv.Atoi(digits)
+	return err == nil
 }
 
 // UploadsDir holds every upload session.
 func UploadsDir() Path { return mustJoin(uploadsDir) }
 
-// QuarantineUpload keeps a failed upload for a human decision:
-// quarantine/uploads/<id>/.
-func QuarantineUpload(id uuid.UUID) (Path, error) {
-	return joinSegments(quarantineUpload, id.String())
+// QuarantineUpload keeps a failed upload session whole for a human
+// decision: quarantine/uploads/<sessionID>/.
+func QuarantineUpload(sessionID uuid.UUID) (Path, error) {
+	return joinSegments(quarantineUpload, sessionID.String())
 }
+
+// QuarantineUploadFile is one file of a quarantined upload session.
+func QuarantineUploadFile(sessionID uuid.UUID, name string) (Path, error) {
+	return joinSegments(quarantineUpload, sessionID.String(), name)
+}
+
+// QuarantineUploadsDir holds every quarantined upload session.
+func QuarantineUploadsDir() Path { return mustJoin(quarantineUpload) }
 
 // RecoveryReceipt is quarantine/recovery/<receiptID>.json.
 func RecoveryReceipt(receiptID uuid.UUID) (Path, error) {
@@ -181,9 +209,22 @@ func RecoveryReceiptDir(receiptID uuid.UUID) (Path, error) {
 // RecoveryDir holds every receipt.
 func RecoveryDir() Path { return mustJoin(recoveryDir) }
 
+// RecoveryMoved is where a registration moves one preserved file:
+// quarantine/recovery/<receiptID>/<its path below .lumilio>.
+func RecoveryMoved(receiptID uuid.UUID, original Path) (Path, error) {
+	rest, ok := strings.CutPrefix(original.value, PrivateRoot+"/")
+	if !original.IsPrivate() || !ok {
+		return Path{}, fmt.Errorf("%w: %q is not below %s", ErrPathNamespace, original.value, PrivateRoot)
+	}
+	return join(recoveryDir, receiptID.String(), rest)
+}
+
 // Log is one file under logs/, such as operations.log or a rotated
 // operations.log.1.
 func Log(name string) (Path, error) { return joinSegments(string(Logs), name) }
+
+// LogsDir holds the Repository's audit logs.
+func LogsDir() Path { return mustJoin(string(Logs)) }
 
 // Temp is a fresh name for an atomic-write temporary: work/tmp/<uuid>.
 // Temporaries are created beside nothing they replace, so an interrupted
@@ -200,6 +241,71 @@ func RootTemp(purpose string) (string, error) {
 		return "", fmt.Errorf("%w: temporary purpose %q", ErrPathInvalid, purpose)
 	}
 	return TempPrefix + purpose + "-" + uuid.NewString(), nil
+}
+
+// TempPattern is the os.CreateTemp pattern of a root temporary, such as
+// .lumilio-tmp-volume-probe-*. It panics on a purpose that is not one path
+// component, which is a programming error.
+func TempPattern(purpose string) string {
+	if !segment(purpose) {
+		panic(fmt.Sprintf("layout: temporary purpose %q", purpose))
+	}
+	return TempPrefix + purpose + "-*"
+}
+
+// Child is the named entry of a private directory, for walking the tree.
+func (p Path) Child(name string) (Path, error) {
+	if !p.IsPrivate() || !segment(name) {
+		return Path{}, fmt.Errorf("%w: %q below %q", ErrPathInvalid, name, p.value)
+	}
+	return private(p.value + "/" + name)
+}
+
+// ParseArtifact validates an artifact path that was stored as text, such as
+// a thumbnails row. Phase 3 replaces stored artifact paths with identities.
+func ParseArtifact(stored string) (Path, error) {
+	p, err := Parse(stored)
+	if err != nil {
+		return Path{}, err
+	}
+	rest, ok := strings.CutPrefix(p.value, path.Join(PrivateRoot, artifactsDir)+"/")
+	if !ok || strings.Count(rest, "/") != 3 {
+		return Path{}, fmt.Errorf("%w: %q is not an artifact", ErrPathNamespace, stored)
+	}
+	return p, nil
+}
+
+// ParseStaged validates a staged upload file that was stored as text, such
+// as a staging commit row: work/uploads/<session>/<name>, or the same file
+// in quarantine/uploads/ after a failure.
+func ParseStaged(stored string) (Path, error) {
+	p, err := Parse(stored)
+	if err != nil {
+		return Path{}, err
+	}
+	for _, dir := range []string{uploadsDir, quarantineUpload} {
+		rest, ok := strings.CutPrefix(p.value, path.Join(PrivateRoot, dir)+"/")
+		if !ok {
+			continue
+		}
+		session, name, ok := strings.Cut(rest, "/")
+		if _, err := uuid.Parse(session); ok && err == nil && segment(name) {
+			return p, nil
+		}
+	}
+	return Path{}, fmt.Errorf("%w: %q is not a staged upload file", ErrPathNamespace, stored)
+}
+
+// StagedSession returns the session a staged file belongs to.
+func StagedSession(p Path) (uuid.UUID, bool) {
+	for _, dir := range []string{uploadsDir, quarantineUpload} {
+		if rest, ok := strings.CutPrefix(p.value, path.Join(PrivateRoot, dir)+"/"); ok && p.IsPrivate() {
+			session, _, _ := strings.Cut(rest, "/")
+			id, err := uuid.Parse(session)
+			return id, err == nil
+		}
+	}
+	return uuid.Nil, false
 }
 
 func mustJoin(elements ...string) Path {

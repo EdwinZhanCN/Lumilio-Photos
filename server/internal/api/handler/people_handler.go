@@ -351,7 +351,7 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 		return
 	}
 
-	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, *person.CoverFaceImagePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, *repository, *person.CoverFaceImagePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -485,7 +485,7 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 		return
 	}
 
-	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, crop.FaceImagePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, *repository, crop.FaceImagePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))

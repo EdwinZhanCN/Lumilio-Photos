@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"server/internal/api/dto"
+	"server/internal/storage/layout"
 	"server/internal/storage/testfixture"
 )
 
@@ -27,7 +28,7 @@ func TestPrivateStateOfAnOpenedRepositoryIsRecoverable(t *testing.T) {
 	if err := os.CopyFS(inherited, os.DirFS(leftover.Path)); err != nil {
 		t.Fatal(err)
 	}
-	stagingBytes, err := os.ReadFile(filepath.Join(leftover.Path, ".lumilio", "staging", "incoming", "abandoned.part"))
+	stagingBytes, err := os.ReadFile(filepath.Join(leftover.Path, filepath.FromSlash(testfixture.LeftoverUpload)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,14 +80,14 @@ func TestPrivateStateOfAnOpenedRepositoryIsRecoverable(t *testing.T) {
 	if studio.ResolvedAssetID != original[0].AssetID || !studio.Present || len(studio.Actions) != 0 {
 		t.Fatalf("studio item = %+v, want reassociated to %s", studio, original[0].AssetID)
 	}
-	staging := items[".lumilio/staging/incoming/abandoned.part"]
+	staging := items[testfixture.LeftoverUpload]
 	if staging.Class != "staging" || staging.Disposition != "moved" || !staging.Present || strings.Join(staging.Actions, ",") != "export,delete" {
 		t.Fatalf("staging item = %+v", staging)
 	}
-	if unknown := items[".lumilio/unknown-child/opaque.bin"]; unknown.Class != "unknown" || !unknown.Present {
+	if unknown := items[testfixture.LeftoverUnknown]; unknown.Class != "unknown" || !unknown.Present {
 		t.Fatalf("unknown item = %+v", unknown)
 	}
-	for _, path := range []string{".lumilio/trash/info", ".lumilio/logs", ".lumilio/assets"} {
+	for _, path := range []string{layout.TrashInfoDir().String(), layout.LogsDir().String(), layout.ArtifactsDir().String()} {
 		for listed := range items {
 			if strings.HasPrefix(listed, path) {
 				t.Fatalf("%s is listed as an item; its class is preserved as a whole", listed)
@@ -148,8 +149,8 @@ func TestPrivateStateOfAnOpenedRepositoryIsRecoverable(t *testing.T) {
 	if status, _ := server.do(http.MethodGet, recoveryPath+"/items/"+staging.ID+"/content", nil, ""); status != http.StatusNotFound {
 		t.Fatalf("export after delete answered %d, want 404", status)
 	}
-	if _, err := os.Stat(filepath.Join(repository.Path, filepath.FromSlash(".lumilio/staging/incoming/abandoned.part"))); !os.IsNotExist(err) {
-		t.Fatal("staging bytes were left in the ordinary staging directory")
+	if _, err := os.Stat(filepath.Join(repository.Path, filepath.FromSlash(testfixture.LeftoverUpload))); !os.IsNotExist(err) {
+		t.Fatal("upload bytes were left in work/")
 	}
 
 	// Accepting retention releases the hold; the file stays in the Trash and

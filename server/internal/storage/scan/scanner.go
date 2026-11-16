@@ -15,6 +15,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/pathsemantics"
 )
 
@@ -229,7 +230,7 @@ func (s *Scanner) requestTx(ctx context.Context, queries *repo.Queries, reposito
 	}
 	scope = strings.Trim(scope, "/")
 	if scope != "" {
-		if _, err := storage.ParseUserMediaPath(scope); err != nil {
+		if _, err := layout.ParseMedia(scope); err != nil {
 			return repo.RepositoryScan{}, false, err
 		}
 	}

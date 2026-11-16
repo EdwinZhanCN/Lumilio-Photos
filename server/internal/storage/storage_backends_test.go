@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
-	"go.uber.org/zap"
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage/repocfg"
+
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type rejectingLocks struct {

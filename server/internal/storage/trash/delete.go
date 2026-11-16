@@ -14,6 +14,7 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/scan"
 )
 
@@ -47,10 +48,10 @@ type trashPayload struct {
 	Moves     []trashMove `json:"moves"`
 }
 
-func (m trashMove) source() (storage.RepositoryPath, error) {
-	return storage.ParseUserMediaPath(m.Path)
+func (m trashMove) source() (layout.Path, error) {
+	return layout.ParseMedia(m.Path)
 }
-func (m trashMove) destination() (storage.RepositoryPath, error) {
+func (m trashMove) destination() (layout.Path, error) {
 	return storage.TrashFilePath(m.TrashID, path.Base(m.Path))
 }
 

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"server/internal/storage/layout"
 )
 
 func TestMoveNoReplaceMovesIntoTheTrashAndBack(t *testing.T) {
@@ -51,7 +53,7 @@ func TestMoveNoReplaceNeverReplacesAndStaysBetweenNamespaces(t *testing.T) {
 	repositoryFS := openRepositoryFSTestFS(t, repository)
 	writeRepositoryFSTestFile(t, repository.Path, "a.jpg", []byte("taken"))
 	writeRepositoryFSTestFile(t, repository.Path, ".lumilio/trash/files/x/a.jpg", []byte("trashed"))
-	trashed, err := ParsePrivateRepositoryPath(".lumilio/trash/files/x/a.jpg")
+	trashed, err := layout.Parse(".lumilio/trash/files/x/a.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,8 +68,8 @@ func TestMoveNoReplaceNeverReplacesAndStaysBetweenNamespaces(t *testing.T) {
 		}
 	}
 	other := mustUserMediaPath(t, "b.jpg")
-	if err := repositoryFS.MoveNoReplace(original, other); !errors.Is(err, ErrRepositoryPathNamespace) {
-		t.Fatalf("media-to-media move = %v, want ErrRepositoryPathNamespace", err)
+	if err := repositoryFS.MoveNoReplace(original, other); !errors.Is(err, layout.ErrPathNamespace) {
+		t.Fatalf("media-to-media move = %v, want layout.ErrPathNamespace", err)
 	}
 }
 
@@ -80,7 +82,7 @@ func TestDropDuplicateLinkRemovesOnlyTheSameFile(t *testing.T) {
 		t.Skipf("hard links unavailable: %v", err)
 	}
 	writeRepositoryFSTestFile(t, repository.Path, "b.jpg", []byte("photo"))
-	trashed, err := ParsePrivateRepositoryPath(".lumilio/trash/files/x/a.jpg")
+	trashed, err := layout.Parse(".lumilio/trash/files/x/a.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}

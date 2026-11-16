@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"path"
 	"sort"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/scan"
 	"server/internal/storage/trash"
 )
@@ -158,9 +158,10 @@ func (s *Service) describe(files *storage.RepositoryFS, receiptID string, item s
 	}
 	current := item.CurrentPath()
 	if item.Disposition == storage.DispositionReassociated && item.ResolvedAssetID != "" {
-		current = studioRecordPath(item.ResolvedAssetID)
+		record, _ := studioRecordPath(item.ResolvedAssetID)
+		current = record.String()
 	}
-	if target, err := storage.ParsePrivateRepositoryPath(current); err == nil {
+	if target, err := layout.Parse(current); err == nil {
 		if info, err := files.StatPrivate(target); err == nil && info.Mode().IsRegular() {
 			described.Present = true
 		}
@@ -186,8 +187,13 @@ func deletable(item storage.RecoveryItem) bool {
 	return false
 }
 
-func studioRecordPath(assetID string) string {
-	return path.Join(storage.DefaultStructure.SidecarsDir, assetID+".lumilio-sidecar")
+// studioRecordPath is where the Studio record of one Asset lives.
+func studioRecordPath(assetID string) (layout.Path, error) {
+	id, err := uuid.Parse(assetID)
+	if err != nil {
+		return layout.Path{}, err
+	}
+	return layout.Studio(id)
 }
 
 // ReconcileResult counts what one pass changed.
@@ -332,14 +338,17 @@ func (s *Service) contentProven(ctx context.Context, repositoryID uuid.UUID, rec
 // removeSupersededRecord drops the old name of a reassociated record when
 // the new one is in place.
 func (s *Service) removeSupersededRecord(files *storage.RepositoryFS, item storage.RecoveryItem) error {
-	if item.ResolvedAssetID == "" || item.Path == studioRecordPath(item.ResolvedAssetID) {
+	if item.ResolvedAssetID == "" {
 		return nil
 	}
-	target, err := storage.ParsePrivateRepositoryPath(studioRecordPath(item.ResolvedAssetID))
+	target, err := studioRecordPath(item.ResolvedAssetID)
 	if err != nil {
 		return err
 	}
-	source, err := storage.ParsePrivateRepositoryPath(item.Path)
+	if item.Path == target.String() {
+		return nil
+	}
+	source, err := layout.Parse(item.Path)
 	if err != nil {
 		return err
 	}
@@ -369,7 +378,7 @@ type studioRecord struct {
 // through persist, and only then removed under its old name, so a crash at
 // any point is finished by the next pass without a second move.
 func (s *Service) reassociate(ctx context.Context, files *storage.RepositoryFS, repositoryID uuid.UUID, item *storage.RecoveryItem, persist func() error) (storage.RecoveryDisposition, error) {
-	source, err := storage.ParsePrivateRepositoryPath(item.Path)
+	source, err := layout.Parse(item.Path)
 	if err != nil {
 		return s.settle(item, storage.DispositionAmbiguous, "", "record path is not portable"), nil
 	}
@@ -416,7 +425,7 @@ func (s *Service) reassociate(ctx context.Context, files *storage.RepositoryFS, 
 	}
 	// A different file at the record's source path means the source was
 	// replaced; the record is not applied to whatever stands there now.
-	if _, err := storage.ParseUserMediaPath(record.Source.StoragePath); err == nil {
+	if _, err := layout.ParseMedia(record.Source.StoragePath); err == nil {
 		if key, keyErr := s.scanner.PathKey(ctx, repositoryID, record.Source.StoragePath); keyErr == nil {
 			if live, err := s.reader.GetLiveRepositoryEntryByKey(ctx, repo.GetLiveRepositoryEntryByKeyParams{RepositoryID: repositoryID, PathKey: key}); err == nil {
 				if live.Kind == scan.KindFile && live.AssetID.Valid && live.AssetID.UUID != assetID {
@@ -427,7 +436,7 @@ func (s *Service) reassociate(ctx context.Context, files *storage.RepositoryFS, 
 			}
 		}
 	}
-	target, err := storage.ParsePrivateRepositoryPath(studioRecordPath(assetID.String()))
+	target, err := layout.Studio(assetID)
 	if err != nil {
 		return storage.DispositionPreserved, err
 	}
@@ -511,7 +520,7 @@ func (s *Service) OpenItem(ctx context.Context, repositoryID uuid.UUID, itemID s
 		_ = files.Close()
 		return nil, item, fmt.Errorf("%w: %s has no exportable bytes", ErrItemNotFound, itemID)
 	}
-	target, err := storage.ParsePrivateRepositoryPath(item.CurrentPath())
+	target, err := layout.Parse(item.CurrentPath())
 	if err != nil {
 		_ = files.Close()
 		return nil, item, err
@@ -557,7 +566,7 @@ func (s *Service) DeleteItem(ctx context.Context, repositoryID uuid.UUID, itemID
 	if !deletable(item.RecoveryItem) {
 		return item, fmt.Errorf("%w: %s is %s", ErrItemNotDeletable, item.Class, item.Disposition)
 	}
-	target, err := storage.ParsePrivateRepositoryPath(item.CurrentPath())
+	target, err := layout.Parse(item.CurrentPath())
 	if err != nil {
 		return item, err
 	}

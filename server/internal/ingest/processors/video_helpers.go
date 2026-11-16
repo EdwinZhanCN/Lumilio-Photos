@@ -21,6 +21,7 @@ import (
 	"server/internal/media/exif"
 	fileutil "server/internal/media/file"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/work/execution"
 )
 
@@ -274,7 +275,7 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 }
 
 // copyVideoAsWebVersion saves the provided video file as the web version.
-func copyVideoAsWebVersion(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, pipelineVersion, version string) error {
+func copyVideoAsWebVersion(ctx context.Context, files *storage.RepositoryFS, sourcePath layout.Path, asset *repo.Asset, pipelineVersion, version string) error {
 	videoFile, err := files.OpenMedia(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open video file: %w", err)

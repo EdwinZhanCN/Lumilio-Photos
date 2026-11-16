@@ -11,6 +11,7 @@ import (
 	"server/internal/catalog/repo"
 	fileutil "server/internal/media/file"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 )
 
 // bindKnown indexes a file the way an upload commit does: the content hash
@@ -23,7 +24,7 @@ func (f *fixture) bindKnown(repository repo.Repository, relative string) KnownBi
 		f.t.Fatal(err)
 	}
 	defer fsys.Close()
-	repositoryPath, err := storage.ParseUserMediaPath(relative)
+	repositoryPath, err := layout.ParseMedia(relative)
 	if err != nil {
 		f.t.Fatal(err)
 	}

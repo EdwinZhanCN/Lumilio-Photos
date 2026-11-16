@@ -1,6 +1,6 @@
 // Package recovery makes the private state a Repository carried into a new
 // registration reachable again. An open, copy, or adoption leaves a
-// format-1 receipt under .lumilio/recovery/ that lists what it found by
+// format-1 receipt under .lumilio/quarantine/recovery/ that lists what it found by
 // class; this package reads those receipts back and acts on them.
 //
 // [Service.Reconcile] runs after a registration's scan and on every Trash

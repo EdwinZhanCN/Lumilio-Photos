@@ -10,6 +10,7 @@ import (
 
 	"server/internal/catalog"
 	"server/internal/catalog/dbtypes"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 )
@@ -89,7 +90,7 @@ func TestAdoptPrimaryRepositoryKeepsIdentityAndPreservesPrivateState(t *testing.
 	if got := review.Actions; len(got) != 2 || got[0] != SetupActionAdopt || got[1] != SetupActionFreshElsewhere {
 		t.Fatalf("actions = %v", got)
 	}
-	if p := review.Recovery; p == nil || p.TrashFiles != 2 || p.StudioRecords != 2 || p.StagingFiles != 2 || p.UnknownFiles < 1 || p.LogFiles < 1 {
+	if p := review.Recovery; p == nil || p.TrashFiles != 2 || p.StudioRecords != 2 || p.StagingFiles != 3 || p.UnknownFiles < 1 || p.LogFiles < 1 {
 		t.Fatalf("recovery preview = %+v", review.Recovery)
 	}
 	if after := hashTree(t, repositoryPath); len(after) != len(before) {
@@ -178,7 +179,7 @@ func TestAdoptPrimaryRepairsAMissingLayoutButNotAnObstructedOne(t *testing.T) {
 		catalog, manager := newCatalogRepositoryManager(t)
 		ctx := context.Background()
 		repositoryPath, repositoryID := leftoverPrimaryForTest(t, catalog, manager)
-		if err := os.RemoveAll(filepath.Join(repositoryPath, DefaultStructure.SystemDir)); err != nil {
+		if err := os.RemoveAll(filepath.Join(repositoryPath, layout.PrivateRoot)); err != nil {
 			t.Fatal(err)
 		}
 		before := hashTree(t, repositoryPath)
@@ -186,7 +187,7 @@ func TestAdoptPrimaryRepairsAMissingLayoutButNotAnObstructedOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if review.State != SetupPrimaryLayoutRepairable || len(review.LayoutMissing) != 1 || review.LayoutMissing[0] != DefaultStructure.SystemDir || review.Existing.RepositoryID != repositoryID {
+		if review.State != SetupPrimaryLayoutRepairable || len(review.LayoutMissing) != 1 || review.LayoutMissing[0] != layout.PrivateRoot || review.Existing.RepositoryID != repositoryID {
 			t.Fatalf("review = %+v missing=%v", review.State, review.LayoutMissing)
 		}
 		adopted, err := adoptReviewed(t, manager, review, "adopt-repair")
@@ -196,8 +197,8 @@ func TestAdoptPrimaryRepairsAMissingLayoutButNotAnObstructedOne(t *testing.T) {
 		if adopted.ReceiptID != "" || adopted.Receipt != nil || len(adopted.LayoutRepaired) != 1 {
 			t.Fatalf("repair result = %+v", adopted)
 		}
-		for _, directory := range []string{DefaultStructure.IncomingDir, DefaultStructure.SidecarsDir, DefaultStructure.InboxDir} {
-			if info, err := os.Stat(filepath.Join(repositoryPath, filepath.FromSlash(directory))); err != nil || !info.IsDir() {
+		for _, directory := range []string{onDisk(t, repositoryPath, layout.UploadsDir()), onDisk(t, repositoryPath, layout.StudioDir()), filepath.Join(repositoryPath, layout.Inbox)} {
+			if info, err := os.Stat(directory); err != nil || !info.IsDir() {
 				t.Fatalf("layout directory %s missing after repair: %v", directory, err)
 			}
 		}
@@ -215,13 +216,13 @@ func TestAdoptPrimaryRepairsAMissingLayoutButNotAnObstructedOne(t *testing.T) {
 		catalog, manager := newCatalogRepositoryManager(t)
 		ctx := context.Background()
 		repositoryPath, _ := leftoverPrimaryForTest(t, catalog, manager)
-		if err := os.RemoveAll(filepath.Join(repositoryPath, DefaultStructure.SystemDir)); err != nil {
+		if err := os.RemoveAll(filepath.Join(repositoryPath, layout.PrivateRoot)); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.RemoveAll(filepath.Join(repositoryPath, DefaultStructure.InboxDir)); err != nil {
+		if err := os.RemoveAll(filepath.Join(repositoryPath, layout.Inbox)); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(repositoryPath, DefaultStructure.InboxDir), []byte("not a directory"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(repositoryPath, layout.Inbox), []byte("not a directory"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		before := hashTree(t, repositoryPath)
@@ -242,7 +243,7 @@ func TestAdoptPrimaryRepairsAMissingLayoutButNotAnObstructedOne(t *testing.T) {
 				t.Fatalf("obstructed repair changed %s", name)
 			}
 		}
-		if _, err := os.Stat(filepath.Join(repositoryPath, DefaultStructure.SystemDir)); !errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(filepath.Join(repositoryPath, layout.PrivateRoot)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("obstructed repair created the private workspace: %v", err)
 		}
 		if count, _ := manager.queries.CountPrimaryRepositories(ctx); count != 0 {
@@ -352,7 +353,7 @@ func TestLifecycleRecoveryRollsBackAnAdoptionInterruptedAfterItsFilesystemPhase(
 			t.Fatalf("recovery did not restore %s", name)
 		}
 	}
-	if receipts, _ := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*.json")); len(receipts) != 0 {
+	if receipts, _ := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(layout.RecoveryDir().String()), "*.json")); len(receipts) != 0 {
 		t.Fatalf("receipt survived the recovery rollback: %v", receipts)
 	}
 	if _, err := manager.GetRepository(repositoryID); err == nil {

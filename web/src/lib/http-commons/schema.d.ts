@@ -18603,7 +18603,7 @@ export interface components {
             disposition?: "preserved" | "moved" | "reassociated" | "ambiguous" | "unreadable" | "deleted";
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
-            /** @example .lumilio/staging/incoming/upload.part */
+            /** @example .lumilio/work/uploads/550e8400-e29b-41d4-a716-446655440000/upload.part */
             path?: string;
             /** @example true */
             present?: boolean;

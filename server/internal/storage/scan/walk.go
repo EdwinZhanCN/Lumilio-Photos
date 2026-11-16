@@ -14,6 +14,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/pathsemantics"
 )
 
@@ -501,7 +502,7 @@ func (t *walkTurn) processDirectory(ctx context.Context, directory string) error
 		if row.Kind == KindDirectory {
 			kind = storage.EntryKindDirectory
 		}
-		repositoryPath, parseErr := storage.ParseUserMediaPath(row.Path)
+		repositoryPath, parseErr := layout.ParseMedia(row.Path)
 		if parseErr != nil {
 			c.errors++
 			continue
@@ -562,7 +563,7 @@ func (t *walkTurn) markCursor(directory string) error {
 // vanishedDirectory handles a directory that could not be listed: when it is
 // positively gone, its subtree is swept.
 func (t *walkTurn) vanishedDirectory(ctx context.Context, directory string) (bool, error) {
-	repositoryPath, err := storage.ParseUserMediaPath(directory)
+	repositoryPath, err := layout.ParseMedia(directory)
 	if err != nil {
 		return false, nil
 	}

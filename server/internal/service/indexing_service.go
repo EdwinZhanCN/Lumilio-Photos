@@ -165,7 +165,7 @@ func NewAssetIndexingService(
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
+		auditProvider = logging.NoopRepositoryAuditProvider()
 	}
 	return &assetIndexingService{
 		queries:         queries,
@@ -702,7 +702,7 @@ func (s *assetIndexingService) countPendingReindexReceipts(ctx context.Context) 
 
 func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logging.RepositoryAuditLogger {
 	if s.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(s.logger, false).ForPath(repoPath)
+		return logging.NoopRepositoryAuditLogger()
 	}
 	if strings.TrimSpace(repoPath) != "" {
 		return s.auditProvider.ForPath(repoPath)

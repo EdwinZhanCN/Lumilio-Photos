@@ -9,6 +9,9 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
+
+	"github.com/google/uuid"
 )
 
 // ChunkMerger tracks relative chunk handles and streams them into a new
@@ -29,10 +32,22 @@ type MergeResult struct {
 }
 
 type ChunkInfo struct {
-	SessionID   string `json:"session_id"`
-	ChunkIndex  int    `json:"chunk_index"`
-	PrivatePath string `json:"private_path"`
-	Size        int64  `json:"size"`
+	SessionID  string `json:"session_id"`
+	ChunkIndex int    `json:"chunk_index"`
+	Size       int64  `json:"size"`
+}
+
+// handle names the chunk's file in its session directory.
+func (c ChunkInfo) handle(repositoryID uuid.UUID) (*storage.StagingFile, error) {
+	session, err := uuid.Parse(c.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("upload session id: %w", err)
+	}
+	chunk, err := layout.UploadChunk(session, c.ChunkIndex)
+	if err != nil {
+		return nil, err
+	}
+	return &storage.StagingFile{ID: c.SessionID, RepositoryID: repositoryID, PrivatePath: chunk.String()}, nil
 }
 
 func (cm *ChunkMerger) AddChunks(sessionID string, newChunks []ChunkInfo) {
@@ -101,7 +116,10 @@ func (cm *ChunkMerger) MergeChunks(repository repo.Repository, sessionID string,
 	buffer := make([]byte, 1<<20)
 	var totalSize int64
 	for _, chunk := range chunks {
-		handle := &storage.StagingFile{ID: chunk.SessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath}
+		handle, err := chunk.handle(repository.RepoID)
+		if err != nil {
+			return nil, err
+		}
 		// The destination already holds this repository's lease; a second
 		// lease would deadlock behind a queued lifecycle mutation.
 		source, err := destination.OpenStagingSibling(repository, handle)
@@ -141,9 +159,9 @@ func (cm *ChunkMerger) CleanupChunks(repository repo.Repository, sessionID strin
 	delete(cm.chunks, sessionID)
 	cm.mu.Unlock()
 	for _, chunk := range chunks {
-		_ = cm.staging.RemoveStagingFile(repository, &storage.StagingFile{
-			ID: chunk.SessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath,
-		})
+		if handle, err := chunk.handle(repository.RepoID); err == nil {
+			_ = cm.staging.RemoveStagingFile(repository, handle)
+		}
 	}
 }
 

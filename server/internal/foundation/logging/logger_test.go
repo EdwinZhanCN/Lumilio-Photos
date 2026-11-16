@@ -113,30 +113,34 @@ func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
 	assert.Contains(t, errorText, "\"job_id\":42")
 }
 
+// testLogsDir stands in for the layout's logs directory, which the Server
+// passes in.
+const testLogsDir = "private/logs"
+
 func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
-	provider := NewRepositoryAuditProvider(zap.NewNop(), false).(*repositoryAuditProvider)
+	provider := NewRepositoryAuditProvider(zap.NewNop(), testLogsDir, false).(*repositoryAuditProvider)
 
 	nonRepoPath := t.TempDir()
 	provider.ForPath(nonRepoPath).Operation("should_not_write")
-	_, err := os.Stat(filepath.Join(nonRepoPath, repositoryLogsDir))
+	_, err := os.Stat(filepath.Join(nonRepoPath, filepath.FromSlash(testLogsDir)))
 	assert.Error(t, err)
 
 	repoPath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(repoPath, repositoryLogsDir), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoPath, filepath.FromSlash(testLogsDir)), 0755))
 
 	t.Run("successful operations persist without REPO_AUDIT_VERBOSE", func(t *testing.T) {
-		p := NewRepositoryAuditProvider(zap.NewNop(), false)
+		p := NewRepositoryAuditProvider(zap.NewNop(), testLogsDir, false)
 		quietRepo := t.TempDir()
 		t.Cleanup(func() { require.NoError(t, p.Close()) })
-		require.NoError(t, os.MkdirAll(filepath.Join(quietRepo, repositoryLogsDir), 0755))
+		require.NoError(t, os.MkdirAll(filepath.Join(quietRepo, filepath.FromSlash(testLogsDir)), 0755))
 		p.ForPath(quietRepo).Operation("asset.ingest", zap.String("asset_id", "quiet"))
-		opsBytes, err := os.ReadFile(filepath.Join(quietRepo, repositoryLogsDir, repositoryOpsLogName))
+		opsBytes, err := os.ReadFile(filepath.Join(quietRepo, filepath.FromSlash(testLogsDir), repositoryOpsLogName))
 		require.NoError(t, err)
 		assert.Contains(t, string(opsBytes), `"operation":"asset.ingest"`)
 		assert.Contains(t, string(opsBytes), `"result":"ok"`)
 	})
 
-	provider = NewRepositoryAuditProvider(zap.NewNop(), true).(*repositoryAuditProvider)
+	provider = NewRepositoryAuditProvider(zap.NewNop(), testLogsDir, true).(*repositoryAuditProvider)
 	t.Cleanup(func() { require.NoError(t, provider.Close()) })
 
 	first := provider.ForPath(repoPath)
@@ -150,9 +154,9 @@ func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
 	first.Operation("asset.ingest", zap.String("asset_id", "asset-1"))
 	first.Error("asset.ingest", assert.AnError, zap.String("asset_id", "asset-1"))
 
-	opsBytes, err := os.ReadFile(filepath.Join(repoPath, repositoryLogsDir, repositoryOpsLogName))
+	opsBytes, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(testLogsDir), repositoryOpsLogName))
 	require.NoError(t, err)
-	errBytes, err := os.ReadFile(filepath.Join(repoPath, repositoryLogsDir, repositoryErrLogName))
+	errBytes, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(testLogsDir), repositoryErrLogName))
 	require.NoError(t, err)
 
 	assert.Contains(t, string(opsBytes), "\"operation\":\"asset.ingest\"")

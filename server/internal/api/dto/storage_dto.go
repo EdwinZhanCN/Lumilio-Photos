@@ -161,7 +161,7 @@ type RepositoryRecoveryItemDTO struct {
 	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	ReceiptID string `json:"receipt_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Class     string `json:"class" example:"staging" enums:"trash,studio,staging,logs,derived,unknown"`
-	Path      string `json:"path" example:".lumilio/staging/incoming/upload.part"`
+	Path      string `json:"path" example:".lumilio/work/uploads/550e8400-e29b-41d4-a716-446655440000/upload.part"`
 	Size      int64  `json:"size" example:"1048576"`
 	// Disposition is what became of the item: preserved or moved bytes await
 	// a decision; reassociated is a Studio record attached to its proven

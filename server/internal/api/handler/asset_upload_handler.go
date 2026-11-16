@@ -384,12 +384,13 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 		h.sessionManager.UpdateSessionStatus(fileInfo.SessionID, "uploading")
 
-		targetName := filename
+		var stagingFile *storage.StagingFile
+		var dst *storage.RepositoryFile
 		if fileInfo.Type == "chunk" {
-			targetName = fmt.Sprintf("chunk_%s_%d", fileInfo.SessionID, fileInfo.ChunkIndex)
+			stagingFile, dst, err = h.stagingManager.CreateSessionChunk(repository, fileInfo.Session, fileInfo.ChunkIndex)
+		} else {
+			stagingFile, dst, err = h.stagingManager.CreateSessionFile(repository, fileInfo.Session, filename)
 		}
-
-		stagingFile, dst, err := h.stagingManager.CreateStagingFile(repository, targetName)
 		if err != nil {
 			part.Close()
 			api.WriteProblem(c, api.Internal(err))
@@ -401,12 +402,13 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		err = errors.Join(err, closeErr)
 		part.Close()
 		if err != nil {
-			h.handleUploadFailureFile(repository, stagingFile, "save batch upload data")
+			// A partial part is dropped; the client may resend it.
+			_ = h.stagingManager.RemoveStagingFile(repository, stagingFile)
 			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
-		if !h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written, stagingFile.PrivatePath) {
+		if !h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written) {
 			api.WriteProblem(c, api.Internal(errors.New("failed to persist upload session")))
 			return
 		}
@@ -425,12 +427,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if !ok {
 			continue
 		}
-		allChunks := make([]upload.ChunkInfo, 0, len(session.ReceivedChunks))
-		for _, index := range session.ReceivedChunks {
-			allChunks = append(allChunks, upload.ChunkInfo{
-				SessionID: sessionID, ChunkIndex: index, PrivatePath: session.ChunkFiles[index], Size: session.ChunkSizes[index],
-			})
-		}
+		allChunks := upload.SessionChunks(session)
 		if state.info.Type == "single" {
 			if len(allChunks) != 1 {
 				continue
@@ -442,10 +439,14 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			}
 			header.Header.Set("Content-Type", state.contentType)
 
-			chunk := allChunks[0]
+			staged, err := storage.SessionFilePath(state.info.Session, state.filename)
+			if err != nil {
+				continue
+			}
 			result, err := h.processCompletedUpload(ctx, header, session, repository, &storage.StagingFile{
-				ID: sessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath, Filename: state.filename,
+				ID: sessionID, RepositoryID: repository.RepoID, PrivatePath: staged.String(), Filename: state.filename,
 			})
+			h.sessionManager.EndSession(sessionID)
 			if err != nil {
 				results = append(results, dto.BatchUploadResultDTO{
 					Success:   false,
@@ -456,7 +457,6 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 				continue
 			}
 
-			h.sessionManager.UpdateSessionStatus(sessionID, "completed")
 			result.SessionID = sessionID
 			results = append(results, *result)
 			continue
@@ -481,8 +481,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		h.sessionManager.UpdateSessionStatus(sessionID, "merging")
 		mergeResult, err := h.chunkMerger.MergeChunks(repository, sessionID, state.info.TotalChunks, state.filename)
 		if err != nil {
-			h.sessionManager.SetSessionError(sessionID, err.Error())
-			h.chunkMerger.CleanupChunks(repository, sessionID)
+			// A session that cannot be assembled moves whole to quarantine.
+			if quarantineErr := h.stagingManager.QuarantineSession(repository, state.info.Session); quarantineErr != nil {
+				log.Printf("Failed to quarantine upload session %s: %v", sessionID, quarantineErr)
+			}
+			h.chunkMerger.ClearSession(sessionID)
+			h.sessionManager.EndSession(sessionID)
 			results = append(results, dto.BatchUploadResultDTO{
 				Success:   false,
 				SessionID: sessionID,
@@ -500,12 +504,10 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		header.Header.Set("Content-Type", state.contentType)
 
 		result, err := h.processCompletedUpload(ctx, header, session, repository, mergeResult.StagingFile)
-
 		h.chunkMerger.CleanupChunks(repository, sessionID)
-
+		h.sessionManager.EndSession(sessionID)
 		if err != nil {
 			_ = h.stagingManager.RemoveStagingFile(repository, mergeResult.StagingFile)
-			h.sessionManager.SetSessionError(sessionID, err.Error())
 			results = append(results, dto.BatchUploadResultDTO{
 				Success:   false,
 				SessionID: sessionID,
@@ -515,10 +517,6 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		h.sessionManager.UpdateSessionStatus(sessionID, "completed")
-		if result.ReceiptID != nil {
-			h.sessionManager.SetSessionReceiptID(sessionID, *result.ReceiptID)
-		}
 		result.SessionID = sessionID
 		results = append(results, *result)
 	}
@@ -712,11 +710,7 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 	if req.ClientFingerprint != "" {
 		h.sessionManager.SetSessionFingerprint(session.SessionID, req.ClientFingerprint)
 	}
-	chunks := make([]upload.ChunkInfo, 0, len(session.ReceivedChunks))
-	for _, index := range session.ReceivedChunks {
-		chunks = append(chunks, upload.ChunkInfo{SessionID: session.SessionID, ChunkIndex: index, PrivatePath: session.ChunkFiles[index], Size: session.ChunkSizes[index]})
-	}
-	h.chunkMerger.AddChunks(session.SessionID, chunks)
+	h.chunkMerger.AddChunks(session.SessionID, upload.SessionChunks(session))
 	api.JSONOK(c, dto.UploadSessionResponseDTO{SessionID: session.SessionID, Status: session.Status, TotalChunks: session.TotalChunks, ReceivedChunks: session.ReceivedChunks, BytesReceived: session.BytesReceived, ReceiptID: session.ReceiptID})
 }
 
@@ -976,7 +970,7 @@ func (h *AssetHandler) cleanupExpiredSessions() {
 // cancellation for graceful shutdown. Call from app.go after construction.
 func (h *AssetHandler) StartCleanupTasks(ctx context.Context) {
 	h.cleanupExpiredSessions()
-	h.cleanupOrphanedChunks()
+	h.cleanupOrphanedChunks(ctx)
 
 	go func() {
 		sessionTicker := time.NewTicker(5 * time.Minute)
@@ -991,86 +985,29 @@ func (h *AssetHandler) StartCleanupTasks(ctx context.Context) {
 			case <-sessionTicker.C:
 				h.cleanupExpiredSessions()
 			case <-orphanedChunkTicker.C:
-				h.cleanupOrphanedChunks()
+				h.cleanupOrphanedChunks(ctx)
 			}
 		}
 	}()
 }
 
-// cleanupOrphanedChunks removes orphaned chunk files that aren't associated with any active session
-func (h *AssetHandler) cleanupOrphanedChunks() {
-	log.Println("🔍 Starting orphaned chunk cleanup...")
-
-	// Get all active session IDs
-	activeSessions := h.sessionManager.GetAllSessions()
-	activeSessionIDs := make(map[string]bool)
-	for _, session := range activeSessions {
-		activeSessionIDs[session.SessionID] = true
+// cleanupOrphanedChunks removes upload sessions that nothing will finish
+// from every reachable repository.
+func (h *AssetHandler) cleanupOrphanedChunks(ctx context.Context) {
+	repositories, err := h.repoManager.ListRepositories()
+	if err != nil {
+		log.Printf("Failed to list repositories for upload session cleanup: %v", err)
+		return
 	}
-
-	// Track stats
-	errorCount := 0
-
-	// Get all repository IDs that have active or recent upload activity
-	repoIDs := make(map[string]bool)
-	for _, session := range activeSessions {
-		if session.RepositoryID != "" {
-			repoIDs[session.RepositoryID] = true
+	for _, repository := range repositories {
+		// An offline repository has no reachable work directory.
+		if repository.Reachability != dbtypes.RepositoryReachabilityActive {
+			continue
+		}
+		if err := h.sessionManager.SweepStaging(ctx, h.stagingManager, *repository, time.Hour); err != nil {
+			log.Printf("Failed to clean upload sessions for repository %s: %v", repository.Name, err)
 		}
 	}
-
-	// Convert map to slice
-	var repositoryIDs []string
-	for id := range repoIDs {
-		repositoryIDs = append(repositoryIDs, id)
-	}
-
-	// If there are no active repositories with sessions, we'll do a general cleanup
-	// of all known repositories
-	if len(repositoryIDs) == 0 {
-		// Get all repositories using ListRepositories
-		repositories, err := h.repoManager.ListRepositories()
-		if err != nil {
-			log.Printf("❌ Failed to list repositories for orphaned chunk cleanup: %v", err)
-		} else {
-			for _, repo := range repositories {
-				// An offline repository has no reachable staging directory;
-				// walking it only produces I/O errors and false failure counts.
-				if repo.Reachability != dbtypes.RepositoryReachabilityActive {
-					continue
-				}
-				// Use staging manager's cleanup function with short max age (1 hour)
-				err := h.stagingManager.CleanupStaging(*repo, time.Hour)
-				if err != nil {
-					log.Printf("❌ Failed to cleanup staging for repository %s: %v", repo.Name, err)
-					errorCount++
-				} else {
-					log.Printf("✅ Cleaned up staging for repository %s", repo.Name)
-				}
-			}
-		}
-	} else {
-		// Cleanup for specific repositories with active sessions
-		for _, repositoryID := range repositoryIDs {
-			repo, err := h.repoManager.GetRepository(repositoryID)
-			if err != nil {
-				log.Printf("❌ Failed to get repository %s: %v", repositoryID, err)
-				errorCount++
-				continue
-			}
-
-			// Use staging manager's cleanup function with short max age (1 hour)
-			err = h.stagingManager.CleanupStaging(*repo, time.Hour)
-			if err != nil {
-				log.Printf("❌ Failed to cleanup staging for repository %s: %v", repo.Name, err)
-				errorCount++
-			} else {
-				log.Printf("✅ Cleaned up staging for repository %s", repo.Name)
-			}
-		}
-	}
-
-	log.Printf("✅ Orphaned chunk cleanup completed: %d errors", errorCount)
 }
 
 func (h *AssetHandler) handleUploadFailureFile(repository repo.Repository, stagingFile *storage.StagingFile, reason string) {

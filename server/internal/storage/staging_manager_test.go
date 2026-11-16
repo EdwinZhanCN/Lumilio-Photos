@@ -1,8 +1,8 @@
 package storage
 
 import (
-	"context"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,6 +10,7 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
@@ -113,7 +114,7 @@ func TestOpenStagingSiblingDoesNotWaitBehindQueuedMutation(t *testing.T) {
 func TestStagingCommitUsesRelativeHandleAndNeverReplaces(t *testing.T) {
 	manager, repository := newStagingTestRepository(t, "flat", "rename")
 	staged := createStagedContent(t, manager, repository, "photo.jpg", "original")
-	if staged.RepositoryID != repository.RepoID || !strings.HasPrefix(staged.PrivatePath, DefaultStructure.IncomingDir+"/") {
+	if staged.RepositoryID != repository.RepoID || !strings.HasPrefix(staged.PrivatePath, layout.UploadsDir().String()+"/") {
 		t.Fatalf("unexpected staging handle: %+v", staged)
 	}
 	if err := manager.CommitStagingFile(repository, staged, "Trips/photo.jpg"); err != nil {
@@ -183,8 +184,11 @@ func TestStagingDuplicateNameAndQuarantine(t *testing.T) {
 	if err := manager.MoveStagingToFailed(repository, failed); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(failed.PrivatePath, DefaultStructure.FailedDir+"/") {
+	if !strings.HasPrefix(failed.PrivatePath, layout.QuarantineUploadsDir().String()+"/") {
 		t.Fatalf("failed path = %q", failed.PrivatePath)
+	}
+	if content, err := os.ReadFile(onDisk(t, repository.Path, mustPath(layout.Parse(failed.PrivatePath)))); err != nil || string(content) != "evidence" {
+		t.Fatalf("quarantined content = %q, %v", content, err)
 	}
 }
 
@@ -198,61 +202,79 @@ func TestStagingHandleRejectsWrongRepository(t *testing.T) {
 	}
 }
 
-func TestRecoveryQuarantinePreservesEveryIncomingByte(t *testing.T) {
-	manager, repository := newStagingTestRepository(t, "flat", "rename")
-	first := createStagedContent(t, manager, repository, "first.jpg", "first-bytes")
-	second := createStagedContent(t, manager, repository, "second.mov", "second-bytes")
+// writeSessionFile stages content as one file of an upload session.
+func writeSessionFile(t *testing.T, manager *DefaultStagingManager, repository repo.Repository, sessionID uuid.UUID, index int, content string) *StagingFile {
+	t.Helper()
+	staged, opened, err := manager.CreateSessionChunk(repository, sessionID, index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := opened.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := opened.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return staged
+}
 
-	legacyPath := filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.StagingDir), "legacy.bin")
-	if err := os.WriteFile(legacyPath, []byte("legacy-bytes"), 0o600); err != nil {
+func TestQuarantineSessionKeepsTheWholeSession(t *testing.T) {
+	manager, repository := newStagingTestRepository(t, "flat", "rename")
+	sessionID := uuid.New()
+	writeSessionFile(t, manager, repository, sessionID, 0, "first-bytes")
+	writeSessionFile(t, manager, repository, sessionID, 1, "second-bytes")
+
+	if err := manager.QuarantineSession(repository, sessionID); err != nil {
 		t.Fatal(err)
 	}
-	moves, err := manager.QuarantineUnresolvedStaging(context.Background(), repository)
-	if err != nil {
+	for index, want := range []string{"first-bytes", "second-bytes"} {
+		chunk := mustPath(layout.UploadChunk(sessionID, index))
+		quarantined := mustPath(layout.QuarantineUploadFile(sessionID, path.Base(chunk.String())))
+		if content, err := os.ReadFile(onDisk(t, repository.Path, quarantined)); err != nil || string(content) != want {
+			t.Fatalf("quarantined chunk %d = %q, %v", index, content, err)
+		}
+	}
+	if _, err := os.Lstat(onDisk(t, repository.Path, mustPath(layout.UploadSession(sessionID)))); !os.IsNotExist(err) {
+		t.Fatalf("work session remains after quarantine: %v", err)
+	}
+	// Quarantining a session that holds nothing is a no-op.
+	if err := manager.QuarantineSession(repository, uuid.New()); err != nil {
 		t.Fatal(err)
-	}
-	if len(moves) != 3 {
-		t.Fatalf("quarantine moves = %+v, want 3", moves)
-	}
-	for _, staged := range []*StagingFile{first, second} {
-		if _, err := os.Stat(filepath.Join(repository.Path, filepath.FromSlash(staged.PrivatePath))); !os.IsNotExist(err) {
-			t.Fatalf("incoming staging %q remains: %v", staged.PrivatePath, err)
-		}
-	}
-	want := map[string]bool{"first-bytes": false, "second-bytes": false, "legacy-bytes": false}
-	entries, err := os.ReadDir(filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.FailedDir)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		content, err := os.ReadFile(filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.FailedDir), entry.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, ok := want[string(content)]; ok {
-			want[string(content)] = true
-		}
-	}
-	for content, found := range want {
-		if !found {
-			t.Fatalf("quarantined content %q was not preserved", content)
-		}
 	}
 }
 
-func TestRecoveryQuarantineValidatesAllIncomingEntriesBeforeMoving(t *testing.T) {
+func TestCleanupStagingRemovesOnlyIdleUnclaimedWorkSessions(t *testing.T) {
 	manager, repository := newStagingTestRepository(t, "flat", "rename")
-	regular := createStagedContent(t, manager, repository, "regular.jpg", "regular-bytes")
-	symlink := filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.IncomingDir), "unsupported-link")
-	if err := os.Symlink("regular.jpg", symlink); err != nil {
-		t.Skipf("create staging symlink: %v", err)
+	old := time.Now().Add(-2 * time.Hour)
+	age := func(staged *StagingFile) {
+		t.Helper()
+		if err := os.Chtimes(onDisk(t, repository.Path, mustPath(layout.Parse(staged.PrivatePath))), old, old); err != nil {
+			t.Fatal(err)
+		}
 	}
+	idle, claimed, fresh, failed := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	age(writeSessionFile(t, manager, repository, idle, 0, "idle"))
+	age(writeSessionFile(t, manager, repository, claimed, 0, "claimed"))
+	writeSessionFile(t, manager, repository, fresh, 0, "fresh")
+	failedFile := writeSessionFile(t, manager, repository, failed, 0, "failed")
+	if err := manager.MoveStagingToFailed(repository, failedFile); err != nil {
+		t.Fatal(err)
+	}
+	age(failedFile)
 
-	if _, err := manager.QuarantineUnresolvedStaging(context.Background(), repository); err == nil {
-		t.Fatal("unsupported staging entry did not abort preflight")
+	if err := manager.CleanupStaging(repository, time.Hour, func(id uuid.UUID) bool { return id == claimed }); err != nil {
+		t.Fatal(err)
 	}
-	content, err := os.ReadFile(filepath.Join(repository.Path, filepath.FromSlash(regular.PrivatePath)))
-	if err != nil || string(content) != "regular-bytes" {
-		t.Fatalf("validated regular staging moved before abort: content=%q err=%v", content, err)
+	if _, err := os.Lstat(onDisk(t, repository.Path, mustPath(layout.UploadSession(idle)))); !os.IsNotExist(err) {
+		t.Fatalf("idle unclaimed session remains: %v", err)
+	}
+	for _, kept := range []layout.Path{
+		mustPath(layout.UploadSession(claimed)),
+		mustPath(layout.UploadSession(fresh)),
+		mustPath(layout.QuarantineUpload(failed)),
+	} {
+		if _, err := os.Lstat(onDisk(t, repository.Path, kept)); err != nil {
+			t.Fatalf("%s was cleaned: %v", kept, err)
+		}
 	}
 }

@@ -27,7 +27,7 @@ sequenceDiagram
     else large files
         n_web->>n_api: create session, then POST chunks
     end
-    n_api->>n_staging: write bytes into the repository's private staging area
+    n_api->>n_staging: write each part into its upload session's directory under .lumilio/work/uploads/
     n_api->>n_api: re-hash staged bytes and validate the media type
     n_api->>n_catalog: one transaction — staging commit + pending ingest receipt
     n_api-->>n_web: receipt_id per file (#quot;processing#quot;)
@@ -68,7 +68,7 @@ sequenceDiagram
 | 3 | api → web | known files are marked duplicate and skip transport | `go:handler.AssetHandler.PrecheckUpload` [`server/internal/api/handler/asset_upload_handler.go`](../../../../server/internal/api/handler/asset_upload_handler.go) |
 | 4 | web → api | _alt small files_ — POST /assets/batch (multipart batch) | `api:POST /api/v1/assets/batch` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
 | 5 | web → api | _else large files_ — create session, then POST chunks | `api:POST /api/v1/assets/batch/sessions` [`server/docs/swagger.yaml`](../../../../server/docs/swagger.yaml) |
-| 6 | api → staging | write bytes into the repository's private staging area | `go:server/internal/storage.StagingManager.CreateStagingFile` [`server/internal/storage/staging_manager.go`](../../../../server/internal/storage/staging_manager.go) |
+| 6 | api → staging | write each part into its upload session's directory under .lumilio/work/uploads/ | `go:server/internal/storage.StagingManager.CreateSessionFile` [`server/internal/storage/staging_manager.go`](../../../../server/internal/storage/staging_manager.go) |
 | 7 | api → api | re-hash staged bytes and validate the media type | `go:handler.AssetHandler.processCompletedUpload` [`server/internal/api/handler/asset_upload_handler.go`](../../../../server/internal/api/handler/asset_upload_handler.go) |
 | 8 | api → catalog | one transaction — staging commit + pending ingest receipt | `go:handler.AssetHandler.enqueueStagingCommit` [`server/internal/api/handler/asset_upload_handler.go`](../../../../server/internal/api/handler/asset_upload_handler.go) |
 | 9 | api → web | receipt_id per file ("processing") |  |
@@ -86,6 +86,10 @@ sequenceDiagram
 ## Why the request never does the work
 
 The HTTP handler's only durable effect is one catalog transaction that records the staged file and a pending receipt. If the Server, River, or QueueDB dies afterwards, the next scheduler pass derives the same ingest job again from the catalog. Nothing is lost and nothing runs twice past the commit coordinator's fences.
+
+## Failed uploads
+
+A part cut off mid-transfer is dropped; the browser still holds the file and resends it. A session whose chunks cannot be assembled moves whole to .lumilio/quarantine/uploads/ for a human decision and is never cleaned automatically. A session in work/ that no live upload owns and no pending staging commit names is removed once it has been idle for an hour.
 
 ## Identity
 

@@ -8,6 +8,7 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/locations"
 
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ type currentAssetSource struct {
 	content     repo.ContentObject
 	repository  repo.Repository
 	files       *storage.RepositoryFS
-	path        storage.RepositoryPath
+	path        layout.Path
 	localPath   string
 	observation storage.FileObservation
 }

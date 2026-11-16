@@ -16,6 +16,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/locations"
 	"server/internal/storage/repocfg"
 
@@ -27,7 +28,7 @@ import (
 type zipTestResolver struct {
 	factory    *storage.RepositoryFSFactory
 	repository repo.Repository
-	paths      map[uuid.UUID]storage.RepositoryPath
+	paths      map[uuid.UUID]layout.Path
 }
 
 func (r *zipTestResolver) OpenAsset(_ context.Context, assetID uuid.UUID) (*locations.OpenedMedia, error) {
@@ -109,12 +110,12 @@ func TestAssetHandlerWriteAssetToZip_UsesOriginalFilenames(t *testing.T) {
 	zipWriter := zip.NewWriter(&archive)
 	archiveNames := map[string]int{}
 
-	firstRepositoryPath, err := storage.ParseUserMediaPath("first.bin")
+	firstRepositoryPath, err := layout.ParseMedia("first.bin")
 	require.NoError(t, err)
-	secondRepositoryPath, err := storage.ParseUserMediaPath("second.bin")
+	secondRepositoryPath, err := layout.ParseMedia("second.bin")
 	require.NoError(t, err)
 	firstID, secondID := uuid.New(), uuid.New()
-	resolver := &zipTestResolver{factory: factory, repository: repository, paths: map[uuid.UUID]storage.RepositoryPath{
+	resolver := &zipTestResolver{factory: factory, repository: repository, paths: map[uuid.UUID]layout.Path{
 		firstID: firstRepositoryPath, secondID: secondRepositoryPath,
 	}}
 	require.NoError(t, writeAssetToZip(context.Background(), resolver, zipWriter, archiveNames, assetDownloadFile{

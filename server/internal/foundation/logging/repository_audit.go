@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	repositoryLogsDir    = ".lumilio/logs"
 	repositoryOpsLogName = "operations.log"
 	repositoryErrLogName = "error.log"
 )
@@ -40,6 +39,9 @@ type repositoryAuditProvider struct {
 	base     *zap.Logger
 	fileMode os.FileMode
 	verbose  bool
+	// logsDir is the logs directory relative to a repository root, slash
+	// separated. Storage owns the layout and passes it in.
+	logsDir string
 }
 
 type repositoryAuditLogger struct {
@@ -58,7 +60,20 @@ func NoopRepositoryAuditLogger() RepositoryAuditLogger {
 	return noopRepositoryAuditLogger{}
 }
 
-func NewRepositoryAuditProvider(baseLogger *zap.Logger, verbose bool) RepositoryAuditProvider {
+// NoopRepositoryAuditProvider is the provider for a value that has none
+// configured; it opens nothing.
+func NoopRepositoryAuditProvider() RepositoryAuditProvider { return noopRepositoryAuditProvider{} }
+
+type noopRepositoryAuditProvider struct{}
+
+func (noopRepositoryAuditProvider) ForPath(string) RepositoryAuditLogger {
+	return noopRepositoryAuditLogger{}
+}
+func (noopRepositoryAuditProvider) Close() error { return nil }
+
+// NewRepositoryAuditProvider writes each repository's audit logs under
+// logsDir, a slash-separated path relative to the repository root.
+func NewRepositoryAuditProvider(baseLogger *zap.Logger, logsDir string, verbose bool) RepositoryAuditProvider {
 	if baseLogger == nil {
 		baseLogger = zap.NewNop()
 	}
@@ -73,6 +88,7 @@ func NewRepositoryAuditProvider(baseLogger *zap.Logger, verbose bool) Repository
 		base:     baseLogger.With(zap.String("component", "repo_audit")),
 		fileMode: 0644,
 		verbose:  verbose,
+		logsDir:  logsDir,
 	}
 }
 
@@ -82,7 +98,10 @@ func (p *repositoryAuditProvider) ForPath(repoPath string) RepositoryAuditLogger
 		return noopRepositoryAuditLogger{}
 	}
 
-	logsDir := filepath.Join(cleanPath, repositoryLogsDir)
+	if p.logsDir == "" {
+		return noopRepositoryAuditLogger{}
+	}
+	logsDir := filepath.Join(cleanPath, filepath.FromSlash(p.logsDir))
 	if _, err := os.Stat(logsDir); err != nil {
 		return noopRepositoryAuditLogger{}
 	}

@@ -14,6 +14,7 @@ import (
 	"server/internal/catalog"
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
@@ -388,7 +389,7 @@ func TestStorageLocationAndCopyRegistrationUseDurableJournal(t *testing.T) {
 	if err := copyConfig.SaveConfigToFile(copyPath); err != nil {
 		t.Fatal(err)
 	}
-	oldPrivateFile := filepath.Join(copyPath, DefaultStructure.SystemDir, "staging", "old-state")
+	oldPrivateFile := filepath.Join(copyPath, layout.PrivateRoot, "work", "old-state")
 	if err := os.MkdirAll(filepath.Dir(oldPrivateFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +436,7 @@ func TestStorageLocationAndCopyRegistrationUseDurableJournal(t *testing.T) {
 	if len(scanned) != 2 || scanned[1] != registered.RepoID.String() {
 		t.Fatalf("durably retried copy scans = %#v", scanned)
 	}
-	recovered, err := filepath.Glob(filepath.Join(copyPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*", "staging", "old-state"))
+	recovered, err := filepath.Glob(filepath.Join(copyPath, filepath.FromSlash(layout.RecoveryDir().String()), "*", "work", "old-state"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,11 +481,11 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	originalPath := filepath.Join(created.Repository.Path, DefaultStructure.InboxDir, "kept.jpg")
+	originalPath := filepath.Join(created.Repository.Path, layout.Inbox, "kept.jpg")
 	if err := os.WriteFile(originalPath, []byte("original-media"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	privatePath := filepath.Join(created.Repository.Path, DefaultStructure.SystemDir, "staging", "kept-state")
+	privatePath := filepath.Join(created.Repository.Path, layout.PrivateRoot, "work", "kept-state")
 	if err := os.MkdirAll(filepath.Dir(privatePath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -567,7 +568,7 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	for _, preservedPath := range []string{
 		originalPath,
 		privatePath,
-		filepath.Join(created.Repository.Path, DefaultStructure.ConfigFile),
+		filepath.Join(created.Repository.Path, repoConfigFile),
 	} {
 		if _, err := os.Stat(preservedPath); err != nil {
 			t.Fatalf("preserved file %s: %v", preservedPath, err)

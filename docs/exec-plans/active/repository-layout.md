@@ -1,7 +1,8 @@
 # Repository layout: one class per directory, owned by one package
 
 Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #278).
-Phase 1 landed 2026-11-16 (RL1, #279). Next: Phase 2 (RL2). The layout below
+Phase 1 landed 2026-11-16 (RL1, #279). Phase 2 landed 2026-11-16 (RL2).
+Next: Phase 3 (RL3). The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
 "fix what is found" contract in [rc-release.md](rc-release.md).
 
@@ -286,13 +287,56 @@ Move these callers onto the constructors:
 Delete `DefaultStructure`, `repoDirs`, and the per-package root constants.
 Then turn the Phase 0 architecture test to failing mode.
 
+Landed in RL2 (2026-11-16):
+
+- The `storage.RepositoryPath` alias and both parse delegates are gone;
+  callers use `layout.Path`, `layout.ParseMedia`, and the typed constructors.
+  Code that reads a stored path back uses a parser of one kind:
+  `layout.ParseArtifact` (thumbnails, face crops) or `layout.ParseStaged`
+  (staging commits). `private-path-construction` now targets `layout.Parse`
+  and allows it only in `layout`, the recovery receipts
+  (`private_recovery.go`, `storage/recovery`), and the private listing in
+  `repository_fs.go`. Both private-path baselines are empty, and the Phase 0
+  upload-session test runs without its gate.
+- Every upload session owns `work/uploads/<session>/`: its manifest, its
+  chunks, and the one file it stages. A merged chunked upload and a cloud
+  import stage in a session of their own. A staged name the session owns
+  (`session.json`, `chunk-<n>`) is staged as `upload-<name>`. Batch field
+  names must carry a UUID session ID. A session ends when its upload
+  completes, and its directory goes with it.
+- A part cut off mid-transfer is dropped; the browser resends it. A session
+  that cannot be assembled moves whole to `quarantine/uploads/<session>/`.
+  Quarantine is never cleaned automatically, which replaces the one-hour
+  cleanup of `staging/failed/`.
+- Found and fixed: the periodic orphan cleanup deleted every staged file older
+  than an hour, including files whose staging commit was still pending and
+  resumable sessions that were idle. `SessionManager.SweepStaging` now keeps
+  live sessions and every session a pending commit names
+  (`ListPendingRepositoryStagingPaths`). `QuarantineUnresolvedStaging` had no
+  production caller and is deleted; Phase 4's startup sweep of `work/`
+  replaces it and must keep sessions with a pending commit too.
+- Face crops are published as `faces` artifacts here, ahead of Phase 3,
+  because the layout has no face directory. `service.PublishFaceCrops` runs
+  in the enrichment worker before the catalog transaction; the commit only
+  records the paths. The artifact cleaner keeps a crop while a face item of
+  its repository names it. `SaveFaceResults` had no caller and is deleted.
+- Private recovery classifies by `layout.Classify`: `work/` moves under the
+  receipt at `quarantine/recovery/<receipt>/`, and `quarantine/uploads/` is
+  listed but stays. The receipt's `PrivateStateClass` values are kept
+  unchanged, because they are an API enum and terminology terms.
+- `ValidateStructure` still fails a repository whose `.lumilio` or `inbox`
+  is missing, as before; Phase 4's startup repair changes that.
+- Repository audit logs take their directory from `app.go`
+  (`layout.LogsDir()`); a value without a provider gets a no-op one instead of
+  a throwaway provider whose files were never closed.
+
 ### Phase 3 — Catalog identities
 
 - Edit the catalog baseline in place before rc.1, following the
   [rc compatibility baseline](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md):
   `thumbnails` and `face_items` store the artifact identity.
-- Face crops are published as `faces` artifacts at the point where they are
-  cut today.
+- Face crops are already `faces` artifacts (RL2); only their catalog column
+  changes.
 - Rebuild `.local/dev`, then re-seed the demo with `task web:demo:seed`.
   Nothing converts an existing tree.
 

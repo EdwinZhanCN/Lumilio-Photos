@@ -63,3 +63,8 @@ SELECT * FROM repository_staging_commits
 WHERE status IN ('prepared', 'committing', 'committed')
 ORDER BY updated_at, commit_id
 LIMIT ?1;
+
+-- name: ListPendingRepositoryStagingPaths :many
+SELECT staging_path FROM repository_staging_commits
+WHERE repository_id = ?1
+  AND status IN ('prepared', 'committing', 'committed');

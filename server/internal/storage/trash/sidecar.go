@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/storage"
+	"server/internal/storage/layout"
 )
 
 // SidecarFormat is the info sidecar format this build writes and reads. The
@@ -87,7 +87,7 @@ func (s Sidecar) validate() error {
 			return fmt.Errorf("%w: %s is not a UUID", ErrSidecarFormat, name)
 		}
 	}
-	if _, err := storage.ParseUserMediaPath(s.OriginalPath); err != nil {
+	if _, err := layout.ParseMedia(s.OriginalPath); err != nil {
 		return fmt.Errorf("%w: original_path %q is not a repository media path", ErrSidecarFormat, s.OriginalPath)
 	}
 	if s.HashAlgorithm == "" || s.ContentHash == "" || s.Size < 0 || s.DeletedAt.IsZero() {

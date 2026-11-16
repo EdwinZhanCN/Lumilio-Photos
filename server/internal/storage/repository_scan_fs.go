@@ -39,7 +39,7 @@ func (r *RepositoryFS) ListUserMediaDirectory(ctx context.Context, directory str
 	}
 	local := "."
 	if directory != "" {
-		parsed, err := ParseUserMediaPath(directory)
+		parsed, err := layout.ParseMedia(directory)
 		if err != nil {
 			return listing, err
 		}
@@ -90,7 +90,7 @@ func (r *RepositoryFS) ListUserMediaDirectory(ctx context.Context, directory str
 				continue
 			}
 		}
-		repositoryPath, parseErr := ParseUserMediaPath(child)
+		repositoryPath, parseErr := layout.ParseMedia(child)
 		if parseErr != nil {
 			listing.Issues = append(listing.Issues, WalkIssue{Path: child, Reason: "invalid_path", Err: parseErr})
 			continue
@@ -123,12 +123,12 @@ func (r *RepositoryFS) ListUserMediaDirectory(ctx context.Context, directory str
 // would not follow), or when the path now holds the other kind of entry.
 // Any other failure, such as a permission error or an unreadable volume, is
 // returned as an error and proves nothing.
-func (r *RepositoryFS) ProbeUserMediaAbsence(ctx context.Context, repositoryPath RepositoryPath, kind EntryKind) (bool, error) {
+func (r *RepositoryFS) ProbeUserMediaAbsence(ctx context.Context, repositoryPath layout.Path, kind EntryKind) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
 	if !repositoryPath.IsMedia() {
-		return false, ErrRepositoryPathNamespace
+		return false, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -176,7 +176,7 @@ func (r *RepositoryFS) ListUserMediaSubdirectories(ctx context.Context, director
 	}
 	local := "."
 	if directory != "" {
-		parsed, err := ParseUserMediaPath(directory)
+		parsed, err := layout.ParseMedia(directory)
 		if err != nil {
 			return nil, err
 		}
@@ -214,7 +214,7 @@ func (r *RepositoryFS) ListUserMediaSubdirectories(ctx context.Context, director
 		if _, markerErr := root.Stat(path.Join(child, ".lumiliorepo")); !errors.Is(markerErr, fs.ErrNotExist) {
 			continue
 		}
-		if _, parseErr := ParseUserMediaPath(child); parseErr != nil {
+		if _, parseErr := layout.ParseMedia(child); parseErr != nil {
 			continue
 		}
 		names = append(names, entry.Name())

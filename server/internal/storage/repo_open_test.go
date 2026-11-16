@@ -10,6 +10,7 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 )
 
@@ -61,7 +62,7 @@ func TestOpenRepositoryPreservesStagingUnderAReceiptAndSchedulesInitialScan(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldState := filepath.Join(created.Repository.Path, DefaultStructure.SystemDir, "staging", "old-state")
+	oldState := filepath.Join(created.Repository.Path, layout.PrivateRoot, "work", "old-state")
 	if err := os.MkdirAll(filepath.Dir(oldState), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestOpenRepositoryPreservesStagingUnderAReceiptAndSchedulesInitialScan(t *t
 	// Abandoned staging is moved under the registration's recovery receipt,
 	// out of the way of ordinary staging cleanup, never discarded.
 	recovered, err := filepath.Glob(filepath.Join(
-		opened.Path, filepath.FromSlash(RepositoryRecoveryDirectory), "*", "staging", "old-state",
+		opened.Path, filepath.FromSlash(layout.RecoveryDir().String()), "*", "work", "old-state",
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +134,7 @@ func TestOpenRepositoryPreservesStagingUnderAReceiptAndSchedulesInitialScan(t *t
 	if len(recovered) != 1 {
 		t.Fatalf("reopened private state = %#v", recovered)
 	}
-	if _, err := os.Stat(filepath.Join(opened.Path, DefaultStructure.SystemDir, "staging", "old-state")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(opened.Path, layout.PrivateRoot, "work", "old-state")); !os.IsNotExist(err) {
 		t.Fatalf("old private state remained active: %v", err)
 	}
 }

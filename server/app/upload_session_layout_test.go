@@ -14,29 +14,16 @@ import (
 	"time"
 
 	"server/internal/ingest/upload"
+	"server/internal/storage/layout"
 
 	"github.com/google/uuid"
 )
 
-// layoutPhase2Pending skips a repository-layout Phase 0 test until Phase 2
-// lands (docs/exec-plans/active/repository-layout.md). Each such test fails
-// on the current tree; LUMILIO_LAYOUT_PHASE0=1 runs it anyway, which is how
-// a PR proves that it still fails. Phase 2 deletes this helper.
-func layoutPhase2Pending(t *testing.T) {
-	t.Helper()
-	if os.Getenv("LUMILIO_LAYOUT_PHASE0") == "" {
-		t.Skip("repository-layout Phase 0: fails until Phase 2 gives each upload session one directory under work/uploads/; set LUMILIO_LAYOUT_PHASE0=1 to run it")
-	}
-}
-
 // TestCompletedChunkedUploadLeavesNoSession: a chunked upload that completed
 // leaves no session behind, neither the in-memory session the progress
 // endpoint reports nor any file in the private classes that open and adopt
-// treat as an uncommitted upload. Today every completed session keeps its
-// manifest under staging/incoming/upload_sessions/ for good, and private
-// recovery moves each one under a receipt as if it were a lost upload.
+// treat as an uncommitted upload, nor the session's directory.
 func TestCompletedChunkedUploadLeavesNoSession(t *testing.T) {
-	layoutPhase2Pending(t)
 	s := startBlackboxServer(t)
 	contents := blackboxJPEG(t, 120, "chunked upload session")
 	chunks := [][]byte{contents[:len(contents)/2], contents[len(contents)/2:]}
@@ -118,18 +105,31 @@ func TestCompletedChunkedUploadLeavesNoSession(t *testing.T) {
 		t.Errorf("the completed session is still held in memory: %+v", progress.Sessions)
 	}
 
-	// staging/ is today's in-flight class and work/ the layout's; open and
-	// adopt move whatever either holds under a recovery receipt.
+	// Open and adopt move whatever work/ holds under a recovery receipt.
+	work, err := layout.ClassDir(layout.Work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	local, err := work.Local()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var leftovers []string
-	for _, class := range []string{"staging", "work"} {
-		root := filepath.Join(s.primary.Path, ".lumilio", class)
-		_ = filepath.WalkDir(root, func(name string, entry fs.DirEntry, err error) error {
-			if err == nil && !entry.IsDir() {
-				relative, _ := filepath.Rel(s.primary.Path, name)
-				leftovers = append(leftovers, filepath.ToSlash(relative))
-			}
-			return nil
-		})
+	_ = filepath.WalkDir(filepath.Join(s.primary.Path, local), func(name string, entry fs.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() {
+			relative, _ := filepath.Rel(s.primary.Path, name)
+			leftovers = append(leftovers, filepath.ToSlash(relative))
+		}
+		return nil
+	})
+	session, err := layout.UploadSession(uuid.MustParse(sessionID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if local, err := session.Local(); err != nil {
+		t.Fatal(err)
+	} else if _, err := os.Lstat(filepath.Join(s.primary.Path, local)); !os.IsNotExist(err) {
+		t.Errorf("the completed session's directory remains: %v", err)
 	}
 	if len(leftovers) != 0 {
 		t.Errorf("the completed session left private files that open and adopt would recover as an uncommitted upload: %v", leftovers)

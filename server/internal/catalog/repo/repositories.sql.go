@@ -7,7 +7,6 @@ package repo
 
 import (
 	"context"
-	"strings"
 
 	"github.com/google/uuid"
 	"server/internal/catalog/dbtypes"
@@ -107,29 +106,6 @@ func (q *Queries) CountPrimaryRepositories(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const countRepositories = `-- name: CountRepositories :one
-SELECT COUNT(*) FROM repositories
-`
-
-func (q *Queries) CountRepositories(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countRepositories)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countRepositoriesByReachability = `-- name: CountRepositoriesByReachability :one
-SELECT COUNT(*) FROM repositories
-WHERE reachability = ?1
-`
-
-func (q *Queries) CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countRepositoriesByReachability, reachability)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createRepository = `-- name: CreateRepository :one
 INSERT INTO repositories (
     repo_id,
@@ -201,26 +177,6 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		&i.PathNormalization,
 	)
 	return i, err
-}
-
-const deleteRepositories = `-- name: DeleteRepositories :exec
-DELETE FROM repositories
-WHERE repo_id IN (/*SLICE:repo_ids*/?)
-`
-
-func (q *Queries) DeleteRepositories(ctx context.Context, repoIds []uuid.UUID) error {
-	query := deleteRepositories
-	var queryParams []interface{}
-	if len(repoIds) > 0 {
-		for _, v := range repoIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:repo_ids*/?", strings.Repeat(",?", len(repoIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:repo_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
-	return err
 }
 
 const deleteRepository = `-- name: DeleteRepository :exec

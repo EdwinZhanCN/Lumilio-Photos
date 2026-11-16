@@ -4,19 +4,35 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // FileFieldInfo represents parsed information from upload field names
 type FileFieldInfo struct {
-	Type        string // "single" or "chunk"
-	SessionID   string // upload session ID
-	ChunkIndex  int    // chunk index (0-based)
-	TotalChunks int    // total number of chunks
-	OriginalKey string // original field name
+	Type        string    // "single" or "chunk"
+	SessionID   string    // upload session ID
+	Session     uuid.UUID // SessionID, parsed
+	ChunkIndex  int       // chunk index (0-based)
+	TotalChunks int       // total number of chunks
+	OriginalKey string    // original field name
 }
 
-// ParseFileField parses upload field names to extract upload type and session information
+// ParseFileField parses upload field names to extract upload type and session
+// information. The session ID must be a UUID: it names the session's staging
+// directory.
 func ParseFileField(fieldName string) (*FileFieldInfo, error) {
+	info, err := parseFileField(fieldName)
+	if err != nil {
+		return nil, err
+	}
+	if info.Session, err = uuid.Parse(info.SessionID); err != nil {
+		return nil, fmt.Errorf("invalid upload session id in field %s: %w", fieldName, err)
+	}
+	return info, nil
+}
+
+func parseFileField(fieldName string) (*FileFieldInfo, error) {
 	parts := strings.Split(fieldName, "_")
 
 	if len(parts) == 2 && parts[0] == "single" {

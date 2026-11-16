@@ -19,6 +19,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
 	"server/internal/storage/locations"
 	"server/internal/work/pipeline"
 
@@ -55,7 +56,7 @@ func respondRepositoryResolveError(c *gin.Context, err error, message string) {
 }
 
 func openRepositoryMedia(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
-	repositoryPath, err := storage.ParseUserMediaPath(strings.TrimSpace(rawPath))
+	repositoryPath, err := layout.ParseMedia(strings.TrimSpace(rawPath))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -71,8 +72,9 @@ func openRepositoryMedia(factory *storage.RepositoryFSFactory, repository repo.R
 	return repositoryFS, file, nil
 }
 
-func openRepositoryPrivate(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
-	repositoryPath, err := storage.ParsePrivateRepositoryPath(strings.TrimSpace(rawPath))
+// openRepositoryArtifact opens a stored thumbnail or face crop path.
+func openRepositoryArtifact(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
+	repositoryPath, err := layout.ParseArtifact(strings.TrimSpace(rawPath))
 	if err != nil {
 		return nil, nil, err
 	}
