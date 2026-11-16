@@ -1,6 +1,6 @@
 # Repository layout: one class per directory, owned by one package
 
-Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #PR).
+Status: active. Created 2026-10-28. Phase 0 landed 2026-11-16 (RL0, #278).
 Next: Phase 1 (RL1). The layout below
 was frozen by the owner on 2026-10-28. It lands before the rc.1 tag, per the
 "fix what is found" contract in [rc-release.md](rc-release.md).
