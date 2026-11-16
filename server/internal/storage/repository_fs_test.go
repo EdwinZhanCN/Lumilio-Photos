@@ -17,6 +17,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/media/hash"
+	"server/internal/storage/layout"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
@@ -183,7 +184,7 @@ func TestRepositoryFSInspectHashesOpenedStableFile(t *testing.T) {
 	contents := []byte("authoritative original bytes")
 	writeRepositoryFSTestFile(t, repository.Path, "inbox/photo.jpg", contents)
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	mediaPath, err := ParseUserMediaPath("inbox/photo.jpg")
+	mediaPath, err := layout.ParseMedia("inbox/photo.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,11 +326,11 @@ func TestRepositoryFSImmutablePrivateWriteNeverReplacesExistingContent(t *testin
 
 	repository := createRepositoryFSTestRoot(t)
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	destination, err := ParsePrivateRepositoryPath(".lumilio/assets/thumbnails/v1/asset_small.webp")
+	destination, err := layout.Parse(".lumilio/assets/thumbnails/v1/asset_small.webp")
 	if err != nil {
 		t.Fatal(err)
 	}
-	directory, err := ParsePrivateRepositoryPath(path.Dir(destination.String()))
+	directory, err := layout.Parse(path.Dir(destination.String()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,9 +395,9 @@ func writeRepositoryFSTestFile(t *testing.T, repositoryPath, relative string, co
 	}
 }
 
-func mustUserMediaPath(t *testing.T, value string) RepositoryPath {
+func mustUserMediaPath(t *testing.T, value string) layout.Path {
 	t.Helper()
-	parsed, err := ParseUserMediaPath(value)
+	parsed, err := layout.ParseMedia(value)
 	if err != nil {
 		t.Fatal(err)
 	}

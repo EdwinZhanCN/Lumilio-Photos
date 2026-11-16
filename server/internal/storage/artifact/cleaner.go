@@ -12,8 +12,9 @@ import (
 )
 
 // Cleaner is the catalog-driven owner of artifact reclamation.  It never
-// guesses from filenames: thumbnail rows and the applied transcode stage are
-// the complete catalog references for the canonical artifact subtree.
+// guesses from filenames: thumbnail rows, face crops, and the applied
+// transcode stage are the complete catalog references for the canonical
+// artifact subtree.
 type Cleaner struct {
 	database *catalog.DB
 	files    *storage.RepositoryFSFactory
@@ -94,20 +95,25 @@ func (c *Cleaner) cleanRepository(ctx context.Context, repository repo.Repositor
 
 func (c *Cleaner) references(ctx context.Context, repository repo.Repository) (map[string]struct{}, error) {
 	referenced := make(map[string]struct{})
-	thumbnails, err := c.database.Reader.Statements().QueryContext(ctx, `
-		SELECT storage_path FROM thumbnails WHERE repository_id = ?`, repository.RepoID.String())
+	// A thumbnail or face crop is kept while a catalog row in this
+	// repository names it.
+	stored, err := c.database.Reader.Statements().QueryContext(ctx, `
+		SELECT storage_path FROM thumbnails WHERE repository_id = ?1
+		UNION
+		SELECT face_image_path FROM face_items
+		WHERE repository_id = ?1 AND face_image_path IS NOT NULL`, repository.RepoID.String())
 	if err != nil {
-		return nil, fmt.Errorf("read thumbnail artifact references: %w", err)
+		return nil, fmt.Errorf("read thumbnail and face crop artifact references: %w", err)
 	}
-	for thumbnails.Next() {
+	for stored.Next() {
 		var storagePath string
-		if err := thumbnails.Scan(&storagePath); err != nil {
-			thumbnails.Close()
+		if err := stored.Scan(&storagePath); err != nil {
+			stored.Close()
 			return nil, err
 		}
 		referenced[storagePath] = struct{}{}
 	}
-	if err := thumbnails.Close(); err != nil {
+	if err := stored.Close(); err != nil {
 		return nil, err
 	}
 

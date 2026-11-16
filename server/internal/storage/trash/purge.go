@@ -16,6 +16,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/lifecycle"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 )
 
 // purgeBatch bounds one purge transaction, like every other lifecycle write.
@@ -224,7 +225,7 @@ func unlinkTrashed(files *storage.RepositoryFS, entry repo.RepositoryEntry) erro
 	if err != nil {
 		return err
 	}
-	for _, target := range []storage.RepositoryPath{trashed, directory, info} {
+	for _, target := range []layout.Path{trashed, directory, info} {
 		if err := files.RemovePrivate(target); err != nil && !isNotExist(err) {
 			return err
 		}

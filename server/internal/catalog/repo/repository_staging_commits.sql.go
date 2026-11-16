@@ -211,6 +211,35 @@ func (q *Queries) GetRepositoryStagingCommit(ctx context.Context, commitID uuid.
 	return i, err
 }
 
+const listPendingRepositoryStagingPaths = `-- name: ListPendingRepositoryStagingPaths :many
+SELECT staging_path FROM repository_staging_commits
+WHERE repository_id = ?1
+  AND status IN ('prepared', 'committing', 'committed')
+`
+
+func (q *Queries) ListPendingRepositoryStagingPaths(ctx context.Context, repositoryID uuid.UUID) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingRepositoryStagingPaths, repositoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var staging_path string
+		if err := rows.Scan(&staging_path); err != nil {
+			return nil, err
+		}
+		items = append(items, staging_path)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRecoverableRepositoryStagingCommits = `-- name: ListRecoverableRepositoryStagingCommits :many
 SELECT commit_id, repository_id, owner_id, source_kind, staging_path, target_path, original_filename, mime_type, full_hash, file_size, quick_fingerprint, quick_fingerprint_version, status, entry_id, asset_id, failure_code, failure_detail, created_at, updated_at, completed_at FROM repository_staging_commits
 WHERE status IN ('prepared', 'committing', 'committed')

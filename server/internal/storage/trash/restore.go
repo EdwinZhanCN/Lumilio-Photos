@@ -13,6 +13,7 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/scan"
 )
 
@@ -46,11 +47,11 @@ type restorePayload struct {
 	Moves    []restoreMove `json:"moves"`
 }
 
-func (m restoreMove) source() (storage.RepositoryPath, error) {
+func (m restoreMove) source() (layout.Path, error) {
 	return storage.TrashFilePath(m.TrashID, path.Base(m.OriginalPath))
 }
-func (m restoreMove) destination() (storage.RepositoryPath, error) {
-	return storage.ParseUserMediaPath(m.RestoredPath)
+func (m restoreMove) destination() (layout.Path, error) {
+	return layout.ParseMedia(m.RestoredPath)
 }
 
 // Restore moves every trashed file of the selected Assets back to its
@@ -172,7 +173,7 @@ func freePath(files *storage.RepositoryFS, original string, reserved map[string]
 		default:
 			candidate = fmt.Sprintf("%s%s (restored %d)%s", directory, stem, attempt, extension)
 		}
-		parsed, err := storage.ParseUserMediaPath(candidate)
+		parsed, err := layout.ParseMedia(candidate)
 		if err != nil {
 			return "", err
 		}
@@ -201,7 +202,7 @@ func (s *Service) moveOutOfTrash(ctx context.Context, files *storage.RepositoryF
 		return scan.RestoredFile{}, err
 	}
 	if parent := path.Dir(move.RestoredPath); parent != "." {
-		directory, err := storage.ParseUserMediaPath(parent)
+		directory, err := layout.ParseMedia(parent)
 		if err != nil {
 			return scan.RestoredFile{}, err
 		}

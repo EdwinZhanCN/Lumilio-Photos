@@ -21,6 +21,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/scan"
 	"server/internal/storage/testfixture"
 	"server/internal/storage/trash"
@@ -173,7 +174,7 @@ func writeStudioRecord(t *testing.T, repository testfixture.Repository, assetID 
 	if err != nil {
 		t.Fatal(err)
 	}
-	relative := ".lumilio/sidecars/" + assetID + ".lumilio-sidecar"
+	relative := studioAt(t, assetID)
 	if err := os.WriteFile(filepath.Join(repository.Path, filepath.FromSlash(relative)), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +258,7 @@ func TestReconcileRecoversInheritedTrashAndProvenStudioRecords(t *testing.T) {
 	if err != nil || second.TrashAdopted != 0 || second.StudioReassociated != 1 || second.StudioAmbiguous != 2 {
 		t.Fatalf("reconcile after the scan = %+v, err=%v", second, err)
 	}
-	reassociated := filepath.Join(primary.Path, filepath.FromSlash(".lumilio/sidecars/"+assetID.String()+".lumilio-sidecar"))
+	reassociated := filepath.Join(primary.Path, filepath.FromSlash(studioAt(t, assetID.String())))
 	data, err := os.ReadFile(reassociated)
 	if err != nil {
 		t.Fatalf("reassociated record missing: %v", err)
@@ -278,7 +279,7 @@ func TestReconcileRecoversInheritedTrashAndProvenStudioRecords(t *testing.T) {
 		t.Fatalf("the superseded record name remains: %v", err)
 	}
 	for _, kept := range []string{orphanID, replacedID, newerID} {
-		if _, err := os.Stat(filepath.Join(primary.Path, filepath.FromSlash(".lumilio/sidecars/"+kept+".lumilio-sidecar"))); err != nil {
+		if _, err := os.Stat(filepath.Join(primary.Path, filepath.FromSlash(studioAt(t, kept)))); err != nil {
 			t.Fatalf("an unproven record was moved or removed: %s: %v", kept, err)
 		}
 	}
@@ -305,9 +306,9 @@ func TestReconcileRecoversInheritedTrashAndProvenStudioRecords(t *testing.T) {
 	if !ok || studio.Disposition != storage.DispositionReassociated || studio.ResolvedAssetID != assetID.String() || !studio.Present || len(studio.Actions) != 0 {
 		t.Fatalf("studio item = %+v", studio)
 	}
-	orphan, _ := itemAt(inventory, ".lumilio/sidecars/"+orphanID+".lumilio-sidecar")
-	replaced, _ := itemAt(inventory, ".lumilio/sidecars/"+replacedID+".lumilio-sidecar")
-	newer, _ := itemAt(inventory, ".lumilio/sidecars/"+newerID+".lumilio-sidecar")
+	orphan, _ := itemAt(inventory, studioAt(t, orphanID))
+	replaced, _ := itemAt(inventory, studioAt(t, replacedID))
+	newer, _ := itemAt(inventory, studioAt(t, newerID))
 	if orphan.Disposition != storage.DispositionAmbiguous || !strings.Contains(orphan.Detail, "no present file") ||
 		replaced.Disposition != storage.DispositionAmbiguous || !strings.Contains(replaced.Detail, "different content") ||
 		newer.Disposition != storage.DispositionUnreadable {
@@ -318,11 +319,11 @@ func TestReconcileRecoversInheritedTrashAndProvenStudioRecords(t *testing.T) {
 			t.Fatalf("reviewable record actions = %+v", reviewable)
 		}
 	}
-	staging, ok := itemAt(inventory, ".lumilio/staging/incoming/abandoned.part")
+	staging, ok := itemAt(inventory, testfixture.LeftoverUpload)
 	if !ok || staging.Class != storage.PrivateClassStaging || staging.Disposition != storage.DispositionMoved || !staging.Present || strings.Join(staging.Actions, ",") != "export,delete" {
 		t.Fatalf("staging item = %+v", staging)
 	}
-	unknown, ok := itemAt(inventory, ".lumilio/unknown-child/opaque.bin")
+	unknown, ok := itemAt(inventory, testfixture.LeftoverUnknown)
 	if !ok || unknown.Class != storage.PrivateClassUnknown || !unknown.Present {
 		t.Fatalf("unknown item = %+v", unknown)
 	}
@@ -382,7 +383,7 @@ func TestReconcileFinishesAnInterruptedReassociation(t *testing.T) {
 		t.Fatalf("reconcile error = %v, want the injected crash", err)
 	}
 	f.recovery.afterStudioWrite = nil
-	newName := filepath.Join(primary.Path, filepath.FromSlash(".lumilio/sidecars/"+assetID.String()+".lumilio-sidecar"))
+	newName := filepath.Join(primary.Path, filepath.FromSlash(studioAt(t, assetID.String())))
 	oldName := filepath.Join(primary.Path, filepath.FromSlash(testfixture.StudioPath))
 	if _, err := os.Stat(newName); err != nil {
 		t.Fatalf("the new record was not written before the crash: %v", err)
@@ -437,4 +438,15 @@ func TestRecoveryRefusesAnUnreachableRepository(t *testing.T) {
 	if result, err := f.recovery.ReconcileAll(f.ctx); err != nil || result != (ReconcileResult{}) {
 		t.Fatalf("reconcile all with an offline repository = %+v, err=%v", result, err)
 	}
+}
+
+// studioAt is where the Studio record of assetID lives, relative to the
+// repository root.
+func studioAt(t testing.TB, assetID string) string {
+	t.Helper()
+	record, err := layout.Studio(uuid.MustParse(assetID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return record.String()
 }

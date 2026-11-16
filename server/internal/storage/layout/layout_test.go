@@ -81,7 +81,11 @@ func TestConstructorsBuildTheFrozenLayout(t *testing.T) {
 		must(UploadSession(session)):                                      ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427",
 		must(UploadManifest(session)):                                     ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/session.json",
 		must(UploadChunk(session, 3)):                                     ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/chunk-3",
-		must(UploadMerged(session)):                                       ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/merged",
+		must(UploadFile(session, "IMG 1.jpg")):                            ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/IMG 1.jpg",
+		must(UploadFile(session, "session.json")):                         ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/upload-session.json",
+		must(UploadFile(session, "chunk-1")):                              ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/upload-chunk-1",
+		must(UploadFile(session, "chunk-1.jpg")):                          ".lumilio/work/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/chunk-1.jpg",
+		must(QuarantineUploadFile(session, "IMG 1.jpg")):                  ".lumilio/quarantine/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427/IMG 1.jpg",
 		must(QuarantineUpload(session)):                                   ".lumilio/quarantine/uploads/1b4e28ba-2fa1-11d2-883f-0016d3cca427",
 		must(RecoveryReceipt(session)):                                    ".lumilio/quarantine/recovery/1b4e28ba-2fa1-11d2-883f-0016d3cca427.json",
 		must(RecoveryReceiptDir(session)):                                 ".lumilio/quarantine/recovery/1b4e28ba-2fa1-11d2-883f-0016d3cca427",
@@ -113,12 +117,49 @@ func TestConstructorsRejectArgumentsThatLeaveTheirKind(t *testing.T) {
 		"artifact reserved":  func() (Path, error) { return Artifact(ArtifactID{"f", "s", "v", "CON"}) },
 		"log nested":         func() (Path, error) { return Log("../trash/x") },
 		"negative chunk":     func() (Path, error) { return UploadChunk(uuid.New(), -1) },
-		"private sidecar":    func() (Path, error) { return AssetSidecar(Root()) },
+		"private sidecar":    func() (Path, error) { return AssetSidecar(LogsDir()) },
+		"child of media":     func() (Path, error) { m, _ := ParseMedia("a"); return m.Child("b") },
+		"child traversal":    func() (Path, error) { return LogsDir().Child("..") },
 		"unknown class":      func() (Path, error) { return ClassDir("assets") },
 	} {
 		if p, err := build(); err == nil {
 			t.Errorf("%s: built %q", name, p)
 		}
+	}
+}
+
+func TestStoredPathParsersAcceptOnlyTheirKind(t *testing.T) {
+	t.Parallel()
+	session := "1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+	if _, err := ParseArtifact(".lumilio/cache/artifacts/f/thumbnails/v1/small.webp"); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{".lumilio/cache/artifacts/f/s/v", ".lumilio/cache/x/f/s/v/n", ".lumilio/work/uploads/" + session + "/x"} {
+		if _, err := ParseArtifact(value); err == nil {
+			t.Errorf("ParseArtifact(%q) succeeded", value)
+		}
+	}
+	for _, value := range []string{".lumilio/work/uploads/" + session + "/IMG.jpg", ".lumilio/quarantine/uploads/" + session + "/IMG.jpg"} {
+		p, err := ParseStaged(value)
+		if id, ok := StagedSession(p); err != nil || !ok || id.String() != session {
+			t.Errorf("ParseStaged(%q) = %v %t, %v", value, id, ok, err)
+		}
+	}
+	for _, value := range []string{".lumilio/work/uploads/not-a-uuid/x", ".lumilio/work/uploads/" + session, ".lumilio/work/uploads/" + session + "/a/b", ".lumilio/work/tmp/x"} {
+		if _, err := ParseStaged(value); err == nil {
+			t.Errorf("ParseStaged(%q) succeeded", value)
+		}
+	}
+	original, _ := Parse(".lumilio/work/uploads/" + session + "/IMG.jpg")
+	moved, err := RecoveryMoved(uuid.MustParse(session), original)
+	if err != nil || moved.String() != ".lumilio/quarantine/recovery/"+session+"/work/uploads/"+session+"/IMG.jpg" {
+		t.Fatalf("RecoveryMoved = %q, %v", moved, err)
+	}
+	if child, err := LogsDir().Child("error.log"); err != nil || child.String() != ".lumilio/logs/error.log" {
+		t.Fatalf("Child = %q, %v", child, err)
+	}
+	if TempPattern("volume-probe") != ".lumilio-tmp-volume-probe-*" {
+		t.Fatal(TempPattern("volume-probe"))
 	}
 }
 

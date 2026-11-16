@@ -19,6 +19,7 @@ import (
 	"server/internal/ingest/queue"
 	"server/internal/storage"
 	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 	"server/internal/work/execution"
 	"server/internal/work/jobs"
@@ -107,7 +108,7 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 	if err := worker.Work(context.Background(), job); err == nil {
 		t.Fatal("macro reported River success after injected catalog rollback")
 	}
-	privatePath, err := storage.ParsePrivateRepositoryPath(identityMustPath(t, identity))
+	privatePath, err := layout.Parse(identityMustPath(t, identity))
 	if err != nil {
 		t.Fatal(err)
 	}

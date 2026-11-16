@@ -13,6 +13,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/pathsemantics"
 )
 
@@ -50,7 +51,7 @@ func (s *Scanner) BindKnownContent(ctx context.Context, known KnownContent) (Kno
 	if len(known.FullHash) != 64 || known.Observation.Size < 0 || known.AssetType == "" || known.MimeType == "" {
 		return binding, errors.New("known content needs a stable identity and media type")
 	}
-	repositoryPath, err := storage.ParseUserMediaPath(known.RelativePath)
+	repositoryPath, err := layout.ParseMedia(known.RelativePath)
 	if err != nil {
 		return binding, err
 	}

@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/google/uuid"
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/event"
 	"server/internal/service"
 	"server/internal/work/pipeline"
+
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
+	"github.com/google/uuid"
 )
 
 type AssetStageApplied struct {
@@ -93,9 +94,11 @@ type EnrichmentSpecies struct {
 	Predictions []dbtypes.SpeciesPredictionMeta
 }
 
+// EnrichmentFace carries the recognition response and the crops the worker
+// already published as artifacts; the commit only records them.
 type EnrichmentFace struct {
 	Payload          *types.FaceV1
-	ImageData        []byte
+	Crops            *service.FaceCrops
 	ProcessingTimeMs int
 }
 
@@ -276,7 +279,7 @@ func applyEnrichment(ctx context.Context, tx *sql.Tx, payload EnrichmentApplied,
 		if face == nil {
 			return 0, errors.New("face enrichment commit is not configured")
 		}
-		if err := face.ApplyFaceResultsTx(ctx, tx, payload.AssetID, payload.Face.Payload, payload.Face.ImageData, payload.Face.ProcessingTimeMs); err != nil {
+		if err := face.ApplyFaceResultsTx(ctx, tx, payload.AssetID, payload.Face.Payload, payload.Face.Crops, payload.Face.ProcessingTimeMs); err != nil {
 			return 0, err
 		}
 	}

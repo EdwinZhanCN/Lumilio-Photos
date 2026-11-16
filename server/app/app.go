@@ -43,6 +43,7 @@ import (
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
 	"server/internal/storage/locations"
 	"server/internal/storage/recovery"
 	"server/internal/storage/scan"
@@ -240,7 +241,7 @@ func run(
 	processorLogger := logRuntime.Named("processor")
 	indexingLogger := logRuntime.Named("indexing")
 	observationLogger := logRuntime.Named("repository_observation")
-	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), appConfig.LoggingConfig.RepositoryAuditVerbose)
+	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), layout.LogsDir().String(), appConfig.LoggingConfig.RepositoryAuditVerbose)
 	defer func() {
 		if err := repoAuditProvider.Close(); err != nil {
 			appLogger.Warn("failed to close repository audit logs", zap.Error(err))

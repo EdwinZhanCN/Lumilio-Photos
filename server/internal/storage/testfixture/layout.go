@@ -17,6 +17,7 @@ import (
 	"github.com/zeebo/blake3"
 	"gopkg.in/yaml.v3"
 
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 )
@@ -33,7 +34,7 @@ const (
 )
 
 // Layout selects the private structure; MissingPrivate retains inbox and
-// originals but omits .lumilio entirely.
+// originals but omits the private tree entirely.
 type Layout int
 
 const (
@@ -46,10 +47,26 @@ const (
 	TrashID      = "22222222-2222-4222-8222-222222222222"
 	AssetID      = "33333333-3333-4333-8333-333333333333"
 	TrashAssetID = "44444444-4444-4444-8444-444444444444"
-	TrashPath    = ".lumilio/trash/files/" + TrashID + "/deleted.png"
-	TrashInfo    = ".lumilio/trash/info/" + TrashID + ".json"
-	StudioPath   = ".lumilio/sidecars/" + AssetID + ".lumilio-sidecar"
+	// SessionID names the leftover upload sessions of NewLeftoverPrimary.
+	SessionID = "55555555-5555-4555-8555-555555555555"
 )
+
+// The private paths the fixtures write, built by the layout package.
+var (
+	TrashPath       = must(layout.TrashFile(uuid.MustParse(TrashID), "deleted.png"))
+	TrashInfo       = must(layout.TrashInfo(uuid.MustParse(TrashID)))
+	StudioPath      = must(layout.Studio(uuid.MustParse(AssetID)))
+	LeftoverUpload  = must(layout.UploadFile(uuid.MustParse(SessionID), "abandoned.part"))
+	LeftoverFailed  = must(layout.QuarantineUploadFile(uuid.MustParse(SessionID), "abandoned.part"))
+	LeftoverUnknown = layout.PrivateRoot + "/unknown-child/opaque.bin"
+)
+
+func must(p layout.Path, err error) string {
+	if err != nil {
+		panic(err)
+	}
+	return p.String()
+}
 
 // Timestamp is the stable timestamp used in markers, sidecars and file mtimes.
 // Return a value rather than exposing mutable global state.
@@ -93,13 +110,13 @@ func NewLocation(t testing.TB, marker Marker) Location {
 // Repository creates a named direct child. Repeated names in independent
 // Locations have the same UUID; different names have different UUIDs. A caller
 // must select a fresh child, so fixture construction cannot overwrite data.
-func (location Location) Repository(t testing.TB, name string, marker Marker, layout Layout) Repository {
+func (location Location) Repository(t testing.TB, name string, marker Marker, structure Layout) Repository {
 	t.Helper()
 	if !filepath.IsLocal(name) || filepath.Base(name) != name || name == "." || name == rootcfg.FileName {
 		t.Fatalf("fixture Repository name must be one local child segment: %q", name)
 	}
-	if layout != Full && layout != MissingPrivate {
-		t.Fatalf("unknown fixture layout %d", layout)
+	if structure != Full && structure != MissingPrivate {
+		t.Fatalf("unknown fixture layout %d", structure)
 	}
 	repository := Repository{
 		Path: filepath.Join(location.Path, name),
@@ -121,19 +138,12 @@ func (location Location) Repository(t testing.TB, name string, marker Marker, la
 		return yaml.Marshal(config)
 	})
 	write(t, repository.Path, OriginalPath, media(t, 0x40))
-	if layout == Full {
-		// Exact directory_manager.go layout. The external self-test checks it
-		// against the current production DirectoryManager to detect drift.
-		for _, name := range []string{
-			".lumilio/assets/faces", ".lumilio/sidecars", ".lumilio/logs",
-		} {
-			mkdir(t, filepath.Join(repository.Path, name), 0o755)
+	if structure == Full {
+		// The production layout: the external self-test checks it against
+		// the current DirectoryManager to detect drift.
+		if err := layout.Init(repository.Path); err != nil {
+			t.Fatal(err)
 		}
-		for _, name := range []string{".lumilio/staging", ".lumilio/staging/incoming", ".lumilio/staging/failed"} {
-			mkdir(t, filepath.Join(repository.Path, name), 0o700)
-		}
-		write(t, repository.Path, ".lumilio/logs/error.log", nil)
-		write(t, repository.Path, ".lumilio/logs/operations.log", nil)
 	}
 	stamp(t, location.Path)
 	return repository
@@ -167,9 +177,9 @@ func NewLeftoverPrimary(t testing.TB) (Location, Repository) {
 		},
 		"adjustments": map[string]any{"exposure": 0.5},
 	})
-	write(t, primary.Path, ".lumilio/staging/incoming/abandoned.part", []byte("uncommitted incoming bytes\n"))
-	write(t, primary.Path, ".lumilio/staging/failed/abandoned.part", []byte("failed staging bytes\n"))
-	write(t, primary.Path, ".lumilio/unknown-child/opaque.bin", []byte("unknown private data\x00\xff"))
+	write(t, primary.Path, LeftoverUpload, []byte("uncommitted incoming bytes\n"))
+	write(t, primary.Path, LeftoverFailed, []byte("failed staging bytes\n"))
+	write(t, primary.Path, LeftoverUnknown, []byte("unknown private data\x00\xff"))
 	stamp(t, location.Path)
 	return location, primary
 }

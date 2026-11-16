@@ -85,7 +85,7 @@ func NewAssetProcessor(
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
+		auditProvider = logging.NoopRepositoryAuditProvider()
 	}
 	return &AssetProcessor{
 		readerDatabase:  readerDatabase,

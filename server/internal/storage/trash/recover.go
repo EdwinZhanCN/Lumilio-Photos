@@ -12,6 +12,7 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/scan"
 )
 
@@ -86,7 +87,7 @@ func (s *Service) openForRecovery(ctx context.Context, ids []uuid.UUID) (reposit
 }
 
 // locate reports whether a move from source to destination happened.
-func locate(files *storage.RepositoryFS, source, destination storage.RepositoryPath) (bool, error) {
+func locate(files *storage.RepositoryFS, source, destination layout.Path) (bool, error) {
 	atDestination, err := files.Exists(destination)
 	if err != nil {
 		return false, err

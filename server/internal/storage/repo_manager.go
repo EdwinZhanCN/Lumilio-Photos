@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,6 +19,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/foundation/logging"
 	"server/internal/lifecycle"
+	"server/internal/storage/layout"
 	"server/internal/storage/marker"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
@@ -263,7 +263,7 @@ func (rm *DefaultRepositoryManager) qualifyRepositoryVolume(root string) (pathse
 		return rm.volumeQualifier(root)
 	}
 	dirs := []string{root}
-	private := filepath.Join(root, ".lumilio")
+	private := filepath.Join(root, layout.PrivateRoot)
 	if info, err := os.Stat(private); err == nil && info.IsDir() {
 		dirs = append(dirs, private)
 	}
@@ -804,7 +804,7 @@ func prepareRepositoryInitializationTarget(path string) (created bool, err error
 		}
 	}
 
-	probe, err := os.CreateTemp(path, ".lumilio-write-test-*")
+	probe, err := os.CreateTemp(path, layout.TempPattern("write-probe"))
 	if err != nil {
 		if created {
 			_ = os.RemoveAll(path)
@@ -835,9 +835,9 @@ func cleanupRepositoryInitializationTarget(path string, targetCreated bool) erro
 
 	var cleanupErrors []error
 	for _, name := range []string{
-		DefaultStructure.ConfigFile,
-		DefaultStructure.SystemDir,
-		DefaultStructure.InboxDir,
+		".lumiliorepo",
+		layout.PrivateRoot,
+		layout.Inbox,
 	} {
 		target := filepath.Join(path, name)
 		if err := os.RemoveAll(target); err != nil {
@@ -933,7 +933,7 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 	`, repoUUID).Scan(&impact.CloudImportCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository cloud import receipts: %w", err)
 	}
-	privatePath := filepath.Join(existing.Path, DefaultStructure.SystemDir)
+	privatePath := filepath.Join(existing.Path, layout.PrivateRoot)
 	if info, statErr := os.Stat(privatePath); statErr == nil && info.IsDir() {
 		size, measureErr := directoryTreeSize(privatePath)
 		if measureErr != nil {
@@ -1283,16 +1283,11 @@ func (rm *DefaultRepositoryManager) WriteRepositorySidecar(ctx context.Context, 
 		return err
 	}
 	defer repositoryFS.Close()
-	directory, err := ParsePrivateRepositoryPath(DefaultStructure.SidecarsDir)
+	target, err := studioRecordPath(assetID)
 	if err != nil {
 		return err
 	}
-	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
-		return err
-	}
-	target, err := ParsePrivateRepositoryPath(path.Join(DefaultStructure.SidecarsDir,
-		path.Base(strings.ReplaceAll(assetID, "\\", "/"))+".lumilio-sidecar"))
-	if err != nil {
+	if err := repositoryFS.MkdirAllPrivate(layout.StudioDir(), 0o755); err != nil {
 		return err
 	}
 	if err := repositoryFS.VerifyIdentity(); err != nil {
@@ -1316,8 +1311,7 @@ func (rm *DefaultRepositoryManager) ReadRepositorySidecar(ctx context.Context, r
 		return nil, err
 	}
 	defer repositoryFS.Close()
-	target, err := ParsePrivateRepositoryPath(path.Join(DefaultStructure.SidecarsDir,
-		path.Base(strings.ReplaceAll(assetID, "\\", "/"))+".lumilio-sidecar"))
+	target, err := studioRecordPath(assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -1326,6 +1320,15 @@ func (rm *DefaultRepositoryManager) ReadRepositorySidecar(ctx context.Context, r
 		return nil, nil
 	}
 	return content, err
+}
+
+// studioRecordPath is the Studio record of one Asset.
+func studioRecordPath(assetID string) (layout.Path, error) {
+	id, err := uuid.Parse(strings.TrimSpace(assetID))
+	if err != nil {
+		return layout.Path{}, fmt.Errorf("%w: asset id %q", layout.ErrPathInvalid, assetID)
+	}
+	return layout.Studio(id)
 }
 
 // RenameRepository changes only the mutable display name. Storage strategy,

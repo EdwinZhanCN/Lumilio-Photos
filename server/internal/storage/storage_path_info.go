@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"server/internal/storage/layout"
 )
 
 var ErrUnavailableCloudPlaceholder = errors.New("repository contains an unavailable cloud placeholder")
@@ -199,7 +201,7 @@ func isNetworkFilesystem(filesystem string) bool {
 }
 
 func directoryWritable(path string) bool {
-	file, err := os.CreateTemp(path, ".lumilio_permission_test-*")
+	file, err := os.CreateTemp(path, layout.TempPattern("permission-probe"))
 	if err != nil {
 		return false
 	}
@@ -212,7 +214,7 @@ func directoryWritable(path string) bool {
 }
 
 func inspectCaseBehavior(path string) (known bool, sensitive bool) {
-	file, err := os.CreateTemp(path, ".lumilio_case_probe-a*")
+	file, err := os.CreateTemp(path, layout.TempPattern("case-probe"))
 	if err != nil {
 		return false, false
 	}

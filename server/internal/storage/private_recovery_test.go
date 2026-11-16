@@ -15,6 +15,7 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
@@ -24,22 +25,39 @@ const (
 	leftoverTrashID   = "22222222-2222-4222-8222-222222222222"
 	leftoverAssetID   = "33333333-3333-4333-8333-333333333333"
 	leftoverNewerID   = "55555555-5555-4555-8555-555555555555"
-	leftoverStudio    = ".lumilio/sidecars/" + leftoverAssetID + ".lumilio-sidecar"
-	leftoverNewer     = ".lumilio/sidecars/" + leftoverNewerID + ".lumilio-sidecar"
-	leftoverIncoming  = ".lumilio/staging/incoming/abandoned.part"
-	leftoverFailed    = ".lumilio/staging/failed/old.part"
-	leftoverOpsLog    = ".lumilio/logs/operations.log"
-	leftoverUnknown   = ".lumilio/unknown-child/opaque.bin"
-	leftoverLegacy    = ".lumilio/recovery/reopened-legacy/staging/x.part"
-	leftoverTrashFile = ".lumilio/trash/files/" + leftoverTrashID + "/deleted.png"
-	leftoverTrashInfo = ".lumilio/trash/info/" + leftoverTrashID + ".json"
+	leftoverSessionID = "66666666-6666-4666-8666-666666666666"
+	leftoverFailedID  = "77777777-7777-4777-8777-777777777777"
+	leftoverContentID = "88888888-8888-4888-8888-888888888888"
 )
+
+// The leftover private tree, spelled by the layout.
+var (
+	leftoverStudio    = layoutString(layout.Studio(uuid.MustParse(leftoverAssetID)))
+	leftoverNewer     = layoutString(layout.Studio(uuid.MustParse(leftoverNewerID)))
+	leftoverIncoming  = layoutString(layout.UploadFile(uuid.MustParse(leftoverSessionID), "abandoned.part"))
+	leftoverTemp      = layoutString(layout.TempDir().Child("interrupted-write"))
+	leftoverFailed    = layoutString(layout.QuarantineUploadFile(uuid.MustParse(leftoverFailedID), "old.part"))
+	leftoverOpsLog    = layoutString(layout.Log("operations.log"))
+	leftoverErrorLog  = layoutString(layout.Log("error.log"))
+	leftoverFaceCrop  = layoutString(layout.Artifact(layout.ArtifactID{SourceFence: leftoverContentID, Stage: "faces", PipelineVersion: "1", Name: "0-face.webp"}))
+	leftoverUnknown   = layout.PrivateRoot + "/unknown-child/opaque.bin"
+	leftoverLegacy    = layoutString(layout.RecoveryDir().Child("reopened-legacy")) + "/staging/x.part"
+	leftoverTrashFile = layoutString(layout.TrashFile(uuid.MustParse(leftoverTrashID), "deleted.png"))
+	leftoverTrashInfo = layoutString(layout.TrashInfo(uuid.MustParse(leftoverTrashID)))
+)
+
+func layoutString(p layout.Path, err error) string {
+	if err != nil {
+		panic(err)
+	}
+	return p.String()
+}
 
 // seedLeftoverPrivateState writes the private state a repository carries
 // after a lost catalog: a trashed file with its format-1 info, a Studio
-// record this build reads and one it does not, abandoned staging, logs with
-// history, a derived face crop, opaque unknown data, and a directory an
-// earlier build's blanket isolation left behind. The storage package cannot
+// record this build reads and one it does not, an abandoned upload, an
+// interrupted atomic write, a quarantined upload, logs with history, a derived face crop, opaque unknown
+// data, and a directory an earlier build's blanket isolation left behind. The storage package cannot
 // import testfixture (cycle), so the tree is written here.
 func seedLeftoverPrivateState(t *testing.T, repositoryPath, repositoryID string) {
 	t.Helper()
@@ -71,10 +89,11 @@ func seedLeftoverPrivateState(t *testing.T, repositoryPath, repositoryID string)
 	newer, _ := json.Marshal(map[string]any{"version": 2, "asset_id": leftoverNewerID, "future": true})
 	write(leftoverNewer, newer)
 	write(leftoverIncoming, []byte("uncommitted incoming bytes\n"))
+	write(leftoverTemp, []byte("interrupted atomic write\n"))
 	write(leftoverFailed, []byte("failed staging bytes\n"))
 	write(leftoverOpsLog, []byte("{\"history\":true}\n"))
-	write(".lumilio/logs/error.log", nil)
-	write(".lumilio/assets/faces/face.jpg", []byte("face crop"))
+	write(leftoverErrorLog, nil)
+	write(leftoverFaceCrop, []byte("face crop"))
 	write(leftoverUnknown, []byte("unknown private data\x00\xff"))
 	write(leftoverLegacy, []byte("legacy isolation"))
 }
@@ -123,7 +142,7 @@ func TestPlanPrivatePreservationClassifiesByClass(t *testing.T) {
 	if plan, err := planPrivatePreservation(repositoryPath, RecoveryEventOpen, "test", "r", "id", "id", time.Now()); err != nil || !plan.Empty() || !plan.PrivateRootAbsent {
 		t.Fatalf("plan without .lumilio = %+v, err=%v", plan, err)
 	}
-	if err := os.Mkdir(filepath.Join(repositoryPath, DefaultStructure.SystemDir), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(repositoryPath, layout.PrivateRoot), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if plan, err := planPrivatePreservation(repositoryPath, RecoveryEventOpen, "test", "r", "id", "id", time.Now()); err != nil || !plan.Empty() || plan.PrivateRootAbsent {
@@ -138,9 +157,11 @@ func TestPlanPrivatePreservationClassifiesByClass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	earlierReceiptFile := layoutString(RecoveryReceiptPath(earlier))
+	earlierMoved := layoutString(layout.RecoveryMoved(uuid.MustParse(earlier), mustPath(layout.UploadFile(uuid.New(), "moved.part"))))
 	for name, content := range map[string][]byte{
-		".lumilio/recovery/" + earlier + ".json":               data,
-		".lumilio/recovery/" + earlier + "/staging/moved.part": []byte("moved earlier"),
+		earlierReceiptFile: data,
+		earlierMoved:       []byte("moved earlier"),
 	} {
 		target := filepath.Join(repositoryPath, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
@@ -166,7 +187,7 @@ func TestPlanPrivatePreservationClassifiesByClass(t *testing.T) {
 	if receipt.Trash.Files != 2 || receipt.Logs.Files != 2 || receipt.Derived.Files != 1 || receipt.ItemsTruncated != 0 {
 		t.Fatalf("summaries: trash=%+v logs=%+v derived=%+v truncated=%d", receipt.Trash, receipt.Logs, receipt.Derived, receipt.ItemsTruncated)
 	}
-	for _, summarized := range []string{leftoverTrashFile, leftoverTrashInfo, leftoverOpsLog, ".lumilio/assets/faces/face.jpg"} {
+	for _, summarized := range []string{leftoverTrashFile, leftoverTrashInfo, leftoverOpsLog, leftoverFaceCrop} {
 		if _, listed := itemByPath(receipt, summarized); listed {
 			t.Fatalf("%s is listed as an item; it is summarized by class", summarized)
 		}
@@ -179,12 +200,18 @@ func TestPlanPrivatePreservationClassifiesByClass(t *testing.T) {
 	if !ok || newer.Class != PrivateClassStudio || newer.Disposition != DispositionUnreadable || !strings.Contains(newer.Detail, "version 2") {
 		t.Fatalf("newer studio item = %+v", newer)
 	}
-	for _, staged := range []string{leftoverIncoming, leftoverFailed} {
-		item, ok := itemByPath(receipt, staged)
-		want := RepositoryRecoveryDirectory + "/" + receipt.ReceiptID + "/" + strings.TrimPrefix(staged, ".lumilio/")
+	// Whatever work/ holds is a dead operation and moves under the receipt;
+	// a quarantined upload is already kept for a decision and stays.
+	for _, abandoned := range []string{leftoverIncoming, leftoverTemp} {
+		item, ok := itemByPath(receipt, abandoned)
+		want := layoutString(layout.RecoveryMoved(uuid.MustParse(receipt.ReceiptID), mustPath(layout.Parse(abandoned))))
 		if !ok || item.Class != PrivateClassStaging || item.Disposition != DispositionMoved || item.MovedTo != want {
-			t.Fatalf("staging item %s = %+v, want moved to %s", staged, item, want)
+			t.Fatalf("abandoned work %s = %+v, want moved to %s", abandoned, item, want)
 		}
+	}
+	failed, ok := itemByPath(receipt, leftoverFailed)
+	if !ok || failed.Class != PrivateClassStaging || failed.Disposition != DispositionPreserved || failed.MovedTo != "" {
+		t.Fatalf("quarantined upload = %+v", failed)
 	}
 	if len(plan.Moves) != 2 {
 		t.Fatalf("moves = %+v", plan.Moves)
@@ -197,10 +224,10 @@ func TestPlanPrivatePreservationClassifiesByClass(t *testing.T) {
 	if !ok || legacy.Class != PrivateClassUnknown || legacy.Detail == "" {
 		t.Fatalf("legacy isolation item = %+v", legacy)
 	}
-	if _, listed := itemByPath(receipt, ".lumilio/recovery/"+earlier+"/staging/moved.part"); listed {
+	if _, listed := itemByPath(receipt, earlierMoved); listed {
 		t.Fatal("bytes an earlier receipt moved were listed again")
 	}
-	if _, listed := itemByPath(receipt, ".lumilio/recovery/"+earlier+".json"); listed {
+	if _, listed := itemByPath(receipt, earlierReceiptFile); listed {
 		t.Fatal("an earlier receipt was listed as unknown content")
 	}
 	ids := map[string]bool{}
@@ -235,11 +262,11 @@ func TestPlanPrivatePreservationClassifiesByClass(t *testing.T) {
 
 // assertPreservedByClass checks the outcome every registration owes the
 // private tree: every file that was there is still there with its bytes,
-// staging now under the receipt, and the receipt names it all.
+// the abandoned work now under the receipt, and the receipt names it all.
 func assertPreservedByClass(t *testing.T, repositoryPath string, before map[string]string, event RecoveryEvent) RecoveryReceipt {
 	t.Helper()
 	after := hashTree(t, repositoryPath)
-	receipts, err := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*.json"))
+	receipts, err := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(layout.RecoveryDir().String()), "*.json"))
 	if err != nil || len(receipts) != 1 {
 		t.Fatalf("receipts = %v, err=%v", receipts, err)
 	}
@@ -273,7 +300,7 @@ func assertPreservedByClass(t *testing.T, repositoryPath string, before map[stri
 		}
 	}
 	if len(movedTo) != 2 {
-		t.Fatalf("moved items = %v, want the two staging files", movedTo)
+		t.Fatalf("moved items = %v, want the two work files", movedTo)
 	}
 	return receipt
 }
@@ -315,13 +342,13 @@ func TestOpenRepositoryPreservesPrivateStateByClass(t *testing.T) {
 	}
 	// The fresh layout exists around the preserved state, and the logs keep
 	// their history rather than being truncated by the layout creation.
-	for _, directory := range []string{DefaultStructure.IncomingDir, DefaultStructure.FailedDir, DefaultStructure.SidecarsDir} {
-		if info, err := os.Stat(filepath.Join(repositoryPath, filepath.FromSlash(directory))); err != nil || !info.IsDir() {
+	for _, directory := range []layout.Path{layout.UploadsDir(), layout.StudioDir(), layout.LogsDir()} {
+		if info, err := os.Stat(onDisk(t, repositoryPath, directory)); err != nil || !info.IsDir() {
 			t.Fatalf("layout directory %s missing after open: %v", directory, err)
 		}
 	}
-	if entries, _ := os.ReadDir(filepath.Join(repositoryPath, filepath.FromSlash(DefaultStructure.IncomingDir))); len(entries) != 0 {
-		t.Fatalf("incoming staging still holds %d entries after open", len(entries))
+	if entries, _ := os.ReadDir(onDisk(t, repositoryPath, layout.UploadsDir())); len(entries) != 0 {
+		t.Fatalf("work/uploads still holds %d entries after open", len(entries))
 	}
 	// Replaying the same request neither remints a receipt nor repeats a move.
 	replayed, err := manager.OpenRepository(ctx, repositoryPath, nil, dbtypes.RepoRoleRegular, request)
@@ -354,7 +381,7 @@ func TestPrivatePreservationRollsBackACrashBetweenMoves(t *testing.T) {
 	if err := applyPrivatePreservation(repositoryPath, plan); !errors.Is(err, crash) {
 		t.Fatalf("apply error = %v, want the injected crash", err)
 	}
-	// One staging file moved, the receipt is written: the state a crash leaves.
+	// One work file moved, the receipt is written: the state a crash leaves.
 	if _, err := os.Stat(filepath.Join(repositoryPath, filepath.FromSlash(plan.Moves[0].To))); err != nil {
 		t.Fatalf("first move did not happen: %v", err)
 	}
@@ -373,7 +400,7 @@ func TestPrivatePreservationRollsBackACrashBetweenMoves(t *testing.T) {
 			t.Fatalf("rollback did not restore %s", name)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(repositoryPath, filepath.FromSlash(RepositoryRecoveryDirectory), plan.ReceiptID()+".json")); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(filepath.Join(repositoryPath, filepath.FromSlash(layout.RecoveryDir().String()), plan.ReceiptID()+".json")); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("receipt survived the rollback: %v", err)
 	}
 	// Rolling back twice is harmless.
@@ -419,7 +446,7 @@ func TestPrivatePreservationRetryFinishesAnInterruptedPlanWithoutRepeatingMoves(
 			t.Fatalf("%s bytes differ after the retry", move.To)
 		}
 	}
-	if receipts, _ := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*.json")); len(receipts) != 1 {
+	if receipts, _ := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(layout.RecoveryDir().String()), "*.json")); len(receipts) != 1 {
 		t.Fatalf("receipts after retry = %v", receipts)
 	}
 	// A third apply is a no-op.
@@ -507,7 +534,7 @@ func TestLifecycleRecoveryRollsBackAnOpenInterruptedAfterItsFilesystemPhase(t *t
 			t.Fatalf("recovery did not restore %s", name)
 		}
 	}
-	if receipts, _ := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*.json")); len(receipts) != 0 {
+	if receipts, _ := filepath.Glob(filepath.Join(repositoryPath, filepath.FromSlash(layout.RecoveryDir().String()), "*.json")); len(receipts) != 0 {
 		t.Fatalf("receipt survived the recovery rollback: %v", receipts)
 	}
 	if _, err := manager.GetRepository(repositoryID); err == nil {

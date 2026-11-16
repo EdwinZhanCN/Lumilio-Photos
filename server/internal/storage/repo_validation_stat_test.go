@@ -1,11 +1,12 @@
 package storage
 
 import (
-	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
 )
 
 // A file used as an ancestor yields nil FileInfo without relying on chmod

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"server/internal/storage/layout"
 	"server/internal/storage/marker"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
@@ -179,7 +180,7 @@ func ObserveStorageTarget(ctx context.Context, observer StorageObserver, target 
 		if result.PlaceholderErr != nil {
 			result.Placeholder = false
 		}
-		for _, dir := range []string{".lumilio", "inbox"} {
+		for _, dir := range []string{layout.PrivateRoot, layout.Inbox} {
 			result.Layout[dir] = ReadAccess(observer.Stat(filepath.Join(result.Path, dir)))
 		}
 	}

@@ -86,8 +86,8 @@ func TestRepositoryRecoveryHandlersProjectInventoryAndMapRefusals(t *testing.T) 
 		Receipts: []recovery.ReceiptSummary{{ReceiptID: uuid.NewString(), Event: storage.RecoveryEventOpen, RecordedAt: now, Actor: "web:user:1",
 			Trash: storage.RecoverySummary{Files: 2, Bytes: 10}, Logs: storage.RecoverySummary{Files: 2}}},
 		Items: []recovery.Item{
-			{RecoveryItem: storage.RecoveryItem{ItemID: stagingID, Class: storage.PrivateClassStaging, Path: ".lumilio/staging/incoming/a.part", Size: 11, Disposition: storage.DispositionMoved, MovedTo: ".lumilio/recovery/x/staging/incoming/a.part"}, Present: true, Actions: []string{"export", "delete"}},
-			{RecoveryItem: storage.RecoveryItem{ItemID: studioID, Class: storage.PrivateClassStudio, Path: ".lumilio/sidecars/old.lumilio-sidecar", Disposition: storage.DispositionReassociated, ResolvedAssetID: uuid.NewString()}, Present: true, Actions: []string{}},
+			{RecoveryItem: storage.RecoveryItem{ItemID: stagingID, Class: storage.PrivateClassStaging, Path: ".lumilio/work/uploads/550e8400-e29b-41d4-a716-446655440000/a.part", Size: 11, Disposition: storage.DispositionMoved, MovedTo: ".lumilio/recovery/x/staging/incoming/a.part"}, Present: true, Actions: []string{"export", "delete"}},
+			{RecoveryItem: storage.RecoveryItem{ItemID: studioID, Class: storage.PrivateClassStudio, Path: ".lumilio/user/studio/550e8400-e29b-41d4-a716-446655440001.lumilio-sidecar", Disposition: storage.DispositionReassociated, ResolvedAssetID: uuid.NewString()}, Present: true, Actions: []string{}},
 		},
 		TrashHeld:          recovery.TrashHeld{Count: 1, Bytes: 5},
 		UnreadableReceipts: []string{},

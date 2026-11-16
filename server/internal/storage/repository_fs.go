@@ -18,6 +18,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	hashutil "server/internal/media/hash"
+	"server/internal/storage/layout"
 
 	"github.com/google/uuid"
 )
@@ -52,7 +53,7 @@ const (
 
 type FileObservation struct {
 	RepositoryID        uuid.UUID
-	Path                RepositoryPath
+	Path                layout.Path
 	EntryKind           EntryKind
 	Size                int64
 	ModTimeNS           int64
@@ -274,9 +275,9 @@ func (r *RepositoryFS) withRoot() (*os.Root, func(), error) {
 	return r.root, r.mu.RUnlock, nil
 }
 
-func (r *RepositoryFS) OpenMedia(repositoryPath RepositoryPath) (*os.File, error) {
+func (r *RepositoryFS) OpenMedia(repositoryPath layout.Path) (*os.File, error) {
 	if !repositoryPath.IsMedia() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -303,9 +304,9 @@ func (r *RepositoryFS) OpenMedia(repositoryPath RepositoryPath) (*os.File, error
 	return opened, nil
 }
 
-func (r *RepositoryFS) OpenPrivate(repositoryPath RepositoryPath) (*os.File, error) {
+func (r *RepositoryFS) OpenPrivate(repositoryPath layout.Path) (*os.File, error) {
 	if !repositoryPath.IsPrivate() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -319,9 +320,9 @@ func (r *RepositoryFS) OpenPrivate(repositoryPath RepositoryPath) (*os.File, err
 	return root.Open(local)
 }
 
-func (r *RepositoryFS) OpenPrivateFile(repositoryPath RepositoryPath, flag int, perm fs.FileMode) (*os.File, error) {
+func (r *RepositoryFS) OpenPrivateFile(repositoryPath layout.Path, flag int, perm fs.FileMode) (*os.File, error) {
 	if !repositoryPath.IsPrivate() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -335,9 +336,9 @@ func (r *RepositoryFS) OpenPrivateFile(repositoryPath RepositoryPath, flag int, 
 	return root.OpenFile(local, flag, perm)
 }
 
-func (r *RepositoryFS) ReadPrivateFile(repositoryPath RepositoryPath) ([]byte, error) {
+func (r *RepositoryFS) ReadPrivateFile(repositoryPath layout.Path) ([]byte, error) {
 	if !repositoryPath.IsPrivate() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -353,19 +354,15 @@ func (r *RepositoryFS) ReadPrivateFile(repositoryPath RepositoryPath) ([]byte, e
 
 // WritePrivateFileAtomic replaces one private-workspace file only after the
 // complete stream is durable. A failed write leaves the previous file intact.
-func (r *RepositoryFS) WritePrivateFileAtomic(repositoryPath RepositoryPath, reader io.Reader, perm fs.FileMode) (int64, error) {
+func (r *RepositoryFS) WritePrivateFileAtomic(repositoryPath layout.Path, reader io.Reader, perm fs.FileMode) (int64, error) {
 	if !repositoryPath.IsPrivate() {
-		return 0, ErrRepositoryPathNamespace
+		return 0, layout.ErrPathNamespace
 	}
 	destination, err := repositoryPath.Local()
 	if err != nil {
 		return 0, err
 	}
-	temporaryPath, err := ParsePrivateRepositoryPath(repositoryPath.String() + ".tmp-" + uuid.NewString())
-	if err != nil {
-		return 0, err
-	}
-	temporary, err := temporaryPath.Local()
+	temporary, err := layout.Temp().Local()
 	if err != nil {
 		return 0, err
 	}
@@ -374,6 +371,9 @@ func (r *RepositoryFS) WritePrivateFileAtomic(repositoryPath RepositoryPath, rea
 		return 0, err
 	}
 	defer done()
+	if err := mkdirPrivateTemp(root); err != nil {
+		return 0, err
+	}
 	file, err := root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
 	if err != nil {
 		return 0, err
@@ -422,9 +422,9 @@ var linkImmutable = func(root *os.Root, oldname, newname string) error {
 // rename after an existence check, the way the trash and staging moves are.
 // The asset work fence admits one publisher per artifact identity, so nothing
 // can appear at the name between the check and the rename.
-func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, reader io.Reader, perm fs.FileMode) (int64, error) {
+func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath layout.Path, reader io.Reader, perm fs.FileMode) (int64, error) {
 	if !repositoryPath.IsPrivate() {
-		return 0, ErrRepositoryPathNamespace
+		return 0, layout.ErrPathNamespace
 	}
 	if reader == nil {
 		return 0, errors.New("immutable file reader is required")
@@ -433,11 +433,7 @@ func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, 
 	if err != nil {
 		return 0, err
 	}
-	temporaryPath, err := ParsePrivateRepositoryPath(repositoryPath.String() + ".tmp-" + uuid.NewString())
-	if err != nil {
-		return 0, err
-	}
-	temporary, err := temporaryPath.Local()
+	temporary, err := layout.Temp().Local()
 	if err != nil {
 		return 0, err
 	}
@@ -446,6 +442,9 @@ func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, 
 		return 0, err
 	}
 	defer done()
+	if err := mkdirPrivateTemp(root); err != nil {
+		return 0, err
+	}
 	file, err := root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
 	if err != nil {
 		return 0, err
@@ -547,9 +546,9 @@ func equalDigest(left, right []byte) bool {
 	return difference == 0
 }
 
-func (r *RepositoryFS) StatPrivate(repositoryPath RepositoryPath) (fs.FileInfo, error) {
+func (r *RepositoryFS) StatPrivate(repositoryPath layout.Path) (fs.FileInfo, error) {
 	if !repositoryPath.IsPrivate() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -563,17 +562,17 @@ func (r *RepositoryFS) StatPrivate(repositoryPath RepositoryPath) (fs.FileInfo, 
 	return root.Stat(local)
 }
 
-func (r *RepositoryFS) MkdirAllPrivate(repositoryPath RepositoryPath, perm fs.FileMode) error {
+func (r *RepositoryFS) MkdirAllPrivate(repositoryPath layout.Path, perm fs.FileMode) error {
 	return r.mkdirAll(repositoryPath, true, perm)
 }
 
-func (r *RepositoryFS) MkdirAllMedia(repositoryPath RepositoryPath, perm fs.FileMode) error {
+func (r *RepositoryFS) MkdirAllMedia(repositoryPath layout.Path, perm fs.FileMode) error {
 	return r.mkdirAll(repositoryPath, false, perm)
 }
 
-func (r *RepositoryFS) mkdirAll(repositoryPath RepositoryPath, private bool, perm fs.FileMode) error {
+func (r *RepositoryFS) mkdirAll(repositoryPath layout.Path, private bool, perm fs.FileMode) error {
 	if (private && !repositoryPath.IsPrivate()) || (!private && !repositoryPath.IsMedia()) {
-		return ErrRepositoryPathNamespace
+		return layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -587,9 +586,9 @@ func (r *RepositoryFS) mkdirAll(repositoryPath RepositoryPath, private bool, per
 	return root.MkdirAll(local, perm)
 }
 
-func (r *RepositoryFS) RemovePrivate(repositoryPath RepositoryPath) error {
+func (r *RepositoryFS) RemovePrivate(repositoryPath layout.Path) error {
 	if !repositoryPath.IsPrivate() {
-		return ErrRepositoryPathNamespace
+		return layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -603,11 +602,39 @@ func (r *RepositoryFS) RemovePrivate(repositoryPath RepositoryPath) error {
 	return root.Remove(local)
 }
 
+// RemoveAllPrivate removes a private directory and everything below it. It
+// ends an operation that owns a whole directory, such as an upload session.
+func (r *RepositoryFS) RemoveAllPrivate(repositoryPath layout.Path) error {
+	if !repositoryPath.IsPrivate() || repositoryPath == layout.Root() {
+		return layout.ErrPathNamespace
+	}
+	local, err := repositoryPath.Local()
+	if err != nil {
+		return err
+	}
+	root, done, err := r.withRoot()
+	if err != nil {
+		return err
+	}
+	defer done()
+	return root.RemoveAll(local)
+}
+
+// mkdirPrivateTemp makes sure the atomic-write temporaries directory exists;
+// a repository opened before its tree was repaired may lack it.
+func mkdirPrivateTemp(root *os.Root) error {
+	local, err := layout.TempDir().Local()
+	if err != nil {
+		return err
+	}
+	return root.MkdirAll(local, 0o700)
+}
+
 // PrivateFile is one regular application-owned file discovered below a
 // validated private repository directory. Callers receive repository-relative
 // paths only; the rooted filesystem capability never leaks an absolute path.
 type PrivateFile struct {
-	Path    RepositoryPath
+	Path    layout.Path
 	Size    int64
 	ModTime time.Time
 }
@@ -615,7 +642,7 @@ type PrivateFile struct {
 // ListPrivateFiles walks one private subtree without following or accepting
 // non-regular entries. It is the bounded capability used by artifact garbage
 // collection; ordinary media code must not inspect the application-owned tree.
-func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory RepositoryPath) ([]PrivateFile, error) {
+func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory layout.Path) ([]PrivateFile, error) {
 	if ctx == nil {
 		return nil, errors.New("private file walk context is nil")
 	}
@@ -623,7 +650,7 @@ func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory Repositor
 		return nil, err
 	}
 	if !directory.IsPrivate() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	root, done, err := r.withRoot()
 	if err != nil {
@@ -651,7 +678,7 @@ func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory Repositor
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("%w: private entry %s is not a regular file", ErrRepositoryEntryUnsupported, name)
 		}
-		privatePath, err := ParsePrivateRepositoryPath(name)
+		privatePath, err := layout.Parse(name)
 		if err != nil {
 			return err
 		}
@@ -661,9 +688,9 @@ func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory Repositor
 	return files, err
 }
 
-func (r *RepositoryFS) StatMedia(repositoryPath RepositoryPath) (fs.FileInfo, error) {
+func (r *RepositoryFS) StatMedia(repositoryPath layout.Path) (fs.FileInfo, error) {
 	if !repositoryPath.IsMedia() {
-		return nil, ErrRepositoryPathNamespace
+		return nil, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -679,7 +706,7 @@ func (r *RepositoryFS) StatMedia(repositoryPath RepositoryPath) (fs.FileInfo, er
 
 // LocalMediaPath is the only adapter for native tools that require a host
 // filename. It verifies the rooted path immediately before deriving it.
-func (r *RepositoryFS) LocalMediaPath(repositoryPath RepositoryPath) (string, error) {
+func (r *RepositoryFS) LocalMediaPath(repositoryPath layout.Path) (string, error) {
 	opened, err := r.OpenMedia(repositoryPath)
 	if err != nil {
 		return "", err
@@ -701,7 +728,7 @@ func (r *RepositoryFS) LocalMediaPath(repositoryPath RepositoryPath) (string, er
 
 // LocalPrivatePath is the private-workspace equivalent used only when a native
 // tool requires a filename instead of an opened file.
-func (r *RepositoryFS) LocalPrivatePath(repositoryPath RepositoryPath) (string, error) {
+func (r *RepositoryFS) LocalPrivatePath(repositoryPath layout.Path) (string, error) {
 	opened, err := r.OpenPrivate(repositoryPath)
 	if err != nil {
 		return "", err
@@ -729,12 +756,12 @@ func (r *RepositoryFS) LocalPrivatePath(repositoryPath RepositoryPath) (string, 
 	return filepath.Join(root.Name(), local), nil
 }
 
-func (r *RepositoryFS) InspectMedia(ctx context.Context, repositoryPath RepositoryPath, mode HashMode) (FileObservation, error) {
+func (r *RepositoryFS) InspectMedia(ctx context.Context, repositoryPath layout.Path, mode HashMode) (FileObservation, error) {
 	if err := ctx.Err(); err != nil {
 		return FileObservation{}, err
 	}
 	if !repositoryPath.IsMedia() {
-		return FileObservation{}, ErrRepositoryPathNamespace
+		return FileObservation{}, layout.ErrPathNamespace
 	}
 	local, err := repositoryPath.Local()
 	if err != nil {
@@ -817,7 +844,7 @@ func (r *RepositoryFS) Revalidate(ctx context.Context, expected FileObservation)
 func (r *RepositoryFS) observeNodeWithHeldRoot(
 	ctx context.Context,
 	root *os.Root,
-	repositoryPath RepositoryPath,
+	repositoryPath layout.Path,
 	directory bool,
 ) (FileObservation, error) {
 	if !directory {
@@ -844,7 +871,7 @@ func (r *RepositoryFS) observeNodeWithHeldRoot(
 // walk already holds it. The walk performs no content read between metadata
 // snapshots, so one opened-handle snapshot is sufficient; content consumers
 // compare the observation token again before committing their work.
-func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Root, repositoryPath RepositoryPath) (FileObservation, error) {
+func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Root, repositoryPath layout.Path) (FileObservation, error) {
 	local, err := repositoryPath.Local()
 	if err != nil {
 		return FileObservation{}, err
@@ -875,7 +902,7 @@ func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Ro
 	return newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime), nil
 }
 
-func newFileObservation(repositoryID uuid.UUID, repositoryPath RepositoryPath, kind EntryKind, info fs.FileInfo, identityKind, identity *string, changeTime *int64) FileObservation {
+func newFileObservation(repositoryID uuid.UUID, repositoryPath layout.Path, kind EntryKind, info fs.FileInfo, identityKind, identity *string, changeTime *int64) FileObservation {
 	observation := FileObservation{
 		RepositoryID:     repositoryID,
 		Path:             repositoryPath,

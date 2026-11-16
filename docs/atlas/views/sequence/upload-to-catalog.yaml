@@ -67,8 +67,8 @@ steps:
             anchor: api:POST /api/v1/assets/batch/sessions
   - from: api
     to: staging
-    label: write bytes into the repository's private staging area
-    anchor: go:server/internal/storage.StagingManager.CreateStagingFile
+    label: write each part into its upload session's directory under .lumilio/work/uploads/
+    anchor: go:server/internal/storage.StagingManager.CreateSessionFile
   - from: api
     to: api
     label: re-hash staged bytes and validate the media type
@@ -133,6 +133,14 @@ notes:
       QueueDB dies afterwards, the next scheduler pass derives the same
       ingest job again from the catalog. Nothing is lost and nothing runs
       twice past the commit coordinator's fences.
+  - title: Failed uploads
+    body: >-
+      A part cut off mid-transfer is dropped; the browser still holds the file
+      and resends it. A session whose chunks cannot be assembled moves whole
+      to .lumilio/quarantine/uploads/ for a human decision and is never
+      cleaned automatically. A session in work/ that no live upload owns and
+      no pending staging commit names is removed once it has been idle for
+      an hour.
   - title: Identity
     body: >-
       The browser fingerprint is only a precheck hint. The server re-hashes

@@ -16,6 +16,7 @@ import (
 	"server/internal/catalog/repo"
 	fileutil "server/internal/media/file"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 )
 
 // HashResult reports one bounded hash pass over a repository's pending rows.
@@ -67,7 +68,7 @@ func (s *Scanner) HashTurn(ctx context.Context, repositoryID uuid.UUID, limit in
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
-		repositoryPath, err := storage.ParseUserMediaPath(row.Path)
+		repositoryPath, err := layout.ParseMedia(row.Path)
 		if err != nil {
 			result.Errors++
 			continue

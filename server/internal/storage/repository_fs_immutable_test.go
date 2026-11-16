@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+
+	"server/internal/storage/layout"
 )
 
 // FAT32 and exFAT refuse hard links before the destination is consulted. The
@@ -26,11 +28,11 @@ func TestRepositoryFSImmutablePrivateWritePublishesWhereHardLinksAreRefused(t *t
 
 	repository := createRepositoryFSTestRoot(t)
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	destination, err := ParsePrivateRepositoryPath(".lumilio/artifacts/fence/derivatives/asset-v1/small.webp")
+	destination, err := layout.Parse(".lumilio/artifacts/fence/derivatives/asset-v1/small.webp")
 	if err != nil {
 		t.Fatal(err)
 	}
-	directory, err := ParsePrivateRepositoryPath(path.Dir(destination.String()))
+	directory, err := layout.Parse(path.Dir(destination.String()))
 	if err != nil {
 		t.Fatal(err)
 	}

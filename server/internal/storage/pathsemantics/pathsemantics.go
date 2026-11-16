@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"golang.org/x/text/unicode/norm"
+
+	"server/internal/storage/layout"
 )
 
 type CaseMode string
@@ -105,7 +107,9 @@ func (s Semantics) String() string {
 	return fmt.Sprintf("case %s, normalization %s", s.Case, s.Normalization)
 }
 
-const probePrefix = ".lumilio-volume-probe-"
+// probePrefix names the probe files: Lumilio temporaries, which scan,
+// the watcher, and recovery ignore.
+const probePrefix = layout.TempPrefix + "volume-probe-"
 
 // Probe measures the name comparison rule of the filesystem that holds dir
 // by creating two hidden temporary files in it and looking them up under a

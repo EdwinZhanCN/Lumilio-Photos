@@ -97,7 +97,7 @@ func TestLeftoverPrimaryFixtures(t *testing.T) {
 		}
 	}
 	for _, name := range []string{
-		".lumilio/staging/incoming/abandoned.part", ".lumilio/staging/failed/abandoned.part", ".lumilio/unknown-child/opaque.bin",
+		testfixture.LeftoverUpload, testfixture.LeftoverFailed, testfixture.LeftoverUnknown,
 	} {
 		if len(read(t, primary.Path, name)) == 0 {
 			t.Fatalf("private fixture %s is empty", name)

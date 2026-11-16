@@ -16,7 +16,10 @@ import (
 
 // A transcode stays referenced while its Asset exists with any entry in the
 // repository, so a trashed or missing video keeps it for a restore.
-func TestCleanerKeepsTranscodesOfAssetsThatStillExist(t *testing.T) {
+// newCleanerCatalog is a migrated catalog with one owner, one Storage
+// Location, and the named repositories in it.
+func newCleanerCatalog(t *testing.T, repositories ...uuid.UUID) *catalog.DB {
+	t.Helper()
 	ctx := context.Background()
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0o700); err != nil {
@@ -30,19 +33,26 @@ func TestCleanerKeepsTranscodesOfAssetsThatStillExist(t *testing.T) {
 	if err := database.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	location, repositoryID := uuid.New(), uuid.New()
-	for _, statement := range []struct {
-		query string
-		args  []any
-	}{
-		{`INSERT INTO users (user_id, username, password, created_at, updated_at, webauthn_user_handle) VALUES (1, 'owner', 'hash', 1, 1, x'01')`, nil},
-		{`INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at) VALUES (?, 'root', '/media', 'default', 1, 1)`, []any{location}},
-		{`INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization) VALUES (?, 'videos', '/media/videos', 1, 1, 1, ?, 'sensitive', 'none')`, []any{repositoryID, location}},
-	} {
-		if _, err := database.SQL.ExecContext(ctx, statement.query, statement.args...); err != nil {
+	location := uuid.New()
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := database.SQL.ExecContext(ctx, query, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
+	exec(`INSERT INTO users (user_id, username, password, created_at, updated_at, webauthn_user_handle) VALUES (1, 'owner', 'hash', 1, 1, x'01')`)
+	exec(`INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at) VALUES (?, 'root', '/media', 'default', 1, 1)`, location)
+	for _, repositoryID := range repositories {
+		exec(`INSERT INTO repositories (repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization) VALUES (?, ?, ?, 1, 1, 1, ?, 'sensitive', 'none')`,
+			repositoryID, repositoryID.String(), "/media/"+repositoryID.String(), location)
+	}
+	return database
+}
+
+func TestCleanerKeepsTranscodesOfAssetsThatStillExist(t *testing.T) {
+	ctx := context.Background()
+	repositoryID := uuid.New()
+	database := newCleanerCatalog(t, repositoryID)
 	names := map[string]string{}
 	for state, name := range map[string]string{"present": "active.mp4", "missing": "missing.mp4", "trashed": "trashed.mp4"} {
 		assetID := uuid.New()
@@ -73,5 +83,47 @@ func TestCleanerKeepsTranscodesOfAssetsThatStillExist(t *testing.T) {
 		if _, ok := referenced[path]; !ok {
 			t.Errorf("the transcode of a %s video is not referenced", state)
 		}
+	}
+}
+
+// A face crop stays referenced while a face item of this repository names
+// it; another repository's crops are not this repository's to keep.
+func TestCleanerKeepsFaceCropsTheirRepositoryNames(t *testing.T) {
+	ctx := context.Background()
+	here, elsewhere := uuid.New(), uuid.New()
+	database := newCleanerCatalog(t, here, elsewhere)
+	crops := map[uuid.UUID]string{}
+	for _, repositoryID := range []uuid.UUID{here, elsewhere} {
+		assetID := uuid.New()
+		occurrence, err := testutil.InsertAssetOccurrence(ctx, database.SQL, testutil.AssetOccurrenceParams{
+			AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1, AssetType: "PHOTO", Filename: "face.jpg",
+			MIMEType: "image/jpeg", FileSize: 1, EntryState: "present",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		crop, err := (Identity{SourceFence: occurrence.ContentID.String(), Stage: "faces", PipelineVersion: "1", Name: "0-face.webp"}).Path()
+		if err != nil {
+			t.Fatal(err)
+		}
+		crops[repositoryID] = crop.String()
+		if _, err := database.SQL.ExecContext(ctx, `INSERT INTO face_results (asset_id, model_id, created_at, updated_at) VALUES (?, 'model', 1, 1)`, assetID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := database.SQL.ExecContext(ctx, `
+			INSERT INTO face_items (asset_id, bounding_box, confidence, face_image_path, created_at, repository_id)
+			VALUES (?, '{}', 0.9, ?, 1, ?)`, assetID, crop.String(), repositoryID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	referenced, err := (&Cleaner{database: database}).references(ctx, repo.Repository{RepoID: here})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := referenced[crops[here]]; !ok {
+		t.Error("the face crop of this repository is not referenced")
+	}
+	if _, ok := referenced[crops[elsewhere]]; ok {
+		t.Error("another repository's face crop is referenced here")
 	}
 }

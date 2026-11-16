@@ -213,7 +213,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	repositoryFS, file, err := openRepositoryPrivate(h.files, repository, thumbnail.StoragePath)
+	repositoryFS, file, err := openRepositoryArtifact(h.files, repository, thumbnail.StoragePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))

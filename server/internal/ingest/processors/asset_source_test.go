@@ -16,6 +16,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/locations"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
@@ -103,7 +104,7 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer repositoryFS.Close()
-		parsed, err := storage.ParseUserMediaPath(relative)
+		parsed, err := layout.ParseMedia(relative)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"server/internal/catalog/dbtypes"
+	"server/internal/storage/layout"
 )
 
 func TestRemoveOfflineRepositoryClearsCatalogWithoutDiskPrerequisite(t *testing.T) {
@@ -28,7 +29,7 @@ func TestRemoveOfflineRepositoryClearsCatalogWithoutDiskPrerequisite(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	originalPath := filepath.Join(created.Repository.Path, DefaultStructure.InboxDir, "kept.jpg")
+	originalPath := filepath.Join(created.Repository.Path, layout.Inbox, "kept.jpg")
 	if err := os.MkdirAll(filepath.Dir(originalPath), 0o755); err != nil {
 		t.Fatal(err)
 	}

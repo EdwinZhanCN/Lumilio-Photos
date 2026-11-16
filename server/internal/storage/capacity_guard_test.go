@@ -12,8 +12,11 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
+
+	"github.com/google/uuid"
 )
 
 func TestCapacityDecisionUsesActualTargetVolumeAndSafetyMargin(t *testing.T) {
@@ -101,10 +104,11 @@ func TestChildWritePathsIgnoreParentStorageLocationFailure(t *testing.T) {
 			}
 
 			sidecarData := []byte(`{"asset":"parent-independent"}`)
-			if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-parent-independent", sidecarData); err != nil {
+			assetID := uuid.NewString()
+			if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), assetID, sidecarData); err != nil {
 				t.Fatalf("sidecar write denied by parent %s: %v", failure, err)
 			}
-			stored, err := manager.ReadRepositorySidecar(ctx, repository.RepoID.String(), "asset-parent-independent")
+			stored, err := manager.ReadRepositorySidecar(ctx, repository.RepoID.String(), assetID)
 			if err != nil || !bytes.Equal(stored, sidecarData) {
 				t.Fatalf("sidecar round trip = %q, %v", stored, err)
 			}
@@ -175,15 +179,16 @@ func TestSidecarWriteHonorsRepositoryMaintenanceNotParentStatus(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	rootAssetID, repositoryAssetID := uuid.New(), uuid.New()
 	rootSidecar := []byte(`{"asset":"storageLocation-maintenance"}`)
-	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-storageLocation", rootSidecar); err != nil {
+	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), rootAssetID.String(), rootSidecar); err != nil {
 		t.Fatalf("sidecar write denied by parent Storage Location maintenance: %v", err)
 	}
-	stored, err := manager.ReadRepositorySidecar(ctx, repository.RepoID.String(), "asset-storageLocation")
+	stored, err := manager.ReadRepositorySidecar(ctx, repository.RepoID.String(), rootAssetID.String())
 	if err != nil || !bytes.Equal(stored, rootSidecar) {
 		t.Fatalf("sidecar written under parent maintenance = %q, %v", stored, err)
 	}
-	rootTarget := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, "asset-storageLocation.lumilio-sidecar")
+	rootTarget := onDisk(t, repository.Path, mustPath(layout.Studio(rootAssetID)))
 	if _, err := os.Stat(rootTarget); err != nil {
 		t.Fatalf("sidecar written under parent maintenance is missing: %v", err)
 	}
@@ -198,18 +203,14 @@ func TestSidecarWriteHonorsRepositoryMaintenanceNotParentStatus(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), "asset-repository", []byte("{}")); !errors.Is(err, ErrRepositoryBusy) {
+	if err := manager.WriteRepositorySidecar(ctx, repository.RepoID.String(), repositoryAssetID.String(), []byte("{}")); !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("sidecar repository-maintenance error = %v, want ErrRepositoryBusy", err)
 	}
-	target := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, "asset-repository.lumilio-sidecar")
-	for _, path := range []string{target, target + ".tmp"} {
-		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-			t.Fatalf("sidecar maintenance rejection left %s: %v", path, err)
-		}
+	target := onDisk(t, repository.Path, mustPath(layout.Studio(repositoryAssetID)))
+	if _, err := os.Stat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("sidecar maintenance rejection left %s: %v", target, err)
 	}
-	if matches, err := filepath.Glob(target + ".tmp-*"); err != nil || len(matches) != 0 {
-		t.Fatalf("sidecar maintenance rejection left temporary files %v (glob error %v)", matches, err)
-	}
+	assertNoPrivateTemporaries(t, repository.Path)
 }
 
 func TestSidecarWriteHonorsContextWhileRepositoryLeaseIsBusy(t *testing.T) {
@@ -225,18 +226,16 @@ func TestSidecarWriteHonorsContextWhileRepositoryLeaseIsBusy(t *testing.T) {
 
 	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
 	defer cancel()
-	assetID := "asset-busy"
+	assetID := uuid.NewString()
 	err = manager.WriteRepositorySidecar(requestCtx, repository.RepoID.String(), assetID, []byte("{}"))
 	if !errors.Is(err, ErrRepositoryBusy) {
 		t.Fatalf("sidecar busy error = %v, want ErrRepositoryBusy", err)
 	}
-	target := filepath.Join(repository.Path, DefaultStructure.SidecarsDir, assetID+".lumilio-sidecar")
+	target := onDisk(t, repository.Path, mustPath(layout.Studio(uuid.MustParse(assetID))))
 	if _, err := os.Stat(target); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("sidecar busy rejection left target %s: %v", target, err)
 	}
-	if matches, err := filepath.Glob(target + ".tmp-*"); err != nil || len(matches) != 0 {
-		t.Fatalf("sidecar busy rejection left temporary files %v (glob error %v)", matches, err)
-	}
+	assertNoPrivateTemporaries(t, repository.Path)
 	current, err := manager.queries.GetRepository(ctx, repository.RepoID)
 	if err != nil {
 		t.Fatal(err)

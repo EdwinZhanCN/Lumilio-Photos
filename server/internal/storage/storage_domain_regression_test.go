@@ -11,6 +11,7 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/rootcfg"
 )
 
@@ -60,7 +61,7 @@ func TestStorageDomainHealthyChildSurvivesParentFailure(t *testing.T) {
 				t.Fatalf("healthy Repository denied by parent %s: %v", failure, err)
 			}
 			defer files.Close()
-			mediaPath, err := ParseUserMediaPath("original.jpg")
+			mediaPath, err := layout.ParseMedia("original.jpg")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -180,7 +181,7 @@ func TestStorageDomainDockerShapedSiblingIndependence(t *testing.T) {
 			t.Fatalf("open repository %s: %v", repository.Path, err)
 		}
 		defer files.Close()
-		mediaPath, err := ParseUserMediaPath(relativePath)
+		mediaPath, err := layout.ParseMedia(relativePath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -232,7 +233,7 @@ func TestStorageDomainDockerShapedSiblingIndependence(t *testing.T) {
 					t.Fatalf("open repository %s: %v", repository.Path, err)
 				}
 				defer files.Close()
-				mediaPath, err := ParseUserMediaPath(relativePath)
+				mediaPath, err := layout.ParseMedia(relativePath)
 				if err != nil {
 					t.Fatal(err)
 				}

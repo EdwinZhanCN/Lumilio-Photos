@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"server/internal/storage/layout"
 )
 
 var ErrIdentityChanged = errors.New("marker identity changed")
@@ -76,7 +78,7 @@ func WriteAtomic(files AtomicFS, path string, data []byte, guard Guard) error {
 		return err
 	}
 	dir := filepath.Dir(path)
-	temp, err := files.CreateTemp(dir, ".lumilio-marker-*")
+	temp, err := files.CreateTemp(dir, layout.TempPattern("marker"))
 	if err != nil {
 		return err
 	}

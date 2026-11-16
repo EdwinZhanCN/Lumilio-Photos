@@ -14,6 +14,7 @@ import (
 
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/marker"
 	"server/internal/storage/repocfg"
 
@@ -183,7 +184,7 @@ func (rm *DefaultRepositoryManager) assessSetupPrimaryResolved(ctx context.Conte
 		setState(SetupPrimaryRegistered)
 		return result
 	}
-	for _, directory := range []string{DefaultStructure.SystemDir, DefaultStructure.InboxDir} {
+	for _, directory := range []string{layout.PrivateRoot, layout.Inbox} {
 		reading, ok := observed.Layout[directory]
 		switch {
 		case !ok || reading.State == AccessAbsent:
@@ -226,7 +227,7 @@ func previewPrivateRecovery(repoPath, repositoryID string) *SetupPrimaryRecovery
 		}
 	}
 	preview.UnknownFiles += receipt.ItemsTruncated
-	if receipts, globErr := filepath.Glob(filepath.Join(repoPath, filepath.FromSlash(RepositoryRecoveryDirectory), "*.json")); globErr == nil {
+	if receipts, globErr := filepath.Glob(filepath.Join(repoPath, filepath.FromSlash(layout.RecoveryDir().String()), "*.json")); globErr == nil {
 		preview.Receipts = len(receipts)
 	}
 	return preview
@@ -408,7 +409,7 @@ func (rm *DefaultRepositoryManager) AdoptPrimaryRepository(ctx context.Context, 
 	if err != nil {
 		return failPrepared(err)
 	}
-	inboxPath := filepath.Join(repoPath, DefaultStructure.InboxDir)
+	inboxPath := filepath.Join(repoPath, layout.Inbox)
 	_, inboxErr := os.Stat(inboxPath)
 	rollbackData := adoptPrimaryRollbackData{Preservation: plan, InboxCreated: errors.Is(inboxErr, fs.ErrNotExist)}
 	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhasePrepared, rollbackData); err != nil {
@@ -490,7 +491,7 @@ func rollbackAdoptedLayout(repoPath string, data adoptPrimaryRollbackData) error
 		return err
 	}
 	if data.InboxCreated {
-		inboxPath := filepath.Join(repoPath, DefaultStructure.InboxDir)
+		inboxPath := filepath.Join(repoPath, layout.Inbox)
 		if err := os.Remove(inboxPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			if entries, readErr := os.ReadDir(inboxPath); readErr == nil && len(entries) > 0 {
 				return nil
@@ -505,7 +506,11 @@ func readRecoveryReceiptFile(repoPath, receiptID string) *RecoveryReceipt {
 	if receiptID == "" {
 		return nil
 	}
-	data, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(RepositoryRecoveryDirectory), receiptID+".json"))
+	receiptPath, err := RecoveryReceiptPath(receiptID)
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(receiptPath.String())))
 	if err != nil {
 		return nil
 	}

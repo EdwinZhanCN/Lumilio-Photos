@@ -14,6 +14,7 @@ import (
 	"server/internal/catalog/repo"
 	"server/internal/storage"
 	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 )
 
@@ -81,7 +82,7 @@ func TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop(t *testing.T)
 	if snapshot := coordinator.Snapshot(); snapshot.Acknowledgements != 0 || snapshot.Failures != 1 {
 		t.Fatalf("failed commit emitted an acknowledgement: %+v", snapshot)
 	}
-	privatePath, err := storage.ParsePrivateRepositoryPath(published.Path)
+	privatePath, err := layout.Parse(published.Path)
 	if err != nil {
 		t.Fatal(err)
 	}

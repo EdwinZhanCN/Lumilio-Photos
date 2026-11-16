@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"path"
 	"sort"
@@ -14,29 +15,33 @@ import (
 
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 
 	"github.com/google/uuid"
 )
 
 type UploadSession struct {
-	SessionID         string         `json:"session_id"`
-	Filename          string         `json:"filename"`
-	TotalSize         int64          `json:"total_size"`
-	TotalChunks       int            `json:"total_chunks"`
-	ReceivedChunks    []int          `json:"received_chunks"`
-	ContentType       string         `json:"content_type"`
-	ClientFingerprint string         `json:"client_fingerprint"`
-	RepositoryID      string         `json:"repository_id"`
-	UserID            string         `json:"user_id"`
-	Status            string         `json:"status"`
-	CreatedAt         time.Time      `json:"created_at"`
-	LastActivity      time.Time      `json:"last_activity"`
-	BytesReceived     int64          `json:"bytes_received"`
-	Error             string         `json:"error,omitempty"`
-	ReceiptID         *string        `json:"receipt_id,omitempty"`
-	ChunkFiles        map[int]string `json:"chunk_files,omitempty"` // private repository-relative paths
-	ChunkSizes        map[int]int64  `json:"chunk_sizes,omitempty"`
+	SessionID         string        `json:"session_id"`
+	Filename          string        `json:"filename"`
+	TotalSize         int64         `json:"total_size"`
+	TotalChunks       int           `json:"total_chunks"`
+	ReceivedChunks    []int         `json:"received_chunks"`
+	ContentType       string        `json:"content_type"`
+	ClientFingerprint string        `json:"client_fingerprint"`
+	RepositoryID      string        `json:"repository_id"`
+	UserID            string        `json:"user_id"`
+	Status            string        `json:"status"`
+	CreatedAt         time.Time     `json:"created_at"`
+	LastActivity      time.Time     `json:"last_activity"`
+	BytesReceived     int64         `json:"bytes_received"`
+	Error             string        `json:"error,omitempty"`
+	ReceiptID         *string       `json:"receipt_id,omitempty"`
+	ChunkSizes        map[int]int64 `json:"chunk_sizes,omitempty"`
 }
+
+// The session's manifest and chunks live in its upload session directory,
+// work/uploads/<session_id>/; layout derives every name, so the manifest
+// stores no path.
 
 type SessionManager struct {
 	sessions map[string]*UploadSession
@@ -67,7 +72,7 @@ func (sm *SessionManager) CreateSession(sessionID, filename string, totalSize in
 		SessionID: sessionID, Filename: portableFilename(filename), TotalSize: totalSize, TotalChunks: totalChunks,
 		ReceivedChunks: []int{}, ContentType: contentType, RepositoryID: repositoryID, UserID: userID,
 		Status: "pending", CreatedAt: now, LastActivity: now,
-		ChunkFiles: make(map[int]string), ChunkSizes: make(map[int]int64),
+		ChunkSizes: make(map[int]int64),
 	}
 	sm.sessions[sessionID] = session
 	_ = sm.persistSession(session)
@@ -81,10 +86,7 @@ func (sm *SessionManager) GetSession(sessionID string) (*UploadSession, bool) {
 	return cloneSession(session), ok
 }
 
-func (sm *SessionManager) UpdateSessionChunk(sessionID string, chunkIndex int, chunkSize int64, privatePath string) bool {
-	if _, err := storage.ParsePrivateRepositoryPath(privatePath); err != nil {
-		return false
-	}
+func (sm *SessionManager) UpdateSessionChunk(sessionID string, chunkIndex int, chunkSize int64) bool {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	session, ok := sm.sessions[sessionID]
@@ -99,7 +101,6 @@ func (sm *SessionManager) UpdateSessionChunk(sessionID string, chunkIndex int, c
 	session.ReceivedChunks = append(session.ReceivedChunks, chunkIndex)
 	sort.Ints(session.ReceivedChunks)
 	session.BytesReceived += chunkSize
-	session.ChunkFiles[chunkIndex] = privatePath
 	session.ChunkSizes[chunkIndex] = chunkSize
 	session.LastActivity = time.Now().UTC()
 	if session.Status == "pending" {
@@ -136,7 +137,11 @@ func (sm *SessionManager) SetSessionReceiptID(sessionID, receiptID string) bool 
 	return sm.mutate(sessionID, func(session *UploadSession) { session.ReceiptID = &receiptID })
 }
 
-func (sm *SessionManager) DeleteSession(sessionID string) bool {
+// EndSession ends a session that completed or failed: it forgets the
+// session and removes its manifest, and its directory once nothing else is
+// in it. A staged file still awaiting commit keeps the directory until the
+// commit moves it out; a failed session was already moved to quarantine.
+func (sm *SessionManager) EndSession(sessionID string) bool {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	session, ok := sm.sessions[sessionID]
@@ -175,13 +180,40 @@ func (sm *SessionManager) CleanupExpiredSessions() int {
 	now := time.Now().UTC()
 	removed := 0
 	for id, session := range sm.sessions {
-		if session.Status != "completed" && now.Sub(session.LastActivity) > sm.timeout {
-			_ = sm.removeManifest(session.RepositoryID, id)
+		if now.Sub(session.LastActivity) > sm.timeout {
+			_ = sm.removeSessionDirectory(session.RepositoryID, id)
 			delete(sm.sessions, id)
 			removed++
 		}
 	}
 	return removed
+}
+
+// SweepStaging removes the repository's upload sessions idle for longer
+// than maxAge that nothing will finish: no live session owns them and no
+// pending staging commit still needs their file.
+func (sm *SessionManager) SweepStaging(ctx context.Context, staging storage.StagingManager, repository repo.Repository, maxAge time.Duration) error {
+	if sm.queries == nil {
+		return errors.New("upload session persistence unavailable")
+	}
+	keep := map[uuid.UUID]bool{}
+	for _, session := range sm.GetAllSessions() {
+		if id, err := uuid.Parse(session.SessionID); err == nil {
+			keep[id] = true
+		}
+	}
+	pending, err := sm.queries.ListPendingRepositoryStagingPaths(ctx, repository.RepoID)
+	if err != nil {
+		return fmt.Errorf("list pending staging commits: %w", err)
+	}
+	for _, stored := range pending {
+		if staged, err := layout.ParseStaged(stored); err == nil {
+			if id, ok := layout.StagedSession(staged); ok {
+				keep[id] = true
+			}
+		}
+	}
+	return staging.CleanupStaging(repository, maxAge, func(id uuid.UUID) bool { return keep[id] })
 }
 
 func (sm *SessionManager) GetSessionProgress(sessionID string) (float64, bool) {
@@ -213,11 +245,7 @@ func cloneSession(session *UploadSession) *UploadSession {
 	}
 	clone := *session
 	clone.ReceivedChunks = append([]int(nil), session.ReceivedChunks...)
-	clone.ChunkFiles = make(map[int]string, len(session.ChunkFiles))
 	clone.ChunkSizes = make(map[int]int64, len(session.ChunkSizes))
-	for index, value := range session.ChunkFiles {
-		clone.ChunkFiles[index] = value
-	}
 	for index, value := range session.ChunkSizes {
 		clone.ChunkSizes[index] = value
 	}
@@ -228,11 +256,21 @@ func portableFilename(filename string) string {
 	return path.Base(strings.ReplaceAll(filename, "\\", "/"))
 }
 
-func sessionManifestPath(sessionID string) (storage.RepositoryPath, error) {
-	if _, err := uuid.Parse(sessionID); err != nil {
-		return storage.RepositoryPath{}, err
+func sessionManifestPath(sessionID string) (layout.Path, error) {
+	id, err := uuid.Parse(sessionID)
+	if err != nil {
+		return layout.Path{}, err
 	}
-	return storage.ParsePrivateRepositoryPath(path.Join(storage.DefaultStructure.IncomingDir, "upload_sessions", sessionID+".json"))
+	return layout.UploadManifest(id)
+}
+
+// SessionChunks lists the chunks a session received.
+func SessionChunks(session *UploadSession) []ChunkInfo {
+	chunks := make([]ChunkInfo, 0, len(session.ReceivedChunks))
+	for _, index := range session.ReceivedChunks {
+		chunks = append(chunks, ChunkInfo{SessionID: session.SessionID, ChunkIndex: index, Size: session.ChunkSizes[index]})
+	}
+	return chunks
 }
 
 func (sm *SessionManager) openRepository(repositoryID string) (*storage.RepositoryFS, error) {
@@ -267,7 +305,10 @@ func (sm *SessionManager) persistSession(session *UploadSession) error {
 		return err
 	}
 	defer repositoryFS.Close()
-	directory, _ := storage.ParsePrivateRepositoryPath(path.Dir(manifest.String()))
+	directory, err := manifest.Dir()
+	if err != nil {
+		return err
+	}
 	if err := repositoryFS.MkdirAllPrivate(directory, 0o700); err != nil {
 		return err
 	}
@@ -299,17 +340,18 @@ func (sm *SessionManager) loadSession(repositoryID, sessionID string) (*UploadSe
 	if session.RepositoryID != repositoryID {
 		return nil, errors.New("upload session repository mismatch")
 	}
-	if session.ChunkFiles == nil {
-		session.ChunkFiles = make(map[int]string)
-	}
 	if session.ChunkSizes == nil {
 		session.ChunkSizes = make(map[int]int64)
 	}
 	valid := session.ReceivedChunks[:0]
 	var bytesReceived int64
+	id, err := uuid.Parse(sessionID)
+	if err != nil {
+		return nil, err
+	}
 	for _, index := range session.ReceivedChunks {
-		privatePath, parseErr := storage.ParsePrivateRepositoryPath(session.ChunkFiles[index])
-		if parseErr != nil {
+		privatePath, chunkErr := layout.UploadChunk(id, index)
+		if chunkErr != nil {
 			continue
 		}
 		info, statErr := repositoryFS.StatPrivate(privatePath)
@@ -338,5 +380,29 @@ func (sm *SessionManager) removeManifest(repositoryID, sessionID string) error {
 	if err := repositoryFS.RemovePrivate(manifest); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
+	if directory, err := manifest.Dir(); err == nil {
+		_ = repositoryFS.RemovePrivate(directory) // only once it is empty
+	}
 	return nil
+}
+
+// removeSessionDirectory ends an expired session: its whole directory goes.
+func (sm *SessionManager) removeSessionDirectory(repositoryID, sessionID string) error {
+	if sm.queries == nil || sm.files == nil {
+		return nil
+	}
+	id, err := uuid.Parse(sessionID)
+	if err != nil {
+		return err
+	}
+	directory, err := layout.UploadSession(id)
+	if err != nil {
+		return err
+	}
+	repositoryFS, err := sm.openRepository(repositoryID)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
+	return repositoryFS.RemoveAllPrivate(directory)
 }

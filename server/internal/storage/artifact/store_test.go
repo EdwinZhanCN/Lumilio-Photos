@@ -14,6 +14,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 )
 
@@ -47,7 +48,7 @@ func TestPublishAdoptsFirstCompleteArtifactForIdentity(t *testing.T) {
 	if first != second {
 		t.Fatalf("adopted artifact = %+v, want %+v", second, first)
 	}
-	privatePath, err := storage.ParsePrivateRepositoryPath(first.Path)
+	privatePath, err := layout.Parse(first.Path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestRemoveOrphansHonorsReferencesAndGrace(t *testing.T) {
 		t.Fatalf("removed = %d, want 1", removed)
 	}
 	for path, exists := range map[string]bool{old.Path: false, kept.Path: true, recent.Path: true} {
-		privatePath, _ := storage.ParsePrivateRepositoryPath(path)
+		privatePath, _ := layout.Parse(path)
 		_, err := files.StatPrivate(privatePath)
 		if exists && err != nil {
 			t.Errorf("kept path %s: %v", path, err)

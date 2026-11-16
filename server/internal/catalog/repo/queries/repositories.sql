@@ -204,22 +204,11 @@ RETURNING *;
 DELETE FROM repositories
 WHERE repo_id = ?1;
 
--- name: DeleteRepositories :exec
-DELETE FROM repositories
-WHERE repo_id IN (sqlc.slice('repo_ids'));
-
 -- name: RepositoryExists :one
 SELECT EXISTS(
     SELECT 1 FROM repositories
     WHERE path = ?1
 );
-
--- name: CountRepositories :one
-SELECT COUNT(*) FROM repositories;
-
--- name: CountRepositoriesByReachability :one
-SELECT COUNT(*) FROM repositories
-WHERE reachability = ?1;
 
 -- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories

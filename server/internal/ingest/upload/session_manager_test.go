@@ -12,6 +12,7 @@ import (
 	"server/internal/catalog/dbtypes"
 	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/layout"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
@@ -72,19 +73,19 @@ func newPersistentSessionFixture(t *testing.T) (*catalog.DB, repo.Repository, *s
 	return catalog, repository, files, storage.NewStagingManager(files)
 }
 
-func TestSessionManagerTracksPrivateChunks(t *testing.T) {
+func TestSessionManagerTracksChunks(t *testing.T) {
 	manager := NewSessionManager(time.Hour, nil, nil)
 	sessionID := uuid.NewString()
 	manager.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", uuid.NewString(), "user")
-	if !manager.UpdateSessionChunk(sessionID, 0, 5, ".lumilio/staging/incoming/chunk-0") {
-		t.Fatal("failed to record private chunk")
-	}
-	if manager.UpdateSessionChunk(sessionID, 1, 5, "/tmp/chunk-1") {
-		t.Fatal("accepted absolute chunk path")
+	if !manager.UpdateSessionChunk(sessionID, 0, 5) || !manager.UpdateSessionChunk(sessionID, 0, 5) {
+		t.Fatal("failed to record chunk")
 	}
 	session, ok := manager.GetSession(sessionID)
 	if !ok || len(session.ReceivedChunks) != 1 || session.BytesReceived != 5 {
 		t.Fatalf("unexpected session: %#v", session)
+	}
+	if chunks := SessionChunks(session); len(chunks) != 1 || chunks[0].ChunkIndex != 0 || chunks[0].Size != 5 {
+		t.Fatalf("chunks = %#v", chunks)
 	}
 }
 
@@ -100,9 +101,10 @@ func TestSessionManagerProgressAndExpiry(t *testing.T) {
 	}
 }
 
-func TestSessionManagerRestoresOnlyExistingPrivateChunks(t *testing.T) {
+func TestSessionManagerRestoresOnlyExistingChunks(t *testing.T) {
 	catalog, repository, files, staging := newPersistentSessionFixture(t)
-	chunk, opened, err := staging.CreateStagingFile(repository, "chunk-0")
+	sessionID := uuid.New()
+	chunk, opened, err := staging.CreateSessionChunk(repository, sessionID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,16 +115,15 @@ func TestSessionManagerRestoresOnlyExistingPrivateChunks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sessionID := uuid.NewString()
 	first := NewSessionManager(time.Hour, catalog.Queries, files)
-	first.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
-	if !first.UpdateSessionChunk(sessionID, 0, 5, chunk.PrivatePath) {
+	first.CreateSession(sessionID.String(), "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
+	if !first.UpdateSessionChunk(sessionID.String(), 0, 5) {
 		t.Fatal("persist chunk")
 	}
 
 	restarted := NewSessionManager(time.Hour, catalog.Queries, files)
-	restored := restarted.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
-	if len(restored.ReceivedChunks) != 1 || restored.ReceivedChunks[0] != 0 || restored.BytesReceived != 5 || restored.ChunkFiles[0] != chunk.PrivatePath {
+	restored := restarted.CreateSession(sessionID.String(), "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
+	if len(restored.ReceivedChunks) != 1 || restored.ReceivedChunks[0] != 0 || restored.BytesReceived != 5 {
 		t.Fatalf("restored session = %#v", restored)
 	}
 
@@ -130,8 +131,63 @@ func TestSessionManagerRestoresOnlyExistingPrivateChunks(t *testing.T) {
 		t.Fatal(err)
 	}
 	restarted = NewSessionManager(time.Hour, catalog.Queries, files)
-	restored = restarted.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
+	restored = restarted.CreateSession(sessionID.String(), "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
 	if len(restored.ReceivedChunks) != 0 || restored.BytesReceived != 0 {
 		t.Fatalf("missing chunk was restored: %#v", restored)
+	}
+}
+
+// A session's directory lives exactly as long as the session: ending it
+// removes the manifest and the emptied directory, and expiry removes the
+// directory with whatever chunks it still holds.
+func TestSessionDirectoryEndsWithTheSession(t *testing.T) {
+	catalog, repository, files, staging := newPersistentSessionFixture(t)
+	directoryOf := func(id uuid.UUID) string {
+		directory, err := layout.UploadSession(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return filepath.Join(repository.Path, filepath.FromSlash(directory.String()))
+	}
+	stageChunk := func(manager *SessionManager, id uuid.UUID) *storage.StagingFile {
+		chunk, opened, err := staging.CreateSessionChunk(repository, id, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := opened.WriteString("chunk"); err != nil {
+			t.Fatal(err)
+		}
+		if err := opened.Close(); err != nil {
+			t.Fatal(err)
+		}
+		manager.CreateSession(id.String(), "photo.jpg", 5, 1, "image/jpeg", repository.RepoID.String(), "user")
+		if !manager.UpdateSessionChunk(id.String(), 0, 5) {
+			t.Fatal("persist chunk")
+		}
+		return chunk
+	}
+
+	ended := uuid.New()
+	manager := NewSessionManager(time.Hour, catalog.Queries, files)
+	chunk := stageChunk(manager, ended)
+	if err := staging.RemoveStagingFile(repository, chunk); err != nil {
+		t.Fatal(err)
+	}
+	if !manager.EndSession(ended.String()) {
+		t.Fatal("end session")
+	}
+	if _, err := os.Lstat(directoryOf(ended)); !os.IsNotExist(err) {
+		t.Fatalf("ended session directory remains: %v", err)
+	}
+
+	expired := uuid.New()
+	expiring := NewSessionManager(time.Nanosecond, catalog.Queries, files)
+	stageChunk(expiring, expired)
+	time.Sleep(time.Millisecond)
+	if removed := expiring.CleanupExpiredSessions(); removed != 1 {
+		t.Fatalf("removed = %d", removed)
+	}
+	if _, err := os.Lstat(directoryOf(expired)); !os.IsNotExist(err) {
+		t.Fatalf("expired session directory remains: %v", err)
 	}
 }

@@ -28,7 +28,7 @@ flowchart TB
     n_media -->|"3"| n_foundation
     n_runtime -->|"5"| n_http
     n_service -->|"1"| n_agent
-    n_service -->|"2"| n_storage
+    n_service -->|"3"| n_storage
     n_storage -->|"3"| n_domain
     n_work -->|"2"| n_catalog
     linkStyle 2 stroke:#d9480f,stroke-width:1.5px
@@ -72,14 +72,14 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `http` → `ingest`: 2 package import(s), declared
 - `http` → `media`: 4 package import(s), declared
 - `http` → `service`: 2 package import(s), declared
-- `http` → `storage`: 8 package import(s), declared
+- `http` → `storage`: 9 package import(s), declared
 - `http` → `work`: 3 package import(s), declared
 - `ingest` → `catalog`: 8 package import(s), declared
 - `ingest` → `domain`: 1 package import(s), declared
 - `ingest` → `foundation`: 12 package import(s), declared
 - `ingest` → `media`: 8 package import(s), declared
 - `ingest` → `service`: 2 package import(s), declared
-- `ingest` → `storage`: 9 package import(s), declared
+- `ingest` → `storage`: 13 package import(s), declared
 - `ingest` → `work`: 7 package import(s), declared
 - `media` → `foundation`: 3 package import(s), declared
 - `runtime` → `agent`: 5 package import(s), declared
@@ -90,14 +90,14 @@ The diagram hides an edge when a longer path between the same groups already imp
 - `runtime` → `ingest`: 5 package import(s), declared
 - `runtime` → `media`: 1 package import(s), declared
 - `runtime` → `service`: 1 package import(s), declared
-- `runtime` → `storage`: 9 package import(s), declared
+- `runtime` → `storage`: 10 package import(s), declared
 - `runtime` → `work`: 4 package import(s), declared
 - `service` → `agent`: 1 package import(s), declared
 - `service` → `catalog`: 4 package import(s), declared
 - `service` → `domain`: 5 package import(s), declared
 - `service` → `foundation`: 5 package import(s), declared
 - `service` → `media`: 3 package import(s), declared
-- `service` → `storage`: 2 package import(s), declared
+- `service` → `storage`: 3 package import(s), declared
 - `service` → `work`: 2 package import(s), declared
 - `storage` → `catalog`: 12 package import(s), declared
 - `storage` → `domain`: 3 package import(s), declared

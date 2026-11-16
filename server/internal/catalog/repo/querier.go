@@ -150,8 +150,6 @@ type Querier interface {
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountPrimaryRepositories(ctx context.Context) (int64, error)
-	CountRepositories(ctx context.Context) (int64, error)
-	CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) (int64, error)
 	CountRepositoryEntriesWithTrashID(ctx context.Context, trashID uuid.NullUUID) (int64, error)
 	CountRepositoryLifecycle(ctx context.Context, repositoryID uuid.UUID) (CountRepositoryLifecycleRow, error)
@@ -245,7 +243,6 @@ type Querier interface {
 	// groups are preserved so the user retains an audit trail of resolved sets.
 	DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID uuid.UUID) error
 	DeletePendingTOTPEnrollments(ctx context.Context, userID int32) error
-	DeleteRepositories(ctx context.Context, repoIds []uuid.UUID) error
 	DeleteRepository(ctx context.Context, repoID uuid.UUID) error
 	// Removes a vanished entry whose Asset is present elsewhere (a move), or an
 	// entry that never held an Asset. It never removes an Asset's last entry.
@@ -645,6 +642,7 @@ type Querier interface {
 	ListPendingHashRepositoryEntries(ctx context.Context, arg ListPendingHashRepositoryEntriesParams) ([]RepositoryEntry, error)
 	ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error)
 	ListPendingLocationProjectionScopes(ctx context.Context, limit int64) ([]ListPendingLocationProjectionScopesRow, error)
+	ListPendingRepositoryStagingPaths(ctx context.Context, repositoryID uuid.UUID) ([]string, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPersonFacesScoped(ctx context.Context, arg ListPersonFacesScopedParams) ([]ListPersonFacesScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
