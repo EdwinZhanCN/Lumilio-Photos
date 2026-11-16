@@ -10,7 +10,7 @@ plans and server-structure Phase B in front of rc.1. Q0 done 2026-10-29
 specs were flaky there, and the owner made fixing them row F1 (2026-11-15).
 F1 did not reproduce in 23 `music.spec` and 18 `music-agent.spec` runs on
 the Radxa (2026-11-16), and the owner set it aside for now; RL0 went ahead
-of it. RL0 done 2026-11-16 (#278). RL1 done 2026-11-16 (#PRNUM). Next step: **RL2**.
+of it. RL0 done 2026-11-16 (#278). RL1 done 2026-11-16 (#279). Next step: **RL2**.
 Update the row of each step in the PR that lands it.
 
 Goal: every open plan lands on `dev` in the order below, then the
@@ -89,7 +89,7 @@ the plan it names.
 | B2 | **Done 2026-11-14 (#276).** Typed catalog handles; `catalog` builds the River driver; database boundary rule 1; rule 4 ceilings recorded | [server-structure.md](server-structure.md) | B1 | New storage SQL obeys the boundary from its first line |
 | F1 | **Set aside by the owner 2026-11-16; open.** No reproduction in 23 `music.spec` and 18 `music-agent.spec` runs on the Radxa: on a fresh stack, under concurrent `@smoke` load, and while the Mac's audio device list changed. Probes ruled out a buffering stall (the whole track was buffered every time) and a slow refine (0.4–0.9 s). Lead: the Playwright browser on the Mac plays through the real audio device, which CI runners do not have. Music E2E flakes from the section-B2 run, both on the first Radxa stack, both passing on retry and clean on a fresh stack: (1) `web/e2e/specs/music.spec.ts:136` (`@smoke`, slice `browser`): after the SPA link back to `/music` the `<audio>` `src` is kept but `currentTime` stays exactly at the pre-navigation position (0.02322 s) for the whole 5 s poll, which is the stalled-playback symptom of [postmortem 0003](../../../.agents/postmortems/0003-web-media-url-switched-representation.md); (2) `web/e2e/specs/music-agent.spec.ts:135` (`@agent-runtime`): after Refine, the second "Music selection" region does not render within 5 s. Find each cause before touching a timeout: a product race is fixed in the product with a failing-first test, and a test that waits on the wrong signal waits on the right one. Evidence: both slices run repeatedly on the Radxa (`--repeat-each`) with no flaky result | — | B2 | A section-end failure is fixed before the next section starts; owner decision 2026-11-15: fixed before rc.1 |
 | RL0 | **Done 2026-11-16 (#278).** Layout Phase 0: session-leak test, single-owner rule (Atlas `calls`/`constructs`, report mode), private-path inventory | [repository-layout.md](repository-layout.md) | F1 | Locks the failures first |
-| RL1 | **Done 2026-11-16 (#PRNUM).** Layout Phase 1: the `storage/layout` package | [repository-layout.md](repository-layout.md) | RL0 | |
+| RL1 | **Done 2026-11-16 (#279).** Layout Phase 1: the `storage/layout` package | [repository-layout.md](repository-layout.md) | RL0 | |
 | RL2 | Layout Phase 2: every caller moved; single-owner rule fails on violations | [repository-layout.md](repository-layout.md) | RL1 | |
 | RL3 | Layout Phase 3: catalog stores artifact identities; face crops published as artifacts; rebuild `.local/dev` | [repository-layout.md](repository-layout.md) | RL2 | RA3 and SC need `cache/artifacts/` and `user/` |
 | RL4 | Layout Phases 4–5: policies (rotation, cleaner, `work/` sweep, validation) and docs | [repository-layout.md](repository-layout.md) | RL3 | Two small phases, one PR |
