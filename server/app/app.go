@@ -660,6 +660,11 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize private recovery: %w", err)
 	}
+	// Before anything writes to a repository again: repair missing layout
+	// directories and quarantine what the last run left in work/.
+	if err := privateRecovery.PrepareRepositories(ctx); err != nil {
+		appLogger.Warn("some repositories wait for the next start to be prepared", zap.Error(err))
+	}
 	go runTrashMaintenanceLoop(ctx, assetTrash, privateRecovery,
 		time.Duration(appConfig.RepositoryTrash.RetentionDays)*24*time.Hour, appLogger.Named("trash"))
 	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {

@@ -15,6 +15,12 @@
 // review or export. Reconciliation is idempotent; a retry after a crash
 // finishes the step it was in without moving anything twice.
 //
+// [Service.PrepareRepositories] runs once at startup, before anything writes
+// to a Repository: it recreates missing layout directories and moves every
+// file in work/ that nothing can still finish under a "startup" receipt. An
+// upload session that a pending staging commit names, or whose manifest lets
+// the browser resume it, stays.
+//
 // [Service.Inventory] is the recovery inventory the Storage page shows: the
 // receipts, every listed item with its current disposition and presence, and
 // the held Trash counts. [Service.OpenItem] exports an item's bytes and

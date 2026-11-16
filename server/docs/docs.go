@@ -9498,7 +9498,8 @@ const docTemplate = `{
                         "enum": [
                             "open",
                             "register_copy",
-                            "adopt"
+                            "adopt",
+                            "startup"
                         ],
                         "example": "open",
                         "type": "string"

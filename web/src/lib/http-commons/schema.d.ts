@@ -18625,7 +18625,7 @@ export interface components {
              * @example open
              * @enum {string}
              */
-            event?: "open" | "register_copy" | "adopt";
+            event?: "open" | "register_copy" | "adopt" | "startup";
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
             /** @example 0 */

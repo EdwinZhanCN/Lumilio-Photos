@@ -73,7 +73,7 @@
       "go:queue.SchedulerWake": "94316fdd1837e84d",
       "go:queue.assetMacroWorker.work": "ee151db46e97780a",
       "go:server/app.pipelineRuntime.analyze": "4d9d8ddb6b0ee596",
-      "go:server/app.run": "69861d385b77ffd1",
+      "go:server/app.run": "ab5d44f9a4e66e8a",
       "go:server/internal/storage.RepositoryFS": "33ecd8a928f607fa"
     },
     "bootstrap": {
@@ -273,7 +273,7 @@
       "server/internal/api/handler": 18029,
       "server/internal/catalog/repo": 31342,
       "server/internal/service": 19926,
-      "server/internal/storage": 14378
+      "server/internal/storage": 14369
     }
   }
 }

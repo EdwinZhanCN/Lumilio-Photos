@@ -56,7 +56,7 @@ Uploads and cloud imports finish in `inbox/`, but a completed original remains a
 
 Lumilio never reorganizes originals during a scan. Every exact copy may remain as a Location of the same owner/content Asset. Files that are still being written, inaccessible directories, offline volumes, cursor gaps, notification overflow, cancellation, and incomplete coverage make an operation partial; none is evidence that an original was deleted. Only an error-free, caught-up enumeration of the parent directory can close a missing Location, and that closure never removes the file from disk.
 
-`.lumilio/` is the only application-private subtree inside a repository. Do not move files into it or edit its staging and derived files. `.lumiliorepo` is the repository identity marker; every other ordinary directory, including `inbox/`, is part of the user-visible media tree.
+`.lumilio/` is the only application-private subtree inside a repository. Do not move files into it or edit its staging and derived files; [Repository layout](./repository-layout) lists what each folder holds, what is safe to delete, and what to back up. `.lumiliorepo` is the repository identity marker; every other ordinary directory, including `inbox/`, is part of the user-visible media tree.
 
 The primary repository is the exception: first-run setup creates it in the non-removable default Storage Location. Regular repositories can use any registered, active Storage Location.
 

@@ -8,7 +8,7 @@ operation with `ErrRepositoryBusy`; it no longer wedges the Repository. This
 plan lands before the rc.1 tag, under the "fix what is found" contract in
 [rc-release.md](rc-release.md), as steps RA0–RA4 of
 [rc1-sequence.md](rc1-sequence.md). Phase 3 publishes face crops through
-the [repository layout](repository-layout.md)'s `cache/artifacts/`, so it starts after
+the [repository layout](../../../.agents/decisions/2026-10-28-repository-private-layout.md)'s `cache/artifacts/`, so it starts after
 that plan's Phase 3.
 
 Goal: an ordinary media handle never waits for a Repository. It is either

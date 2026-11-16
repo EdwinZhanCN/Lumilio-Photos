@@ -96,17 +96,6 @@ func (c *RepositoryAccessCoordinator) AcquireRootRead(id uuid.UUID) func() {
 	return release
 }
 
-func (c *RepositoryAccessCoordinator) AcquireRootReadContext(ctx context.Context, id uuid.UUID) (func(), error) {
-	lock := c.storageLocationLockFor(id)
-	if lock == nil {
-		return func() {}, nil
-	}
-	if ctx == nil {
-		return nil, errors.New("context is required")
-	}
-	return lock.acquire(ctx, repositoryAccessRead)
-}
-
 // AcquireStorageLocationMutationContext takes the root barrier without waiting past the
 // caller's deadline. It returns context.Canceled/DeadlineExceeded as
 // resource-busy evidence rather than changing paths while leases are active.
