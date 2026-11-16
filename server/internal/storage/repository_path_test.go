@@ -66,7 +66,7 @@ func TestParsePrivateRepositoryPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !privatePath.isPrivate() {
+	if !privatePath.IsPrivate() {
 		t.Fatal("private path did not retain its namespace")
 	}
 	if _, err := ParsePrivateRepositoryPath("inbox/upload.jpg"); !errors.Is(err, ErrRepositoryPathNamespace) {

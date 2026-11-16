@@ -118,7 +118,7 @@ func TestWatcherTurnsAnEventFloodIntoAFullScan(t *testing.T) {
 func TestWatcherIgnoresLumilioPrivateFiles(t *testing.T) {
 	h := newWatchHarness(t, WatchConfig{Delay: 20 * time.Millisecond}, 0)
 	<-h.started
-	h.send(".lumilio/staging/upload.tmp", ".lumiliorepo")
+	h.send(".lumilio/work/tmp/x", ".lumiliorepo", ".lumiliorepo.lock", ".lumilio-tmp-probe-1")
 	time.Sleep(100 * time.Millisecond)
 	h.mu.Lock()
 	defer h.mu.Unlock()
