@@ -30,6 +30,6 @@ code-evidence:
 5. 随机验证照片、RAW、视频和 sidecar 可读。
 6. 保存文件数量、总大小和校验结果。
 
-资源库 `.lumilio/assets` 多数可重建，但 sidecar、暂存失败证据和资源库日志具有恢复或诊断价值。除非备份窗口和容量策略明确，不要默认排除整个 `.lumilio/`。
+资源库 `.lumilio/cache/` 可以重建，`.lumilio/work/` 只保存进行中的写入，两者都可以排除；但 `user/`（Studio 编辑和 sidecar）、`trash/`、`quarantine/`（等待决定的失败上传和恢复内容）和资源库日志具有恢复或诊断价值。不要默认排除整个 `.lumilio/`，详见[资源库存储目录](../reference/storage-layout)。
 
 对于网络或云对象备份，应确认大小写、Unicode、原子重命名和隐藏文件行为不会改变资源库身份文件。

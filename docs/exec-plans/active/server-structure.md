@@ -102,7 +102,7 @@ they are.
   2026-10-19).** Every session of this plan lands before `v26.1.0-rc.1` is
   tagged, under the fix-before-release rule in [rc-release.md](rc-release.md).
   The order of Phase B relative to the open storage plans
-  ([repository-layout.md](repository-layout.md),
+  ([repository layout decision](../../../.agents/decisions/2026-10-28-repository-private-layout.md),
   [repository-access-simplification.md](repository-access-simplification.md),
   [portable-asset-sidecars.md](portable-asset-sidecars.md)) is fixed in
   [rc1-sequence.md](rc1-sequence.md), because import-path churn conflicts

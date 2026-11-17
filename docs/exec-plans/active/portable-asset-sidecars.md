@@ -4,7 +4,7 @@ Status: active, created 2026-10-28. Nothing has landed. The owner decided the
 format, the location, and the first-phase scope on 2026-10-28 (see
 Decisions). It runs as steps SC0–SC4 of
 [rc1-sequence.md](rc1-sequence.md). These come after the
-[repository layout](repository-layout.md) plan, which creates the
+[repository layout](../../../.agents/decisions/2026-10-28-repository-private-layout.md) plan, which creates the
 `user/assets/` class and the only path constructors, and after the
 [repository access](repository-access-simplification.md) plan, whose
 fail-fast handles the drain uses. It lands before the
@@ -71,7 +71,7 @@ not a second source of truth.
 
 - **Format and location (owner):** Lumilio JSON in a path mirror under
   `.lumilio/user/assets/`, the `user` class of
-  [repository layout](repository-layout.md). Rejected alternatives:
+  [repository layout](../../../.agents/decisions/2026-10-28-repository-private-layout.md). Rejected alternatives:
   - *Standard XMP next to the original.* It writes into the user's folders
     and collides with other software's sidecars (Lightroom writes
     `IMG.xmp`, darktable writes `IMG.jpg.xmp`). It needs Lightroom-style

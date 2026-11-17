@@ -19,7 +19,7 @@ code-evidence:
 
 # 磁盘空间不足或性能下降
 
-空间增长不只来自原件。检查以下位置：资源库 `inbox/` 和普通媒体、`.lumilio/assets` 派生文件、`.lumilio/staging` 失败或未完成暂存、应用私有 `backups`、云会话，以及 Lumen 模型缓存。
+空间增长不只来自原件。检查以下位置：资源库 `inbox/` 和普通媒体、`.lumilio/cache` 派生文件、`.lumilio/work` 未完成的上传、`.lumilio/quarantine` 失败的上传和恢复内容、应用私有 `backups`、云会话，以及 Lumen 模型缓存。
 
 ## 空间不足
 

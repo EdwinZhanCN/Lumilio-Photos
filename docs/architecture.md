@@ -125,7 +125,7 @@ invariant with no enforcement.
   `/api/v1/storage/candidates`.
 - The SQLite catalog, cloud sessions, secrets, logs, and database backups are
   app-private state and must be configured outside `storage.path`. Repository
-  staging remains inside its repository under `.lumilio/staging`.
+  staging remains inside its repository under `.lumilio/work/uploads/`.
 - Registered repository I/O is rooted by `internal/storage.RepositoryFS` and
   serialized against repository relocation and removal. Assets own logical
   owner/content identity, not paths; `repository_entries` binds files to

@@ -143,7 +143,7 @@ type SetupPrimaryRepositoryRequestDTO struct {
 // inventory items.
 type RepositoryRecoveryReceiptDTO struct {
 	ID                 string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Event              string    `json:"event" example:"open" enums:"open,register_copy,adopt"`
+	Event              string    `json:"event" example:"open" enums:"open,register_copy,adopt,startup"`
 	RecordedAt         time.Time `json:"recorded_at"`
 	Actor              string    `json:"actor,omitempty" example:"web:user:1"`
 	SourceRepositoryID string    `json:"source_repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`

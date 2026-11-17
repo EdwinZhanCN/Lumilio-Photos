@@ -4,15 +4,15 @@ description: "理解 `.lumiliorepo`、`inbox/`、`.lumilio/` 和 date、flat、c
 page_id: "admin/repository-layout"
 audience: "管理员、高级用户"
 platform: "Desktop、Server"
-baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-06"
+baseline_commit: "c2fd359863d31d0f533dd38eddeecb6a997c3416"
+last_verified: "2026-11-16"
 verification_status: "verified"
 ---
 
 <!--
 code-evidence:
 - server/internal/storage/repocfg/repo_config.go
-- server/internal/storage/directory_manager.go
+- server/internal/storage/layout/classes.go
 - server/internal/storage/repo_provisioning.go
 - server/internal/ingest/sourcing/materializer.go
 -->
@@ -28,7 +28,7 @@ repository/
 └── .lumilio/
 ```
 
-`.lumiliorepo` 保存资源库 UUID、名称、创建时间、存储策略和本地同名处理。`inbox/` 是通过流明集提交新媒体的受管理区域；`.lumilio/` 保存派生文件、sidecar、暂存、回收相关基础设施和资源库日志。
+`.lumiliorepo` 保存资源库 UUID、名称、创建时间、存储策略和本地同名处理。`inbox/` 是通过流明集提交新媒体的受管理区域；`.lumilio/` 按类别保存人工创作的内容、回收站、可重建的缓存、进行中的工作、隔离内容和资源库日志，详见[资源库存储目录](../reference/storage-layout)。
 
 ## 布局策略
 

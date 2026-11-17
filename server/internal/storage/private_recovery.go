@@ -71,6 +71,8 @@ const (
 	RecoveryEventOpen         RecoveryEvent = "open"
 	RecoveryEventRegisterCopy RecoveryEvent = "register_copy"
 	RecoveryEventAdopt        RecoveryEvent = "adopt"
+	// RecoveryEventStartup quarantines what an earlier run left in work/.
+	RecoveryEventStartup RecoveryEvent = "startup"
 )
 
 // RecoveryDisposition is what became of one recorded item.
@@ -194,7 +196,7 @@ func (r RecoveryReceipt) validate() error {
 		return fmt.Errorf("%w: receipt_id is not a UUID", ErrRecoveryReceiptFormat)
 	}
 	switch r.Event {
-	case RecoveryEventOpen, RecoveryEventRegisterCopy, RecoveryEventAdopt:
+	case RecoveryEventOpen, RecoveryEventRegisterCopy, RecoveryEventAdopt, RecoveryEventStartup:
 	default:
 		return fmt.Errorf("%w: unknown event %q", ErrRecoveryReceiptFormat, r.Event)
 	}
@@ -232,9 +234,9 @@ func RecoveryReceiptDirectory(receiptID string) (layout.Path, error) {
 	return layout.RecoveryReceiptDir(id)
 }
 
-// recoveryItemID derives a stable item identity from the receipt and the
+// RecoveryItemID derives a stable item identity from the receipt and the
 // path the receipt recorded, so a retry or a second catalog names the same item.
-func recoveryItemID(receiptID, itemPath string) string {
+func RecoveryItemID(receiptID, itemPath string) string {
 	return uuid.NewSHA1(uuid.NameSpaceURL, []byte("lumilio-recovery-item/"+receiptID+"/"+itemPath)).String()
 }
 
@@ -423,7 +425,7 @@ func planPrivatePreservation(repositoryPath string, event RecoveryEvent, actor, 
 			receipt.ItemsTruncated++
 			return
 		}
-		item.ItemID = recoveryItemID(receiptID, item.Path)
+		item.ItemID = RecoveryItemID(receiptID, item.Path)
 		receipt.Items = append(receipt.Items, item)
 	}
 	walkErr := fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, err error) error {

@@ -89,7 +89,7 @@ The HTTP handler's only durable effect is one catalog transaction that records t
 
 ## Failed uploads
 
-A part cut off mid-transfer is dropped; the browser still holds the file and resends it. A session whose chunks cannot be assembled moves whole to .lumilio/quarantine/uploads/ for a human decision and is never cleaned automatically. A session in work/ that no live upload owns and no pending staging commit names is removed once it has been idle for an hour.
+A part cut off mid-transfer is dropped; the browser still holds the file and resends it. A session whose chunks cannot be assembled moves whole to .lumilio/quarantine/uploads/ for a human decision and is never cleaned automatically. A session in work/ that no live upload owns and no pending staging commit names is removed once it has been idle for an hour. At startup, before uploads resume, anything in work/ that no pending commit names and no manifest can resume moves under a startup receipt in .lumilio/quarantine/recovery/.
 
 ## Identity
 
