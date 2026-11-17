@@ -10,7 +10,7 @@ plans and server-structure Phase B in front of rc.1. Q0 done 2026-10-29
 specs were flaky there, and the owner made fixing them row F1 (2026-11-15).
 F1 did not reproduce in 23 `music.spec` and 18 `music-agent.spec` runs on
 the Radxa (2026-11-16), and the owner set it aside for now; RL0 went ahead
-of it. RL0 done 2026-11-16 (#278). RL1 done 2026-11-16 (#279). RL2 done 2026-11-16 (#280). RL3 done 2026-11-16 (#281). RL4 done 2026-11-16 (#PR) and completed the
+of it. RL0 done 2026-11-16 (#278). RL1 done 2026-11-16 (#279). RL2 done 2026-11-16 (#280). RL3 done 2026-11-16 (#281). RL4 done 2026-11-16 (#282) and completed the
 repository layout plan. Section-RL4 full run done 2026-11-16 on the Radxa
 (Server gate, Docker E2E slices, and Desktop tests). Next step: **RA0**.
 Update the row of each step in the PR that lands it.
@@ -94,7 +94,7 @@ the plan it names.
 | RL1 | **Done 2026-11-16 (#279).** Layout Phase 1: the `storage/layout` package | [decision record](../../../.agents/decisions/2026-10-28-repository-private-layout.md) | RL0 | |
 | RL2 | **Done 2026-11-16 (#280).** Layout Phase 2: every caller moved; single-owner rule fails on violations | [decision record](../../../.agents/decisions/2026-10-28-repository-private-layout.md) | RL1 | |
 | RL3 | **Done 2026-11-16 (#281).** Layout Phase 3: catalog stores artifact identities; face crops published as artifacts; rebuild `.local/dev` | [decision record](../../../.agents/decisions/2026-10-28-repository-private-layout.md) | RL2 | RA3 and SC need `cache/artifacts/` and `user/` |
-| RL4 | **Done 2026-11-16 (#PR).** Layout Phases 4–5: policies (rotation, cleaner, `work/` sweep, validation) and docs | [decision record](../../../.agents/decisions/2026-10-28-repository-private-layout.md) | RL3 | Two small phases, one PR |
+| RL4 | **Done 2026-11-16 (#282).** Layout Phases 4–5: policies (rotation, cleaner, `work/` sweep, validation) and docs | [decision record](../../../.agents/decisions/2026-10-28-repository-private-layout.md) | RL3 | Two small phases, one PR |
 | RA0 | Access Phase 0: a failing test per audited path, plus the stress test | [repository-access-simplification.md](repository-access-simplification.md) | RL4 | The mitigation still ships until here |
 | RA1 | Access Phase 1: lock order in `architecture.md`; context-free acquisition removed; Atlas rule against unbounded waits | [repository-access-simplification.md](repository-access-simplification.md) | RA0 | |
 | RA2 | Access Phase 2: busy maps to retry; fail-fast handles; maintenance barrier | [repository-access-simplification.md](repository-access-simplification.md) | RA1 | SC's drain is written against fail-fast handles |

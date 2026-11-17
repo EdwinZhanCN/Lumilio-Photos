@@ -1,7 +1,7 @@
 # Decision: One class per directory under `.lumilio/`, owned by one package
 
 Status: implemented — owner froze the layout 2026-10-28; landed in RL0–RL4
-(#278, #279, #280, #281, and the RL4 PR) of the
+(#278, #279, #280, #281, #282) of the
 [rc.1 sequence](../../docs/exec-plans/active/rc1-sequence.md).
 
 ## Problem
