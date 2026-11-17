@@ -14,12 +14,12 @@ import (
 	"github.com/riverqueue/river"
 
 	"server/config"
-	"server/internal/commit"
-	"server/internal/db"
-	"server/internal/db/catalogtx"
-	"server/internal/pipeline"
-	"server/internal/queue"
-	"server/internal/queue/jobs"
+	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/queue"
+	"server/internal/work/jobs"
+	"server/internal/work/pipeline"
 )
 
 func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *testing.T) {
@@ -32,12 +32,12 @@ func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *
 		Path:      filepath.Join(root, "catalog.sqlite3"),
 		QueuePath: filepath.Join(root, "river.sqlite3"),
 	}
-	catalog, err := db.Open(ctx, configuration)
+	catalog, err := catalog.Open(ctx, configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
-	if err := catalog.MigrateCatalog(ctx); err != nil {
+	if err := catalog.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,9 +103,9 @@ func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *
 	}
 }
 
-func openRecoveryQueue(t *testing.T, ctx context.Context, configuration config.DatabaseConfig) *db.QueueDB {
+func openRecoveryQueue(t *testing.T, ctx context.Context, configuration config.DatabaseConfig) *catalog.QueueDB {
 	t.Helper()
-	queueDatabase, err := db.OpenQueue(ctx, configuration)
+	queueDatabase, err := catalog.OpenQueue(ctx, configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,13 +116,12 @@ func openRecoveryQueue(t *testing.T, ctx context.Context, configuration config.D
 	return queueDatabase
 }
 
-func newRecoveryQueueClient(t *testing.T, queueDatabase *db.QueueDB) *river.Client[*sql.Tx] {
+func newRecoveryQueueClient(t *testing.T, queueDatabase *catalog.QueueDB) *river.Client[*sql.Tx] {
 	t.Helper()
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &queue.IngestMacroWorker{})
 	client, err := queue.New(
-		queueDatabase.SQL,
-		queueDatabase.ReaderSQL,
+		queueDatabase.RiverDriver(),
 		workers,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		8,

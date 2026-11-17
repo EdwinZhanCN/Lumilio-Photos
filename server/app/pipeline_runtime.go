@@ -7,7 +7,6 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -16,125 +15,85 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 
-	"server/internal/commit"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
 	"server/internal/event"
-	"server/internal/execution"
-	"server/internal/processors"
-	"server/internal/queue"
-	"server/internal/queue/jobs"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/processors"
+	"server/internal/ingest/queue"
 	"server/internal/search/bleveocr"
 	"server/internal/service"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
-	"server/internal/storage/roe/materializer"
-	"server/internal/workqos"
+	"server/internal/storage/recovery"
+	"server/internal/storage/scan"
+	"server/internal/work/execution"
+	"server/internal/work/jobs"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 )
 
-type repositoryScanReader interface {
-	GetRepositoryObservationState(context.Context, uuid.UUID) (repo.RepositoryObservationState, error)
-	GetRepositoryScanRun(context.Context, repo.GetRepositoryScanRunParams) (repo.RepositoryScanRun, error)
-	ListRepositoryMaterializationCandidates(context.Context, repo.ListRepositoryMaterializationCandidatesParams) ([]repo.ListRepositoryMaterializationCandidatesRow, error)
-}
+// scanDeliveryBudget bounds the work one scan macro performs before it
+// snoozes, so a repository cannot hold a macro worker indefinitely.
+const scanDeliveryBudget = 2 * time.Second
 
-// runRepositoryScanBatch advances one durable ROE turn and materializes the
-// bounded hash candidates derived from catalog observations. The active run
-// and requested epoch are read from catalog state, so a stale or duplicated
-// macro is a successful no-op and never needs River state to decide whether
-// work exists.
+// runRepositoryScanBatch advances one repository's scan index. The walk goes
+// first: bounded walk turns run back to back until the walk is done or the
+// delivery budget is spent. Only when no walk is due does the delivery hash
+// pending entries, so a first import is indexed before its Assets start
+// competing for the writer with downstream processing. Scan and entry rows
+// are the durable state, so a stale or duplicated macro is a harmless no-op
+// and River state never decides whether work exists.
 func runRepositoryScanBatch(
 	ctx context.Context,
-	controller *roecontroller.Controller,
-	hasher *materializer.HashPreparer,
-	reader repositoryScanReader,
+	scanner *scan.Scanner,
 	engine *execution.Engine,
 	demand execution.DemandCatalog,
-	commits *commit.Coordinator,
-	qos workqos.Class,
+	qos qos.Class,
 	args jobs.ScanRepositoryBatchArgs,
 ) (bool, error) {
-	if controller == nil || hasher == nil || reader == nil || engine == nil || commits == nil {
+	if scanner == nil || engine == nil {
 		return false, errors.New("repository scan runtime is not configured")
 	}
-	state, err := reader.GetRepositoryObservationState(ctx, args.RepositoryID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("load repository observation state: %w", err)
-	}
-	if !state.ActiveRunID.Valid {
-		return false, nil
-	}
-	run, err := reader.GetRepositoryScanRun(ctx, repo.GetRepositoryScanRunParams{
-		RepositoryID: args.RepositoryID,
-		RunID:        state.ActiveRunID.UUID,
-	})
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("load active repository observation run: %w", err)
-	}
-	if !repositoryScanCommandCurrent(state, run, args) {
-		return false, nil
-	}
-	var turn roecontroller.TurnResult
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return false, err
 	}
-	err = engine.Run(ctx, class, demand.Demand(execution.StepScanRepositoryTurn, execution.MediaUnknown), func(stepCtx context.Context) error {
-		var stepErr error
-		turn, stepErr = controller.RunTurn(stepCtx, args.RepositoryID, run.RunID)
-		return stepErr
-	})
-	if err != nil {
-		return false, err
-	}
-	more := turn.HasMore
-	candidates, err := reader.ListRepositoryMaterializationCandidates(ctx, repo.ListRepositoryMaterializationCandidatesParams{
-		RepositoryID: args.RepositoryID,
-		Limit:        32,
-	})
-	if err != nil {
-		return false, fmt.Errorf("list repository hash candidates: %w", err)
-	}
-	for _, candidate := range candidates {
-		err := engine.Run(ctx, class, demand.Demand(execution.StepScanRepositoryHash, execution.MediaUnknown), func(stepCtx context.Context) error {
-			prepared, prepareErr := hasher.PrepareHash(stepCtx, candidate.NodeID, candidate.ObservationRevision)
-			if prepareErr != nil || prepared == nil {
-				return prepareErr
-			}
-			_, submitErr := commits.ApplyRepositoryHash(stepCtx, commit.RepositoryHashApplied{Prepared: *prepared})
-			return submitErr
+	started := time.Now()
+	for time.Since(started) < scanDeliveryBudget {
+		var turn scan.TurnResult
+		err = engine.Run(ctx, class, demand.Demand(execution.StepScanRepositoryTurn, execution.MediaUnknown), func(stepCtx context.Context) error {
+			var stepErr error
+			turn, stepErr = scanner.RunTurn(stepCtx, args.RepositoryID)
+			return stepErr
 		})
 		if err != nil {
 			return false, err
 		}
+		// A settle follow-up that is not due yet is not work; the scheduler
+		// derives a new macro once it is.
+		if !turn.HasMore || !turn.NotBefore.IsZero() {
+			break
+		}
 	}
-	more = more || len(candidates) == 32
-	if !more {
-		err = engine.Run(ctx, class, demand.Demand(execution.StepScanRepositoryEpoch, execution.MediaUnknown), func(stepCtx context.Context) error {
-			_, submitErr := commits.ApplyRepositoryEpoch(stepCtx, commit.RepositoryEpochApplied{RepositoryID: args.RepositoryID, RequestedEpoch: args.RequestedEpoch})
-			return submitErr
+	if time.Since(started) >= scanDeliveryBudget {
+		return true, nil
+	}
+	for time.Since(started) < scanDeliveryBudget {
+		var hashed scan.HashResult
+		err = engine.Run(ctx, class, demand.Demand(execution.StepScanRepositoryHash, execution.MediaUnknown), func(stepCtx context.Context) error {
+			var stepErr error
+			hashed, stepErr = scanner.HashTurn(stepCtx, args.RepositoryID, 32)
+			return stepErr
 		})
 		if err != nil {
 			return false, err
 		}
+		if !hashed.HasMore {
+			return false, nil
+		}
 	}
-	return more, nil
-}
-
-func repositoryScanCommandCurrent(state repo.RepositoryObservationState, run repo.RepositoryScanRun, args jobs.ScanRepositoryBatchArgs) bool {
-	requested := int64(args.RequestedEpoch)
-	return state.ActiveRunID.Valid &&
-		state.ActiveRunID.UUID == run.RunID &&
-		state.DesiredEpoch >= requested &&
-		state.AppliedEpoch < requested &&
-		run.RequestedEpoch == requested
+	return true, nil
 }
 
 // runAssetEnrichment keeps all optional enrichment work behind the one
@@ -150,7 +109,7 @@ func runAssetEnrichment(
 	repositoryFiles *storage.RepositoryFSFactory,
 	engine *execution.Engine,
 	demand execution.DemandCatalog,
-	qos workqos.Class,
+	qos qos.Class,
 	args jobs.EnrichAssetArgs,
 ) (queue.EnrichmentResult, error) {
 	if reader == nil || repositoryFiles == nil || engine == nil {
@@ -210,13 +169,14 @@ type ocrProjectionPreparer interface {
 // object and manages lifecycle only; River workers validate delivery payloads
 // while every bounded compute/commit step declares its own resource vector.
 type pipelineRuntime struct {
+	logger             *zap.Logger
+	pipelineReader     pipeline.Queryer
 	engine             *execution.Engine
 	demand             execution.DemandCatalog
 	commits            *commit.Coordinator
 	processor          *processors.AssetProcessor
-	repository         *roecontroller.Controller
-	repositoryHasher   *materializer.HashPreparer
-	repositoryReader   repositoryScanReader
+	scanner            *scan.Scanner
+	recovery           *recovery.Service
 	eventProjection    eventProjectionPreparer
 	locationProjection locationProjectionPreparer
 	ocrProjection      ocrProjectionPreparer
@@ -230,16 +190,16 @@ type pipelineRuntime struct {
 
 func (runtime *pipelineRuntime) register(workers *river.Workers) error {
 	if runtime == nil || workers == nil || runtime.engine == nil || runtime.commits == nil || runtime.processor == nil ||
-		runtime.repository == nil || runtime.repositoryHasher == nil || runtime.repositoryReader == nil ||
+		runtime.scanner == nil ||
 		runtime.eventProjection == nil || runtime.locationProjection == nil || runtime.ocrProjection == nil ||
-		runtime.reindexProjection == nil || runtime.enrichmentReader == nil || runtime.files == nil {
+		runtime.pipelineReader == nil || runtime.reindexProjection == nil || runtime.enrichmentReader == nil || runtime.files == nil {
 		return errors.New("pipeline runtime is not configured")
 	}
 	river.AddWorker[jobs.IngestAssetArgs](workers, &queue.IngestMacroWorker{Execute: runtime.ingest})
-	river.AddWorker[jobs.AnalyzeAssetArgs](workers, queue.NewAnalyzeAssetWorker(runtime.analyze))
-	river.AddWorker[jobs.GenerateAssetDerivativesArgs](workers, queue.NewGenerateAssetDerivativesWorker(runtime.derivatives))
-	river.AddWorker[jobs.TranscodeMediaArgs](workers, queue.NewTranscodeMediaWorker(runtime.transcode))
-	river.AddWorker[jobs.EnrichAssetArgs](workers, &queue.EnrichAssetWorker{Execute: runtime.enrich})
+	river.AddWorker[jobs.AnalyzeAssetArgs](workers, queue.NewAnalyzeAssetWorker(guardAssetExecution(runtime, runtime.analyze)))
+	river.AddWorker[jobs.GenerateAssetDerivativesArgs](workers, queue.NewGenerateAssetDerivativesWorker(guardAssetExecution(runtime, runtime.derivatives)))
+	river.AddWorker[jobs.TranscodeMediaArgs](workers, queue.NewTranscodeMediaWorker(guardAssetExecution(runtime, runtime.transcode)))
+	river.AddWorker[jobs.EnrichAssetArgs](workers, &queue.EnrichAssetWorker{Execute: guardAssetExecution(runtime, runtime.enrich)})
 	river.AddWorker[jobs.ScanRepositoryBatchArgs](workers, &queue.ScanRepositoryBatchWorker{Execute: runtime.scanRepository})
 	river.AddWorker[jobs.RebuildProjectionBatchArgs](workers, &queue.RebuildProjectionBatchWorker{Execute: runtime.rebuildProjection})
 	return nil
@@ -249,7 +209,7 @@ func (runtime *pipelineRuntime) registerBackup(workers *river.Workers, execute f
 	if runtime == nil || workers == nil || runtime.engine == nil || runtime.commits == nil || execute == nil {
 		return errors.New("backup pipeline runtime is not configured")
 	}
-	river.AddWorker[jobs.BackupCatalogArgs](workers, &queue.BackupCatalogWorker{Execute: func(ctx context.Context, qos workqos.Class, args jobs.BackupCatalogArgs) error {
+	river.AddWorker[jobs.BackupCatalogArgs](workers, &queue.BackupCatalogWorker{Execute: func(ctx context.Context, qos qos.Class, args jobs.BackupCatalogArgs) error {
 		class, err := execution.ClassFromQoS(qos)
 		if err != nil {
 			return err
@@ -265,7 +225,7 @@ func (runtime *pipelineRuntime) registerBackup(workers *river.Workers, execute f
 	return nil
 }
 
-func (runtime *pipelineRuntime) ingest(ctx context.Context, qos workqos.Class, args jobs.IngestAssetArgs) error {
+func (runtime *pipelineRuntime) ingest(ctx context.Context, qos qos.Class, args jobs.IngestAssetArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -279,7 +239,7 @@ func (runtime *pipelineRuntime) ingest(ctx context.Context, qos workqos.Class, a
 	})
 }
 
-func (runtime *pipelineRuntime) analyze(ctx context.Context, qos workqos.Class, args jobs.AnalyzeAssetArgs) error {
+func (runtime *pipelineRuntime) analyze(ctx context.Context, qos qos.Class, args jobs.AnalyzeAssetArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -312,7 +272,7 @@ func (runtime *pipelineRuntime) analyze(ctx context.Context, qos workqos.Class, 
 	})
 }
 
-func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Class, args jobs.GenerateAssetDerivativesArgs) error {
+func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos qos.Class, args jobs.GenerateAssetDerivativesArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -346,7 +306,7 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Cla
 	}); err != nil {
 		return err
 	}
-	if mType == execution.MediaVideo {
+	if mType == execution.MediaVideo || mType == execution.MediaAudio {
 		if err := runtime.engine.Run(ctx, class, runtime.demand.Demand(execution.StepDerivativesComputeScale, mType), func(stepCtx context.Context) error {
 			return runtime.processor.ComputeThumbnailScale(stepCtx, work)
 		}); err != nil {
@@ -371,7 +331,7 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Cla
 		for _, artifact := range result.Artifacts {
 			artifacts = append(artifacts, commit.ThumbnailArtifact{
 				RepositoryID: artifact.RepositoryID, Size: artifact.Size,
-				StoragePath: artifact.StoragePath, MimeType: artifact.MimeType,
+				Artifact: artifact.Artifact, MimeType: artifact.MimeType,
 			})
 		}
 		if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
@@ -384,7 +344,7 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Cla
 	})
 }
 
-func (runtime *pipelineRuntime) transcode(ctx context.Context, qos workqos.Class, args jobs.TranscodeMediaArgs) error {
+func (runtime *pipelineRuntime) transcode(ctx context.Context, qos qos.Class, args jobs.TranscodeMediaArgs) error {
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
@@ -427,7 +387,7 @@ func (runtime *pipelineRuntime) transcode(ctx context.Context, qos workqos.Class
 	})
 }
 
-func (runtime *pipelineRuntime) enrich(ctx context.Context, qos workqos.Class, args jobs.EnrichAssetArgs) error {
+func (runtime *pipelineRuntime) enrich(ctx context.Context, qos qos.Class, args jobs.EnrichAssetArgs) error {
 	result, err := runAssetEnrichment(
 		ctx,
 		runtime.processor,
@@ -476,21 +436,21 @@ func (runtime *pipelineRuntime) enrich(ctx context.Context, qos workqos.Class, a
 	})
 }
 
-func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos workqos.Class, args jobs.ScanRepositoryBatchArgs) (bool, error) {
-	return runRepositoryScanBatch(
-		ctx,
-		runtime.repository,
-		runtime.repositoryHasher,
-		runtime.repositoryReader,
-		runtime.engine,
-		runtime.demand,
-		runtime.commits,
-		qos,
-		args,
-	)
+func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos qos.Class, args jobs.ScanRepositoryBatchArgs) (bool, error) {
+	more, err := runRepositoryScanBatch(ctx, runtime.scanner, runtime.engine, runtime.demand, qos, args)
+	if err != nil || more || runtime.recovery == nil {
+		return more, err
+	}
+	// The walk is done and nothing is left to hash: content is proven, so
+	// the private recovery of this repository can decide its Studio records
+	// and adopt any inherited Trash now rather than on the hourly pass.
+	if _, reconcileErr := runtime.recovery.Reconcile(ctx, args.RepositoryID); reconcileErr != nil && ctx.Err() == nil {
+		runtime.logger.Warn("private recovery after scan", zap.String("repository_id", args.RepositoryID.String()), zap.Error(reconcileErr))
+	}
+	return false, nil
 }
 
-func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, qos workqos.Class, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {
+func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, qos qos.Class, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {
 	var result queue.ProjectionExecution
 	class, err := execution.ClassFromQoS(qos)
 	if err != nil {

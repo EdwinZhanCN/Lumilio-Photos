@@ -17,8 +17,10 @@ type MediaToolPaths struct {
 	FFprobe  string
 }
 
-// ResolveBundledResourcesDir resolves the runtime resource root next to the
-// Desktop executable. LUMILIO_RESOURCES_DIR is only a host-side development
+// ResolveBundledResourcesDir resolves the runtime resource root of the
+// packaged app: Contents/Resources in a macOS bundle, and the executable's
+// own directory on Windows, which is where the packager installs the
+// project's resources. LUMILIO_RESOURCES_DIR is only a host-side development
 // override; standalone Server configuration never searches for this directory.
 func ResolveBundledResourcesDir() (string, error) {
 	if override := os.Getenv("LUMILIO_RESOURCES_DIR"); override != "" {
@@ -40,7 +42,7 @@ func bundledResourcesDir(executable, goos string) string {
 		return ""
 	}
 	if goos == "windows" {
-		return filepath.Join(filepath.Dir(executable), "resources")
+		return filepath.Dir(executable)
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(executable), "..", "Resources"))
 }

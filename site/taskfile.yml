@@ -28,6 +28,21 @@ tasks:
     cmds:
       - vp run dev
 
+  atlas:
+    desc: Serve the internal Atlas page (use the root `task atlas`, which writes its data first)
+    env:
+      LUMILIO_ATLAS: '1'
+    cmds:
+      - vp exec vitepress dev docs --strictPort --open /atlas/
+
+  build:atlas:
+    desc: Compile the internal Atlas variant (no deploy) so its Vue code cannot rot unseen
+    env:
+      LUMILIO_ATLAS: '1'
+    cmds:
+      - vp exec vitepress build docs --outDir ../.local/atlas/build
+      - rm -rf ../.local/atlas/build
+
   build:
     desc: Build the documentation site
     cmds:

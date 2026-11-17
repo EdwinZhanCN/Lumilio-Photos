@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/httporigin/policy.go
+- server/internal/api/httporigin/policy.go
 - server/config
 - deploy/compose/caddy.compose.yml
 - deploy/compose/acme.compose.yml

@@ -8,16 +8,19 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/media/hash"
+	"server/internal/storage/layout"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
-	"server/internal/utils/hash"
 
 	"github.com/google/uuid"
 )
@@ -56,18 +59,18 @@ func TestRepositoryFSWalkIncludesInboxAndProtectsPrivateTree(t *testing.T) {
 	writeRepositoryFSTestFile(t, repository.Path, ".hidden/secret.png", []byte("hidden"))
 	writeRepositoryFSTestFile(t, repository.Path, ".lumilio/assets/private.jpg", []byte("private"))
 	writeRepositoryFSTestFile(t, repository.Path, "notes.txt", []byte("unsupported"))
+	// Reserved root names are skipped, not reported as invalid media paths.
+	writeRepositoryFSTestFile(t, repository.Path, ".lumiliorepo.lock", nil)
+	writeRepositoryFSTestFile(t, repository.Path, ".lumilio-tmp-probe-1.jpg", []byte("probe"))
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{ScanID: uuid.New()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !summary.Authoritative {
-		t.Fatalf("walk unexpectedly partial: %s", summary.PartialReason)
+	observations, issues := listAllUserMedia(t, repositoryFS)
+	if len(issues) != 0 {
+		t.Fatalf("walk reported issues: %+v", issues)
 	}
 	paths := make(map[string]bool)
-	for _, observation := range summary.Observations {
-		paths[observation.Path.String()] = true
+	for path := range observations {
+		paths[path] = true
 	}
 	for _, want := range []string{"inbox/2026/08/upload.jpg", "Trips/photo.jpg", ".hidden/secret.png"} {
 		if !paths[want] {
@@ -97,56 +100,34 @@ func TestRepositoryFSWalkStopsAtNestedRepositoryBoundary(t *testing.T) {
 	writeRepositoryFSTestFile(t, repository.Path, "nested/must-not-scan.jpg", []byte("nested"))
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{ScanID: uuid.New()})
-	if err != nil {
-		t.Fatal(err)
+	observations, issues := listAllUserMedia(t, repositoryFS)
+	if len(issues) != 1 || !errors.Is(issues[0].Err, ErrNestedRepository) {
+		t.Fatalf("issues = %#v, want one nested-repository boundary", issues)
 	}
-	if summary.Authoritative || !errors.Is(summary.Issues[0].Err, ErrNestedRepository) {
-		t.Fatalf("summary = %#v, want nested-repository topology failure", summary)
-	}
-	for _, observation := range summary.Observations {
-		if observation.Path.String() == "nested/must-not-scan.jpg" {
-			t.Fatal("walk crossed nested .lumiliorepo boundary")
-		}
+	if _, ok := observations["nested/must-not-scan.jpg"]; ok {
+		t.Fatal("walk crossed nested .lumiliorepo boundary")
 	}
 }
 
-func TestRepositoryFSReadDirectoryResumesInBoundedPages(t *testing.T) {
+func TestRepositoryFSListsAWholeDirectoryInNameOrder(t *testing.T) {
 	t.Parallel()
 
 	repository := createRepositoryFSTestRoot(t)
-	for _, name := range []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg", "f.jpg", "g.jpg"} {
+	for _, name := range []string{"g.jpg", "b.jpg", "e.jpg", "a.jpg", "d.jpg", "c.jpg", "f.jpg"} {
 		writeRepositoryFSTestFile(t, repository.Path, filepath.Join("wide", name), []byte(name))
 	}
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	offset := int64(0)
-	observed := make(map[string]bool)
-	for turns := 0; ; turns++ {
-		if turns > 8 {
-			t.Fatal("bounded directory reader did not reach EOF")
-		}
-		batch, err := repositoryFS.ReadUserMediaDirectory(context.Background(), DirectoryReadOptions{
-			Directory: "wide", Offset: offset, Limit: 2, ScanID: uuid.New(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(batch.Entries) > 2 {
-			t.Fatalf("batch entries = %d, want at most 2", len(batch.Entries))
-		}
-		for _, entry := range batch.Entries {
-			observed[entry.Observation.Path.String()] = true
-		}
-		if batch.Done {
-			break
-		}
-		if batch.NextOffset <= offset {
-			t.Fatalf("offset did not advance: %d -> %d", offset, batch.NextOffset)
-		}
-		offset = batch.NextOffset
+	listing, err := repositoryFS.ListUserMediaDirectory(context.Background(), "wide")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(observed) != 7 {
-		t.Fatalf("observed entries = %d, want 7: %#v", len(observed), observed)
+	var names []string
+	for _, observation := range listing.Files {
+		names = append(names, observation.Path.String())
+	}
+	want := []string{"wide/a.jpg", "wide/b.jpg", "wide/c.jpg", "wide/d.jpg", "wide/e.jpg", "wide/f.jpg", "wide/g.jpg"}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Fatalf("listing = %v, want %v", names, want)
 	}
 }
 
@@ -179,14 +160,7 @@ func TestRepositoryFSSymlinkPolicyAndHardLinkIdentity(t *testing.T) {
 	}
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	observations := make(map[string]FileObservation)
-	for _, observation := range summary.Observations {
-		observations[observation.Path.String()] = observation
-	}
+	observations, _ := listAllUserMedia(t, repositoryFS)
 	if observations["inside.jpg"].EntryKind != EntryKindSymlink {
 		t.Fatalf("inside symlink kind = %q", observations["inside.jpg"].EntryKind)
 	}
@@ -210,7 +184,7 @@ func TestRepositoryFSInspectHashesOpenedStableFile(t *testing.T) {
 	contents := []byte("authoritative original bytes")
 	writeRepositoryFSTestFile(t, repository.Path, "inbox/photo.jpg", contents)
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	mediaPath, err := ParseUserMediaPath("inbox/photo.jpg")
+	mediaPath, err := layout.ParseMedia("inbox/photo.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +210,7 @@ func TestRepositoryFSInspectHashesOpenedStableFile(t *testing.T) {
 	}
 }
 
-func TestRepositoryFSSettleAndLifecycleLease(t *testing.T) {
+func TestRepositoryFSHoldsTheLifecycleLeaseUntilClose(t *testing.T) {
 	t.Parallel()
 
 	repository := createRepositoryFSTestRoot(t)
@@ -246,14 +220,6 @@ func TestRepositoryFSSettleAndLifecycleLease(t *testing.T) {
 	repositoryFS, err := factory.Open(repository)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{Settle: time.Hour})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(summary.Observations) != 0 || len(summary.DeferredPaths) != 1 {
-		t.Fatalf("settle observations=%d deferred=%d", len(summary.Observations), len(summary.DeferredPaths))
 	}
 
 	acquired := make(chan struct{})
@@ -289,7 +255,7 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	if err := os.Chmod(catalogDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,23 +266,28 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 
 	stale := createRepositoryFSTestRoot(t)
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	rootMarker := rootcfg.New("test root")
-	rootMarker.ID = rootID.String()
+	rootMarker.ID = storageLocationID.String()
 	if err := rootMarker.Save(filepath.Dir(stale.Path)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "test root", Path: filepath.Dir(stale.Path),
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	if _, err := catalog.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "test root", Path: filepath.Dir(stale.Path),
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
+		t.Fatal(err)
+	}
+	rule, err := pathsemantics.Probe(filepath.Dir(stale.Path))
+	if err != nil {
 		t.Fatal(err)
 	}
 	stale, err = catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: stale.RepoID, Name: "relocated", Path: stale.Path, Config: stale.Config,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive,
-		Activity: dbtypes.RepositoryActivityIdle, CreatedAt: now, UpdatedAt: now, RootID: rootID,
+		Activity: dbtypes.RepositoryActivityIdle, CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID,
+		PathCase: rule.Case, PathNormalization: rule.Normalization,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -330,7 +301,7 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	coordinator := NewRepositoryAccessCoordinator()
 	release := coordinator.AcquireMutation(stale.RepoID)
 	if _, err := catalog.Queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID: stale.RepoID, Path: newPath, RootID: rootID,
+		RepoID: stale.RepoID, Path: newPath, StorageLocationID: storageLocationID,
 		Reachability: dbtypes.RepositoryReachabilityActive, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}); err != nil {
 		release()
@@ -355,11 +326,11 @@ func TestRepositoryFSImmutablePrivateWriteNeverReplacesExistingContent(t *testin
 
 	repository := createRepositoryFSTestRoot(t)
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	destination, err := ParsePrivateRepositoryPath(".lumilio/assets/thumbnails/v1/asset_small.webp")
+	destination, err := layout.Parse(".lumilio/assets/thumbnails/v1/asset_small.webp")
 	if err != nil {
 		t.Fatal(err)
 	}
-	directory, err := ParsePrivateRepositoryPath(path.Dir(destination.String()))
+	directory, err := layout.Parse(path.Dir(destination.String()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,11 +395,36 @@ func writeRepositoryFSTestFile(t *testing.T, repositoryPath, relative string, co
 	}
 }
 
-func mustUserMediaPath(t *testing.T, value string) RepositoryPath {
+func mustUserMediaPath(t *testing.T, value string) layout.Path {
 	t.Helper()
-	parsed, err := ParseUserMediaPath(value)
+	parsed, err := layout.ParseMedia(value)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return parsed
+}
+
+// listAllUserMedia walks a repository the way the scan index does, one whole
+// directory listing at a time, and returns every observation by path.
+func listAllUserMedia(t *testing.T, repositoryFS *RepositoryFS) (map[string]FileObservation, []WalkIssue) {
+	t.Helper()
+	observations := make(map[string]FileObservation)
+	var issues []WalkIssue
+	pending := []string{""}
+	for len(pending) > 0 {
+		directory := pending[0]
+		pending = pending[1:]
+		listing, err := repositoryFS.ListUserMediaDirectory(context.Background(), directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issues = append(issues, listing.Issues...)
+		for _, observation := range listing.Files {
+			observations[observation.Path.String()] = observation
+		}
+		for _, observation := range listing.Directories {
+			pending = append(pending, observation.Path.String())
+		}
+	}
+	return observations, issues
 }

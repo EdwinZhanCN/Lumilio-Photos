@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
 /** Theme tone for an icon card, mapped to pure daisyUI tokens. */
@@ -82,14 +83,23 @@ function PhotoBody({
   title: string;
   subtitle?: string;
 }) {
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setLoadFailed(false);
+  }, [src]);
+
+  const showImage = Boolean(src) && !loadFailed;
+
   return (
     <div className="relative aspect-square overflow-hidden rounded-[1.75rem] bg-base-200 transition duration-300">
-      {src ? (
+      {showImage ? (
         <img
-          src={src}
+          src={src!}
           alt={title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           loading="lazy"
+          onError={() => setLoadFailed(true)}
         />
       ) : (
         <div className="flex h-full items-center justify-center bg-gradient-to-br from-base-200 via-base-300/70 to-base-200">

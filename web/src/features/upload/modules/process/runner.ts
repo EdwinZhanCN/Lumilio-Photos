@@ -85,11 +85,13 @@ export const runUploadProcess = async (
       }
     });
 
-    const durationSeconds = Math.max((performance.now() - startTime) / 1000, Number.EPSILON);
-    const sizeInMegabytes = totalBytesHashed / (1024 * 1024);
-    console.log(
-      `[Hash Metrics] Processed ${fileArray.length} files (${sizeInMegabytes.toFixed(2)} MB) in ${durationSeconds.toFixed(2)}s. Average speed: ${(sizeInMegabytes / durationSeconds).toFixed(2)} MB/s`,
-    );
+    if (import.meta.env.DEV) {
+      const durationSeconds = Math.max((performance.now() - startTime) / 1000, Number.EPSILON);
+      const sizeInMegabytes = totalBytesHashed / (1024 * 1024);
+      console.debug(
+        `[Hash Metrics] Processed ${fileArray.length} files (${sizeInMegabytes.toFixed(2)} MB) in ${durationSeconds.toFixed(2)}s. Average speed: ${(sizeInMegabytes / durationSeconds).toFixed(2)} MB/s`,
+      );
+    }
 
     if (smallFileBuffer.length > 0) {
       uploadTasks.push(transport.uploadBatch([...smallFileBuffer]));

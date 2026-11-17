@@ -8,38 +8,48 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
 )
 
 // StagingManager is the private-workspace owner for upload and cloud ingest.
-// Staging handles contain no host path and remain valid across repository
-// relocation because every operation reopens the current catalog location.
+// Every staged file belongs to one upload session directory,
+// work/uploads/<session>/, which also holds a chunked session's manifest and
+// chunks. Ending the session removes that one directory; a failed session
+// moves whole to quarantine/uploads/<session>/. Staging handles contain no
+// host path and remain valid across repository relocation because every
+// operation reopens the current catalog location.
 type StagingManager interface {
+	// CreateStagingFile stages a file in a fresh session of its own.
 	CreateStagingFile(repository repo.Repository, filename string) (*StagingFile, *RepositoryFile, error)
+	// CreateSessionFile stages the file of an upload session.
+	CreateSessionFile(repository repo.Repository, sessionID uuid.UUID, filename string) (*StagingFile, *RepositoryFile, error)
+	// CreateSessionChunk stores one chunk of a chunked upload session.
+	CreateSessionChunk(repository repo.Repository, sessionID uuid.UUID, index int) (*StagingFile, *RepositoryFile, error)
 	OpenStagingFile(repository repo.Repository, stagingFile *StagingFile) (*RepositoryFile, error)
 	RemoveStagingFile(repository repo.Repository, stagingFile *StagingFile) error
 	CommitStagingFile(repository repo.Repository, stagingFile *StagingFile, finalPath string) error
 	CommitStagingFileToInbox(repository repo.Repository, stagingFile *StagingFile, contentHash string) (string, error)
 	ResolveInboxPath(repository repo.Repository, originalFilename, contentHash string) (string, error)
+	// MoveStagingToFailed quarantines the file's whole session and points
+	// the handle at the quarantined file.
 	MoveStagingToFailed(repository repo.Repository, stagingFile *StagingFile) error
-	CleanupStaging(repository repo.Repository, maxAge time.Duration) error
+	// QuarantineSession moves a whole upload session to quarantine.
+	QuarantineSession(repository repo.Repository, sessionID uuid.UUID) error
+	// CleanupStaging removes upload sessions idle for longer than maxAge
+	// unless keep claims them. Quarantine is never cleaned automatically.
+	CleanupStaging(repository repo.Repository, maxAge time.Duration, keep func(sessionID uuid.UUID) bool) error
 }
 
 type DefaultStagingManager struct {
 	files *RepositoryFSFactory
-}
-
-// StagingQuarantine records one recoverable recovery move. Both paths are
-// repository-private paths; no host path becomes a durable payload.
-type StagingQuarantine struct {
-	Before string
-	After  string
 }
 
 func NewStagingManager(files *RepositoryFSFactory) *DefaultStagingManager {
@@ -52,10 +62,36 @@ func NewStagingManager(files *RepositoryFSFactory) *DefaultStagingManager {
 var _ StagingManager = (*DefaultStagingManager)(nil)
 
 func (sm *DefaultStagingManager) CreateStagingFile(repository repo.Repository, filename string) (*StagingFile, *RepositoryFile, error) {
-	base, err := portableBase(filename)
+	return sm.CreateSessionFile(repository, uuid.New(), filename)
+}
+
+func (sm *DefaultStagingManager) CreateSessionFile(repository repo.Repository, sessionID uuid.UUID, filename string) (*StagingFile, *RepositoryFile, error) {
+	privatePath, err := SessionFilePath(sessionID, filename)
 	if err != nil {
 		return nil, nil, err
 	}
+	return sm.createInSession(repository, sessionID, privatePath, path.Base(privatePath.String()))
+}
+
+// SessionFilePath is where an upload session stages its file under the
+// file's portable name.
+func SessionFilePath(sessionID uuid.UUID, filename string) (layout.Path, error) {
+	base, err := portableBase(filename)
+	if err != nil {
+		return layout.Path{}, err
+	}
+	return layout.UploadFile(sessionID, base)
+}
+
+func (sm *DefaultStagingManager) CreateSessionChunk(repository repo.Repository, sessionID uuid.UUID, index int) (*StagingFile, *RepositoryFile, error) {
+	privatePath, err := layout.UploadChunk(sessionID, index)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sm.createInSession(repository, sessionID, privatePath, path.Base(privatePath.String()))
+}
+
+func (sm *DefaultStagingManager) createInSession(repository repo.Repository, sessionID uuid.UUID, privatePath layout.Path, filename string) (*StagingFile, *RepositoryFile, error) {
 	repositoryFS, err := sm.files.Open(repository)
 	if err != nil {
 		return nil, nil, err
@@ -66,15 +102,12 @@ func (sm *DefaultStagingManager) CreateStagingFile(repository repo.Repository, f
 			_ = repositoryFS.Close()
 		}
 	}()
-
-	directory, _ := ParsePrivateRepositoryPath(DefaultStructure.IncomingDir)
-	if err := repositoryFS.MkdirAllPrivate(directory, 0o700); err != nil {
-		return nil, nil, fmt.Errorf("create incoming staging directory: %w", err)
-	}
-	id := uuid.NewString()
-	privatePath, err := ParsePrivateRepositoryPath(path.Join(DefaultStructure.IncomingDir, id+"_"+base))
+	directory, err := layout.UploadSession(sessionID)
 	if err != nil {
 		return nil, nil, err
+	}
+	if err := repositoryFS.MkdirAllPrivate(directory, 0o700); err != nil {
+		return nil, nil, fmt.Errorf("create upload session directory: %w", err)
 	}
 	opened, err := repositoryFS.OpenPrivateFile(privatePath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
@@ -82,10 +115,10 @@ func (sm *DefaultStagingManager) CreateStagingFile(repository repo.Repository, f
 	}
 	keepOpen = true
 	return &StagingFile{
-		ID:           id,
+		ID:           sessionID.String(),
 		RepositoryID: repository.RepoID,
 		PrivatePath:  privatePath.String(),
-		Filename:     base,
+		Filename:     filename,
 		CreatedAt:    time.Now().UTC(),
 	}, newRepositoryFile(opened, repositoryFS), nil
 }
@@ -107,8 +140,28 @@ func (sm *DefaultStagingManager) OpenStagingFile(repository repo.Repository, sta
 	return newRepositoryFile(opened, repositoryFS), nil
 }
 
+// OpenStagingSibling opens another staging file of the same repository for
+// reading through the root this file already holds. Leases are not reentrant:
+// opening it with OpenStagingFile would wait behind any lifecycle mutation
+// queued since this file was opened, and that mutation waits for this file.
+func (f *RepositoryFile) OpenStagingSibling(repository repo.Repository, stagingFile *StagingFile) (*os.File, error) {
+	repositoryPath, err := validateStagingHandle(repository, stagingFile)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.repositoryFS == nil || f.repositoryFS.RepositoryID() != repository.RepoID {
+		return nil, errors.New("staging sibling belongs to a different repository handle")
+	}
+	return f.repositoryFS.OpenPrivateFile(repositoryPath, os.O_RDONLY, 0)
+}
+
+// RemoveStagingFile removes a staged file, and its session directory once
+// nothing else is left in it. A quarantined file is kept for a decision.
 func (sm *DefaultStagingManager) RemoveStagingFile(repository repo.Repository, stagingFile *StagingFile) error {
 	repositoryPath, err := validateStagingHandle(repository, stagingFile)
+	if errors.Is(err, errStagingQuarantined) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -120,6 +173,7 @@ func (sm *DefaultStagingManager) RemoveStagingFile(repository repo.Repository, s
 	if err := repositoryFS.RemovePrivate(repositoryPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("remove staging file: %w", err)
 	}
+	removeEmptySession(repositoryFS, repositoryPath)
 	return nil
 }
 
@@ -128,7 +182,7 @@ func (sm *DefaultStagingManager) CommitStagingFile(repository repo.Repository, s
 	if err != nil {
 		return err
 	}
-	destination, err := ParseUserMediaPath(finalPath)
+	destination, err := layout.ParseMedia(finalPath)
 	if err != nil {
 		return err
 	}
@@ -138,7 +192,7 @@ func (sm *DefaultStagingManager) CommitStagingFile(repository repo.Repository, s
 	}
 	defer repositoryFS.Close()
 
-	parent, err := ParseUserMediaPath(path.Dir(destination.String()))
+	parent, err := layout.ParseMedia(path.Dir(destination.String()))
 	if err != nil {
 		return err
 	}
@@ -148,6 +202,7 @@ func (sm *DefaultStagingManager) CommitStagingFile(repository repo.Repository, s
 	if err := repositoryFS.movePrivateNoReplace(source, destination); err != nil {
 		return fmt.Errorf("commit staged file: %w", err)
 	}
+	removeEmptySession(repositoryFS, source)
 	return nil
 }
 
@@ -180,151 +235,120 @@ func (sm *DefaultStagingManager) ResolveInboxPath(repository repo.Repository, or
 
 func (sm *DefaultStagingManager) MoveStagingToFailed(repository repo.Repository, stagingFile *StagingFile) error {
 	source, err := validateStagingHandle(repository, stagingFile)
+	if errors.Is(err, errStagingQuarantined) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	repositoryFS, err := sm.files.Open(repository)
+	sessionID, _ := layout.StagedSession(source)
+	if err := sm.QuarantineSession(repository, sessionID); err != nil {
+		return err
+	}
+	quarantined, err := layout.QuarantineUploadFile(sessionID, path.Base(source.String()))
 	if err != nil {
 		return err
 	}
-	defer repositoryFS.Close()
-	failedDir, _ := ParsePrivateRepositoryPath(DefaultStructure.FailedDir)
-	if err := repositoryFS.MkdirAllPrivate(failedDir, 0o700); err != nil {
-		return err
-	}
-	ext := path.Ext(stagingFile.Filename)
-	name := strings.TrimSuffix(stagingFile.Filename, ext)
-	shortID := stagingFile.ID
-	if len(shortID) > 8 {
-		shortID = shortID[:8]
-	}
-	failed, err := ParsePrivateRepositoryPath(path.Join(DefaultStructure.FailedDir,
-		fmt.Sprintf("%s_%s_%s%s", name, time.Now().UTC().Format("20060102_150405"), shortID, ext)))
-	if err != nil {
-		return err
-	}
-	if err := repositoryFS.movePrivateNoReplace(source, failed); err != nil {
-		return fmt.Errorf("quarantine staging file: %w", err)
-	}
-	stagingFile.PrivatePath = failed.String()
+	stagingFile.PrivatePath = quarantined.String()
 	return nil
 }
 
-// QuarantineUnresolvedStaging validates the complete private staging tree
-// before it moves any file, then moves every regular file outside the existing
-// failed subtree into that explicit recoverable area. A symlink, special file,
-// nested repository error, or unavailable Repository aborts the destructive
-// startup/recovery boundary.
-func (sm *DefaultStagingManager) QuarantineUnresolvedStaging(
-	ctx context.Context,
-	repository repo.Repository,
-) ([]StagingQuarantine, error) {
-	if sm == nil || sm.files == nil {
-		return nil, errors.New("staging manager is unavailable")
-	}
-	repositoryFS, err := sm.files.OpenContext(ctx, repository)
+func (sm *DefaultStagingManager) QuarantineSession(repository repo.Repository, sessionID uuid.UUID) error {
+	session, err := layout.UploadSession(sessionID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var candidates []*StagingFile
-	walkErr := fs.WalkDir(repositoryFS.root.FS(), DefaultStructure.StagingDir, func(
-		privatePath string,
-		entry fs.DirEntry,
-		walkErr error,
-	) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			if privatePath == DefaultStructure.FailedDir {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("unresolved staging entry %q is not a regular file", privatePath)
-		}
-		parsed, err := ParsePrivateRepositoryPath(privatePath)
-		if err != nil {
-			return err
-		}
-		filename, err := portableBase(path.Base(parsed.String()))
-		if err != nil {
-			return err
-		}
-		candidates = append(candidates, &StagingFile{
-			ID: uuid.NewString(), RepositoryID: repository.RepoID,
-			PrivatePath: parsed.String(), Filename: filename, CreatedAt: info.ModTime().UTC(),
-		})
-		return nil
-	})
-	closeErr := repositoryFS.Close()
-	if errors.Is(walkErr, fs.ErrNotExist) {
-		return []StagingQuarantine{}, closeErr
+	destination, err := layout.QuarantineUpload(sessionID)
+	if err != nil {
+		return err
 	}
-	if err := errors.Join(walkErr, closeErr); err != nil {
-		return nil, fmt.Errorf("inspect unresolved staging: %w", err)
-	}
-
-	quarantined := make([]StagingQuarantine, 0, len(candidates))
-	for _, candidate := range candidates {
-		before := candidate.PrivatePath
-		if err := sm.MoveStagingToFailed(repository, candidate); err != nil {
-			return quarantined, fmt.Errorf("quarantine unresolved staging %q: %w", before, err)
-		}
-		quarantined = append(quarantined, StagingQuarantine{
-			Before: before,
-			After:  candidate.PrivatePath,
-		})
-	}
-	return quarantined, nil
-}
-
-func (sm *DefaultStagingManager) CleanupStaging(repository repo.Repository, maxAge time.Duration) error {
 	repositoryFS, err := sm.files.Open(repository)
 	if err != nil {
 		return err
 	}
 	defer repositoryFS.Close()
-	cutoff := time.Now().Add(-maxAge)
-	for _, name := range []string{DefaultStructure.IncomingDir, DefaultStructure.FailedDir} {
-		directory, _ := ParsePrivateRepositoryPath(name)
-		entries, readErr := fs.ReadDir(repositoryFS.root.FS(), name)
-		if errors.Is(readErr, fs.ErrNotExist) {
+	files, err := repositoryFS.ListPrivateFiles(context.Background(), session)
+	if err != nil {
+		return fmt.Errorf("inspect upload session: %w", err)
+	}
+	if len(files) == 0 {
+		return nil
+	}
+	if err := repositoryFS.MkdirAllPrivate(destination, 0o700); err != nil {
+		return err
+	}
+	for _, file := range files {
+		target, err := layout.QuarantineUploadFile(sessionID, path.Base(file.Path.String()))
+		if err != nil {
+			return err
+		}
+		if err := repositoryFS.movePrivateNoReplace(file.Path, target); err != nil {
+			return fmt.Errorf("quarantine upload session: %w", err)
+		}
+	}
+	return repositoryFS.RemoveAllPrivate(session)
+}
+
+func (sm *DefaultStagingManager) CleanupStaging(repository repo.Repository, maxAge time.Duration, keep func(sessionID uuid.UUID) bool) error {
+	repositoryFS, err := sm.files.Open(repository)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
+	files, err := repositoryFS.ListPrivateFiles(context.Background(), layout.UploadsDir())
+	if err != nil {
+		return fmt.Errorf("read upload sessions: %w", err)
+	}
+	// A session's age is the age of its newest file.
+	newest := map[uuid.UUID]time.Time{}
+	for _, file := range files {
+		sessionID, ok := layout.StagedSession(file.Path)
+		if !ok {
 			continue
 		}
-		if readErr != nil {
-			return fmt.Errorf("read staging directory %s: %w", name, readErr)
+		if file.ModTime.After(newest[sessionID]) {
+			newest[sessionID] = file.ModTime
 		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			info, infoErr := entry.Info()
-			if infoErr != nil || !info.ModTime().Before(cutoff) {
-				continue
-			}
-			candidate, parseErr := ParsePrivateRepositoryPath(path.Join(directory.String(), entry.Name()))
-			if parseErr == nil {
-				_ = repositoryFS.RemovePrivate(candidate)
-			}
+	}
+	cutoff := time.Now().Add(-maxAge)
+	for sessionID, modified := range newest {
+		if !modified.Before(cutoff) || keep(sessionID) {
+			continue
+		}
+		if session, err := layout.UploadSession(sessionID); err == nil {
+			_ = repositoryFS.RemoveAllPrivate(session)
 		}
 	}
 	return nil
 }
 
-func validateStagingHandle(repository repo.Repository, stagingFile *StagingFile) (RepositoryPath, error) {
+// removeEmptySession removes the session directory of a staged file once
+// nothing is left in it. A directory that still holds files stays.
+func removeEmptySession(repositoryFS *RepositoryFS, staged layout.Path) {
+	if sessionID, ok := layout.StagedSession(staged); ok {
+		if session, err := layout.UploadSession(sessionID); err == nil {
+			_ = repositoryFS.RemovePrivate(session)
+		}
+	}
+}
+
+var errStagingQuarantined = errors.New("staging file is quarantined")
+
+func validateStagingHandle(repository repo.Repository, stagingFile *StagingFile) (layout.Path, error) {
 	if stagingFile == nil {
-		return RepositoryPath{}, errors.New("staging file is nil")
+		return layout.Path{}, errors.New("staging file is nil")
 	}
 	if stagingFile.RepositoryID != repository.RepoID {
-		return RepositoryPath{}, fmt.Errorf("%w: staging=%s repository=%s", ErrRepositoryIDMismatch, stagingFile.RepositoryID, repository.RepoID)
+		return layout.Path{}, fmt.Errorf("%w: staging=%s repository=%s", ErrRepositoryIDMismatch, stagingFile.RepositoryID, repository.RepoID)
 	}
-	return ParsePrivateRepositoryPath(stagingFile.PrivatePath)
+	staged, err := layout.ParseStaged(stagingFile.PrivatePath)
+	if err != nil {
+		return layout.Path{}, err
+	}
+	if layout.Classify(staged) == layout.Quarantine {
+		return staged, errStagingQuarantined
+	}
+	return staged, nil
 }
 
 func repositoryConfig(repositoryFS *RepositoryFS) (*repocfg.RepositoryConfig, error) {
@@ -351,22 +375,22 @@ func (sm *DefaultStagingManager) resolveInboxRelativePath(repositoryFS *Reposito
 	}
 	strategy := strings.ToLower(config.StorageStrategy)
 	if strategy == "cas" && len(contentHash) >= 6 {
-		directory := path.Join(DefaultStructure.InboxDir, contentHash[0:2], contentHash[2:4], contentHash[4:6])
+		directory := path.Join(layout.Inbox, contentHash[0:2], contentHash[2:4], contentHash[4:6])
 		return path.Join(directory, contentHash+path.Ext(filename)), nil
 	}
 	if strategy == "flat" {
-		unique, err := uniqueInboxFilename(repositoryFS, DefaultStructure.InboxDir, filename, config.LocalSettings.HandleDuplicateFilenames)
-		return path.Join(DefaultStructure.InboxDir, unique), err
+		unique, err := uniqueInboxFilename(repositoryFS, layout.Inbox, filename, config.LocalSettings.HandleDuplicateFilenames)
+		return path.Join(layout.Inbox, unique), err
 	}
 	now := time.Now().UTC()
-	directory := path.Join(DefaultStructure.InboxDir, fmt.Sprintf("%d", now.Year()), fmt.Sprintf("%02d", now.Month()))
+	directory := path.Join(layout.Inbox, fmt.Sprintf("%d", now.Year()), fmt.Sprintf("%02d", now.Month()))
 	unique, err := uniqueInboxFilename(repositoryFS, directory, filename, config.LocalSettings.HandleDuplicateFilenames)
 	return path.Join(directory, unique), err
 }
 
 func uniqueInboxFilename(repositoryFS *RepositoryFS, directory, filename, mode string) (string, error) {
 	available := func(candidate string) (bool, error) {
-		repositoryPath, err := ParseUserMediaPath(path.Join(directory, candidate))
+		repositoryPath, err := layout.ParseMedia(path.Join(directory, candidate))
 		if err != nil {
 			return false, err
 		}
@@ -396,23 +420,33 @@ func uniqueInboxFilename(repositoryFS *RepositoryFS, directory, filename, mode s
 func portableBase(filename string) (string, error) {
 	base := path.Base(strings.ReplaceAll(strings.TrimSpace(filename), "\\", "/"))
 	if base == "" || base == "." || base == "/" {
-		return "", ErrRepositoryPathInvalid
+		return "", layout.ErrPathInvalid
 	}
-	if _, err := ParseUserMediaPath(path.Join(DefaultStructure.InboxDir, base)); err != nil {
+	if _, err := layout.ParseMedia(path.Join(layout.Inbox, base)); err != nil {
 		return "", err
 	}
 	return base, nil
 }
 
-func (r *RepositoryFS) movePrivateNoReplace(source, destination RepositoryPath) error {
-	if !source.isPrivate() || (!destination.isPrivate() && !destination.isUserMedia()) {
-		return ErrRepositoryPathNamespace
+// MovePrivateFile moves one file inside the private tree without replacing
+// an existing destination. The recovery service uses it to give a Studio
+// record its reassociated Asset name.
+func (r *RepositoryFS) MovePrivateFile(source, destination layout.Path) error {
+	if !source.IsPrivate() || !destination.IsPrivate() {
+		return layout.ErrPathNamespace
 	}
-	sourceLocal, err := source.local()
+	return r.movePrivateNoReplace(source, destination)
+}
+
+func (r *RepositoryFS) movePrivateNoReplace(source, destination layout.Path) error {
+	if !source.IsPrivate() || (!destination.IsPrivate() && !destination.IsMedia()) {
+		return layout.ErrPathNamespace
+	}
+	sourceLocal, err := source.Local()
 	if err != nil {
 		return err
 	}
-	destinationLocal, err := destination.local()
+	destinationLocal, err := destination.Local()
 	if err != nil {
 		return err
 	}
@@ -489,17 +523,12 @@ func (r *RepositoryFS) movePrivateNoReplace(source, destination RepositoryPath) 
 	return syncRootDirectory(root, path.Dir(source.String()))
 }
 
+// syncRootDirectory syncs a root-relative directory, private or media. The
+// root confines the name; Localize rejects a rooted or escaping one.
 func syncRootDirectory(root *os.Root, directory string) error {
-	local, err := ParsePrivateRepositoryPath(directory)
+	name, err := filepath.Localize(directory)
 	if err != nil {
-		local, err = ParseUserMediaPath(directory)
-		if err != nil {
-			return err
-		}
-	}
-	name, err := local.local()
-	if err != nil {
-		return err
+		return fmt.Errorf("%w: %q", layout.ErrPathInvalid, directory)
 	}
 	opened, err := root.Open(name)
 	if err != nil {

@@ -11,10 +11,10 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/db/backup/restore.go
-- server/internal/db/backup/backup.go
+- server/internal/catalog/backup/restore.go
+- server/internal/catalog/backup/backup.go
 - server/app/app.go
-- server/internal/db/db.go
+- server/internal/catalog/db.go
 - server/internal/service/backup_service.go
 - server/internal/api/handler/backup_handler.go
 -->

@@ -1,18 +1,12 @@
 import { $api } from "@/lib/http-commons/queryClient";
 import type { AgentRefAssetsDTO } from "../../model/chatTypes";
-import { getMockWidgetAssetsPage, isMockWidgetSource } from "./mockWidgetData";
 import type { WidgetSource } from "./types";
 
 /** Hydration hooks: the data plane. Both endpoints return the same page
  * shape ({assets, total, pagination}), so widgets are source-agnostic. */
 
-const MOCK_PREVIEW_LIMIT = 9;
-
 export function useWidgetAssetsPreview(source: WidgetSource, limit: number) {
   const common = { retry: false, staleTime: 60_000 } as const;
-  const mockPage = isMockWidgetSource(source)
-    ? getMockWidgetAssetsPage(source.mockId, Math.min(limit, MOCK_PREVIEW_LIMIT))
-    : undefined;
 
   const refQuery = $api.useQuery(
     "get",
@@ -41,15 +35,6 @@ export function useWidgetAssetsPreview(source: WidgetSource, limit: number) {
     { ...common, enabled: source.kind === "pin" },
   );
 
-  if (mockPage) {
-    return {
-      assets: mockPage.assets ?? [],
-      total: mockPage.total ?? 0,
-      isLoading: false,
-      isError: false,
-    };
-  }
-
   const query = source.kind === "ref" ? refQuery : pinQuery;
   const payload = query.data;
   return {
@@ -61,9 +46,6 @@ export function useWidgetAssetsPreview(source: WidgetSource, limit: number) {
 }
 
 export function useWidgetAssetsInfinite(source: WidgetSource, pageSize: number) {
-  const mockPage = isMockWidgetSource(source)
-    ? getMockWidgetAssetsPage(source.mockId, Math.min(pageSize, MOCK_PREVIEW_LIMIT))
-    : undefined;
   const infiniteOptions = (enabled: boolean) => ({
     pageParamName: "offset" as const,
     initialPageParam: 0,
@@ -105,16 +87,6 @@ export function useWidgetAssetsInfinite(source: WidgetSource, pageSize: number) 
     },
     infiniteOptions(source.kind === "pin"),
   );
-
-  if (mockPage) {
-    return {
-      data: { pages: [mockPage] },
-      hasNextPage: false,
-      isFetchingNextPage: false,
-      isError: false,
-      fetchNextPage: () => Promise.resolve(undefined),
-    };
-  }
 
   return source.kind === "ref" ? refQuery : pinQuery;
 }

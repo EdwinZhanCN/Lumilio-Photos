@@ -17,9 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -849,7 +849,7 @@ func (s *AuthService) decryptMFASecret(ciphertext []byte) (string, error) {
 }
 
 func (s *AuthService) withTx(ctx context.Context, fn func(*repo.Queries) error) error {
-	if s.db == nil {
+	if s.writer == nil {
 		return fn(s.queries)
 	}
 

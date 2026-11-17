@@ -18,9 +18,7 @@ describe("NotFound", () => {
       { router: false },
     );
 
-    await expect
-      .element(screen.getByRole("heading", { name: t("notFound.title") }))
-      .toBeVisible();
+    await expect.element(screen.getByRole("heading", { name: t("notFound.title") })).toBeVisible();
     await expect
       .element(screen.getByRole("link", { name: t("notFound.home") }))
       .toHaveAttribute("href", "/");

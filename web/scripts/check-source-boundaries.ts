@@ -45,19 +45,92 @@ const appImportEntrypoints = new Set(["main.tsx"]);
 // Storage identity is presentation-sensitive: feature UI consumes the
 // Repositories-owned normalized model, never transport DTOs with raw `name`.
 const storageTransportDtoPattern =
-  /dto\.(?:IndexingRepositoryListResponseDTO|IndexingRepositoryOptionDTO|ListRepositoryRootsResponseDTO|RepositoryDTO|RepositoryRootDTO|StorageDiagnosticDTO|StorageDiagnosticsResponseDTO)/;
+  /dto\.(?:StorageTargetDTO|StorageTargetsResponseDTO|StorageLocationViewDTO|StorageViewResponseDTO|RepositoryDTO|StorageDiagnosticDTO|StorageDiagnosticsResponseDTO)/;
 const storageTransportAdapterFiles = new Set([
   "features/repositories/model/storageEntities.ts",
   "features/repositories/model/repositoryOptions.ts",
   "features/repositories/types.ts",
+  "features/repositories/api/useStorageView.ts",
+  "features/repositories/flows/storage-panel/storageViewModel.ts",
 ]);
 const storagePresentationQueryPattern =
-  /\$api\.useQuery\s*\(\s*["']get["']\s*,\s*["']\/api\/v1\/(?:assets\/indexing\/repositories|repository-roots|repositories\/storage-diagnostics)["']/;
+  /\$api\.useQuery\s*\(\s*["']get["']\s*,\s*["']\/api\/v1\/(?:assets\/indexing\/repositories|storage\/view|storage\/diagnostics|storage\/targets)["']/;
 const storagePresentationQueryFiles = new Set([
   "features/repositories/api/useRepositoryOptions.ts",
-  "features/repositories/api/useRepositoryRoots.ts",
+  "features/repositories/api/useStorageLocations.ts",
+  "features/repositories/api/useStorageView.ts",
   "features/repositories/api/useStorageDiagnostics.ts",
 ]);
+
+// Structured failures stay structured: lib/http-commons/problem parses every
+// Problem, and features localize it only at the presentation boundary. A
+// private legacy parser, an Error authored from a status code, a dynamic
+// apiErrors key, or a feature-owned Problem normalizer is a second parser.
+const problemCatalogFile = "lib/http-commons/problem.ts";
+const privateProblemHelper =
+  /^(?:export\s+)?(?:function|const)\s+(?:normalize|parse|read)[A-Za-z0-9_]*(?:Problem|problem)/;
+
+function problemBoundaryViolation(relative: string, line: string): boolean {
+  if (
+    /\.test\.tsx?$/.test(relative) ||
+    relative.endsWith(".worker.ts") ||
+    relative === problemCatalogFile
+  ) {
+    return false;
+  }
+  if (line.includes(`"error" in payload`) || line.includes(`"message" in payload`)) {
+    return true;
+  }
+  if (
+    line.includes("failed with status ${response.status}") ||
+    line.includes("failed with ${response.status}")
+  ) {
+    return true;
+  }
+  if (
+    line.includes("apiErrors") &&
+    (line.includes("${") || line.includes(".replace(") || line.includes("+"))
+  ) {
+    return true;
+  }
+  return privateProblemHelper.test(line.trim());
+}
+
+// Candidates suggest folders. Their risks, and the acknowledgement of those
+// risks, come from the open_repository review of the exact folder; the native
+// task's storage_risk decision carries its own reviewed codes.
+function candidateRiskViolation(relative: string, line: string): boolean {
+  if (!relative.startsWith("features/") || /\.(?:test|spec)\./.test(relative)) {
+    return false;
+  }
+  if (relative.endsWith("NativeHostActionModal.tsx")) {
+    return false;
+  }
+  return (
+    line.includes("risk_warnings") ||
+    line.includes("risk_confirmation") ||
+    line.includes("candidate.risk")
+  );
+}
+
+function hasTranslation(catalog: Record<string, unknown>, dottedKey: string): boolean {
+  const parts = dottedKey.split(".");
+  let current: Record<string, unknown> = catalog;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (typeof next !== "object" || next === null) {
+      return false;
+    }
+    current = next as Record<string, unknown>;
+  }
+  const leaf = parts[parts.length - 1];
+  return Object.entries(current).some(
+    ([key, value]) =>
+      (key === leaf || key.startsWith(`${leaf}_`)) &&
+      typeof value === "string" &&
+      value.trim() !== "",
+  );
+}
 
 // Worker entry points are lower-layer files but may register specific
 // feature-owned, worker-safe runners. Keep this list exact and review additions.
@@ -351,6 +424,19 @@ for (const filename of files) {
   const isFlowLocalState = featureSection === "flows" && importerParts.length >= 5;
   const basename = path.basename(importerRelative);
 
+  sourceText.split("\n").forEach((line, index) => {
+    if (problemBoundaryViolation(importerRelative, line)) {
+      violations.push(
+        `${importerRelative}:${index + 1}: Problem failures are parsed by ${problemCatalogFile} and localized at the presentation boundary`,
+      );
+    }
+    if (candidateRiskViolation(importerRelative, line)) {
+      violations.push(
+        `${importerRelative}:${index + 1}: create risks come from the open_repository assessment, never a candidate`,
+      );
+    }
+  });
+
   if (
     storageTransportDtoPattern.test(sourceText) &&
     !storageTransportAdapterFiles.has(importerRelative)
@@ -506,6 +592,29 @@ for (const filename of files) {
       importerFeature !== importedFeature
     ) {
       featureGraph.get(importerFeature)?.add(importedFeature);
+    }
+  }
+}
+
+// Every apiErrors key the Problem catalog renders is translated in en and zh.
+const problemCatalogSource = ts.sys.readFile(path.join(srcRoot, problemCatalogFile)) ?? "";
+const apiErrorKeys = new Set(
+  [...problemCatalogSource.matchAll(/t\(\s*["'](apiErrors\.[A-Za-z0-9_.]+)["']/g)].map(
+    (match) => match[1],
+  ),
+);
+if (apiErrorKeys.size === 0) {
+  violations.push(`${problemCatalogFile}: no literal apiErrors translation keys`);
+}
+for (const locale of ["en", "zh"]) {
+  const catalogFile = `locales/${locale}/translation.json`;
+  const catalog = JSON.parse(ts.sys.readFile(path.join(srcRoot, catalogFile)) ?? "{}") as Record<
+    string,
+    unknown
+  >;
+  for (const key of apiErrorKeys) {
+    if (!hasTranslation(catalog, key)) {
+      violations.push(`${catalogFile}: Problem translation ${key} is missing`);
     }
   }
 }

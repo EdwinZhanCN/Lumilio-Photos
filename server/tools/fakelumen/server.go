@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -260,13 +261,33 @@ func builtinFaceCapability() *pb.Capability {
 	}
 }
 
+// advertisedCapabilities overlays the recorded capabilities on the builtin set
+// per service: a recorded service advertises exactly what the recording hub
+// advertised, and every other service keeps its deterministic builtin
+// contract, so its fallback responses stay consistent with what it claims.
 func (s *inferenceServer) advertisedCapabilities() []*pb.Capability {
-	if recorded := s.store.capabilities(); len(recorded) > 0 {
-		return recorded
-	}
-	return []*pb.Capability{
+	recorded := s.store.capabilities()
+	advertised := make([]*pb.Capability, 0, len(recorded)+4)
+	for _, builtin := range []*pb.Capability{
 		builtinCapability(), builtinBioCLIPCapability(), builtinOCRCapability(), builtinFaceCapability(),
+	} {
+		capability := builtin
+		for _, candidate := range recorded {
+			if candidate.GetServiceName() == builtin.GetServiceName() {
+				capability = candidate
+				break
+			}
+		}
+		advertised = append(advertised, capability)
 	}
+	for _, candidate := range recorded {
+		if !slices.ContainsFunc(advertised, func(existing *pb.Capability) bool {
+			return existing.GetServiceName() == candidate.GetServiceName()
+		}) {
+			advertised = append(advertised, candidate)
+		}
+	}
+	return advertised
 }
 
 func (s *inferenceServer) GetCapabilities(ctx context.Context, _ *emptypb.Empty) (*pb.Capability, error) {

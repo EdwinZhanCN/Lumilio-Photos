@@ -101,6 +101,8 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
   const newConversation = useLumilioChatStore((s) => s.newConversation);
   const stopGeneration = useLumilioChatStore((s) => s.stopGeneration);
+  const canRetry = useLumilioChatStore((s) => s.canRetry);
+  const retryLastMessage = useLumilioChatStore((s) => s.retryLastMessage);
   const capabilitiesQuery = useCapabilities(5000);
   const { capabilities } = capabilitiesQuery;
   const availability = resolveAgentAvailability({
@@ -297,6 +299,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           type="button"
           className="btn btn-ghost btn-sm btn-circle shrink-0 text-base-content/60"
           title={t("lumilio.chat.newConversation", "New conversation")}
+          aria-label={t("lumilio.chat.newConversation", "New conversation")}
           onClick={(event) => {
             event.stopPropagation();
             void newConversation();
@@ -340,8 +343,21 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         </div>
       )}
       {connectionErrorCopy && (
-        <div className="border-b border-base-300 bg-error/10 px-3 py-1.5 text-xs text-error">
-          {connectionErrorCopy}
+        <div
+          role="alert"
+          className="flex items-center gap-2 border-b border-base-300 bg-error/10 px-3 py-1.5 text-xs text-error"
+        >
+          <span className="min-w-0 flex-1">{connectionErrorCopy}</span>
+          {canRetry && !agentUnavailableReason && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs shrink-0 text-error"
+              onClick={() => void retryLastMessage()}
+            >
+              <RotateCcw size={12} strokeWidth={2} aria-hidden />
+              {t("lumilio.chat.retry", "Retry")}
+            </button>
+          )}
         </div>
       )}
       {messages.length === 0 ? (

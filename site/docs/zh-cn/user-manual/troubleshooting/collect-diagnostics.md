@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/logging/logger.go
+- server/internal/foundation/logging/logger.go
 - server/internal/api/handler/queue_handler.go
 - server/internal/api/handler/health_handler.go
 - server/internal/api/handler/capabilities_handler.go

@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
-	"server/internal/logging"
+	"server/internal/foundation/logging"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -69,19 +69,16 @@ type StackService interface {
 
 type stackService struct {
 	queries       *repo.Queries
-	pool          *sql.DB
 	writer        *catalogtx.Writer
-	readerPool    *sql.DB
+	reader        *catalogtx.Reader
 	logger        *zap.Logger
 	auditProvider logging.RepositoryAuditProvider
 }
 
-func NewStackService(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
-	return &stackService{queries: queries, pool: pool, writer: catalogtx.NewWriter(pool, nil), readerPool: pool, logger: logger, auditProvider: auditProvider}
-}
-
-func NewStackServiceWithReader(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, readerPool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
-	return &stackService{queries: queries, pool: pool, writer: writer, readerPool: readerPool, logger: logger, auditProvider: auditProvider}
+// NewStackService groups assets through the writer and reads stack ownership
+// through the query-only reader.
+func NewStackService(queries *repo.Queries, writer *catalogtx.Writer, reader *catalogtx.Reader, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
+	return &stackService{queries: queries, writer: writer, reader: reader, logger: logger, auditProvider: auditProvider}
 }
 
 const stackMaxTimeGap = 5 * time.Second
@@ -884,7 +881,7 @@ func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) e
 
 func (s *stackService) DeleteStack(ctx context.Context, stackID uuid.UUID) error {
 	var ownerID sql.NullInt64
-	if err := s.readerPool.QueryRowContext(ctx, `SELECT owner_id FROM asset_stacks WHERE stack_id=?`, stackID).Scan(&ownerID); err != nil {
+	if err := s.reader.Statements().QueryRowContext(ctx, `SELECT owner_id FROM asset_stacks WHERE stack_id=?`, stackID).Scan(&ownerID); err != nil {
 		return err
 	}
 	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackDelete, nil)

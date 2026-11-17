@@ -1,0 +1,652 @@
+# Lumilio Atlas — the human-owned architecture declaration.
+#
+# Groups are the architecture vocabulary. Every Go package and Web module
+# belongs to exactly one group: the one whose `match` paths contain it. `uses`
+# is the complete, reviewed list of groups a group may import. The
+# group-dependencies rule compares it with the import graph derived from
+# source in BOTH directions: an import without a declaration fails, and a
+# declaration that no import needs fails. `rules` are the other architecture
+# rules, each proven by fixtures in server/tools/atlas/testdata/rules/<id>.
+# Changing this file is an architecture decision — review it as one.
+# Authoring guide: docs/atlas/README.md.
+
+github: https://github.com/EdwinZhanCN/Lumilio-Photos
+branch: dev
+
+goModules:
+  - { dir: server, path: server, side: server }
+  - { dir: desktop, path: desktop, side: desktop }
+
+# Handwritten documents whose references must resolve: repository paths in
+# backticks, relative links, `task` targets, and /api/v1 routes. Decision
+# records and postmortems are history and are not checked; active exec plans
+# name work that does not exist yet.
+docs:
+  - AGENTS.md
+  - CONTRIBUTING.md
+  - docs/*.md
+  - docs/atlas/README.md
+  - docs/exec-plans/tech-debt-tracker.md
+  - web/ARCHITECTURE.md
+  - .agents/skills/*/SKILL.md
+
+# Real routes deliberately left out of OpenAPI (inline infrastructure probes).
+undocumentedRoutes:
+  - /api/v1/health
+  - /api/v1/health/live
+  - /api/v1/health/ready
+
+# Developer tooling and generated code are not part of the product map.
+exclude:
+  - server/tools/**
+  - server/docs
+  - desktop/cmd/**
+  - desktop/internal/resources/cmd/**
+  - server/internal/catalog/conformance/sqlcfixture/**
+
+groups:
+  # ---------------------------------------------------------------- Server
+  - id: foundation
+    title: Foundation
+    side: server
+    match:
+      - server/config
+      - server/internal/foundation/**
+      # The one package outside its group's directory: media and the catalog
+      # both use these value types, and the catalog uses media. B13 splits it
+      # into column codecs (catalog) and product vocabulary (leaf packages).
+      - server/internal/catalog/dbtypes
+    summary: >-
+      Dependency-free primitives every layer may use: the strict TOML
+      configuration loader, runtime-mutable settings types, logging, version,
+      catalog value types, secret sealing, memory and process helpers, and the
+      owner-only filesystem policy. Nothing here knows about Assets,
+      repositories, or HTTP.
+
+  - id: media
+    title: Media utilities
+    side: server
+    match: [server/internal/media/**]
+    uses: [foundation]
+    summary: >-
+      Stateless file and media mechanics: content hashing, EXIF extraction,
+      libvips imaging, LibRaw decoding, perceptual hashes, and geohash. Pure
+      functions over bytes and paths; no catalog access.
+
+  - id: catalog
+    title: Catalog
+    side: server
+    match:
+      # Every package under server/internal/catalog except dbtypes (see
+      # foundation).
+      - server/internal/catalog
+      - server/internal/catalog/backup
+      - server/internal/catalog/catalogtx
+      - server/internal/catalog/conformance
+      - server/internal/catalog/repo
+      - server/internal/catalog/sqliteuri
+      - server/internal/catalog/vec1ext
+      - server/internal/catalog/vectorindex
+      - server/migrations
+    uses: [foundation, media]
+    summary: >-
+      The embedded SQLite catalog and its QueueDB sibling: the single-writer
+      runtime, named transactions, sqlc queries, the Vec1 vector index,
+      SQLite file URIs, migrations, verified backups, and the driver
+      conformance tests. The catalog is product truth.
+
+  - id: work
+    title: Work contracts
+    side: server
+    match: [server/internal/work/**]
+    uses: [catalog]
+    summary: >-
+      Catalog-owned asynchronous work vocabulary: desired/applied pipeline
+      contracts, the closed River macro-job catalog, work QoS classes, the
+      process-wide execution governor, and the administrator processing read
+      model.
+
+  - id: domain
+    title: Domain semantics
+    side: server
+    match:
+      - server/internal/classify
+      - server/internal/event
+      - server/internal/lifecycle
+      - server/internal/llm
+      - server/internal/search
+      - server/internal/search/bleveocr
+    uses: [foundation, catalog, work]
+    summary: >-
+      Derived product meaning that is independent of storage and transport:
+      Event topology, the Asset lifecycle rules, search (FTS5, vectors, OCR
+      sidecar), zero-shot classification math, and the LLM provider adapter.
+
+  - id: storage
+    title: Storage
+    side: server
+    match: [server/internal/storage/**]
+    uses: [foundation, media, catalog, domain]
+    summary: >-
+      Storage Locations and Repositories on disk: repository lifecycle and
+      layout, the scan index that mirrors each repository tree in
+      repository_entries, the journaled repository trash, and immutable
+      derived artifacts.
+
+  - id: agent
+    title: Lumilio Agent
+    side: server
+    match: [server/internal/agent/**]
+    uses: [foundation, media, catalog, domain]
+    summary: >-
+      The in-app assistant: the agent run loop, typed references and facets,
+      pinned widgets, prompt injection of library context, and the tools the
+      model may call over the catalog.
+
+  - id: service
+    title: Services
+    side: server
+    match:
+      - server/internal/service
+    uses: [foundation, media, catalog, work, domain, storage, agent]
+    summary: >-
+      Business logic behind the HTTP API: authentication and MFA, assets,
+      albums, people, music, settings, setup, search orchestration, cloud
+      import planning, and ML adapters.
+
+  - id: ingest
+    title: Ingest and execution
+    side: server
+    match: [server/internal/ingest/**]
+    uses: [foundation, media, catalog, work, domain, storage, service]
+    summary: >-
+      Everything that moves bytes and background results into the catalog:
+      staged sourcing for upload and cloud import, the River workers and
+      scheduler, media processors, and the commit coordinator that is the only
+      writer of asynchronous results.
+
+  - id: http
+    title: HTTP API
+    side: server
+    match: [server/internal/api/**]
+    uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest]
+    summary: >-
+      The transport edge: router and auth boundaries, handlers, DTOs, RFC 9457
+      Problem responses, rate limiting, request-origin policy, and the
+      plaintext/ACME listeners.
+
+  - id: runtime
+    title: Server runtime
+    side: server
+    match:
+      - server
+      - server/app
+      - server/cmd
+    uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest, http]
+    summary: >-
+      Process composition: the CLI entry point, the Docker entrypoint, and
+      server/app, the only place that wires every subsystem together and owns
+      startup and graceful shutdown. Desktop hosts the same runtime in-process.
+
+  # --------------------------------------------------------------- Desktop
+  - id: desktop-platform
+    title: Desktop platform
+    side: desktop
+    match:
+      - desktop/internal/buildinfo
+      - desktop/internal/platform
+      - desktop/internal/platform/stateversion
+      - desktop/internal/resources
+    summary: >-
+      OS integration for the Desktop App: application-support paths, schema
+      versions for desktop state files, signed resource manifests, and build
+      metadata.
+
+  - id: desktop-control
+    title: Desktop control plane
+    side: desktop
+    match:
+      - desktop/internal/control
+      - desktop/internal/control/dto
+      - desktop/internal/operation
+      - desktop/internal/state
+    summary: >-
+      The revisioned snapshot the Settings window and the tray render, its
+      DTOs, the validating service facade they call, and the request-id
+      idempotent operation gate that serializes every mutation.
+
+  - id: desktop-runtime
+    title: Desktop runtime
+    side: desktop
+    match:
+      - desktop/internal/preferences
+      - desktop/internal/runtime
+      - desktop/internal/runtime/runtimeconfig
+      - desktop/internal/shutdown
+      - desktop/internal/storage
+    uses: [desktop-platform, desktop-control, foundation, runtime]
+    summary: >-
+      Hosts server/app in-process: the runtime generation supervisor, the
+      schema-versioned runtime configuration transaction, preferences, the
+      repository handoff, and coordinated shutdown.
+
+  - id: desktop-services
+    title: Desktop services
+    side: desktop
+    match:
+      - desktop/internal/lumen
+      - desktop/internal/lumen/controlv1
+      - desktop/internal/update
+    uses: [desktop-platform, desktop-control]
+    summary: >-
+      Optional supervised capabilities: the Lumen ML child process with signed
+      staged artifacts, and the application update aggregate, whose transport
+      and signature verification the host supplies.
+
+  - id: desktop-panel
+    title: Desktop panel
+    side: desktop
+    match:
+      - desktop/internal/locales
+      - desktop/internal/panel
+    uses: [desktop-control]
+    summary: >-
+      The Settings window as native UI drawn by MyGo: its view state, the
+      draft that is the one save boundary, operation tracking, and the message
+      catalogs every string a person reads comes from. It calls the control
+      plane through the validating service facade and never a controller.
+
+  - id: desktop-host
+    title: Desktop host
+    side: desktop
+    match:
+      - desktop
+      - desktop/internal/host
+    uses: [desktop-platform, desktop-control, desktop-runtime, desktop-services, desktop-panel]
+    summary: >-
+      The MyGo tray application: the main assembly, the tray menu, the
+      on-demand Settings window, the navigation guard, the coordinated quit,
+      and the adapter that gives the update controller MyGo's signed updater.
+      The product UI stays in the system browser.
+
+  # ------------------------------------------------------------------- Web
+  - id: web-lib
+    title: Web lib
+    side: web
+    match: [web/src/lib, web/src/lib/**, web/src/config]
+    summary: >-
+      Non-visual lower layer: the generated OpenAPI client, i18n, preferences,
+      theme, formatting, geo, and small cross-feature contracts. Never imports
+      a feature.
+
+  - id: web-workers
+    title: Web workers
+    side: web
+    match: [web/src/workers]
+    uses: [web-lib]
+    summary: >-
+      Browser worker entry points (hashing, justified layout, Studio tools)
+      and the shared worker client.
+
+  - id: web-components
+    title: Web components
+    side: web
+    match: [web/src/components/**]
+    uses: [web-lib]
+    summary: >-
+      Reusable presentational UI with no feature, API, or store dependency.
+
+  - id: web-contexts
+    title: Web contexts
+    side: web
+    match: [web/src/contexts]
+    uses: [web-lib, web-workers]
+    summary: >-
+      Truly application-wide React providers: global notifications and worker
+      access.
+
+  - id: web-features
+    title: Web features
+    side: web
+    match: [web/src/features/**]
+    uses: [web-lib, web-workers, web-components, web-contexts]
+    summary: >-
+      Product capabilities. Each feature owns its routes, flows, model, API
+      adapters, and state, and documents itself in doc.ts. Features import each
+      other only through narrow public entries, acyclically.
+
+  - id: web-app
+    title: Web app shell
+    side: web
+    match: [web/src/main.tsx, web/src/app]
+    uses: [web-lib, web-components, web-contexts, web-features]
+    summary: >-
+      Composition root: providers, router, shell, and fatal-error handling. No
+      domain behaviour.
+
+# Architecture rules over type-resolved facts. Each names the invariant it
+# protects in `why`; violations that existed when a rule landed are baselined
+# by symbol in atlas.lock.json and may only shrink.
+rules:
+  - id: group-dependencies
+    why: every import that crosses a group boundary is a reviewed architecture decision
+    group_uses: true
+
+  # ------------------------------------------------------ catalog writer
+  # Database boundary (server-structure plan, rules 1 and 4): SQLite is an
+  # implementation detail of the catalog.
+  - id: catalog-engine-drivers
+    why: SQLite is the catalog's implementation detail; only catalog packages import an engine driver, and the catalog builds the River driver
+    forbid_imports:
+      from: [server/**, desktop/**]
+      except: [server/internal/catalog/**]
+      imports: [github.com/mattn/go-sqlite3, github.com/riverqueue/river/riverdriver/riversqlite]
+
+  - id: catalog-sql-handles
+    why: code above the catalog reaches SQLite only through catalogtx.Reader and catalogtx.Writer, so the pool a read or write uses is a type, not a choice
+    forbid_types:
+      in: [server/**, desktop/**]
+      except: [server/internal/catalog/**]
+      types: ["*database/sql.DB"]
+      expressions: true
+
+  - id: catalog-sql-sites
+    why: hand-written SQL only shrinks; new SQL is a sqlc query unless it is chosen at run time, and lives with the tables its package owns
+    budgets: { measure: sql, default: 0, except: [server/internal/catalog/**] }
+
+  - id: catalog-transactions
+    why: one writer; every catalog transaction is named, admitted, and measured by catalogtx
+    calls:
+      targets:
+        - (*database/sql.DB).Begin
+        - (*database/sql.DB).BeginTx
+        - (*database/sql.Conn).BeginTx
+        - (*database/sql.DB).Exec
+        - (*database/sql.DB).ExecContext
+      # conformance is the SQLite conformance harness; it opens its own
+      # throwaway databases.
+      only: [server/internal/catalog/catalogtx, server/internal/catalog, server/internal/catalog/conformance]
+
+  - id: tx-purity
+    why: no filesystem, network, hashing, sleeping, or table-wide COUNT inside a transaction, which holds the single writer or a read snapshot
+    tx_purity:
+      tx_types: ["*database/sql.Tx", "*server/internal/catalog/catalogtx.Tx"]
+      begin: [(*server/internal/catalog/catalogtx.Writer).BeginTx]
+      forbid_packages: [os, io, io/fs, io/ioutil, net, net/http, server/internal/media/hash, github.com/zeebo/blake3]
+      forbid_calls:
+        - time.Sleep
+        - time.After
+        - time.Tick
+        - time.NewTimer
+        - time.NewTicker
+        - path/filepath.Walk
+        - path/filepath.WalkDir
+        - path/filepath.Glob
+      forbid_count_queries: true
+      allow:
+        # Pure helpers of a forbidden package.
+        - os.IsNotExist
+        - os.IsExist
+        - os.IsPermission
+        - io/fs.ValidPath
+        # Bounded by a unique key: one trash ID per trashed file.
+        - (*server/internal/catalog/repo.Queries).CountRepositoryEntriesWithTrashID
+        # Bounded by its key set: the media items of one Live Photo pair.
+        - (*server/internal/catalog/repo.Queries).CountStackedMediaItems
+
+  - id: static-sql
+    why: every SQL statement is a constant or a sqlc query, so the table rules see every read and write
+    static_sql: true
+
+  - id: asset-purge
+    why: an Asset disappears only through the lifecycle purge, which removes its entries first
+    tables:
+      assets: { delete: [server/internal/lifecycle] }
+
+  - id: river-tables
+    why: River's tables are the queue's private state; product correctness never consults them
+    tables:
+      river_job:
+        read:
+          - server/internal/ingest/queue
+          - server/internal/work/jobs
+          - server/internal/api/handler/queue_handler.go
+          - server/app/sqlite_diagnostics.go
+        write: [server/internal/ingest/queue]
+
+  # ------------------------------------------------------ asynchronous work
+  - id: producer-capabilities
+    why: asynchronous preparers own only narrow read and compute interfaces; catalog mutation belongs to the commit coordinator
+    forbid_types:
+      in:
+        - server/internal/ingest/sourcing/materializer.go
+        - server/internal/storage/locations/resolver.go
+        - server/internal/ingest/processors/asset_processor.go
+        - server/internal/ingest/queue/asset_work_fence.go
+        - server/internal/ingest/queue/enrichment_runner.go
+        - server/internal/ingest/queue/ml_image_loader.go
+        - server/internal/ingest/queue/projection_preparer.go
+      types:
+        - "*database/sql.DB"
+        - "*server/internal/catalog/repo.Queries"
+        - server/internal/service.SettingsService
+        - server/internal/service.LumenService
+        - server/internal/service.ClassifierService
+        - server/internal/service.LocationService
+        - server/internal/service.AssetIndexingService
+
+  - id: catalog-handle-imports
+    why: preparers and the scan index never hold the catalog database; they write through the commit coordinator
+    forbid_imports:
+      from:
+        - server/internal/ingest/sourcing/materializer.go
+        - server/internal/storage/locations/resolver.go
+        - server/internal/ingest/processors/asset_processor.go
+        - server/internal/ingest/queue/asset_work_fence.go
+        - server/internal/ingest/queue/enrichment_runner.go
+        - server/internal/ingest/queue/ml_image_loader.go
+        - server/internal/ingest/queue/projection_preparer.go
+        - server/internal/storage/scan
+      imports: [server/internal/catalog]
+
+  - id: scan-index-query-set
+    why: the scan index writes only through its Writer; it never builds its own catalog query set
+    calls:
+      targets: [server/internal/catalog/repo.New]
+      forbid: [server/internal/storage/scan]
+
+  - id: river-child-jobs
+    why: workers never enqueue child work; the catalog-derived scheduler is the only River producer
+    calls:
+      targets:
+        - (*github.com/riverqueue/river.Client).Insert
+        - (*github.com/riverqueue/river.Client).InsertTx
+        - (*github.com/riverqueue/river.Client).InsertMany
+        - (*github.com/riverqueue/river.Client).InsertManyTx
+        - (*github.com/riverqueue/river.Client).InsertManyFast
+        - (*github.com/riverqueue/river.Client).InsertManyFastTx
+      only: [server/internal/ingest/queue/scheduler.go]
+
+  - id: execution-governor
+    why: one process-wide execution governor, built by the execution package from the budget
+    calls:
+      targets: [server/internal/work/execution.NewGovernor]
+      only: [server/internal/work/execution]
+
+  - id: execution-resources
+    why: resource demands come from the execution package's demand table, never from literals scattered through the pipeline
+    constructs:
+      types: [server/internal/work/execution.Resources]
+      only: [server/internal/work/execution]
+
+  - id: scheduling-algorithms
+    why: the composition root only constructs and runs; macro work runs in the pipeline runtime and the ingest packages
+    calls:
+      targets:
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeMetadataTask
+        - (*server/internal/ingest/processors.AssetProcessor).LoadThumbnailTask
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeThumbnailCodec
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeThumbnailScale
+        - (*server/internal/ingest/processors.AssetProcessor).LoadTranscodeTask
+        - (*server/internal/ingest/processors.AssetProcessor).ComputeTranscodeTask
+        - (*server/internal/ingest/processors.AssetProcessor).ProcessVideoFramesTask
+        - server/app.runAssetEnrichment
+        - (*server/app.pipelineRuntime).prepareProjection
+        - github.com/riverqueue/river.AddWorker
+      only:
+        - server/internal/ingest/cloud/**
+        - server/internal/ingest/commit
+        - server/internal/ingest/processors
+        - server/internal/ingest/queue/**
+        - server/internal/ingest/sourcing
+        - server/internal/ingest/upload
+        - server/app/pipeline_runtime.go
+
+  # ------------------------------------------------------ storage
+  - id: storage-reconciliation
+    why: projection writes run at startup and in the background reconciler; a foreground read never reconciles
+    calls:
+      targets:
+        - (*server/internal/storage.DefaultRepositoryManager).ReconcileAll
+        - (*server/internal/storage.DefaultRepositoryManager).ReconcileStorageLocations
+      only: [server/app, server/internal/storage]
+      # Setup status reads the storage runtime status on every request; the
+      # projection it reports is the background reconciler's.
+      forbid: [server/internal/storage/runtime_status.go]
+
+  # Repository layout plan: one package, storage/layout, builds and
+  # classifies every path under a Repository's .lumilio/. Both rules land
+  # with today's violations baselined (Phase 0) and fail once Phase 2 moves
+  # every caller onto the layout constructors.
+  - id: private-path-spelling
+    why: one package spells the private tree, so .lumilio/ has one declared layout and every path in it one class
+    literals:
+      in: [server/**, desktop/**]
+      # server/docs is the generated OpenAPI document; server/tools are
+      # developer tools outside the Server.
+      except: [server/internal/storage/layout, server/docs, server/tools/**]
+      equal: [.lumilio]
+      prefix: [.lumilio/, .lumilio-, .lumilio_]
+      contains: [/.lumilio/]
+
+  - id: private-path-construction
+    why: a private path comes from a typed layout constructor or a parser of one stored kind, never from a parsed string
+    calls:
+      targets: [server/internal/storage/layout.Parse]
+      # Recovery receipts and the private directory listing read paths of
+      # every class back from disk.
+      only:
+        - server/internal/storage/layout
+        - server/internal/storage/private_recovery.go
+        - server/internal/storage/repository_fs.go
+        - server/internal/storage/recovery
+
+  # ------------------------------------------------------ desktop
+  - id: desktop-marker-parsing
+    why: the Desktop asks server/app about portable markers; the Server's typed readers are the only marker parsers
+    forbid_imports:
+      from: [desktop/**]
+      imports: [gopkg.in/yaml.v2, gopkg.in/yaml.v3, github.com/goccy/go-yaml]
+
+  # ------------------------------------------------------ size
+  - id: package-size
+    why: a package stays small enough to read and review whole; packages over the default only shrink
+    budgets: { default: 5000 }
+
+# Where SQL comes from for the static-sql and tables rules.
+# Every cross-cutting invariant names what enforces it: an Atlas rule, a Go
+# test, or a Task target. A bullet without an entry, an entry without a
+# bullet, or a reference that no longer resolves fails atlas check.
+invariants:
+  doc: docs/architecture.md#cross-cutting-invariants
+  entries:
+    - title: The catalog is product truth.
+      enforced_by:
+        - rule:catalog-transactions
+        - rule:river-tables
+        - go:server/internal/catalog.TestOpenMigrateAndReopenSQLiteCatalog
+        - go:server/internal/catalog.TestQueryOnlyReaderPoolStaysAvailableDuringWriterTransaction
+        - go:server/internal/catalog.TestReaderStaysReadOnlyWhenQueryOnlyIsSwitchedOff
+        - go:server/internal/catalog.TestConnectionPolicySurvivesPhysicalConnectionReplacement
+        - go:server/app.TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery
+    - title: No work inside write transactions.
+      enforced_by:
+        - rule:tx-purity
+        - rule:catalog-transactions
+        - go:server/internal/storage/scan.TestWriterTransactionsStayWithinTheRowBudget
+    - title: Background results have one writer.
+      enforced_by:
+        - rule:producer-capabilities
+        - rule:catalog-handle-imports
+        - rule:scan-index-query-set
+        - rule:river-child-jobs
+        - go:server/app.TestProductionWorkersAreTheMacroCatalog
+        - go:server/internal/ingest/commit.TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop
+    - title: Foreground reads never write.
+      enforced_by:
+        - rule:storage-reconciliation
+        - go:server/app.TestForegroundReadsAnswerWhileTheWriterIsHeld
+        - go:server/app.TestSetupStatusAnswersWhileTheWriterIsHeldBeforeSetupFinishes
+        - rule:catalog-sql-handles
+        - go:server/internal/catalog.TestForegroundReadStaysAvailableWithQueuedWriter
+    - title: Originals are never rewritten; deletion follows explicit lifecycle policy.
+      enforced_by:
+        - rule:asset-purge
+        - go:server/app.TestLifecycleExternalDeletionIsHiddenEverywhereAndReversible
+        - go:server/app.TestTrashListsADeletedPhotoAndRestoreReturnsIt
+        - go:server/app.TestLifecycleRegressionRepositoryRemovalPurgesMissingOnlyAssets
+    - title: Owner scope is explicit.
+      enforced_by:
+        - go:server/internal/api/handler.TestApplyAssetOwnershipScope_AdminEventQueryUsesCurrentOwner
+        - go:server/internal/api/handler.TestCreateRepositoryUsesHostOwnerNotActingAdmin
+        - go:server/internal/agent/core.TestAuthorizedLibraryReadOCRDocumentsIsOwnerScopedAndOrdered
+    - title: Events contain photos and videos only.
+      enforced_by:
+        - go:server/internal/event.TestAudioNeverSeedsOrBridgesEvents
+        - go:server/internal/event.TestAudioOnlyProducesNoEvents
+        - go:server/internal/event.TestMixedEventResolutionAndRebuildExcludeAudio
+    - title: ML and LLM are optional.
+      enforced_by:
+        - go:server/internal/service.TestSearchAssets_FusedSet_SemanticDegradedStillReturnsResults
+        - go:server/internal/api/handler.TestAssetHandlerSearchAssets_ReturnsDegradedResultsWithout503
+        - go:server/internal/service.TestNewLumenServiceFromAppConfigDisabled
+    - title: The Desktop App supervises, it does not reimplement.
+      enforced_by:
+        - rule:group-dependencies
+        - rule:desktop-marker-parsing
+        - go:desktop/internal/runtime.TestDesktopReadsNoPortableMarker
+        - go:desktop/internal/host.TestOpenProductNeedsARunningServerAndAWebURL
+    - title: Web dependency direction.
+      enforced_by:
+        - task:web:check:boundaries
+
+sql:
+  queries:
+    - files: [server/internal/catalog/repo/queries/*.sql]
+      type: "*server/internal/catalog/repo.Queries"
+  executors:
+    - "*database/sql.DB"
+    - "*database/sql.Tx"
+    - "*database/sql.Conn"
+    - "*server/internal/catalog/catalogtx.Tx"
+    - "*server/internal/catalog/catalogtx.Writer"
+    - "*server/internal/catalog/catalogtx.Reader"
+    - "server/internal/catalog/catalogtx.Statements"
+    - "*server/internal/catalog.queryRouter"
+  triggers: [server/migrations/*.up.sql]
+
+exceptions:
+  - from: server/internal/catalog/repo
+    to: server/internal/storage/repocfg
+    reason: >-
+      sqlc maps the repositories.config column to repocfg.RepositoryConfig so
+      the catalog stores a typed per-repository configuration. repocfg is
+      dependency-free, so this cannot create a cycle.
+  - from: server/internal/catalog/repo
+    to: server/internal/storage/pathsemantics
+    reason: >-
+      sqlc maps repositories.path_case and path_normalization to the
+      pathsemantics CaseMode and Normalization types so the catalog stores the
+      measured volume name rule the scan index keys under, never a free
+      string. pathsemantics depends only on the standard library and
+      x/text, so this cannot create a cycle.

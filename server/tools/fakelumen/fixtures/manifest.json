@@ -1,4 +1,37 @@
 {
   "schemaVersion": 1,
-  "note": "No recorded Lumen fixtures yet. Replay advertises deterministic SigLIP, BioCLIP, OCR, and Face capabilities. It serves a constant 768-dim embedding, empty valid BioCLIP/Face results, and two stable ordered OCR lines so queue/storage paths can run keyless and GPU-less. General seeding keeps optional tasks disabled. Record real model fixtures per .agents/skills/lumilio-lumen-fixtures/SKILL.md; recording overwrites this manifest with the upstream capability set."
+  "recordedFrom": "host.docker.internal:50051",
+  "recordedAt": "2026-09-23T19:39:05Z",
+  "note": "Face recognition only: five portraits of the @people slice (web/e2e/specs/people-merge.spec.ts), recorded from a real Lumen Hub (insightface antelopev2). Services without recorded fixtures keep the deterministic builtin SigLIP, BioCLIP and OCR capabilities: a constant 768-dim embedding, empty BioCLIP results, and two stable OCR lines. Unrecorded face payloads get an empty result. Record per .agents/skills/lumilio-lumen-fixtures/SKILL.md; the manifest keeps the upstream capability of each recorded service only.",
+  "capabilities": [
+    {
+      "service_name": "face",
+      "model_ids": [
+        "antelopev2"
+      ],
+      "runtime": "wgpu",
+      "max_concurrency": 1,
+      "tasks": [
+        {
+          "name": "face_recognition",
+          "input_mimes": [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/avif",
+            "application/octet-stream"
+          ],
+          "output_mimes": [
+            "application/json;schema=face_v1"
+          ],
+          "limits": {
+            "det_input_height": "640",
+            "det_input_width": "640",
+            "embedding_dim": "512"
+          }
+        }
+      ],
+      "protocol_version": "1.0"
+    }
+  ]
 }

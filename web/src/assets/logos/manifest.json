@@ -40,14 +40,23 @@
       "id": "apple",
       "name": "Apple",
       "accent": "#555555",
-      "variants": [{ "id": "symbol", "kind": "symbol", "file": "apple/symbol.svg", "aspect": 0.84, "h": 1.0 }]
+      "variants": [
+        { "id": "symbol", "kind": "symbol", "file": "apple/symbol.svg", "aspect": 0.84, "h": 1.0 }
+      ]
     },
     {
       "id": "canon",
       "name": "Canon",
       "accent": "#cc0011",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "canon/wordmark.svg", "aspect": 4.72, "h": 0.45, "color": "#cc0011" }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "canon/wordmark.svg",
+          "aspect": 4.72,
+          "h": 0.45,
+          "color": "#cc0011"
+        }
       ]
     },
     {
@@ -56,7 +65,13 @@
       "accent": "#222222",
       "variants": [
         { "id": "symbol", "kind": "symbol", "file": "dji/symbol.svg", "aspect": 1.0, "h": 0.7 },
-        { "id": "wordmark", "kind": "wordmark", "file": "dji/wordmark.svg", "aspect": 1.75, "h": 0.6 }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "dji/wordmark.svg",
+          "aspect": 1.75,
+          "h": 0.6
+        }
       ]
     },
     {
@@ -64,7 +79,13 @@
       "name": "FUJIFILM",
       "accent": "#ed1c24",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "fujifilm/wordmark.svg", "aspect": 6.01, "h": 0.45 }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "fujifilm/wordmark.svg",
+          "aspect": 6.01,
+          "h": 0.45
+        }
       ]
     },
     {
@@ -72,8 +93,20 @@
       "name": "Hasselblad",
       "accent": "#ff6a00",
       "variants": [
-        { "id": "symbol", "kind": "symbol", "file": "hasselblad/symbol.svg", "aspect": 1.26, "h": 1.0 },
-        { "id": "wordmark", "kind": "wordmark", "file": "hasselblad/wordmark.svg", "aspect": 10.58, "h": 0.45 }
+        {
+          "id": "symbol",
+          "kind": "symbol",
+          "file": "hasselblad/symbol.svg",
+          "aspect": 1.26,
+          "h": 1.0
+        },
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "hasselblad/wordmark.svg",
+          "aspect": 10.58,
+          "h": 0.45
+        }
       ]
     },
     {
@@ -81,7 +114,14 @@
       "name": "Leica",
       "accent": "#e20612",
       "variants": [
-        { "id": "symbol", "kind": "symbol", "file": "leica/symbol.svg", "aspect": 1.0, "h": 0.72, "colorLocked": true }
+        {
+          "id": "symbol",
+          "kind": "symbol",
+          "file": "leica/symbol.svg",
+          "aspect": 1.0,
+          "h": 0.72,
+          "colorLocked": true
+        }
       ]
     },
     {
@@ -89,23 +129,50 @@
       "name": "Nikon",
       "accent": "#ffe100",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "nikon/wordmark.svg", "aspect": 3.62, "h": 0.45 },
-        { "id": "lockup", "kind": "symbol", "file": "nikon/lockup.svg", "aspect": 1.0, "h": 1.0, "colorLocked": true }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "nikon/wordmark.svg",
+          "aspect": 3.62,
+          "h": 0.45
+        },
+        {
+          "id": "lockup",
+          "kind": "symbol",
+          "file": "nikon/lockup.svg",
+          "aspect": 1.0,
+          "h": 1.0,
+          "colorLocked": true
+        }
       ]
     },
     {
       "id": "olympus",
       "name": "OLYMPUS",
       "accent": "#00509f",
-      "variants": [{ "id": "symbol", "kind": "symbol", "file": "olympus/symbol.svg", "aspect": 1.0, "h": 1.0 }]
+      "variants": [
+        { "id": "symbol", "kind": "symbol", "file": "olympus/symbol.svg", "aspect": 1.0, "h": 1.0 }
+      ]
     },
     {
       "id": "panasonic",
       "name": "LUMIX",
       "accent": "#0041c0",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "panasonic/wordmark.svg", "aspect": 5.14, "h": 0.45 },
-        { "id": "corp", "kind": "wordmark", "file": "panasonic/corp.svg", "aspect": 6.54, "h": 0.45 }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "panasonic/wordmark.svg",
+          "aspect": 5.14,
+          "h": 0.45
+        },
+        {
+          "id": "corp",
+          "kind": "wordmark",
+          "file": "panasonic/corp.svg",
+          "aspect": 6.54,
+          "h": 0.45
+        }
       ]
     },
     {
@@ -113,7 +180,13 @@
       "name": "PENTAX",
       "accent": "#222222",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "pentax/wordmark.svg", "aspect": 4.99, "h": 0.45 }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "pentax/wordmark.svg",
+          "aspect": 4.99,
+          "h": 0.45
+        }
       ]
     },
     {
@@ -121,7 +194,14 @@
       "name": "RICOH",
       "accent": "#d7063b",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "ricoh/wordmark.svg", "aspect": 5.54, "h": 0.45, "color": "#d7063b" }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "ricoh/wordmark.svg",
+          "aspect": 5.54,
+          "h": 0.45,
+          "color": "#d7063b"
+        }
       ]
     },
     {
@@ -129,7 +209,13 @@
       "name": "SIGMA",
       "accent": "#222222",
       "variants": [
-        { "id": "wordmark", "kind": "wordmark", "file": "sigma/wordmark.svg", "aspect": 4.52, "h": 0.45 }
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "sigma/wordmark.svg",
+          "aspect": 4.52,
+          "h": 0.45
+        }
       ]
     },
     {
@@ -137,15 +223,30 @@
       "name": "SONY",
       "accent": "#f47521",
       "variants": [
-        { "id": "symbol", "kind": "symbol", "file": "sony/symbol.svg", "aspect": 0.95, "h": 1.0, "color": "#f47521" },
-        { "id": "wordmark", "kind": "wordmark", "file": "sony/wordmark.svg", "aspect": 5.68, "h": 0.45 }
+        {
+          "id": "symbol",
+          "kind": "symbol",
+          "file": "sony/symbol.svg",
+          "aspect": 0.95,
+          "h": 1.0,
+          "color": "#f47521"
+        },
+        {
+          "id": "wordmark",
+          "kind": "wordmark",
+          "file": "sony/wordmark.svg",
+          "aspect": 5.68,
+          "h": 0.45
+        }
       ]
     },
     {
       "id": "zeiss",
       "name": "ZEISS",
       "accent": "#0072ef",
-      "variants": [{ "id": "symbol", "kind": "symbol", "file": "zeiss/symbol.svg", "aspect": 1.0, "h": 1.0 }]
+      "variants": [
+        { "id": "symbol", "kind": "symbol", "file": "zeiss/symbol.svg", "aspect": 1.0, "h": 1.0 }
+      ]
     }
   ]
 }

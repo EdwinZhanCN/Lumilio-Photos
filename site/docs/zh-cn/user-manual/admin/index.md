@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/doc.go
-- server/internal/db/backup/backup.go
+- server/internal/catalog/backup/backup.go
 - server/internal/api/router.go
 - server/app/app.go
 -->

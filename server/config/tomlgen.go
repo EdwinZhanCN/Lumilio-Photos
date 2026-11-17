@@ -78,15 +78,41 @@ func writeProfileHeader(out *bytes.Buffer, profile Profile, schemaRef string) {
 			writeComment(out, "", note)
 		}
 	}
+	writeManifestRules(out)
+	writeComment(out, "", "")
+	writeComment(out, "", "Generated from server/config/profiles.go by `make config-examples`.")
+	writeComment(out, "", "Edit the profile table, not this file.")
+	out.WriteByte('\n')
+}
+
+// writeManifestRules states the loading contract shared by every rendered
+// manifest header.
+func writeManifestRules(out *bytes.Buffer) {
 	writeComment(out, "", "")
 	writeComment(out, "", "Every key below is required: the loader has no defaults, performs no file")
 	writeComment(out, "", "search, and accepts no environment overrides. Whether a manifest is legal")
 	writeComment(out, "", "also depends on combinations across keys, which no per-key comment can")
 	writeComment(out, "", "state; `server config validate --config <file>` is the authority.")
-	writeComment(out, "", "")
-	writeComment(out, "", "Generated from server/config/profiles.go by `make config-examples`.")
-	writeComment(out, "", "Edit the profile table, not this file.")
+}
+
+// encodeUpgradedManifest renders a manifest produced by UpgradeManifest with
+// the same per-key documentation as a generated profile.
+func encodeUpgradedManifest(raw manifest, from, to int) ([]byte, error) {
+	schema, err := loadEmbeddedSchema()
+	if err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	fmt.Fprintf(&out, "#:schema %s\n", SchemaID)
+	writeComment(&out, "", "Lumilio Photos runtime manifest, schema v"+strconv.Itoa(to)+".")
+	writeComment(&out, "", "Upgraded from schema v"+strconv.Itoa(from)+" by `server config upgrade`. The previous file,")
+	writeComment(&out, "", "including any comments added to it, is kept next to this one with a .bak suffix.")
+	writeManifestRules(&out)
 	out.WriteByte('\n')
+	if err := writeSection(&out, "", reflect.ValueOf(raw), schema); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 // writeSection emits one TOML table: scalars first, then nested tables, so the

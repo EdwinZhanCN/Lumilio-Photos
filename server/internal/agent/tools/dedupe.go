@@ -8,7 +8,7 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
-	"server/internal/utils/phash"
+	"server/internal/media/phash"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"

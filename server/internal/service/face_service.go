@@ -3,21 +3,22 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/fs"
 	"math"
-	"path"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/storage"
+	"server/internal/storage/artifact"
 
 	"github.com/davidbyttow/govips/v2/vips"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
@@ -34,8 +35,7 @@ const (
 
 // FaceService defines face detection and recognition related operations interface.
 type FaceService interface {
-	SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error
-	ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error
+	ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetID uuid.UUID, faceV1 *types.FaceV1, crops *FaceCrops, processingTimeMs int) error
 	GetFaceResults(ctx context.Context, assetID uuid.UUID) (*FaceResultWithItems, error)
 	SearchAssetsByFaceID(ctx context.Context, faceID string, limit, offset int) ([]repo.Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, clusterID int32, limit, offset int) ([]repo.Asset, error)
@@ -66,6 +66,10 @@ type FaceService interface {
 // ownership rule), e.g. an admin merging two users' people.
 var ErrPeopleCrossOwner = errors.New("people belong to different owners")
 
+// ErrFaceClusterRebuildInProgress is returned when face results cannot be
+// applied inside a catalog transaction while a cluster rebuild runs.
+var ErrFaceClusterRebuildInProgress = errors.New("face clusters are being rebuilt")
+
 // FaceResultWithItems contains face results and detailed face items.
 type FaceResultWithItems struct {
 	Result *repo.FaceResult
@@ -80,16 +84,16 @@ type SimilarFace struct {
 
 // Person is the service-level representation of a face cluster exposed as a person.
 type Person struct {
-	PersonID              int32
-	Name                  *string
-	IsConfirmed           bool
-	IsHidden              bool
-	HiddenAt              *time.Time
-	MemberCount           int64
-	AssetCount            int64
-	CoverFaceImagePath    *string
+	PersonID    int32
+	Name        *string
+	IsConfirmed bool
+	IsHidden    bool
+	HiddenAt    *time.Time
+	MemberCount int64
+	AssetCount  int64
+	// CoverFaceID is the face whose crop is the person's cover, if any.
+	CoverFaceID           *int32
 	RepresentativeAssetID *string
-	CoverRepositoryID     *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -109,11 +113,11 @@ type PersonFace struct {
 	UploadTime       *time.Time
 }
 
-// PersonFaceCrop locates a single face crop on disk for media serving.
+// PersonFaceCrop names a single face crop artifact for media serving.
 type PersonFaceCrop struct {
-	FaceID        int32
-	RepositoryID  string
-	FaceImagePath string
+	FaceID       int32
+	RepositoryID string
+	Artifact     artifact.Identity
 }
 
 // FaceClusterRebuildResult summarizes a full people-cluster rebuild.
@@ -131,25 +135,24 @@ type FaceClusterRebuildResult struct {
 
 type faceService struct {
 	queries           *repo.Queries
-	pool              *sql.DB
 	writer            *catalogtx.Writer
 	files             *storage.RepositoryFSFactory
 	clusterRebuildMu  sync.RWMutex
 	afterRebuildReset func()
 }
 
-// NewFaceService creates face service instance.
-func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, database *sql.DB, writer *catalogtx.Writer) FaceService {
+// NewFaceService creates face service instance. Clustering mutations run in
+// named writer transactions, or straight on queries when writer is nil.
+func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, writer *catalogtx.Writer) FaceService {
 	return &faceService{
 		queries: queries,
-		pool:    database,
 		writer:  writer,
 		files:   files,
 	}
 }
 
 func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) error {
-	if s.pool == nil {
+	if s.writer == nil {
 		return fn(s.queries)
 	}
 
@@ -168,60 +171,109 @@ func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 	return nil
 }
 
-// SaveFaceResults saves face detection results, persists crops, and updates recognition clusters.
-func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
-	s.clusterRebuildMu.RLock()
-	defer s.clusterRebuildMu.RUnlock()
-	if s.writer == nil {
-		return s.applyFaceResultsTx(ctx, s.queries, assetID, faceV1, imageData, processingTimeMs)
-	}
-	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationFaceMutation, nil)
-	if err != nil {
-		return fmt.Errorf("begin face result transaction: %w", err)
-	}
-	defer tx.Rollback()
-	if err := s.applyFaceResultsTx(ctx, s.queries.WithTx(tx.Raw()), assetID, faceV1, imageData, processingTimeMs); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit face result transaction: %w", err)
-	}
-	return nil
-}
-
-// ApplyFaceResultsTx persists face facts and immutable crops in a caller-owned
-// catalog transaction. The coordinator supplies the transaction so the face
-// result and its fenced stage acknowledgement share one commit boundary.
-func (s *faceService) ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
+// ApplyFaceResultsTx persists face facts in a caller-owned catalog
+// transaction. The crops were published before it opened. The coordinator
+// supplies the transaction so the face result and its fenced stage
+// acknowledgement share one commit boundary.
+func (s *faceService) ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetID uuid.UUID, faceV1 *types.FaceV1, crops *FaceCrops, processingTimeMs int) error {
 	if tx == nil {
 		return errors.New("face result transaction is required")
 	}
-	s.clusterRebuildMu.RLock()
+	// The caller already holds SQLite's only writer, and a cluster rebuild
+	// holds this lock while it waits for that writer. Waiting here would
+	// deadlock; refuse instead so the enrichment publication is retried.
+	if !s.clusterRebuildMu.TryRLock() {
+		return ErrFaceClusterRebuildInProgress
+	}
 	defer s.clusterRebuildMu.RUnlock()
-	return s.applyFaceResultsTx(ctx, s.queries.WithTx(tx), assetID, faceV1, imageData, processingTimeMs)
+	return s.applyFaceResultsTx(ctx, s.queries.WithTx(tx), assetID, faceV1, crops, processingTimeMs)
 }
 
-func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
+// FaceCrops are the published crops of one face result, one per detected
+// face in order, and the repository whose artifacts hold them.
+type FaceCrops struct {
+	RepositoryID uuid.UUID
+	Artifacts    []artifact.Identity
+}
 
+// PublishFaceCrops cuts every detected face out of the source image and
+// publishes it as an immutable faces artifact of the asset's content. It runs
+// before the catalog transaction: a crop whose result never commits is an
+// unreferenced artifact the artifact cleaner reclaims.
+func PublishFaceCrops(ctx context.Context, files *storage.RepositoryFSFactory, repository repo.Repository, contentID uuid.UUID, faceV1 *types.FaceV1, imageData []byte) (*FaceCrops, error) {
+	if faceV1 == nil {
+		return nil, fmt.Errorf("face result payload is required")
+	}
+	if files == nil {
+		return nil, fmt.Errorf("face repository filesystem is unavailable")
+	}
+	crops := &FaceCrops{RepositoryID: repository.RepoID, Artifacts: make([]artifact.Identity, 0, len(faceV1.Faces))}
+	if len(faceV1.Faces) == 0 {
+		return crops, nil
+	}
+	repositoryFS, err := files.OpenContext(ctx, repository)
+	if err != nil {
+		return nil, err
+	}
+	defer repositoryFS.Close()
+	store, err := artifact.NewStore(repositoryFS)
+	if err != nil {
+		return nil, err
+	}
+	for i, face := range faceV1.Faces {
+		bbox := dbtypes.NewFaceBoundingBoxFromLumen(face.BBox)
+		if bbox == nil {
+			return nil, fmt.Errorf("face %d: invalid bounding box", i)
+		}
+		bboxJSON, err := bbox.SerializeToJSON()
+		if err != nil {
+			return nil, fmt.Errorf("face %d: serialize bounding box: %w", i, err)
+		}
+		cropBytes, err := encodeFaceCrop(imageData, bbox)
+		if err != nil {
+			return nil, fmt.Errorf("face %d: %w", i, err)
+		}
+		box := sha256.Sum256(bboxJSON)
+		identity := artifact.Identity{
+			SourceFence:     contentID.String(),
+			Stage:           artifact.StageFaces,
+			PipelineVersion: faceCropVersion,
+			Name:            fmt.Sprintf("%d-%s.webp", i, hex.EncodeToString(box[:6])),
+		}
+		if _, err := store.Publish(ctx, identity, bytes.NewReader(cropBytes)); err != nil {
+			return nil, fmt.Errorf("publish face crop %d: %w", i, err)
+		}
+		crops.Artifacts = append(crops.Artifacts, identity)
+	}
+	return crops, nil
+}
+
+// faceCropVersion fences how a crop is cut and encoded. Raise it when that
+// changes so earlier crops are not adopted.
+const faceCropVersion = "1"
+
+func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, faceV1 *types.FaceV1, crops *FaceCrops, processingTimeMs int) error {
 	if faceV1 == nil {
 		return fmt.Errorf("face result payload is required")
 	}
+	if crops == nil || len(crops.Artifacts) != len(faceV1.Faces) {
+		return fmt.Errorf("face result has no published crop for every face")
+	}
+	_, asset, err := s.resolveAssetRepositoryWithQueries(ctx, queries, assetID)
+	if err != nil {
+		return err
+	}
 
-	repository, asset, err := s.resolveAssetRepositoryWithQueries(ctx, queries, assetID)
+	// A user's manual person assignments survive a re-detection of changed
+	// content (#223 in-place carry-over): they are captured before the old
+	// faces go and re-applied to the new faces before emptied people are
+	// dissolved.
+	manualAssignments, err := captureManualFaceAssignments(ctx, queries, assetID)
 	if err != nil {
 		return err
 	}
-	repositoryFS, err := s.files.Open(repository)
+	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID)
 	if err != nil {
-		return err
-	}
-	defer repositoryFS.Close()
-
-	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID, repositoryFS)
-	if err != nil {
-		return err
-	}
-	if err := s.cleanupAffectedClustersWithQueries(ctx, queries, affectedClusters); err != nil {
 		return err
 	}
 
@@ -264,10 +316,7 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 
 		isPrimary := i == primaryFaceIndex
 
-		faceImagePath, err := s.persistFaceCrop(repositoryFS, assetID, i, imageData, faceItemMeta.BoundingBox)
-		if err != nil {
-			return fmt.Errorf("failed to persist face crop %d: %w", i, err)
-		}
+		crop := crops.Artifacts[i]
 
 		createdItem, err := queries.CreateFaceItem(ctx, repo.CreateFaceItemParams{
 			AssetID:        assetID,
@@ -279,14 +328,16 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 			Ethnicity:      nil,
 			Expression:     nil,
 			FaceSize:       int64Ptr(int64(faceItemMeta.FaceSize)),
-			FaceImagePath:  faceImagePath,
+			CropFence:      &crop.SourceFence,
+			CropVersion:    &crop.PipelineVersion,
+			CropName:       &crop.Name,
 			Embedding:      embeddingVector,
 			EmbeddingModel: &faceV1.ModelID,
 			IsPrimary:      isPrimary,
 			QualityScore:   nil,
 			BlurScore:      nil,
 			PoseAngles:     dbtypes.JSON(landmarksJSON),
-			RepositoryID:   repository.RepoID,
+			RepositoryID:   crops.RepositoryID,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create face item %d: %w", i, err)
@@ -297,8 +348,24 @@ func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Quer
 	if err := s.recognizePendingFacesForAssetWithQueries(ctx, queries, *asset, createdItems); err != nil {
 		return fmt.Errorf("recognize pending faces: %w", err)
 	}
+	reapplied, err := reapplyManualFaceAssignments(ctx, queries, manualAssignments, createdItems)
+	if err != nil {
+		return err
+	}
+	return s.cleanupAffectedClustersWithQueries(ctx, queries, uniqueClusterIDs(append(affectedClusters, reapplied...)))
+}
 
-	return nil
+func uniqueClusterIDs(ids []int32) []int32 {
+	seen := make(map[int32]bool, len(ids))
+	out := make([]int32, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 func largestFaceIndex(faces []types.Face) int {
@@ -372,11 +439,14 @@ func (s *faceService) resolveAssetRepositoryWithQueries(ctx context.Context, que
 	return repository, &asset, nil
 }
 
-func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid.UUID, repositoryFS *storage.RepositoryFS) ([]int32, error) {
-	return s.cleanupExistingFaceStateWithQueries(ctx, s.queries, assetID, repositoryFS)
+func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid.UUID) ([]int32, error) {
+	return s.cleanupExistingFaceStateWithQueries(ctx, s.queries, assetID)
 }
 
-func (s *faceService) cleanupExistingFaceStateWithQueries(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, repositoryFS *storage.RepositoryFS) ([]int32, error) {
+// cleanupExistingFaceStateWithQueries removes an asset's face facts. Their
+// crops stay: they are immutable artifacts the artifact cleaner reclaims
+// once nothing references them, and an unchanged re-detection reuses them.
+func (s *faceService) cleanupExistingFaceStateWithQueries(ctx context.Context, queries *repo.Queries, assetID uuid.UUID) ([]int32, error) {
 	existingItems, err := queries.GetFaceItemsByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load existing face items: %w", err)
@@ -385,19 +455,6 @@ func (s *faceService) cleanupExistingFaceStateWithQueries(ctx context.Context, q
 	affectedClusterIDs, err := s.collectAffectedClusterIDsWithQueries(ctx, queries, existingItems)
 	if err != nil {
 		return nil, err
-	}
-
-	for _, item := range existingItems {
-		if item.FaceImagePath == nil || strings.TrimSpace(*item.FaceImagePath) == "" {
-			continue
-		}
-		privatePath, parseErr := storage.ParsePrivateRepositoryPath(*item.FaceImagePath)
-		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse previous face crop: %w", parseErr)
-		}
-		if err := repositoryFS.RemovePrivate(privatePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("failed to remove previous face crop: %w", err)
-		}
 	}
 
 	if err := queries.DeleteFaceResultByAsset(ctx, assetID); err != nil {
@@ -549,32 +606,6 @@ func isClusterCandidate(item repo.FaceItem) bool {
 	return true
 }
 
-func (s *faceService) persistFaceCrop(repositoryFS *storage.RepositoryFS, assetID uuid.UUID, index int, imageData []byte, bbox *dbtypes.FaceBoundingBox) (*string, error) {
-	cropBytes, err := encodeFaceCrop(imageData, bbox)
-	if err != nil {
-		return nil, err
-	}
-
-	filename := fmt.Sprintf("%s_%d.webp", assetID, index)
-	privatePath, err := storage.ParsePrivateRepositoryPath(path.Join(storage.DefaultStructure.FacesDir, filename))
-	if err != nil {
-		return nil, err
-	}
-	directory, err := storage.ParsePrivateRepositoryPath(path.Dir(privatePath.String()))
-	if err != nil {
-		return nil, err
-	}
-	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
-		return nil, fmt.Errorf("create face crop directory: %w", err)
-	}
-	if _, err := repositoryFS.WritePrivateFileAtomic(privatePath, bytes.NewReader(cropBytes), 0o644); err != nil {
-		return nil, fmt.Errorf("write face crop: %w", err)
-	}
-
-	normalized := privatePath.String()
-	return &normalized, nil
-}
-
 // encodeFaceCrop uses the same display orientation as the inference tensor.
 func encodeFaceCrop(imageData []byte, bbox *dbtypes.FaceBoundingBox) ([]byte, error) {
 	if bbox == nil {
@@ -665,22 +696,17 @@ func (s *faceService) GetFaceResults(ctx context.Context, assetID uuid.UUID) (*F
 	}, nil
 }
 
-// DeleteFaceResults deletes face results for specified asset, including crops and cluster memberships.
+// DeleteFaceResults deletes face results for specified asset and its cluster
+// memberships. The crops are artifacts: the artifact cleaner reclaims them
+// once no face item references them.
 func (s *faceService) DeleteFaceResults(ctx context.Context, assetID uuid.UUID) error {
 	s.clusterRebuildMu.RLock()
 	defer s.clusterRebuildMu.RUnlock()
 
-	repository, _, err := s.resolveAssetRepository(ctx, assetID)
-	if err != nil {
+	if _, _, err := s.resolveAssetRepository(ctx, assetID); err != nil {
 		return err
 	}
-	repositoryFS, err := s.files.Open(repository)
-	if err != nil {
-		return err
-	}
-	defer repositoryFS.Close()
-
-	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID, repositoryFS)
+	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID)
 	if err != nil {
 		return err
 	}
@@ -805,7 +831,9 @@ func (s *faceService) FindSimilarFaces(ctx context.Context, embeddingVector []fl
 				Ethnicity:      row.Ethnicity,
 				Expression:     row.Expression,
 				FaceSize:       row.FaceSize,
-				FaceImagePath:  row.FaceImagePath,
+				CropFence:      row.CropFence,
+				CropVersion:    row.CropVersion,
+				CropName:       row.CropName,
 				Embedding:      row.Embedding,
 				EmbeddingModel: row.EmbeddingModel,
 				IsPrimary:      row.IsPrimary,
@@ -962,7 +990,7 @@ func (s *faceService) ListPersonFaces(ctx context.Context, clusterID int32, repo
 			Confidence:       float32(row.Confidence),
 			IsRepresentative: row.ID == representativeFaceID,
 			IsManual:         row.IsManual,
-			HasCrop:          row.FaceImagePath != nil && strings.TrimSpace(*row.FaceImagePath) != "",
+			HasCrop:          row.CropName != nil,
 			Filename:         row.OriginalFilename,
 			TakenTime:        optionalTimestamp(row.TakenTime),
 			UploadTime:       optionalTimestamp(row.UploadTime),
@@ -983,13 +1011,13 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 	if err != nil {
 		return nil, err
 	}
-	if row.FaceImagePath == nil || strings.TrimSpace(*row.FaceImagePath) == "" {
+	if row.CropFence == nil || row.CropVersion == nil || row.CropName == nil {
 		return nil, sql.ErrNoRows
 	}
 	return &PersonFaceCrop{
-		FaceID:        row.ID,
-		RepositoryID:  row.RepositoryID.String(),
-		FaceImagePath: *row.FaceImagePath,
+		FaceID:       row.ID,
+		RepositoryID: row.RepositoryID.String(),
+		Artifact:     artifact.Identity{SourceFence: *row.CropFence, Stage: artifact.StageFaces, PipelineVersion: *row.CropVersion, Name: *row.CropName},
 	}, nil
 }
 
@@ -1181,9 +1209,8 @@ func personFromListRow(row repo.ListPeopleScopedRow) Person {
 		HiddenAt:              optionalTimestamp(row.HiddenAt),
 		MemberCount:           row.MemberCount,
 		AssetCount:            row.AssetCount,
-		CoverFaceImagePath:    row.CoverFaceImagePath,
+		CoverFaceID:           coverFaceID(row.CoverFaceID),
 		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
-		CoverRepositoryID:     optionalStringFromSQLiteUUID(row.CoverRepositoryID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
@@ -1198,12 +1225,20 @@ func personFromDetailRow(row repo.GetPersonByIDScopedRow) Person {
 		HiddenAt:              optionalTimestamp(row.HiddenAt),
 		MemberCount:           row.MemberCount,
 		AssetCount:            row.AssetCount,
-		CoverFaceImagePath:    row.CoverFaceImagePath,
+		CoverFaceID:           coverFaceID(row.CoverFaceID),
 		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
-		CoverRepositoryID:     optionalStringFromSQLiteUUID(row.CoverRepositoryID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
+}
+
+// coverFaceID maps the query's 0 (no face has a crop) to no cover.
+func coverFaceID(id int64) *int32 {
+	if id == 0 {
+		return nil
+	}
+	value := int32(id)
+	return &value
 }
 
 func optionalTimestamp(value dbtypes.Timestamp) *time.Time {

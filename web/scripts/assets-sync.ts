@@ -45,6 +45,8 @@ type SyncOptions = {
   lockPath: string;
   cacheRoot: string;
   profileName?: string;
+  /** Materialize only these profile asset IDs instead of the whole profile. */
+  assetIds?: string[];
 };
 
 type SyncResult = {
@@ -146,12 +148,42 @@ export async function validateMaterializedAssets(root: string, assets: Asset[]):
   }
 }
 
+/**
+ * Narrows a resolved profile to an explicit asset selection. Every requested
+ * ID must belong to the profile, so a selection can never reach outside the
+ * pinned profile it names.
+ */
+export function selectAssets(assets: Asset[], assetIds: string[], profileName: string): Asset[] {
+  if (new Set(assetIds).size !== assetIds.length) {
+    throw new Error("asset selection contains duplicate IDs");
+  }
+  const byId = new Map(assets.map((asset) => [asset.id, asset]));
+  return assetIds.map((id) => {
+    const asset = byId.get(id);
+    if (!asset) throw new Error(`asset ${id} is not in the ${profileName} profile`);
+    return asset;
+  });
+}
+
+/**
+ * Cache directory name for a sync. A selection lives beside the full profile
+ * (`<profile>+selection`) so a partial copy is never mistaken for the whole
+ * profile by another consumer.
+ */
+export function cacheDirectoryName(profileName: string, assetIds?: string[]): string {
+  return assetIds ? `${profileName}+selection` : profileName;
+}
+
 function readGitFile(gitRoot: string, revision: string, relativePath: string): string {
   return run("git", ["show", `${revision}:${relativePath}`], { cwd: gitRoot, capture: true });
 }
 
-function parseProfileArgument(args: string[], fallback: string): string {
+export function parseArguments(
+  args: string[],
+  fallback: string,
+): { profile: string; assetIds?: string[] } {
   let profile = fallback;
+  const assetIds: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--") continue;
@@ -160,20 +192,31 @@ function parseProfileArgument(args: string[], fallback: string): string {
       const value = args[++index];
       if (!value) throw new Error("--profile requires a value");
       profile = value;
+    } else if (argument.startsWith("--asset=")) assetIds.push(argument.slice("--asset=".length));
+    else if (argument === "--asset") {
+      const value = args[++index];
+      if (!value) throw new Error("--asset requires a value");
+      assetIds.push(value);
     } else throw new Error(`unknown argument: ${argument}`);
   }
   if (!/^[a-z0-9][a-z0-9-]*$/.test(profile ?? "")) throw new Error("profile is invalid");
-  return profile;
+  if (assetIds.some((id) => !/^[a-z0-9][a-z0-9-]*$/.test(id))) {
+    throw new Error("asset ID is invalid");
+  }
+  return assetIds.length > 0 ? { profile, assetIds } : { profile };
 }
 
 async function validateCache(
   target: string,
   lock: AssetLock,
   profileName: string,
+  assetIds?: string[],
 ): Promise<boolean> {
   const metadataPath = path.join(target, ".lumilio-assets-sync.json");
   if (!existsSync(metadataPath)) return false;
-  const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as Partial<AssetLock>;
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as Partial<AssetLock> & {
+    assets?: string[];
+  };
   if (
     metadata.revision !== lock.revision ||
     metadata.profile !== profileName ||
@@ -187,7 +230,11 @@ async function validateCache(
   const profile = JSON.parse(
     await readFile(path.join(target, `profiles/${profileName}.json`), "utf8"),
   ) as AssetProfile;
-  const assets = selectProfile(catalog, profile, profileName);
+  const profileAssets = selectProfile(catalog, profile, profileName);
+  const assets = assetIds ? selectAssets(profileAssets, assetIds, profileName) : profileAssets;
+  if (JSON.stringify(metadata.assets) !== JSON.stringify(assets.map((asset) => asset.id))) {
+    return false;
+  }
   await validateMaterializedAssets(target, assets);
   return true;
 }
@@ -196,14 +243,15 @@ export async function syncAssets({
   lockPath,
   cacheRoot,
   profileName,
+  assetIds,
 }: SyncOptions): Promise<SyncResult> {
   const lock = parseLock(await readFile(lockPath, "utf8"));
   const selectedProfile = profileName ?? lock.profile;
   if (!/^[a-z0-9][a-z0-9-]*$/.test(selectedProfile)) throw new Error("profile is invalid");
 
-  const target = path.join(cacheRoot, lock.revision, selectedProfile);
+  const target = path.join(cacheRoot, lock.revision, cacheDirectoryName(selectedProfile, assetIds));
   try {
-    if (await validateCache(target, lock, selectedProfile)) {
+    if (await validateCache(target, lock, selectedProfile, assetIds)) {
       return { target, cached: true };
     }
   } catch {
@@ -230,7 +278,10 @@ export async function syncAssets({
     const profileRaw = readGitFile(temporary, "FETCH_HEAD", `profiles/${selectedProfile}.json`);
     const catalog = JSON.parse(manifestRaw) as AssetCatalog;
     const profile = JSON.parse(profileRaw) as AssetProfile;
-    const assets = selectProfile(catalog, profile, selectedProfile);
+    const profileAssets = selectProfile(catalog, profile, selectedProfile);
+    const assets = assetIds
+      ? selectAssets(profileAssets, assetIds, selectedProfile)
+      : profileAssets;
 
     run("git", ["sparse-checkout", "init", "--no-cone"], { cwd: temporary });
     const sparsePatterns = [
@@ -282,14 +333,16 @@ export async function syncAssets({
 async function main() {
   const lockPath = path.join(repositoryRoot, "assets.lock.json");
   const lock = parseLock(await readFile(lockPath, "utf8"));
-  const profileName = parseProfileArgument(process.argv.slice(2), lock.profile);
+  const { profile: profileName, assetIds } = parseArguments(process.argv.slice(2), lock.profile);
   const result = await syncAssets({
     lockPath,
     cacheRoot: path.join(repositoryRoot, ".cache/lumilio-assets"),
     profileName,
+    assetIds,
   });
+  const scope = assetIds ? `${assetIds.length} selected ${profileName}` : profileName;
   console.log(
-    `${result.cached ? "Verified cached" : "Synchronized"} ${profileName} assets at ${result.target}`,
+    `${result.cached ? "Verified cached" : "Synchronized"} ${scope} assets at ${result.target}`,
   );
 }
 

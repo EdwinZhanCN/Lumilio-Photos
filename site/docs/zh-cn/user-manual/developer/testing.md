@@ -19,12 +19,13 @@ code-evidence:
 
 # 测试与门禁
 
-`task test` 包含架构检查、Server 测试和 Web 测试，不包含 Desktop 或浏览器 E2E。交付相关变更还需要对应门禁。
+`task test` 包含术语检查、Atlas 检查、Server 测试和 Web 测试，不包含 Desktop 或浏览器 E2E。交付相关变更还需要对应门禁。
 
 ## 常用组合
 
 ```bash
-task architecture:check
+task terminology:check
+task atlas:check
 task server:test
 task web:test
 task desktop:test

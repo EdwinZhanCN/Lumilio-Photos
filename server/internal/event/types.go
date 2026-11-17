@@ -1,4 +1,3 @@
-// Package event owns deterministic media Event semantics.
 package event
 
 import "time"
@@ -17,6 +16,7 @@ type Candidate struct {
 	Timezone    string
 	Coordinate  *Coordinate
 	StackID     string
+	MediaKind   string
 }
 
 type ConstraintKind string
@@ -36,12 +36,13 @@ type Constraint struct {
 }
 
 type Segment struct {
-	MediaItemIDs []string
-	StartAt      time.Time
-	EndAt        time.Time
-	Timezone     string
-	Coordinate   *Coordinate
-	HardEventID  string
+	MediaItemIDs     []string
+	StartAt          time.Time
+	EndAt            time.Time
+	Timezone         string
+	Coordinate       *Coordinate
+	HardEventID      string
+	CoverCandidateID string
 }
 
 type PublishedEvent struct {

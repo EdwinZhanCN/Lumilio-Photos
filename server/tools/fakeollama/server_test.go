@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"server/internal/foundation/settings"
 	"server/internal/llm"
-	"server/internal/settings"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"

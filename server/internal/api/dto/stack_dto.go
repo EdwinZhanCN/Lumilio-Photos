@@ -3,7 +3,7 @@ package dto
 import (
 	"github.com/google/uuid"
 
-	"server/internal/db/dbtypes"
+	"server/internal/catalog/dbtypes"
 )
 
 // StackDTO represents a stack of related assets.

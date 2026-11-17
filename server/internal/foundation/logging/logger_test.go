@@ -1,0 +1,166 @@
+package logging
+
+import (
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"server/internal/foundation/fsprivacy"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+)
+
+func TestNewLoggerRoutesApplicationAndErrorLogs(t *testing.T) {
+	logDir := t.TempDir()
+	runtime, err := NewLogger(Config{
+		Level:         "debug",
+		LogDir:        logDir,
+		ConsoleFormat: "console",
+		FileFormat:    "json",
+		Development:   true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
+
+	logger := runtime.Named("app")
+	logger.Info("info message", zap.String("operation", "test.info"))
+	logger.Warn("warn message", zap.String("operation", "test.warn"))
+
+	require.NoError(t, runtime.Sync())
+
+	appBytes, err := os.ReadFile(filepath.Join(logDir, globalApplicationLog))
+	require.NoError(t, err)
+	errorBytes, err := os.ReadFile(filepath.Join(logDir, globalErrorLog))
+	require.NoError(t, err)
+
+	appText := string(appBytes)
+	errorText := string(errorBytes)
+	assert.Contains(t, appText, "info message")
+	assert.Contains(t, appText, "warn message")
+	assert.Contains(t, errorText, "warn message")
+	assert.NotContains(t, errorText, "info message")
+	assert.Contains(t, appText, "\"component\":\"app\"")
+	securityBytes, err := os.ReadFile(filepath.Join(logDir, globalSecurityLog))
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(string(securityBytes)))
+}
+
+func TestSecurityLoggerIsIsolatedAndAlwaysEnabled(t *testing.T) {
+	logDir := t.TempDir()
+	runtime, err := NewLogger(Config{
+		Level:         "error",
+		LogDir:        logDir,
+		ConsoleFormat: "console",
+		FileFormat:    "json",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
+
+	runtime.Security().Warn("temporary access issued",
+		zap.String("operation", "auth.break_glass"),
+		zap.String("temporary_password", "OnlyInSecurity9"),
+	)
+	require.NoError(t, runtime.Sync())
+
+	securityPath := filepath.Join(logDir, globalSecurityLog)
+	securityBytes, err := os.ReadFile(securityPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(securityBytes), "OnlyInSecurity9")
+
+	appBytes, err := os.ReadFile(filepath.Join(logDir, globalApplicationLog))
+	if err != nil && !os.IsNotExist(err) {
+		require.NoError(t, err)
+	}
+	errorBytes, err := os.ReadFile(filepath.Join(logDir, globalErrorLog))
+	if err != nil && !os.IsNotExist(err) {
+		require.NoError(t, err)
+	}
+	assert.NotContains(t, string(appBytes), "OnlyInSecurity9")
+	assert.NotContains(t, string(errorBytes), "OnlyInSecurity9")
+
+	private, err := fsprivacy.IsPrivate(securityPath)
+	require.NoError(t, err)
+	assert.True(t, private)
+}
+
+func TestRiverLoggerBridgesSlogToZap(t *testing.T) {
+	logDir := t.TempDir()
+	runtime, err := NewLogger(Config{
+		Level:         "debug",
+		LogDir:        logDir,
+		ConsoleFormat: "console",
+		FileFormat:    "json",
+		Development:   true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
+
+	riverLogger := runtime.RiverLogger()
+	riverLogger.Warn("river warning", slog.String("job_kind", "enrich_asset"), slog.Int64("job_id", 42))
+
+	require.NoError(t, runtime.Sync())
+
+	errorBytes, err := os.ReadFile(filepath.Join(logDir, globalErrorLog))
+	require.NoError(t, err)
+	errorText := string(errorBytes)
+	assert.Contains(t, errorText, "river warning")
+	assert.Contains(t, errorText, "\"component\":\"river\"")
+	assert.Contains(t, errorText, "\"job_kind\":\"enrich_asset\"")
+	assert.Contains(t, errorText, "\"job_id\":42")
+}
+
+// testLogsDir stands in for the layout's logs directory, which the Server
+// passes in.
+const testLogsDir = "private/logs"
+
+func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
+	provider := NewRepositoryAuditProvider(zap.NewNop(), testLogsDir, false).(*repositoryAuditProvider)
+
+	nonRepoPath := t.TempDir()
+	provider.ForPath(nonRepoPath).Operation("should_not_write")
+	_, err := os.Stat(filepath.Join(nonRepoPath, filepath.FromSlash(testLogsDir)))
+	assert.Error(t, err)
+
+	repoPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(repoPath, filepath.FromSlash(testLogsDir)), 0755))
+
+	t.Run("successful operations persist without REPO_AUDIT_VERBOSE", func(t *testing.T) {
+		p := NewRepositoryAuditProvider(zap.NewNop(), testLogsDir, false)
+		quietRepo := t.TempDir()
+		t.Cleanup(func() { require.NoError(t, p.Close()) })
+		require.NoError(t, os.MkdirAll(filepath.Join(quietRepo, filepath.FromSlash(testLogsDir)), 0755))
+		p.ForPath(quietRepo).Operation("asset.ingest", zap.String("asset_id", "quiet"))
+		opsBytes, err := os.ReadFile(filepath.Join(quietRepo, filepath.FromSlash(testLogsDir), repositoryOpsLogName))
+		require.NoError(t, err)
+		assert.Contains(t, string(opsBytes), `"operation":"asset.ingest"`)
+		assert.Contains(t, string(opsBytes), `"result":"ok"`)
+	})
+
+	provider = NewRepositoryAuditProvider(zap.NewNop(), testLogsDir, true).(*repositoryAuditProvider)
+	t.Cleanup(func() { require.NoError(t, provider.Close()) })
+
+	first := provider.ForPath(repoPath)
+	second := provider.ForPath(repoPath)
+	firstConcrete, ok := first.(*repositoryAuditLogger)
+	require.True(t, ok)
+	secondConcrete, ok := second.(*repositoryAuditLogger)
+	require.True(t, ok)
+	assert.Same(t, firstConcrete, secondConcrete)
+
+	first.Operation("asset.ingest", zap.String("asset_id", "asset-1"))
+	first.Error("asset.ingest", assert.AnError, zap.String("asset_id", "asset-1"))
+
+	opsBytes, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(testLogsDir), repositoryOpsLogName))
+	require.NoError(t, err)
+	errBytes, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(testLogsDir), repositoryErrLogName))
+	require.NoError(t, err)
+
+	assert.Contains(t, string(opsBytes), "\"operation\":\"asset.ingest\"")
+	assert.Contains(t, string(opsBytes), "\"asset_id\":\"asset-1\"")
+	assert.Contains(t, string(errBytes), "\"result\":\"error\"")
+	assert.True(t, strings.Contains(string(errBytes), "assert.AnError") || strings.Contains(string(errBytes), "assert.AnError general error for testing"))
+}

@@ -13,10 +13,10 @@ import (
 
 	"server/config"
 	"server/internal/agent/ref"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/settings"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/settings"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/google/uuid"
@@ -30,7 +30,7 @@ func (f llmConfigProviderFunc) GetLLMConfig(ctx context.Context) (settings.LLM, 
 }
 
 type awaitingAgentFixture struct {
-	catalog  *db.DB
+	catalog  *catalog.DB
 	service  *agentService
 	user     repo.User
 	thread   repo.AgentThread
@@ -41,7 +41,7 @@ func TestEnsureThreadPersistsMissingBindingsAsJSONArrays(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := t.TempDir()
 	require.NoError(t, os.Chmod(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "agent-service.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func newAwaitingAgentFixture(t *testing.T, provider LLMConfigProvider) awaitingA
 	ctx := context.Background()
 	catalogDir := t.TempDir()
 	require.NoError(t, os.Chmod(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "agent-resume.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -224,10 +224,10 @@ func newAwaitingAgentFixture(t *testing.T, provider LLMConfigProvider) awaitingA
 		Role: "user", WebauthnUserHandle: []byte("agent-resume-test-handle"),
 	})
 	require.NoError(t, err)
-	libraries := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.SQL)
+	libraries := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.Reader)
 	refStore := ref.NewMemoryStore(0, 0)
 	service := NewAgentService(
-		catalog.Queries, catalog.SQL, catalog.Writer, provider, refStore, libraries,
+		catalog.Queries, catalog.Writer, provider, refStore, libraries,
 		NewConversationStore(0), "",
 	).(*agentService)
 	thread, err := service.EnsureThread(ctx, user.UserID, "resume-thread", "free", ThreadBindings{})

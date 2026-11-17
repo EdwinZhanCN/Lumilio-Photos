@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -20,7 +20,7 @@ func TestBreakGlassSQLiteIntegration(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "breakglass.sqlite"),
 	})
 	require.NoError(t, err)
@@ -77,17 +77,17 @@ func TestBreakGlassSQLiteIntegration(t *testing.T) {
 		{ordinary, ordinaryID},
 		{inactiveAdmin, inactiveID},
 	} {
-		_, _, err := NewUserService(database.Queries, database.SQL).BreakGlassReset(ctx, ineligible.username)
+		_, _, err := NewUserService(database.Queries, database.Writer).BreakGlassReset(ctx, ineligible.username)
 		require.ErrorIs(t, err, ErrBreakGlassTargetInvalid)
 		var authVersion int64
 		require.NoError(t, database.SQL.QueryRowContext(ctx, `SELECT auth_version FROM users WHERE user_id = ?`, ineligible.userID).Scan(&authVersion))
 		require.Zero(t, authVersion, "rejected targets must not be modified")
 	}
-	_, _, err = NewUserService(database.Queries, database.SQL).BreakGlassReset(ctx, "missing")
+	_, _, err = NewUserService(database.Queries, database.Writer).BreakGlassReset(ctx, "missing")
 	require.ErrorIs(t, err, ErrUserNotFound)
 
 	queries := database.Queries
-	auth, err := NewAuthService(queries, database.SQL, config.AuthConfig{
+	auth, err := NewAuthService(queries, nil, database.Writer, config.AuthConfig{
 		SecretKeyFile:   filepath.Join(t.TempDir(), "secret"),
 		AccessTokenTTL:  time.Hour,
 		RefreshTokenTTL: 24 * time.Hour,
@@ -150,7 +150,7 @@ func TestBreakGlassSQLiteIntegration(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, selected, err := NewUserService(queries, database.SQL).BreakGlassReset(ctx, "")
+	result, selected, err := NewUserService(queries, database.Writer).BreakGlassReset(ctx, "")
 	require.NoError(t, err)
 	require.Equal(t, oldID, selected.UserID, "created_at ties must be broken by user_id")
 	require.NotEmpty(t, result.TemporaryPassword)

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ import (
 func TestAuthorizedLibraryReadOCRDocumentsIsOwnerScopedAndOrdered(t *testing.T) {
 	catalog, ids := openAuthorizedLibraryOCRTestCatalog(t)
 	ctx := context.Background()
-	library := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.SQL).ForUser(1)
+	library := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.Reader).ForUser(1)
 
 	rows, err := library.ReadOCRDocuments(ctx, []uuid.UUID{
 		ids.ownerPhoto,
@@ -53,19 +53,19 @@ type authorizedLibraryOCRIDs struct {
 	ownerVideo      uuid.UUID
 }
 
-func openAuthorizedLibraryOCRTestCatalog(t *testing.T) (*db.DB, authorizedLibraryOCRIDs) {
+func openAuthorizedLibraryOCRTestCatalog(t *testing.T) (*catalog.DB, authorizedLibraryOCRIDs) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)
 	require.NoError(t, catalog.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, catalog.Close(context.Background())) })
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	ids := authorizedLibraryOCRIDs{
 		ownerPhoto:      uuid.New(),
@@ -79,13 +79,13 @@ INSERT INTO users (
 ) VALUES
     (1, 'ocr-owner', 'hash', 1, 1, x'01'),
     (2, 'other-owner', 'hash', 1, 1, x'02');
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
-) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-`, rootID, repositoryID, rootID)
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization
+) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?, 'sensitive', 'none');
+`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	for _, fixture := range []struct {
 		id, filename, assetType, mime string
@@ -100,7 +100,7 @@ INSERT INTO repositories (
 		_, err = testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
 			AssetID: uuid.MustParse(fixture.id), RepositoryID: repositoryID, OwnerID: fixture.ownerID,
 			AssetType: fixture.assetType, Filename: fixture.filename, MIMEType: fixture.mime,
-			FileSize: 1, IsDeleted: fixture.deleted,
+			FileSize: 1, EntryState: testutil.EntryStateTrashedIf(fixture.deleted),
 		})
 		require.NoError(t, err)
 	}

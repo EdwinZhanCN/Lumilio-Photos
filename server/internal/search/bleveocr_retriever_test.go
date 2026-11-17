@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 	"server/internal/search/bleveocr"
-	"server/internal/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ VALUES (1, ?, 0, 1);
 	index, err := bleveocr.Open(ctx, database.Path, database.Queries, false, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
-	retriever := NewBleveOCRRetriever(database.SQL, index, 0.7)
+	retriever := NewBleveOCRRetriever(database.Reader, index, 0.7)
 
 	ownerID := int32(1)
 	candidates, err := retriever.Retrieve(ctx, Request{
@@ -73,25 +73,25 @@ VALUES (1, ?, 0, 1);
 	require.NoError(t, err)
 	require.Equal(t, []uuid.UUID{relaxedBicycle}, candidateUUIDs(candidates))
 
-	isDeleted := true
+	trashed := "trashed"
 	candidates, err = retriever.Retrieve(ctx, Request{
 		Query: "red bicycle",
 		TopK:  10,
 		Filter: Filter{
-			OwnerID:      &ownerID,
-			RepositoryID: &repositoryA,
-			IsDeleted:    &isDeleted,
+			OwnerID:        &ownerID,
+			RepositoryID:   &repositoryA,
+			LifecycleState: &trashed,
 		},
 	})
 	require.NoError(t, err)
 	require.Equal(t, []uuid.UUID{deleted}, candidateUUIDs(candidates))
 }
 
-func openRetrieverTestDatabase(t *testing.T) *db.DB {
+func openRetrieverTestDatabase(t *testing.T) *catalog.DB {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	database, err := db.Open(context.Background(), config.DatabaseConfig{
+	database, err := catalog.Open(context.Background(), config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -108,25 +108,25 @@ INSERT INTO users (
 	return database
 }
 
-func insertRetrieverRepositories(t *testing.T, database *db.DB, repositoryA, repositoryB uuid.UUID) {
+func insertRetrieverRepositories(t *testing.T, database *catalog.DB, repositoryA, repositoryB uuid.UUID) {
 	t.Helper()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err := database.SQL.Exec(`
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization
 ) VALUES
-    (?, 'repo-a', '/media/a', 1, 1, 1, ?),
-    (?, 'repo-b', '/media/b', 1, 1, 1, ?);
-`, rootID, repositoryA, rootID, repositoryB, rootID)
+    (?, 'repo-a', '/media/a', 1, 1, 1, ?, 'sensitive', 'none'),
+    (?, 'repo-b', '/media/b', 1, 1, 1, ?, 'sensitive', 'none');
+`, storageLocationID, repositoryA, storageLocationID, repositoryB, storageLocationID)
 	require.NoError(t, err)
 }
 
 func insertRetrieverOCRAsset(
 	t *testing.T,
-	database *db.DB,
+	database *catalog.DB,
 	ownerID int32,
 	repositoryID uuid.UUID,
 	text string,
@@ -137,7 +137,7 @@ func insertRetrieverOCRAsset(
 	_, err := testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
 		AssetID: assetID, RepositoryID: repositoryID, OwnerID: ownerID,
 		AssetType: "PHOTO", Filename: assetID.String() + ".jpg", MIMEType: "image/jpeg",
-		FileSize: 1, IsDeleted: isDeleted,
+		FileSize: 1, EntryState: testutil.EntryStateTrashedIf(isDeleted),
 	})
 	require.NoError(t, err)
 	_, err = database.SQL.Exec(`

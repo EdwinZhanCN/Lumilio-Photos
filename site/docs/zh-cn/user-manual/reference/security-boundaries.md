@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/service/auth_service.go
 - server/internal/service/share_link_service.go
 - server/internal/api/handler/share_link_handler.go
-- server/internal/cloud
+- server/internal/ingest/cloud
 - server/internal/agent
 - server/internal/service/lumen_service.go
 -->

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 )
@@ -48,7 +48,7 @@ func TestFaceRebuildConvergesThroughBoundedPublishes(t *testing.T) {
 	}
 
 	ownerID := int32(1)
-	service := NewFaceService(database.Queries, nil, database.SQL, database.Writer)
+	service := NewFaceService(database.Queries, nil, database.Writer)
 	result, err := service.RebuildFaceClusters(ctx, uuid.NullUUID{UUID: repositoryID, Valid: true}, &ownerID)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestFaceRebuildReleasesWriterBeforeDerivedConvergence(t *testing.T) {
 	defer cancel()
 	database := openFaceClusteringDatabase(t, ctx)
 
-	service := NewFaceService(database.Queries, nil, database.SQL, database.Writer).(*faceService)
+	service := NewFaceService(database.Queries, nil, database.Writer).(*faceService)
 	rebuildOutsideWriter := make(chan struct{}, 1)
 	releaseRebuild := make(chan struct{})
 	var releaseOnce sync.Once
@@ -112,13 +112,13 @@ func TestFaceRebuildReleasesWriterBeforeDerivedConvergence(t *testing.T) {
 	}
 }
 
-func openFaceClusteringDatabase(t *testing.T, ctx context.Context) *db.DB {
+func openFaceClusteringDatabase(t *testing.T, ctx context.Context) *catalog.DB {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(dir, "face-rebuild.sqlite3"),
 	})
 	if err != nil {
@@ -131,20 +131,21 @@ func openFaceClusteringDatabase(t *testing.T, ctx context.Context) *db.DB {
 	return database
 }
 
-func seedFaceClusteringRepository(t *testing.T, ctx context.Context, database *db.DB) uuid.UUID {
+func seedFaceClusteringRepository(t *testing.T, ctx context.Context, database *catalog.DB) uuid.UUID {
 	t.Helper()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	if _, err := database.SQL.ExecContext(ctx, `
 INSERT INTO users (
   user_id, username, password, created_at, updated_at, display_name, role, webauthn_user_handle
 ) VALUES (1, 'face-owner', 'unused', 1, 1, 'Face Owner', 'admin', x'01');
-INSERT INTO repository_roots (
-  root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+  storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'Face root', '/face', 'default', 1, 1);
 INSERT INTO repositories (
-  repo_id, name, path, created_at, updated_at, default_owner_id, role, root_id
-) VALUES (?, 'Faces', '/face/repository', 1, 1, 1, 'primary', ?);`, rootID, repositoryID, rootID); err != nil {
+  repo_id, name, path, created_at, updated_at, default_owner_id, role, storage_location_id,
+  path_case, path_normalization
+) VALUES (?, 'Faces', '/face/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');`, storageLocationID, repositoryID, storageLocationID); err != nil {
 		t.Fatal(err)
 	}
 	return repositoryID

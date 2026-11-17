@@ -56,14 +56,12 @@ export function useUtilityShortcuts(): UtilityShortcut[] {
       title: t("collections.utilities.sharedLinks.title", "Shared Links"),
       tone: "primary",
     },
-    ...UTILITY_CLASSIFIERS.map(
-      (classifier): UtilityShortcut => ({
-        key: classifier.slug,
-        to: `/collections/utilities/${classifier.slug}`,
-        icon: classifier.icon,
-        title: getUtilityClassifierTitle(t, classifier.slug),
-        tone: "accent",
-      }),
-    ),
+    ...UTILITY_CLASSIFIERS.map((classifier): UtilityShortcut => ({
+      key: classifier.slug,
+      to: `/collections/utilities/${classifier.slug}`,
+      icon: classifier.icon,
+      title: getUtilityClassifierTitle(t, classifier.slug),
+      tone: "accent",
+    })),
   ];
 }

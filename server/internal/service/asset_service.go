@@ -8,15 +8,17 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/event"
-	aggregatesearch "server/internal/search"
-	"server/internal/search/bleveocr"
-	"server/internal/utils/geohash"
 	"strings"
 	"time"
+
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/event"
+	"server/internal/media/geohash"
+	aggregatesearch "server/internal/search"
+	"server/internal/search/bleveocr"
+	"server/internal/storage/trash"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -54,8 +56,18 @@ type AssetService interface {
 	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
-	DeleteAsset(ctx context.Context, id uuid.UUID) error
-	RestoreAsset(ctx context.Context, id uuid.UUID) error
+	// DeleteAssets moves the Assets' files into their repository trash;
+	// RestoreAssets moves them back. Both refuse the whole request, moving
+	// nothing, when a repository is offline or a file changed.
+	DeleteAssets(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
+	RestoreAssets(ctx context.Context, request trash.Request) (trash.RestoreResult, error)
+	DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
+	RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
+	EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
+	// HeldTrashAssetIDs lists Assets whose trashed files are inherited and
+	// held; AcceptTrashRetention lifts that hold so ordinary retention applies.
+	HeldTrashAssetIDs(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) ([]uuid.UUID, error)
+	AcceptTrashRetention(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.AcceptRetentionResult, error)
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
 	UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error
@@ -82,12 +94,10 @@ type AssetService interface {
 	// SearchTags returns tag definitions for autocomplete; empty query lists all.
 	SearchTags(ctx context.Context, query string, limit int) ([]repo.Tag, error)
 
-	CreateThumbnail(ctx context.Context, assetID, repositoryID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
 
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*repo.Tag, error)
-	GetThumbnailByID(ctx context.Context, thumbnailID int) (*repo.Thumbnail, error)
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error)
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
@@ -162,7 +172,7 @@ type QueryAssetsParams struct {
 	MediaComposition MediaComposition // media-item component makeup filter (empty = all)
 	StackMembership  StackMembership  // presentation-stack membership filter (empty = all)
 	StackKinds       []string         // presentation-stack kind filter (non-empty implies stacked)
-	IsDeleted        *bool
+	LifecycleState   *string
 	Rating           *int
 	Liked            *bool
 	CameraModel      *string
@@ -283,10 +293,9 @@ type PhotoMapPoint struct {
 
 type assetService struct {
 	queries                *repo.Queries
-	pool                   *sql.DB
 	writer                 *catalogtx.Writer
 	readQueries            *repo.Queries
-	readPool               *sql.DB
+	reader                 *catalogtx.Reader
 	lumen                  LumenService
 	embeddingService       EmbeddingService
 	aggregateSearch        aggregatesearch.Service
@@ -295,31 +304,26 @@ type assetService struct {
 	placeRetriever         *aggregatesearch.TextRetriever
 	queryAssetsUnifiedFn   func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
 	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
-	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error)
-	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
+	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, lifecycleState *string) ([]repo.Asset, error)
+	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, lifecycleState *string) ([]repo.Asset, error)
 	ocrIndexNotifier       OCRIndexNotifier
+	trash                  AssetTrash
 }
 
+// NewAssetService is the runtime constructor with explicit SQLite roles:
+// mutations use the sole writer while library and search reads use the
+// bounded query-only WAL reader and its queries. ocrIndexNotifier wakes the
+// OCR index; the durable projection request is written to Catalog state in
+// the same transaction as the asset mutation.
 func NewAssetService(
 	q *repo.Queries,
-	pool *sql.DB,
-	l LumenService,
-	e EmbeddingService,
-	ocrIndex *bleveocr.Index,
-	loggers ...*zap.Logger,
-) (AssetService, error) {
-	return newAssetService(q, pool, catalogtx.NewWriter(pool, nil), q, pool, l, e, ocrIndex, loggers...)
-}
-
-func newAssetService(
-	q *repo.Queries,
-	pool *sql.DB,
 	writer *catalogtx.Writer,
 	readQueries *repo.Queries,
-	readPool *sql.DB,
+	reader *catalogtx.Reader,
 	l LumenService,
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
+	ocrIndexNotifier OCRIndexNotifier,
 	loggers ...*zap.Logger,
 ) (AssetService, error) {
 	logger := zap.NewNop()
@@ -328,15 +332,15 @@ func newAssetService(
 	}
 	svc := &assetService{
 		queries:          q,
-		pool:             pool,
 		writer:           writer,
 		readQueries:      readQueries,
-		readPool:         readPool,
+		reader:           reader,
 		lumen:            l,
 		embeddingService: e,
+		ocrIndexNotifier: ocrIndexNotifier,
 	}
 	svc.semanticRetriever = aggregatesearch.NewEmbeddingRetriever(
-		readPool,
+		reader,
 		func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
 			embedding, err := svc.resolveSemanticQueryEmbedding(ctx, query, fast)
 			if err != nil {
@@ -355,61 +359,14 @@ func newAssetService(
 		},
 		1.0,
 	)
-	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(readPool, ocrIndex, 0.7)
-	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(readPool, 0.8)
-	svc.aggregateSearch = aggregatesearch.NewAggregateService(readPool, []aggregatesearch.Retriever{
+	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(reader, ocrIndex, 0.7)
+	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(reader, 0.8)
+	svc.aggregateSearch = aggregatesearch.NewAggregateService(readQueries, []aggregatesearch.Retriever{
 		svc.semanticRetriever,
 		svc.ocrRetriever,
 		svc.placeRetriever,
 	}, logger.Named("aggregate_search"))
 	return svc, nil
-}
-
-// NewAssetServiceWithNotifier wires the OCR wakeup notifier. The durable
-// projection request is written to Catalog state in the same transaction as
-// the asset mutation; the Catalog scheduler derives disposable River work.
-func NewAssetServiceWithNotifier(
-	q *repo.Queries,
-	pool *sql.DB,
-	l LumenService,
-	e EmbeddingService,
-	ocrIndex *bleveocr.Index,
-	ocrIndexNotifier OCRIndexNotifier,
-	loggers ...*zap.Logger,
-) (AssetService, error) {
-	created, err := NewAssetService(q, pool, l, e, ocrIndex, loggers...)
-	if err != nil {
-		return nil, err
-	}
-	if concrete, ok := created.(*assetService); ok {
-		concrete.ocrIndexNotifier = ocrIndexNotifier
-	}
-	return created, nil
-}
-
-// NewAssetServiceWithReader is the runtime constructor with explicit
-// SQLite roles: mutations use the sole writer while library/search reads use
-// the bounded query-only WAL pool.
-func NewAssetServiceWithReader(
-	q *repo.Queries,
-	pool *sql.DB,
-	writer *catalogtx.Writer,
-	readQueries *repo.Queries,
-	readPool *sql.DB,
-	l LumenService,
-	e EmbeddingService,
-	ocrIndex *bleveocr.Index,
-	ocrIndexNotifier OCRIndexNotifier,
-	loggers ...*zap.Logger,
-) (AssetService, error) {
-	created, err := newAssetService(q, pool, writer, readQueries, readPool, l, e, ocrIndex, loggers...)
-	if err != nil {
-		return nil, err
-	}
-	if concrete, ok := created.(*assetService); ok {
-		concrete.ocrIndexNotifier = ocrIndexNotifier
-	}
-	return created, nil
 }
 
 // ================================
@@ -635,6 +592,9 @@ func ApplyAssetExtractedMetadataTx(
 	}); err != nil {
 		return err
 	}
+	if err := SyncMusicTrackFromAssetTx(ctx, tx, queries, id, metadata); err != nil {
+		return fmt.Errorf("sync music track metadata: %w", err)
+	}
 	if firstExtraction {
 		if err := importEmbeddedKeywords(ctx, queries, id, common.Keywords); err != nil {
 			return err
@@ -653,25 +613,32 @@ func ApplyAssetExtractedMetadataTx(
 	return nil
 }
 
+// preserveSpecificMetadataDescription keeps a user-edited description, even
+// an empty one, across re-extraction; an extracted description follows the
+// file, so a caption rewritten by another tool shows up after an in-place
+// edit.
 func preserveSpecificMetadataDescription(existing, incoming dbtypes.SpecificMetadata) (dbtypes.SpecificMetadata, error) {
 	var existingObject map[string]json.RawMessage
 	if len(existing) == 0 || json.Unmarshal(existing, &existingObject) != nil {
+		return incoming, nil
+	}
+	var edited bool
+	if raw, ok := existingObject["description_edited"]; !ok || json.Unmarshal(raw, &edited) != nil || !edited {
 		return incoming, nil
 	}
 	description, exists := existingObject["description"]
 	if !exists {
 		return incoming, nil
 	}
-	var descriptionText string
-	if err := json.Unmarshal(description, &descriptionText); err != nil {
-		return incoming, nil
-	}
-
 	var incomingObject map[string]json.RawMessage
 	if err := json.Unmarshal(incoming, &incomingObject); err != nil {
 		return nil, err
 	}
+	if incomingObject == nil {
+		incomingObject = map[string]json.RawMessage{}
+	}
 	incomingObject["description"] = description
+	incomingObject["description_edited"] = json.RawMessage("true")
 	encoded, err := json.Marshal(incomingObject)
 	return dbtypes.SpecificMetadata(encoded), err
 }
@@ -748,78 +715,56 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 	return &hash5, &hash7
 }
 
-// DeleteAsset moves an asset into the app Trash via a database soft-delete.
-func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
-	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetDelete, nil)
-	if err != nil {
-		return fmt.Errorf("begin asset Trash transaction: %w", err)
+// AssetTrash is the repository trash that Delete and Restore go through.
+type AssetTrash interface {
+	Delete(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
+	Restore(ctx context.Context, request trash.Request) (trash.RestoreResult, error)
+	DeletePermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
+	RemoveMissing(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
+	Empty(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
+	HeldAssetIDs(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) ([]uuid.UUID, error)
+	AcceptRetention(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.AcceptRetentionResult, error)
+}
+
+// ErrAssetTrashUnavailable reports a Server built without the repository
+// trash.
+var ErrAssetTrashUnavailable = errors.New("the repository trash is not available")
+
+// BindAssetTrash installs the repository trash once the scanner it commits
+// through exists.
+func BindAssetTrash(service AssetService, assetTrash AssetTrash) error {
+	concrete, ok := service.(*assetService)
+	if !ok {
+		return errors.New("asset service does not accept a repository trash")
 	}
-	defer tx.Rollback()
-	queries := s.queries.WithTx(tx.Raw())
-	if err := queries.DeleteAsset(ctx, id); err != nil {
-		return err
-	}
-	// The trashed component can no longer serve as the browsing component of
-	// its logical media item; re-pick the primary from what remains.
-	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil {
-		if err := NormalizeMediaItemPrimaryAsset(ctx, queries, item.MediaItemID); err != nil {
-			return fmt.Errorf("normalize media item after Trash: %w", err)
-		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
-		return err
-	}
-	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil && item.OwnerID != nil {
-		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *item.OwnerID, "asset_trashed"); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit asset Trash transaction: %w", err)
-	}
-	if s.ocrIndexNotifier != nil {
-		s.ocrIndexNotifier.Notify()
-	}
+	concrete.trash = assetTrash
 	return nil
 }
 
-// RestoreAsset restores an asset from the app Trash.
-func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
-	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetRestore, nil)
-	if err != nil {
-		return fmt.Errorf("begin asset restore transaction: %w", err)
+// DeleteAssets moves every present file of the Assets into its repository
+// trash. The Assets become trashed with their metadata, leave the library,
+// and are listed in the Trash until restored or expired.
+func (s *assetService) DeleteAssets(ctx context.Context, request trash.Request) (trash.DeleteResult, error) {
+	if s.trash == nil {
+		return trash.DeleteResult{}, ErrAssetTrashUnavailable
 	}
-	defer tx.Rollback()
-	queries := s.queries.WithTx(tx.Raw())
-	if err := queries.RestoreAsset(ctx, id); err != nil {
-		return err
-	}
-	// A restored component may reclaim the canonical primary slot (for example
-	// a JPEG that outranks the RAW that served while it was trashed).
-	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil {
-		if err := NormalizeMediaItemPrimaryAsset(ctx, queries, item.MediaItemID); err != nil {
-			return fmt.Errorf("normalize media item after restore: %w", err)
-		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
-		return err
-	}
-	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil && item.OwnerID != nil {
-		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *item.OwnerID, "asset_restored"); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit asset restore transaction: %w", err)
-	}
-	if s.ocrIndexNotifier != nil {
+	result, err := s.trash.Delete(ctx, request)
+	if err == nil && s.ocrIndexNotifier != nil {
 		s.ocrIndexNotifier.Notify()
 	}
-	return nil
+	return result, err
+}
+
+// RestoreAssets moves the Assets' trashed files back and makes them active.
+func (s *assetService) RestoreAssets(ctx context.Context, request trash.Request) (trash.RestoreResult, error) {
+	if s.trash == nil {
+		return trash.RestoreResult{}, ErrAssetTrashUnavailable
+	}
+	result, err := s.trash.Restore(ctx, request)
+	if err == nil && s.ocrIndexNotifier != nil {
+		s.ocrIndexNotifier.Notify()
+	}
+	return result, err
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -935,34 +880,6 @@ func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, f
 // ================================
 // Thumbnail CRUD Operations
 // ================================
-
-// CreateThumbnail creates or updates a thumbnail record for an asset
-func (s *assetService) CreateThumbnail(ctx context.Context, assetID, repositoryID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
-	params := repo.CreateThumbnailParams{
-		AssetID:      assetID,
-		Size:         size,
-		StoragePath:  thumbnailPath,
-		MimeType:     "image/webp",
-		RepositoryID: repositoryID,
-	}
-
-	dbThumbnail, err := s.queries.CreateThumbnail(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create thumbnail: %w", err)
-	}
-
-	return &dbThumbnail, nil
-}
-
-// GetThumbnailByID retrieves thumbnails by their ID
-func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*repo.Thumbnail, error) {
-	dbThumbnail, err := s.readQueries.GetThumbnailByID(ctx, int32(thumbnailID))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get thumbnail: %w", err)
-	}
-
-	return &dbThumbnail, nil
-}
 
 // GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
 func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error) {
@@ -1278,7 +1195,7 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 			// Best Results exists only when the set is larger than the
 			// showcase size; otherwise everything lives in Results.
 			if len(ids) >= params.TopResultsLimit {
-				topResults, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit], params.IsDeleted)
+				topResults, err := s.runHydrateAssetsInOrder(ctx, ids[:params.TopResultsLimit], params.LifecycleState)
 				if err != nil {
 					return SearchAssetsResult{}, err
 				}
@@ -1286,7 +1203,7 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 			}
 
 			if params.EnhancementMode != SearchEnhancementModeOnly {
-				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset, params.IsDeleted)
+				page, err := s.runPageAssetsBySort(ctx, ids, params.SortBy, params.Limit, params.Offset, params.LifecycleState)
 				if err != nil {
 					return SearchAssetsResult{}, err
 				}
@@ -1357,7 +1274,7 @@ func (s *assetService) applyEventScope(ctx context.Context, params QueryAssetsPa
 	if params.OwnerID == nil {
 		return QueryAssetsParams{}, event.ErrNotFound
 	}
-	resolved, _, err := event.NewResolver(s.pool).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
+	resolved, _, err := event.NewResolver(s.reader).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
 	if err != nil {
 		return QueryAssetsParams{}, err
 	}
@@ -1428,7 +1345,7 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		FilenameOperator: params.FilenameOperator,
 		DateFrom:         params.DateFrom,
 		DateTo:           params.DateTo,
-		IsDeleted:        params.IsDeleted,
+		LifecycleState:   params.LifecycleState,
 		Rating:           params.Rating,
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
@@ -1470,7 +1387,7 @@ type unifiedQueryInputs struct {
 	sortBy          *string
 	composition     *string
 	stackMembership *string
-	isDeleted       bool
+	lifecycleState  *string
 }
 
 func mediaCompositionParam(value MediaComposition) *string {
@@ -1497,7 +1414,7 @@ func newUnifiedQueryInputs(params QueryAssetsParams) (unifiedQueryInputs, error)
 		stackKinds:      sqliteStrings(params.StackKinds),
 		composition:     mediaCompositionParam(params.MediaComposition),
 		stackMembership: stackMembershipParam(params.StackMembership),
-		isDeleted:       params.IsDeleted != nil && *params.IsDeleted,
+		lifecycleState:  params.LifecycleState,
 	}
 
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
@@ -1535,7 +1452,7 @@ func countMediaItemsUnifiedParams(params QueryAssetsParams, in unifiedQueryInput
 		AssetTypes:       in.assetTypes,
 		TagNames:         in.tagNames,
 		StackKinds:       in.stackKinds,
-		IsDeleted:        in.isDeleted,
+		LifecycleState:   in.lifecycleState,
 		Query:            in.query,
 		AssetType:        params.AssetType,
 		OwnerID:          params.OwnerID,
@@ -1569,7 +1486,7 @@ func countMediaItemFilesUnifiedParams(params QueryAssetsParams, in unifiedQueryI
 		AssetTypes:       in.assetTypes,
 		TagNames:         in.tagNames,
 		StackKinds:       in.stackKinds,
-		IsDeleted:        in.isDeleted,
+		LifecycleState:   in.lifecycleState,
 		Query:            in.query,
 		AssetType:        params.AssetType,
 		OwnerID:          params.OwnerID,
@@ -1604,7 +1521,7 @@ func getMediaItemsUnifiedParams(params QueryAssetsParams, in unifiedQueryInputs)
 		TagNames:         in.tagNames,
 		StackKinds:       in.stackKinds,
 		SortBy:           in.sortBy,
-		IsDeleted:        in.isDeleted,
+		LifecycleState:   in.lifecycleState,
 		Query:            in.query,
 		AssetType:        params.AssetType,
 		OwnerID:          params.OwnerID,
@@ -1688,7 +1605,7 @@ func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssets
 	if end > len(candidates) {
 		end = len(candidates)
 	}
-	assets, err := s.hydrateAssetsInOrder(ctx, candidateIDs(candidates[params.Offset:end]), params.IsDeleted)
+	assets, err := s.hydrateAssetsInOrder(ctx, candidateIDs(candidates[params.Offset:end]), params.LifecycleState)
 	return assets, total, err
 }
 
@@ -1897,7 +1814,7 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetMediaItemRefsUni
 	out.Composition = mediaCompositionParam(params.MediaComposition)
 	out.StackMembership = stackMembershipParam(params.StackMembership)
 	out.StackKinds = sqliteStrings(params.StackKinds)
-	out.IsDeleted = params.IsDeleted != nil && *params.IsDeleted
+	out.LifecycleState = params.LifecycleState
 	if params.Rating != nil {
 		rating := int32(*params.Rating)
 		out.Rating = &rating
@@ -1906,4 +1823,35 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetMediaItemRefsUni
 	out.CameraModel = params.CameraModel
 	out.LensModel = params.LensModel
 	return out
+}
+
+func (s *assetService) DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.DeletePermanently(ctx, request)
+}
+func (s *assetService) RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.RemoveMissing(ctx, request)
+}
+func (s *assetService) EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.Empty(ctx, request, repositoryID, ownerID)
+}
+func (s *assetService) HeldTrashAssetIDs(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) ([]uuid.UUID, error) {
+	if s.trash == nil {
+		return nil, ErrAssetTrashUnavailable
+	}
+	return s.trash.HeldAssetIDs(ctx, repositoryID, ownerID)
+}
+func (s *assetService) AcceptTrashRetention(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.AcceptRetentionResult, error) {
+	if s.trash == nil {
+		return trash.AcceptRetentionResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.AcceptRetention(ctx, request, repositoryID, ownerID)
 }

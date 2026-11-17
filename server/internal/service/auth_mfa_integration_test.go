@@ -8,17 +8,17 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/repo"
+	"server/internal/catalog"
+	"server/internal/catalog/repo"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func newMFAIntegrationService(t *testing.T) (context.Context, *db.DB, *AuthService, repo.User, string, string) {
+func newMFAIntegrationService(t *testing.T) (context.Context, *catalog.DB, *AuthService, repo.User, string, string) {
 	t.Helper()
 	ctx := context.Background()
-	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(t.TempDir(), "app-state", "library.sqlite3")})
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(t.TempDir(), "app-state", "library.sqlite3")})
 	require.NoError(t, err)
 	require.NoError(t, catalog.Migrate(ctx))
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
@@ -36,7 +36,7 @@ func newMFAIntegrationService(t *testing.T) (context.Context, *db.DB, *AuthServi
 	require.NoError(t, err)
 
 	secretPath := filepath.Join(t.TempDir(), "secret")
-	auth, err := NewAuthService(catalog.Queries, catalog.SQL, config.AuthConfig{
+	auth, err := NewAuthService(catalog.Queries, nil, catalog.Writer, config.AuthConfig{
 		SecretKeyFile:   secretPath,
 		AccessTokenTTL:  time.Hour,
 		RefreshTokenTTL: 24 * time.Hour,
@@ -47,7 +47,7 @@ func newMFAIntegrationService(t *testing.T) (context.Context, *db.DB, *AuthServi
 }
 
 func TestTOTPEnrollmentAuthoritativelyEnablesLoginMFA(t *testing.T) {
-	ctx, catalog, auth, user, password, _ := newMFAIntegrationService(t)
+	ctx, catalogDB, auth, user, password, _ := newMFAIntegrationService(t)
 	oldSession, err := auth.generateAuthResponse(user)
 	require.NoError(t, err)
 	oldMediaToken, _, err := auth.GenerateMediaToken(ctx, int(user.UserID))
@@ -125,13 +125,13 @@ func TestTOTPEnrollmentAuthoritativelyEnablesLoginMFA(t *testing.T) {
 
 	// Reopen the catalog through a new DB handle to prove the typed status is
 	// durable rather than a process-local enrollment result.
-	path := catalog.Path
-	require.NoError(t, catalog.Close(ctx))
-	reopened, err := db.Open(ctx, config.DatabaseConfig{Path: path})
+	path := catalogDB.Path
+	require.NoError(t, catalogDB.Close(ctx))
+	reopened, err := catalog.Open(ctx, config.DatabaseConfig{Path: path})
 	require.NoError(t, err)
 	require.NoError(t, reopened.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, reopened.Close(context.Background())) })
-	reopenedAuth, err := NewAuthService(reopened.Queries, reopened.SQL, config.AuthConfig{
+	reopenedAuth, err := NewAuthService(reopened.Queries, nil, reopened.Writer, config.AuthConfig{
 		SecretKeyFile: filepath.Join(t.TempDir(), "secret-reopened"),
 	})
 	require.NoError(t, err)
@@ -228,7 +228,7 @@ func enableIntegrationTOTP(t *testing.T, ctx context.Context, auth *AuthService,
 
 func TestPendingTOTPEnrollmentSurvivesRestartAndExpiryIsNonDestructive(t *testing.T) {
 	t.Run("restart", func(t *testing.T) {
-		ctx, catalog, auth, user, password, secretPath := newMFAIntegrationService(t)
+		ctx, catalogDB, auth, user, password, secretPath := newMFAIntegrationService(t)
 		security, err := auth.VerifySecurity(ctx, int(user.UserID), SecurityVerificationInput{
 			CurrentPassword: password,
 			Purpose:         securityPurposeTOTPSetup,
@@ -240,12 +240,12 @@ func TestPendingTOTPEnrollmentSurvivesRestartAndExpiryIsNonDestructive(t *testin
 		require.NoError(t, err)
 		require.False(t, status.TOTPEnabled)
 
-		path := catalog.Path
-		require.NoError(t, catalog.Close(ctx))
-		reopened, err := db.Open(ctx, config.DatabaseConfig{Path: path})
+		path := catalogDB.Path
+		require.NoError(t, catalogDB.Close(ctx))
+		reopened, err := catalog.Open(ctx, config.DatabaseConfig{Path: path})
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, reopened.Close(context.Background())) })
-		reopenedAuth, err := NewAuthService(reopened.Queries, reopened.SQL, config.AuthConfig{
+		reopenedAuth, err := NewAuthService(reopened.Queries, nil, reopened.Writer, config.AuthConfig{
 			SecretKeyFile: secretPath,
 		})
 		require.NoError(t, err)

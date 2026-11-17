@@ -22,7 +22,7 @@ export function dateRangeLabel(range: AgentRefFacetsDTO["date_range"] | undefine
 const IMAGE_KEYS = new Set(["image", "photo"]);
 
 /** Sum the type-count facet for a kind, tolerating backend ("PHOTO"/"VIDEO"),
- * mock ("photo") and handoff ("IMAGE") casing. */
+ * lowercase ("photo") and handoff ("IMAGE") casing. */
 export function typeCount(
   types: AgentRefFacetsDTO["types"] | undefined,
   kind: "image" | "video",

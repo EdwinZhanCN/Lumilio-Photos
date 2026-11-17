@@ -12,9 +12,9 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/directory_manager.go
-- server/internal/db/migration.go
-- server/internal/api/handler/asset_handler.go
-- server/internal/db/backup/backup.go
+- server/internal/catalog/migration.go
+- server/internal/api/handler/asset_media_handler.go
+- server/internal/catalog/backup/backup.go
 -->
 
 # 原件、数据库与派生文件
@@ -29,7 +29,7 @@ SQLite 保存资产与路径映射、用户、相册、标签、喜欢、描述�
 
 ## 派生文件
 
-资源库 `.lumilio/assets` 保存缩略图、Web 视频、Web 音频和人脸裁剪；sidecar 保存非破坏编辑；OCR 与语义索引位于应用可重建状态中。
+资源库 `.lumilio/cache/artifacts` 保存缩略图、Web 视频、Web 音频和人脸裁剪；sidecar 保存非破坏编辑；OCR 与语义索引位于应用可重建状态中。
 
 ## 恢复含义
 

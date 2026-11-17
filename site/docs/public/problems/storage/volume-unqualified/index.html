@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Volume name rules unqualified · Lumilio API Problem</title>
+  <style>body{max-width:52rem;margin:4rem auto;padding:0 1.5rem;font:16px/1.6 system-ui,sans-serif;color:#202124}code{background:#f3f4f6;padding:.15rem .35rem;border-radius:.25rem}dt{font-weight:700;margin-top:1rem}dd{margin-left:0}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #ddd;padding:.6rem}</style>
+</head>
+<body>
+  <p><a href="/problems/">Lumilio API Problems</a></p>
+  <h1>Volume name rules unqualified</h1>
+  <dl>
+    <dt>Type</dt><dd><code>https://lumilio.org/problems/storage/volume-unqualified</code></dd>
+    <dt>Normal HTTP status</dt><dd>409</dd>
+    <dt>Definition</dt><dd>The name comparison rule of the volume holding the target folder could not be measured, or directories of the tree follow different rules, so the Repository was not registered or reconnected there.</dd>
+    <dt>Recovery</dt><dd>Check that the folder is writable and that no per-directory case-folding flag differs inside the tree, then try again; a volume Lumilio cannot qualify is not used.</dd>
+    <dt>Recovery entry</dt><dd>actor <code>desktop_host</code>, phase <code>running</code>, kind <code>host_action</code>, route <code>/storage</code>, host action <code>locate_repository</code></dd>
+  </dl>
+  <h2>Extension members</h2>
+  <p>This Problem type defines no extension members.</p>
+  <p>Runtime clients identify this condition by <code>type</code>; they do not dereference this page automatically.</p>
+</body>
+</html>

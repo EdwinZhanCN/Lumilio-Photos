@@ -27,13 +27,7 @@ import {
   type CanvasScrim,
   type CanvasSpec,
 } from "../../model/canvasSpec";
-import {
-  angledLinearGradient,
-  clamp,
-  context2d,
-  createCanvas,
-  roundRectPath,
-} from "./canvasUtils";
+import { angledLinearGradient, clamp, context2d, createCanvas, roundRectPath } from "./canvasUtils";
 
 export type PhotoSource = ImageBitmap | OffscreenCanvas;
 

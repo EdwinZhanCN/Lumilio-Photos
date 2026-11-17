@@ -7,17 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
 	"server/internal/storage/repocfg"
 )
 
-func TestStorageRuntimeStatusDegradesOnlyForBootstrapAnchors(t *testing.T) {
+func TestStorageRuntimeStatusDegradesOnlyForMissingBootstrapAnchors(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	defaultPath := filepath.Join(t.TempDir(), "default")
 	initializeDefaultStorageForTest(t, manager, defaultPath)
-	defaultRoot, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	defaultStorageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +24,7 @@ func TestStorageRuntimeStatusDegradesOnlyForBootstrapAnchors(t *testing.T) {
 	regular, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-ordinary", Actor: "test", Name: "Ordinary",
 		DirectoryName: "ordinary", Role: dbtypes.RepoRoleRegular,
-		RootID: defaultRoot.RootID.String(),
+		StorageLocationID: defaultStorageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +52,7 @@ func TestStorageRuntimeStatusDegradesOnlyForBootstrapAnchors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if status.State != StorageRuntimeStateActive {
-		t.Fatalf("status read mutated the unreconciled projection: %+v", status)
+		t.Fatalf("primary reachability failure degraded instance: %+v", status)
 	}
 	if err := manager.ReconcileAll(ctx); err != nil {
 		t.Fatal(err)
@@ -62,8 +61,18 @@ func TestStorageRuntimeStatusDegradesOnlyForBootstrapAnchors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if status.State != StorageRuntimeStateActive {
+		t.Fatalf("reconciled primary unavailability degraded instance: %+v", status)
+	}
+	if _, err = manager.writer.Pool().ExecContext(ctx, `DELETE FROM repositories WHERE repo_id = ?`, primary.RepoID); err != nil {
+		t.Fatal(err)
+	}
+	status, err = manager.StorageRuntimeStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if status.State != StorageRuntimeStateDegraded || status.Reason != StorageRuntimeReasonRecoveryRequired {
-		t.Fatalf("primary failure runtime status = %+v", status)
+		t.Fatalf("missing primary registration runtime status = %+v", status)
 	}
 }
 
@@ -72,8 +81,6 @@ func TestStorageRuntimeStatusStaysAvailableWhileWriterIsBusy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	manager.readerDatabase = catalog.ReaderSQL
-	manager.readerQueries = repo.New(catalog.ReaderSQL)
 
 	writer, err := catalog.SQL.BeginTx(ctx, nil)
 	if err != nil {
@@ -95,7 +102,7 @@ func TestStorageRuntimeStatusStaysAvailableWhileWriterIsBusy(t *testing.T) {
 	}
 }
 
-func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
+func TestReconnectStorageLocationIsAllOrNothing(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -105,21 +112,21 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 	if err := os.Mkdir(externalPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	external, err := manager.AddRepositoryRoot(ctx, externalPath, "Archive")
+	external, err := manager.AddStorageLocation(ctx, externalPath, "Archive")
 	if err != nil {
 		t.Fatal(err)
 	}
 	externalPath = external.Path
-	first, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	first, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "external-first", Actor: "test", Name: "First", DirectoryName: "first",
-		Role: dbtypes.RepoRoleRegular, RootID: external.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: external.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := manager.CreateRepository(ctx, CreateRepositorySpec{
+	second, err := createAcknowledgedForTest(t, manager, CreateRepositorySpec{
 		RequestID: "external-second", Actor: "test", Name: "Second", DirectoryName: "second",
-		Role: dbtypes.RepoRoleRegular, RootID: external.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: external.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -142,10 +149,10 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 	if err := secondConfig.SaveConfigToFile(secondNewPath); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.RelocateRepositoryRoot(ctx, external.RootID.String(), newPath); err == nil {
+	if _, err := manager.ReconnectStorageLocation(ctx, external.StorageLocationID.String(), newPath); err == nil {
 		t.Fatal("relocate with invalid child identity unexpectedly succeeded")
 	}
-	rootAfterFailure, _ := manager.queries.GetRepositoryRoot(ctx, external.RootID)
+	rootAfterFailure, _ := manager.queries.GetStorageLocation(ctx, external.StorageLocationID)
 	firstAfterFailure, _ := manager.queries.GetRepository(ctx, first.Repository.RepoID)
 	secondAfterFailure, _ := manager.queries.GetRepository(ctx, second.Repository.RepoID)
 	if rootAfterFailure.Path != externalPath || firstAfterFailure.Path != first.Repository.Path || secondAfterFailure.Path != second.Repository.Path {
@@ -158,14 +165,14 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	relocateRequest := LifecycleRequest{RequestID: "relocate-external-stable", Actor: "test"}
-	if _, err := manager.RelocateRepositoryRoot(ctx, external.RootID.String(), newPath, relocateRequest); err != nil {
+	if _, err := manager.ReconnectStorageLocation(ctx, external.StorageLocationID.String(), newPath, relocateRequest); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.RelocateRepositoryRoot(ctx, external.RootID.String(), newPath, relocateRequest); err != nil {
+	if _, err := manager.ReconnectStorageLocation(ctx, external.StorageLocationID.String(), newPath, relocateRequest); err != nil {
 		t.Fatalf("stable relocate retry: %v", err)
 	}
 	var stableOperations int
-	if err := manager.database.QueryRowContext(ctx, `
+	if err := manager.writer.Pool().QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_operations WHERE request_id = ?
 	`, relocateRequest.RequestID).Scan(&stableOperations); err != nil {
 		t.Fatal(err)
@@ -173,7 +180,7 @@ func TestRelocateStorageLocationIsAllOrNothing(t *testing.T) {
 	if stableOperations != 1 {
 		t.Fatalf("stable relocate operations = %d, want 1", stableOperations)
 	}
-	rootAfterSuccess, _ := manager.queries.GetRepositoryRoot(ctx, external.RootID)
+	rootAfterSuccess, _ := manager.queries.GetStorageLocation(ctx, external.StorageLocationID)
 	firstAfterSuccess, _ := manager.queries.GetRepository(ctx, first.Repository.RepoID)
 	secondAfterSuccess, _ := manager.queries.GetRepository(ctx, second.Repository.RepoID)
 	if rootAfterSuccess.Path != canonicalNewPath || firstAfterSuccess.Path != filepath.Join(canonicalNewPath, "first") || secondAfterSuccess.Path != filepath.Join(canonicalNewPath, "second") {

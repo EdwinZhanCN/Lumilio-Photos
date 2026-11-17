@@ -2,7 +2,6 @@ package storage
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -19,8 +18,9 @@ func TestDetectsPhotosLibraryBundle(t *testing.T) {
 	}
 }
 
-// A synced folder is a legitimate if risky choice, so it warns rather than
-// rejects.
+// A synced folder is a legitimate if risky choice: the observer names the
+// provider as a fact and the one classifier turns it into the
+// cloud_sync_directory risk, never a refusal.
 func TestCloudSyncProviderRecognizesKnownLocations(t *testing.T) {
 	// Built from the platform's own root so these stay absolute on Windows,
 	// where filepath.IsAbs rejects a driveless path like "/Users/someone".
@@ -35,9 +35,8 @@ func TestCloudSyncProviderRecognizesKnownLocations(t *testing.T) {
 	}
 
 	for path, provider := range cases {
-		warnings := RepositoryRootWarnings(path)
-		if len(warnings) != 1 || !strings.Contains(warnings[0], provider) {
-			t.Fatalf("path %q warnings = %v, want one mentioning %s", path, warnings, provider)
+		if got := cloudSyncProvider(path); got != provider {
+			t.Fatalf("cloudSyncProvider(%q) = %q, want %q", path, got, provider)
 		}
 	}
 }

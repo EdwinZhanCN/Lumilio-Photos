@@ -7,8 +7,8 @@ import (
 	"math"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 )
@@ -54,9 +54,6 @@ func (rm *DefaultRepositoryManager) CheckRepositoryWriteCapacity(ctx context.Con
 	}
 	repository, err := rm.queries.GetRepository(ctx, id)
 	if err != nil {
-		return CapacityDecision{}, err
-	}
-	if err := rm.files.ValidateRepositoryParent(ctx, repository); err != nil {
 		return CapacityDecision{}, err
 	}
 	info := InspectStoragePath(repository.Path)

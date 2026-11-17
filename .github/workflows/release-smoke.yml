@@ -1,0 +1,128 @@
+# Published-artifact smoke: the post-tag Docker checkpoint of rc-release.md
+# Phase 4 and the producer of the compatibility fixture (Phase 3). It pulls
+# the Server image named in the dispatch from the registry, installs it the
+# way the release bundle does (its Compose file, a .env, two host directories),
+# drives the first-run wizard, an upload, browse, a backup and a restore
+# through the browser and the public API, and uploads what that made.
+#
+# Workflow owns triggers, runner setup, credentials, and artifacts; the
+# commands live in the root Taskfile (release:smoke:*) and web/taskfile.yml
+# (web:test:release-smoke).
+name: Release smoke
+
+# A dispatch proves a published image (post-tag, by digest). A pull request
+# that changes the workflow, its Task targets, its spec, or the bundle's
+# Compose file proves the workflow itself against the current `edge` image,
+# so a broken smoke never waits for a release to be noticed.
+on:
+    workflow_dispatch:
+        inputs:
+            image:
+                description: Server image to prove, as a tag or a digest reference (ghcr.io/edwinzhancn/lumilio-server@sha256:…)
+                required: true
+                default: ghcr.io/edwinzhancn/lumilio-server:edge
+    pull_request:
+        paths:
+            - '.github/workflows/release-smoke.yml'
+            - 'deploy/compose/compose.yml'
+            - 'taskfile.yml'
+            - 'web/taskfile.yml'
+            - 'web/e2e/specs/release-smoke.spec.ts'
+            - 'web/e2e/support/sample-image.ts'
+            - 'web/e2e/support/i18n.ts'
+            - 'web/e2e/support/api.ts'
+            - 'web/e2e/support/totp.ts'
+            - 'web/e2e/pages/gallery.page.ts'
+
+permissions:
+    contents: read
+    packages: read
+
+concurrency:
+    group: release-smoke-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    smoke:
+        name: fresh install, setup, upload, browse, backup and restore
+        runs-on: ubuntu-24.04
+        timeout-minutes: 45
+        env:
+            LUMILIO_IMAGE: ${{ inputs.image || 'ghcr.io/edwinzhancn/lumilio-server:edge' }}
+            # The release bundle's default deployment uses host networking;
+            # localhost is what a first user on the host opens.
+            LUMILIO_E2E_BASE_URL: http://localhost:6680
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: voidzero-dev/setup-vp@v1
+              with:
+                  node-version: '24'
+                  run-install: false
+
+            - name: Install dependencies
+              run: task web:install:ci
+
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
+            - name: Install Playwright Chromium
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              run: task web:playwright:install
+
+            - name: Install Playwright browser system dependencies
+              if: steps.playwright-cache.outputs.cache-hit == 'true'
+              run: task web:playwright:install:deps
+
+            - name: Log in to the image registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install the image from the release bundle's Compose files
+              run: task release:smoke:up
+
+            - name: Run the first-run, upload, browse, backup, and restore journey
+              run: task web:test:release-smoke
+
+            - name: Collect the compatibility fixture
+              run: SUDO=sudo task release:smoke:fixture
+
+            - name: Upload the compatibility fixture
+              uses: actions/upload-artifact@v7
+              with:
+                  name: compatibility-fixture-${{ github.run_id }}
+                  path: .local/release-smoke/fixture/
+                  retention-days: 90
+
+            - name: Capture Server logs
+              if: failure()
+              run: |
+                  mkdir -p web/test-results
+                  task release:smoke:logs > web/test-results/server.log 2>&1 || true
+
+            - name: Upload Playwright diagnostics
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: release-smoke-diagnostics-${{ github.run_id }}
+                  path: |
+                      web/playwright-report/
+                      web/test-results/
+                  if-no-files-found: ignore
+                  retention-days: 14
+
+            - name: Remove the install
+              if: always()
+              run: SUDO=sudo task release:smoke:down

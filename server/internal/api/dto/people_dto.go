@@ -7,17 +7,18 @@ import (
 )
 
 type PersonSummaryDTO struct {
-	PersonID              int32      `json:"person_id"`
-	Name                  *string    `json:"name,omitempty"`
-	IsConfirmed           bool       `json:"is_confirmed"`
-	IsHidden              bool       `json:"is_hidden"`
-	HiddenAt              *time.Time `json:"hidden_at,omitempty"`
-	MemberCount           int64      `json:"member_count"`
-	AssetCount            int64      `json:"asset_count"`
-	CoverFaceImagePath    *string    `json:"cover_face_image_path,omitempty"`
-	RepresentativeAssetID *string    `json:"representative_asset_id,omitempty"`
-	CreatedAt             time.Time  `json:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at"`
+	PersonID    int32      `json:"person_id"`
+	Name        *string    `json:"name,omitempty"`
+	IsConfirmed bool       `json:"is_confirmed"`
+	IsHidden    bool       `json:"is_hidden"`
+	HiddenAt    *time.Time `json:"hidden_at,omitempty"`
+	MemberCount int64      `json:"member_count"`
+	AssetCount  int64      `json:"asset_count"`
+	// HasCover reports whether GET /people/{id}/cover serves a face crop.
+	HasCover              bool      `json:"has_cover"`
+	RepresentativeAssetID *string   `json:"representative_asset_id,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }
 
 type PersonDetailDTO struct {
@@ -115,7 +116,7 @@ func ToPersonSummaryDTO(person service.Person) PersonSummaryDTO {
 		HiddenAt:              person.HiddenAt,
 		MemberCount:           person.MemberCount,
 		AssetCount:            person.AssetCount,
-		CoverFaceImagePath:    person.CoverFaceImagePath,
+		HasCover:              person.CoverFaceID != nil,
 		RepresentativeAssetID: person.RepresentativeAssetID,
 		CreatedAt:             person.CreatedAt,
 		UpdatedAt:             person.UpdatedAt,

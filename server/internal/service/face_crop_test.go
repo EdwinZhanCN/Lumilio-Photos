@@ -2,15 +2,28 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"image/jpeg"
 	"math"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
-	"server/internal/db/dbtypes"
-	"server/internal/utils/imaging"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/media/imaging"
+	"server/internal/storage"
+	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
+	"server/internal/storage/repocfg"
 
 	"github.com/davidbyttow/govips/v2/vips"
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
+	"github.com/google/uuid"
 )
 
 func TestFaceCropUsesDisplayCoordinates(t *testing.T) {
@@ -43,5 +56,57 @@ func TestFaceCropUsesDisplayCoordinates(t *testing.T) {
 		if _, err := encodeFaceCrop(src, bbox); err == nil {
 			t.Fatalf("invalid bounds accepted: %+v", bbox)
 		}
+	}
+}
+
+// Crops are published before the catalog transaction as immutable faces
+// artifacts of the content, one per face in order, and republishing the same
+// result adopts the same files.
+func TestPublishFaceCropsWritesFacesArtifacts(t *testing.T) {
+	imaging.StartVips()
+	var source bytes.Buffer
+	if err := jpeg.Encode(&source, image.NewRGBA(image.Rect(0, 0, 80, 60)), nil); err != nil {
+		t.Fatal(err)
+	}
+	repositoryPath := t.TempDir()
+	if err := layout.Init(repositoryPath); err != nil {
+		t.Fatal(err)
+	}
+	repository := repo.Repository{RepoID: uuid.New(), Path: repositoryPath, Reachability: dbtypes.RepositoryReachabilityActive}
+	marker := repocfg.NewRepositoryConfig("Faces")
+	marker.ID = repository.RepoID.String()
+	if err := marker.SaveConfigToFile(repositoryPath); err != nil {
+		t.Fatal(err)
+	}
+	files := storage.NewRepositoryFSFactory(nil, nil)
+	contentID := uuid.New()
+	result := &types.FaceV1{Faces: []types.Face{{BBox: []float32{5, 5, 25, 25}}, {BBox: []float32{40, 10, 70, 50}}}}
+
+	crops, err := PublishFaceCrops(context.Background(), files, repository, contentID, result, source.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if crops.RepositoryID != repository.RepoID || len(crops.Artifacts) != 2 {
+		t.Fatalf("crops = %+v", crops)
+	}
+	for index, identity := range crops.Artifacts {
+		if identity.SourceFence != contentID.String() || identity.Stage != artifact.StageFaces || identity.PipelineVersion != faceCropVersion || !strings.HasPrefix(identity.Name, strconv.Itoa(index)+"-") {
+			t.Fatalf("crop %d identity = %+v", index, identity)
+		}
+		stored, err := identity.Path()
+		if err != nil {
+			t.Fatal(err)
+		}
+		local, err := stored.Local()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info, err := os.Stat(filepath.Join(repositoryPath, local)); err != nil || info.Size() == 0 {
+			t.Fatalf("crop %d on disk: %v", index, err)
+		}
+	}
+	again, err := PublishFaceCrops(context.Background(), files, repository, contentID, result, source.Bytes())
+	if err != nil || !slices.Equal(again.Artifacts, crops.Artifacts) {
+		t.Fatalf("republished crops = %+v, %v", again, err)
 	}
 }

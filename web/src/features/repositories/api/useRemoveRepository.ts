@@ -1,10 +1,11 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
+import { storageViewQueryKey } from "./useStorageView";
 
 export function useRemoveRepository() {
   const queryClient = useQueryClient();
-  const mutation = $api.useMutation("delete", "/api/v1/repositories/{id}");
+  const mutation = $api.useMutation("post", "/api/v1/storage/repositories/{id}/detach");
 
   const removeRepository = useCallback(
     async (repositoryId: string, confirmationName: string) => {
@@ -13,10 +14,8 @@ export function useRemoveRepository() {
         body: { confirmation_name: confirmationName },
       });
       await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["get", "/api/v1/assets/indexing/repositories"],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/repositories"] }),
+        queryClient.invalidateQueries({ queryKey: [...storageViewQueryKey] }),
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/targets"] }),
         queryClient.invalidateQueries({ queryKey: ["post", "/api/v1/assets/list"] }),
         queryClient.invalidateQueries({ queryKey: ["post", "/api/v1/assets/search"] }),
       ]);

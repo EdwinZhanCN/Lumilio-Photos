@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"server/internal/catalog/catalogtx"
 )
 
 type ResourceRef struct {
@@ -28,12 +30,19 @@ type RelationResult struct {
 	SourceVersion string             `json:"source_version"`
 }
 
-type RelationService struct{ db *sql.DB }
+type RelationService struct {
+	reader *catalogtx.Reader
+	db     catalogtx.Statements
+}
 
-func NewRelationService(db *sql.DB) *RelationService { return &RelationService{db: db} }
+// NewRelationService reads Event relations through the catalog's query-only
+// reader.
+func NewRelationService(reader *catalogtx.Reader) *RelationService {
+	return &RelationService{reader: reader, db: reader.Statements()}
+}
 
 func (s *RelationService) ForEvent(ctx context.Context, ownerID int32, eventID string) (RelationResult, error) {
-	resolver := NewResolver(s.db)
+	resolver := NewResolver(s.reader)
 	summary, err := resolver.Resolve(ctx, ownerID, eventID)
 	if err != nil {
 		return RelationResult{}, err

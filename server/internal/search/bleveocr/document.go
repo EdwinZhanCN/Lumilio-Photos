@@ -7,24 +7,24 @@ import (
 )
 
 type OCRDocument struct {
-	AssetID      string `json:"asset_id"`
-	TextEN       string `json:"text_en"`
-	TextZH       string `json:"text_zh"`
-	OwnerID      int32  `json:"owner_id"`
-	RepositoryID string `json:"repository_id"`
-	AssetType    string `json:"asset_type"`
-	IsDeleted    bool   `json:"is_deleted"`
-	Revision     int64  `json:"revision"`
+	AssetID        string `json:"asset_id"`
+	TextEN         string `json:"text_en"`
+	TextZH         string `json:"text_zh"`
+	OwnerID        int32  `json:"owner_id"`
+	RepositoryID   string `json:"repository_id"`
+	AssetType      string `json:"asset_type"`
+	LifecycleState string `json:"lifecycle_state"`
+	Revision       int64  `json:"revision"`
 }
 
 type SourceDocument struct {
-	AssetID      string
-	OwnerID      int32
-	RepositoryID string
-	AssetType    string
-	IsDeleted    bool
-	Revision     int64
-	TextItems    []string
+	AssetID        string
+	OwnerID        int32
+	RepositoryID   string
+	AssetType      string
+	LifecycleState string
+	Revision       int64
+	TextItems      []string
 }
 
 func repositoryIDString(value any) string {
@@ -43,14 +43,14 @@ func repositoryIDString(value any) string {
 func BuildDocument(source SourceDocument) OCRDocument {
 	textEN, textZH := SplitText(strings.Join(source.TextItems, " "))
 	return OCRDocument{
-		AssetID:      source.AssetID,
-		TextEN:       textEN,
-		TextZH:       textZH,
-		OwnerID:      source.OwnerID,
-		RepositoryID: source.RepositoryID,
-		AssetType:    source.AssetType,
-		IsDeleted:    source.IsDeleted,
-		Revision:     source.Revision,
+		AssetID:        source.AssetID,
+		TextEN:         textEN,
+		TextZH:         textZH,
+		OwnerID:        source.OwnerID,
+		RepositoryID:   source.RepositoryID,
+		AssetType:      source.AssetType,
+		LifecycleState: source.LifecycleState,
+		Revision:       source.Revision,
 	}
 }
 

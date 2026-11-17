@@ -2,13 +2,14 @@ package search
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -26,18 +27,20 @@ type Service interface {
 }
 
 type AggregateService struct {
-	pool       *sql.DB
+	queries    *repo.Queries
 	retrievers []Retriever
 	logger     *zap.Logger
 	rrfK       float64
 }
 
-func NewAggregateService(pool *sql.DB, retrievers []Retriever, logger *zap.Logger) *AggregateService {
+// NewAggregateService fuses retrievers and hydrates the ranked Assets through
+// queries, the catalog's query-only reader queries.
+func NewAggregateService(queries *repo.Queries, retrievers []Retriever, logger *zap.Logger) *AggregateService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	return &AggregateService{
-		pool:       pool,
+		queries:    queries,
 		retrievers: retrievers,
 		logger:     logger,
 		rrfK:       DefaultRRFK,
@@ -45,7 +48,7 @@ func NewAggregateService(pool *sql.DB, retrievers []Retriever, logger *zap.Logge
 }
 
 func (s *AggregateService) Search(ctx context.Context, req Request) (Response, error) {
-	if s == nil || s.pool == nil {
+	if s == nil || s.queries == nil {
 		return Response{}, fmt.Errorf("aggregate search service is not configured")
 	}
 	if !hasTextQuery(req) {
@@ -137,8 +140,7 @@ func (s *AggregateService) Search(ctx context.Context, req Request) (Response, e
 		rankedIDs = append(rankedIDs, item.assetID)
 	}
 
-	includeDeleted := req.Filter.IsDeleted != nil && *req.Filter.IsDeleted
-	assets, err := HydrateAssets(ctx, s.pool, rankedIDs, includeDeleted)
+	assets, err := HydrateAssets(ctx, s.queries, rankedIDs, req.Filter.lifecycleState())
 	if err != nil {
 		return Response{Sources: sourceMetas, TotalCandidates: totalCandidates, CandidatePoolSize: req.TopK}, err
 	}

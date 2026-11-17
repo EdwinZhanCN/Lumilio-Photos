@@ -1,10 +1,3 @@
-// Package app contains the server bootstrap: it wires configuration, logging,
-// storage, the job queue, ML services, and the HTTP router, then serves until
-// the provided context is cancelled. It is invoked by the CLI entrypoint
-// (server/cmd) and imported in-process by the desktop supervisor, so it must
-// own its full lifecycle (startup and graceful shutdown) without calling
-// os.Exit. Fatal startup conditions are returned as errors for the caller to
-// handle.
 package app
 
 import (
@@ -29,32 +22,35 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/handler"
-	"server/internal/artifact"
-	"server/internal/cloud"
-	"server/internal/commit"
-	"server/internal/db"
-	dbbackup "server/internal/db/backup"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/api/httporigin"
+	"server/internal/api/servertransport"
+	"server/internal/catalog"
+	dbbackup "server/internal/catalog/backup"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
-	"server/internal/execution"
-	"server/internal/httporigin"
-	"server/internal/logging"
-	"server/internal/processors"
-	"server/internal/queue"
+	"server/internal/foundation/logging"
+	"server/internal/foundation/settings"
+	"server/internal/foundation/version"
+	"server/internal/ingest/cloud"
+	"server/internal/ingest/commit"
+	"server/internal/ingest/processors"
+	"server/internal/ingest/queue"
+	"server/internal/ingest/sourcing"
+	"server/internal/media/imaging"
 	"server/internal/search/bleveocr"
-	"server/internal/servertransport"
 	"server/internal/service"
-	"server/internal/settings"
-	"server/internal/sourcing"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
-	roelocations "server/internal/storage/roe/locations"
-	roematerializer "server/internal/storage/roe/materializer"
-	"server/internal/utils/imaging"
-	"server/internal/version"
+	"server/internal/storage/artifact"
+	"server/internal/storage/layout"
+	"server/internal/storage/locations"
+	"server/internal/storage/recovery"
+	"server/internal/storage/scan"
+	"server/internal/storage/trash"
+	"server/internal/work/execution"
 
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -88,6 +84,15 @@ type OperatorControls struct {
 	// workers are available. Desktop uses this typed handoff instead of probing
 	// its own loopback listener to establish generation ownership.
 	RuntimeReady func(RuntimeInfo)
+	// ChangeWatchBackend supplies the recursive filesystem hints the scan
+	// watcher turns into scan requests. Nil uses the native syncthing/notify
+	// watcher. A host or test without a usable native watcher installs its
+	// own; hints only shorten latency, and the periodic full scan stays the
+	// authority whatever backend is installed.
+	ChangeWatchBackend scan.ChangeWatchBackend
+	// catalogOpened hands the opened catalog to an in-package test; hosts
+	// cannot set it.
+	catalogOpened func(*catalog.DB)
 }
 
 // RuntimeInfo describes the listener published by one server generation. It
@@ -236,7 +241,7 @@ func run(
 	processorLogger := logRuntime.Named("processor")
 	indexingLogger := logRuntime.Named("indexing")
 	observationLogger := logRuntime.Named("repository_observation")
-	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), appConfig.LoggingConfig.RepositoryAuditVerbose)
+	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), layout.LogsDir().String(), appConfig.LoggingConfig.RepositoryAuditVerbose)
 	defer func() {
 		if err := repoAuditProvider.Close(); err != nil {
 			appLogger.Warn("failed to close repository audit logs", zap.Error(err))
@@ -256,16 +261,19 @@ func run(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Ensure the default media root and explicitly separate private cloud/backup
+	// Ensure the default media storageLocation and explicitly separate private cloud/backup
 	// directories exist before any service reads them.
 	if err := storage.EnsureRootLayout(appConfig.StorageConfig); err != nil {
 		return fmt.Errorf("ensure storage layout: %w", err)
 	}
 
 	catalogScheduleWake := queue.NewSchedulerWake()
-	database, err := db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))
+	database, err := catalog.Open(ctx, dbConfig, catalog.WithTransactionObserver(catalogScheduleWake))
 	if err != nil {
 		return fmt.Errorf("open SQLite database: %w", err)
+	}
+	if controls.catalogOpened != nil {
+		controls.catalogOpened(database)
 	}
 	databaseCloseAllowed := true
 	defer func() {
@@ -287,16 +295,29 @@ func run(
 		}
 	}()
 
-	// Schema generation 8 is intentionally fresh-only. Pre-production catalogs
-	// from earlier generations are rejected and recreated instead of translated.
-	if err := database.MigrateCatalog(ctx); err != nil {
+	// An empty catalog gets the baseline and every forward step. An older
+	// catalog (including one just installed by a restore) is snapshotted into
+	// a protected pre-upgrade backup first; pre-release and newer catalogs were
+	// already rejected by db.Open.
+	preUpgradeBackup := func(ctx context.Context, source *catalogtx.Reader, from, to int) (string, error) {
+		snapshot, err := dbbackup.CreateSnapshot(
+			ctx,
+			source,
+			appConfig.StorageConfig.BackupsDir(),
+			dbbackup.PreUpgradePrefix,
+			dbbackup.SnapshotMetadata{AppVersion: version.Version, ConfigSchemaVersion: appConfig.SchemaVersion},
+			appLogger.Named("db_backup").Sugar().Infof,
+		)
+		return snapshot.Path, err
+	}
+	if err := database.MigrateCatalog(ctx, preUpgradeBackup); err != nil {
 		appLogger.Error("failed to run migrations automatically",
 			zap.String("operation", "database.migrate"),
 			zap.Error(err),
 		)
 		return fmt.Errorf("run database migrations: %w", err)
 	}
-	queueDatabase, quarantinedQueuePath, err := db.OpenQueueWithRecovery(ctx, dbConfig)
+	queueDatabase, quarantinedQueuePath, err := catalog.OpenQueueWithRecovery(ctx, dbConfig)
 	if err != nil {
 		return fmt.Errorf("open SQLite queue database: %w", err)
 	}
@@ -318,7 +339,6 @@ func run(
 	if err := queueDatabase.Migrate(ctx); err != nil {
 		return fmt.Errorf("run SQLite queue migrations: %w", err)
 	}
-	sqlDB := database.SQL
 	queries := database.Queries
 	ocrIndex, err := bleveocr.Open(
 		ctx,
@@ -335,7 +355,7 @@ func run(
 			runErr = errors.Join(runErr, err)
 		}
 	}()
-	ocrIndexWriter := bleveocr.NewWriter(sqlDB, database.Writer, queries, ocrIndex)
+	ocrIndexWriter := bleveocr.NewWriter(database.Writer, queries, ocrIndex)
 	ocrIndexTrigger := bleveocr.NewOutboxTrigger()
 
 	// Execution budget, macro workers lane width, and process-global tool session
@@ -363,15 +383,15 @@ func run(
 	// desired state remains recoverable while the domain services and commit
 	// capabilities are assembled below.
 	workers := river.NewWorkers()
-	queueClient, err := queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers, logRuntime.RiverLogger(), budget.DerivedMacroWorkers())
+	queueClient, err := queue.New(queueDatabase.RiverDriver(), workers, logRuntime.RiverLogger(), budget.DerivedMacroWorkers())
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
-	settingsService := service.NewSettingsServiceWithRuntime(
+	settingsService := service.NewSettingsService(
 		queries,
 		settings.Default(appConfig.Environment),
 		appConfig.Auth.SecretKeyFile,
-		service.SettingsRuntime{DB: sqlDB, Writer: database.Writer},
+		database.Writer,
 	)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
 		return fmt.Errorf("initialize system settings: %w", err)
@@ -404,7 +424,7 @@ func run(
 	// Initialize new repository-based storage system
 	repositoryAccess := storage.NewRepositoryAccessCoordinator()
 	repositoryFiles := storage.NewRepositoryFSFactory(repositoryAccess, queries)
-	repoManager, err := storage.NewRepositoryManagerWithCatalog(sqlDB, database.Writer, database.ReaderSQL, queries, repositoryLogger, repoAuditProvider, repositoryFiles)
+	repoManager, err := storage.NewRepositoryManager(database.Writer, database.Reader, queries, database.ReaderQueries, repositoryLogger, repoAuditProvider, repositoryFiles)
 	if err != nil {
 		return fmt.Errorf("initialize repository manager: %w", err)
 	}
@@ -421,18 +441,23 @@ func run(
 	if err := repoManager.RecoverHostActions(ctx); err != nil {
 		return fmt.Errorf("recover native host actions: %w", err)
 	}
-	defaultRoot, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
+	defaultStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
 	if err != nil {
 		return err
 	}
-	if degradedStorage {
+	if defaultStorage.Degraded {
+		// Restricted recovery runtime: the catalog is usable, HTTP starts, and
+		// the authenticated setup or Storage journey names the way out. No
+		// marker is provisioned or replaced here.
 		appLogger.Warn("default Storage Location requires recovery; continuing in degraded mode",
-			zap.String("operation", "repository_root.recovery_required"),
+			zap.String("operation", "storage_location.recovery_required"),
+			zap.String("reason", defaultStorage.Reason),
+			zap.Bool("registered", defaultStorage.Location != nil),
 			zap.String("path", appConfig.StorageConfig.Path))
 	} else {
 		appLogger.Info("default storage location initialized",
-			zap.String("operation", "repository_root.init"),
-			zap.String("path", defaultRoot.Path),
+			zap.String("operation", "storage_location.init"),
+			zap.String("path", defaultStorage.Location.Path),
 		)
 	}
 	stagingManager := storage.NewStagingManager(repositoryFiles)
@@ -442,7 +467,7 @@ func run(
 	// Re-check every repository's recorded path before anything schedules work
 	// against it. Unreachable repositories become offline rather than failing
 	// mid-scan.
-	if err := repoManager.ReconcileRepositoryRoots(ctx); err != nil {
+	if err := repoManager.ReconcileStorageLocations(ctx); err != nil {
 		appLogger.Warn("failed to reconcile Storage Locations", zap.Error(err))
 	}
 	if err := repoManager.ReconcileAll(ctx); err != nil {
@@ -453,10 +478,10 @@ func run(
 		appLogger.Warn("failed to reconcile repository capacity", zap.Error(err))
 	}
 	go monitorRepositoryCapacity(ctx, repoManager, appLogger.Named("storage_capacity"))
-	eventService := event.NewServiceWithCatalog(database.Writer, database.Reader)
-	faceService := service.NewFaceService(queries, repositoryFiles, sqlDB, database.Writer)
+	eventService := event.NewService(database.Writer, database.Reader)
+	faceService := service.NewFaceService(queries, repositoryFiles, database.Writer)
 
-	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, database.Writer, database.ReaderSQL, queries, appLogger, lumenLogger)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, database.Writer, database.Reader, queries, appLogger, lumenLogger)
 	if err != nil {
 		return fmt.Errorf("initialize ML services: %w", err)
 	}
@@ -469,12 +494,11 @@ func run(
 		}
 	}()
 
-	assetService, err := service.NewAssetServiceWithReader(
+	assetService, err := service.NewAssetService(
 		queries,
-		sqlDB,
 		database.Writer,
 		database.ReaderQueries,
-		database.ReaderSQL,
+		database.Reader,
 		lumenService,
 		embeddingService,
 		ocrIndex,
@@ -484,15 +508,14 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize asset service: %w", err)
 	}
-	locationService := service.NewLocationServiceWithCatalog(queries, database.Writer, database.Reader)
+	locationService := service.NewLocationService(queries, database.Writer, database.Reader)
 	speciesReferenceService := service.NewSpeciesReferenceService()
-	indexingService := service.NewAssetIndexingServiceWithReader(queries, settingsService, lumenService, database.Writer, database.ReaderSQL, indexingLogger, repoAuditProvider, repositoryFiles)
-	stackService := service.NewStackServiceWithReader(queries, sqlDB, database.Writer, database.ReaderSQL, appLogger.Named("stack"), repoAuditProvider)
-	duplicateService := service.NewDuplicateService(queries, sqlDB, database.Writer, appLogger.Named("duplicate"), assetService)
-	authService, err := service.NewAuthServiceWithReader(
+	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, database.Writer, database.Reader, indexingLogger, repoAuditProvider, repositoryFiles)
+	stackService := service.NewStackService(queries, database.Writer, database.Reader, appLogger.Named("stack"), repoAuditProvider)
+	duplicateService := service.NewDuplicateService(queries, database.Writer, appLogger.Named("duplicate"), assetService)
+	authService, err := service.NewAuthService(
 		queries,
 		database.ReaderQueries,
-		sqlDB,
 		database.Writer,
 		appConfig.Auth,
 		appLogger.Named("auth"),
@@ -506,7 +529,13 @@ func run(
 		return fmt.Errorf("initialize auth rate limiter: %w", err)
 	}
 	albumService := service.NewAlbumService(queries)
-	userService := service.NewUserServiceWithWriter(queries, sqlDB, database.Writer)
+	musicService := service.NewMusicService(queries, database.ReaderQueries, database.Writer)
+	go func() {
+		if err := musicService.BackfillAll(ctx, 500); err != nil {
+			appLogger.Warn("music catalog backfill failed", zap.String("operation", "music.backfill"), zap.Error(err))
+		}
+	}()
+	userService := service.NewUserService(queries, database.Writer)
 
 	// Break-glass recovery is an explicit single-run host control, separate from
 	// immutable AppConfig.
@@ -515,7 +544,7 @@ func run(
 	// Initialize Agent Service. The ref store is shared between the agent
 	// tool chain and the hydration API handler; its janitor bounds memory
 	// for abandoned sessions.
-	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)
+	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService, database.Reader)
 	refStore := ref.NewPersistentStore(
 		queries,
 		authorizedLibraries,
@@ -527,23 +556,22 @@ func run(
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, sqlDB, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
+	agentService := core.NewAgentService(queries, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath, musicService)
 	agentPins := pins.NewService(queries, refStore, authorizedLibraries)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
 	// Share links reuse the same asset-set-source query path pins use
 	// (resolveSourceAssetIDs -> AssetService.QueryAssets / agentPins.AssetIDs),
 	// so it's constructed here once both dependencies exist.
-	shareLinkService := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
+	shareLinkService, err := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
+	if err != nil {
+		return fmt.Errorf("initialize share link service: %w", err)
+	}
 
 	// Register agent tools
 	tools.RegisterAll()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	// Upload/cloud staging and filesystem observation converge at the same ROE
-	// content/Asset/Location commit boundary.
-	repositoryHashPreparer := roematerializer.NewHashPreparer(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
-	repositoryHashApplier := roematerializer.NewHashApplier()
 	artifactCleaner, err := artifact.NewCleaner(database, repositoryFiles, 24*time.Hour)
 	if err != nil {
 		return fmt.Errorf("initialize artifact cleaner: %w", err)
@@ -557,12 +585,9 @@ func run(
 		return fmt.Errorf("initialize execution governor: %w", err)
 	}
 	executionEngine := execution.NewEngine(governor)
-	repositoryObservationConfig := roecontroller.Config{
-		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
-	}
 	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commit.CatalogDependencies{
 		Face: faceService, Event: eventService, Location: locationService,
-		Indexing: indexingService, Materializer: repositoryHashApplier,
+		Indexing: indexingService,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize commit coordinator: %w", err)
@@ -588,7 +613,7 @@ func run(
 	sourceMaterializer.SetCapacityGuard(repoManager)
 	assetProcessor := processors.NewAssetProcessor(
 		database.ReaderQueries,
-		database.ReaderSQL,
+		database.Reader.Statements(),
 		sourceMaterializer,
 		settingsService,
 		lumenService,
@@ -599,25 +624,6 @@ func run(
 		repoAuditProvider,
 		repositoryFiles,
 	)
-	sourceMaterializer.SetActivation(func(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
-		_, err := commitCoordinator.ApplyRepositoryKnownContent(ctx, commit.RepositoryKnownContentApplied{Fact: fact})
-		if err != nil {
-			return roematerializer.Result{}, err
-		}
-		observation, err := database.ReaderQueries.GetRepositoryObservationBySourceEvent(ctx, repo.GetRepositoryObservationBySourceEventParams{RepositoryID: fact.RepositoryID, Source: fact.Source, SourceEventKey: &fact.SourceEventKey})
-		if err != nil || !observation.MappedNodeID.Valid {
-			return roematerializer.Result{}, fmt.Errorf("load committed source observation: %w", err)
-		}
-		location, err := database.ReaderQueries.GetActiveAssetLocationByNode(ctx, observation.MappedNodeID.UUID)
-		if err != nil {
-			return roematerializer.Result{}, fmt.Errorf("load committed source asset: %w", err)
-		}
-		asset, err := database.ReaderQueries.GetAssetByIDAny(ctx, location.AssetID)
-		if err != nil {
-			return roematerializer.Result{}, fmt.Errorf("load committed source content: %w", err)
-		}
-		return roematerializer.Result{Code: roematerializer.ResultBound, RepositoryID: fact.RepositoryID, NodeID: observation.MappedNodeID.UUID, AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: observation.Revision}, nil
-	})
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -625,45 +631,61 @@ func run(
 			runErr = errors.Join(runErr, err)
 		}
 	}()
-	assetLocationResolver := roelocations.NewResolver(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
-	assetProcessor.SetLocationResolver(assetLocationResolver)
-	repositoryObserver := roecontroller.New(database.ReaderQueries, commitCoordinator, repositoryFiles, repositoryObservationConfig, observationLogger)
-	repositoryScanCommands := roecontroller.NewCommands(database, repositoryObservationConfig, observationLogger)
-	defer func() {
-		if err := repositoryObserver.Close(); err != nil {
-			runErr = errors.Join(runErr, fmt.Errorf("close repository change feed: %w", err))
-		}
-	}()
-	if notifications := repositoryObserver.Notifications(); notifications != nil {
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case repositoryID, ok := <-notifications:
-					if !ok {
-						return
-					}
-					if _, err := repositoryScanCommands.Request(ctx, repositoryID, "watcher", "native_change", false); err != nil && ctx.Err() == nil {
-						observationLogger.Warn("enqueue native repository observation",
-							zap.String("repository_id", repositoryID.String()), zap.Error(err))
-					}
-				}
-			}
-		}()
+	// Upload/cloud staging and filesystem scans converge on the same scan
+	// index binding, written through the commit coordinator.
+	repositoryScanner, err := scan.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, scan.Config{
+		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
+		Activate: func(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
+			return service.ApplyAssetActivationTx(ctx, tx, queries, repositoryID, entryID, assetID, contentID)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("initialize repository scanner: %w", err)
 	}
+	sourceMaterializer.SetActivation(repositoryScanner.BindKnownContent)
+	// Delete and Restore move files through the repository trash and commit
+	// through the scanner. A move a crash interrupted is reconciled before
+	// users act; one whose repository is offline waits for the next start.
+	assetTrash, err := trash.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, repositoryScanner, appLogger.Named("trash"))
+	if err != nil {
+		return fmt.Errorf("initialize repository trash: %w", err)
+	}
+	if err := assetTrash.Recover(ctx); err != nil {
+		appLogger.Warn("interrupted trash operations wait for their repositories", zap.Error(err))
+	}
+	// Private recovery adopts the inherited Trash (held) and reassociates
+	// proven Studio records after a Repository is opened, copied, or adopted;
+	// it runs with every Trash maintenance pass and after a scan completes.
+	privateRecovery, err := recovery.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, repositoryScanner, assetTrash, appLogger.Named("recovery"))
+	if err != nil {
+		return fmt.Errorf("initialize private recovery: %w", err)
+	}
+	// Before anything writes to a repository again: repair missing layout
+	// directories and quarantine what the last run left in work/.
+	if err := privateRecovery.PrepareRepositories(ctx); err != nil {
+		appLogger.Warn("some repositories wait for the next start to be prepared", zap.Error(err))
+	}
+	go runTrashMaintenanceLoop(ctx, assetTrash, privateRecovery,
+		time.Duration(appConfig.RepositoryTrash.RetentionDays)*24*time.Hour, appLogger.Named("trash"))
+	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {
+		return err
+	}
+	assetLocationResolver := locations.NewResolver(database.ReaderQueries, repositoryFiles)
+	assetProcessor.SetLocationResolver(assetLocationResolver)
 	repoManager.SetInitialScanEnqueuer(func(ctx context.Context, repositoryID string) error {
-		_, err := repositoryScanCommands.EnqueueManualScan(ctx, repositoryID, "storage_lifecycle", true)
+		_, err := repositoryScanner.RequestScan(ctx, repositoryID, scan.TriggerManual, "storage_lifecycle")
 		return err
 	})
 	if err := repoManager.RetryPendingInitialRepositoryScans(ctx); err != nil {
 		return fmt.Errorf("resume pending initial repository scans: %w", err)
 	}
-	go func() {
-		ticker := time.NewTicker(time.Duration(appConfig.RepositoryScan.IntervalSeconds) * time.Second)
-		defer ticker.Stop()
-		runRepositoryVerifierLoop(ctx, ticker.C, repositoryScanCommands.EnqueueAllPeriodicScans, observationLogger)
-	}()
+	go runRepositoryVerifierLoop(ctx,
+		jitteredTicks(ctx, time.Duration(appConfig.RepositoryScan.IntervalSeconds)*time.Second),
+		repositoryScanner.RequestAllPeriodic, observationLogger)
+	// Filesystem events only shorten latency; the periodic full scan above is
+	// the authority when events are lost.
+	go scan.NewWatcher(database.ReaderQueries, repositoryScanner, observationLogger,
+		scan.WatchConfig{Backend: controls.ChangeWatchBackend}).Run(ctx)
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
@@ -686,10 +708,12 @@ func run(
 	// the commit coordinator own product progress; each bounded runtime step
 	// declares its own process-wide execution resources.
 	macroRuntime := &pipelineRuntime{
-		engine: executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
-		repository: repositoryObserver, repositoryHasher: repositoryHashPreparer,
-		repositoryReader: database.ReaderQueries,
-		eventProjection:  eventService, locationProjection: locationService,
+		logger:         appLogger.Named("pipeline"),
+		pipelineReader: database.Reader.Statements(),
+		engine:         executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
+		scanner:         repositoryScanner,
+		recovery:        privateRecovery,
+		eventProjection: eventService, locationProjection: locationService,
 		ocrProjection: ocrIndexWriter, reindexProjection: indexingService,
 		enrichmentReader: database.ReaderQueries, settings: settingsService,
 		lumen: lumenService, classifier: classifierService, files: repositoryFiles,
@@ -698,11 +722,11 @@ func run(
 		return fmt.Errorf("register pipeline runtime: %w", err)
 	}
 	// Automatic database backups use their explicit private destination rather
-	// than following any removable repository root. Policy
+	// than following any removable Storage Location. Policy
 	// (enabled/interval/retention) is read from runtime settings on every tick,
 	// so the periodic job below can stay a fixed hourly heartbeat.
 	backupLogger := appLogger.Named("db_backup").Sugar()
-	catalogInfo, err := db.InspectCatalog(ctx, database.Path)
+	catalogInfo, err := catalog.InspectCatalog(ctx, database.Path)
 	if err != nil {
 		return fmt.Errorf("inspect SQLite catalog for backup runtime: %w", err)
 	}
@@ -711,10 +735,10 @@ func run(
 		ConfigSchemaVersion: appConfig.SchemaVersion,
 	}
 	snapshotCompatibility := dbbackup.Compatibility{
-		LibraryID:               catalogInfo.LibraryID,
-		ConfigSchemaVersion:     appConfig.SchemaVersion,
-		MaxApplicationMigration: catalogInfo.ApplicationMigration,
-		MaxRiverMigration:       catalogInfo.RiverMigration,
+		LibraryID:           catalogInfo.LibraryID,
+		ConfigSchemaVersion: appConfig.SchemaVersion,
+		SchemaVersion:       catalogInfo.SchemaVersion,
+		MaxRiverMigration:   catalogInfo.RiverMigration,
 	}
 	backupScheduler := &dbbackup.Scheduler{
 		// Online Backup holds one source connection while it copies the
@@ -722,7 +746,7 @@ func run(
 		// query-only reader pool; using the single writer connection here
 		// would stall every application and River write for the duration of
 		// a large backup.
-		Source:   database.ReaderSQL,
+		Source:   database.Reader,
 		Dir:      appConfig.StorageConfig.BackupsDir(),
 		Metadata: snapshotMetadata,
 		Ready:    bootstrapService.IsReady,
@@ -793,18 +817,20 @@ func run(
 	}
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, sqlDB, database.Writer, repoManager, stagingManager, settingsService, lumenService, repositoryFiles)
-	assetController.SetReaderDatabase(database.ReaderSQL)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, database.Writer, database.ReaderQueries, database.Reader, repoManager, stagingManager, settingsService, lumenService, repositoryFiles)
+	assetController.SetTrashRetentionDays(appConfig.RepositoryTrash.RetentionDays)
 	assetController.SetLocationResolver(assetLocationResolver)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
-	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
+	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path), controls.RepositoryManagerReady != nil)
 	albumController := handler.NewAlbumHandler(&albumService, queries, database.Writer, settingsService, lumenService)
+	musicController := handler.NewMusicHandler(musicService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager, repositoryFiles)
 	locationController := handler.NewLocationHandler(locationService)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
-	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL)
+	queueController := handler.NewQueueHandler(queueDatabase.Reader, database.Reader)
+	queueController.SetRetryWriter(database.Writer)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
@@ -818,10 +844,13 @@ func run(
 		appLogger.Warn("failed to recover interrupted cloud import runs", zap.Error(err))
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanCommands, repoManager)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
+	repositoryScanController.SetBootstrapService(bootstrapService)
+	storageController := handler.NewStorageHandler(repoManager, database.ReaderQueries, repositoryScanner)
+	storageController.SetRecovery(privateRecovery)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
-	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)
+	eventController := handler.NewEventHandler(eventService, database.Writer, database.Reader, shareLinkService)
 	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries, repositoryFiles)
 	shareLinkController.SetLocationResolver(assetLocationResolver)
 
@@ -848,6 +877,7 @@ func run(
 		settingsController,
 		classifierController,
 		userController,
+		storageController,
 		repositoryScanController,
 		hostActionController,
 		duplicateController,
@@ -858,6 +888,7 @@ func run(
 		handler.RequireAppInitialized(bootstrapService),
 		originPolicy,
 		appLogger.Named("http"),
+		musicController,
 	)
 
 	// Add Swagger documentation endpoint
@@ -899,7 +930,7 @@ func run(
 			)
 		}
 		var users int
-		if err := database.ReaderSQL.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
+		if err := database.Reader.Statements().QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
 			return errors.Join(
 				fmt.Errorf("users table unreadable after SQLite restore: %w", err),
 				shutdownTransport(),
@@ -978,44 +1009,75 @@ func run(
 }
 
 type defaultStorageRuntimeManager interface {
-	EnsureDefaultRepositoryRoot(context.Context, string, ...storage.LifecycleRequest) (*repo.RepositoryRoot, error)
-	ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error)
+	EnsureDefaultStorageLocation(context.Context, string, ...storage.LifecycleRequest) (*repo.StorageLocation, error)
+	ListStorageLocations(context.Context) ([]repo.StorageLocation, error)
 }
 
-// ensureDefaultStorageForRuntime distinguishes a first-run initialization
-// failure from a previously registered portable identity that needs recovery.
-// The latter must not prevent the HTTP runtime and unrelated repositories from
-// starting in degraded mode.
-func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.RepositoryRoot, bool, error) {
+// defaultStorageStartup is what startup learned about the Default Storage
+// Location. Degraded means the runtime serves in restricted recovery mode:
+// Location is the registered default when one exists (offline or with an
+// invalid marker at its unchanged path) and nil when a fresh catalog found
+// an unusable marker at storage.path and registered nothing.
+type defaultStorageStartup struct {
+	Location *repo.StorageLocation
+	Degraded bool
+	Reason   string
+}
+
+const (
+	defaultStorageReasonOffline       = "default_storage_offline"
+	defaultStorageReasonMarkerInvalid = "default_storage_marker_invalid"
+)
+
+// ensureDefaultStorageForRuntime splits the catalog-first startup: a usable
+// catalog whose configured Default Storage Location cannot be used right now
+// still serves, so setup or the Storage page can diagnose it or choose
+// elsewhere; only a first run that cannot create its default at all, or a
+// configured path that claims to be a move of an established default
+// without proving its identity, stops the Server.
+func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (defaultStorageStartup, error) {
 	hostInstanceID, _ := os.Hostname()
-	root, err := manager.EnsureDefaultRepositoryRoot(ctx, path, storage.LifecycleRequest{
+	storageLocation, err := manager.EnsureDefaultStorageLocation(ctx, path, storage.LifecycleRequest{
 		Actor: "server:config", HostInstanceID: hostInstanceID, ConfirmationType: "portable_identity_match",
 	})
 	if err == nil {
-		return root, false, nil
+		return defaultStorageStartup{Location: storageLocation}, nil
 	}
-	if !errors.Is(err, storage.ErrRepositoryRootOffline) && !errors.Is(err, storage.ErrRepositoryRootInvalid) {
-		return nil, false, fmt.Errorf("initialize default storage location: %w", err)
+	offline := errors.Is(err, storage.ErrStorageLocationOffline)
+	invalid := errors.Is(err, storage.ErrStorageLocationInvalid)
+	if !offline && !invalid {
+		return defaultStorageStartup{}, fmt.Errorf("%w: initialize default storage location: %v", ErrDefaultStorageUnavailable, err)
 	}
-	roots, listErr := manager.ListRepositoryRoots(ctx)
+	reason := defaultStorageReasonMarkerInvalid
+	if offline {
+		reason = defaultStorageReasonOffline
+	}
+	storageLocations, listErr := manager.ListStorageLocations(ctx)
 	if listErr != nil {
-		return nil, false, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
+		return defaultStorageStartup{}, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
 	}
-	for i := range roots {
-		if roots[i].Kind == dbtypes.RepositoryRootKindDefault {
-			// A registered default failing at its unchanged configured path is a
-			// recoverable offline/missing-marker condition. A different configured
-			// path is a migration attempt; failure to prove its portable identity
-			// must fail startup so Desktop rolls the runtime intent back.
-			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(roots[i].Path)
-			configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
-			if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
-				return nil, false, fmt.Errorf("validate default storage location migration: %w", err)
-			}
-			return &roots[i], true, nil
+	for i := range storageLocations {
+		if storageLocations[i].Kind != dbtypes.StorageLocationKindDefault {
+			continue
 		}
+		// A registered default failing at its unchanged configured path is a
+		// recoverable offline/invalid-marker condition. A different configured
+		// path is a migration attempt; failure to prove its portable identity
+		// must fail startup so Desktop rolls the runtime intent back.
+		registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(storageLocations[i].Path)
+		configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
+		if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
+			return defaultStorageStartup{}, fmt.Errorf("%w: validate default storage location migration: %v", ErrDefaultStorageMigrationRejected, err)
+		}
+		return defaultStorageStartup{Location: &storageLocations[i], Degraded: true, Reason: reason}, nil
 	}
-	return nil, false, fmt.Errorf("initialize default storage location: %w", err)
+	if invalid {
+		// First run against a folder that already carries a marker this
+		// build cannot adopt (corrupt, newer, or a Repository). Nothing is
+		// provisioned over it; the catalog serves so setup can say so.
+		return defaultStorageStartup{Degraded: true, Reason: reason}, nil
+	}
+	return defaultStorageStartup{}, fmt.Errorf("%w: initialize default storage location: %v", ErrDefaultStorageUnavailable, err)
 }
 
 func monitorRepositoryCapacity(ctx context.Context, manager *storage.DefaultRepositoryManager, logger *zap.Logger) {
@@ -1045,8 +1107,8 @@ const (
 // It does no SQLite work while the WAL is below the threshold.
 func monitorSQLiteWriter(
 	ctx context.Context,
-	database *db.DB,
-	queueDatabase *db.QueueDB,
+	database *catalog.DB,
+	queueDatabase *catalog.QueueDB,
 	commitCoordinator *commit.Coordinator,
 	governor *execution.Governor,
 	logDir string,
@@ -1056,14 +1118,11 @@ func monitorSQLiteWriter(
 	defer telemetryTicker.Stop()
 	checkpointTicker := time.NewTicker(sqliteCheckpointInterval)
 	defer checkpointTicker.Stop()
-	previous := database.SQL.Stats()
-	var previousQueue sql.DBStats
-	if queueDatabase != nil && queueDatabase.SQL != nil {
-		previousQueue = queueDatabase.SQL.Stats()
-	}
-	var checkpointedWAL db.WALState
+	previous := database.WriterStats()
+	previousQueue := queueDatabase.WriterStats()
+	var checkpointedWAL catalog.WALState
 	hasCheckpointedWAL := false
-	var checkpointedQueueWAL db.WALState
+	var checkpointedQueueWAL catalog.WALState
 	hasCheckpointedQueueWAL := false
 	var lastCheckpoint *sqliteCheckpointObservation
 	var lastQueueCheckpoint *sqliteCheckpointObservation
@@ -1074,27 +1133,25 @@ func monitorSQLiteWriter(
 		intervalEndedAt := time.Now().UTC()
 		interval, intervalErr := database.TransactionIntervalReport()
 		diagnosticCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		catalogPipeline, catalogPipelineErr := readCatalogPipelineObservation(diagnosticCtx, database.ReaderSQL, intervalStartedAt, intervalEndedAt)
+		catalogPipeline, catalogPipelineErr := readCatalogPipelineObservation(diagnosticCtx, database.Reader, intervalStartedAt, intervalEndedAt)
 		var macroQueue macroQueueObservation
 		var macroQueueErr error
 		if queueDatabase != nil {
-			macroQueue, macroQueueErr = readMacroQueueObservation(diagnosticCtx, queueDatabase.ReaderSQL, intervalStartedAt, intervalEndedAt)
+			macroQueue, macroQueueErr = readMacroQueueObservation(diagnosticCtx, queueDatabase.Reader, intervalStartedAt, intervalEndedAt)
 		}
 		cancel()
-		current := database.SQL.Stats()
+		current := database.WriterStats()
 		waitCount := current.WaitCount - previous.WaitCount
 		waitDuration := current.WaitDuration - previous.WaitDuration
 		previous = current
 		walState, walErr := database.InspectWAL()
 		var queueStats sql.DBStats
-		var queueTelemetry db.QueueTelemetrySnapshot
-		var queueWAL db.WALState
+		var queueTelemetry catalog.QueueTelemetrySnapshot
+		var queueWAL catalog.WALState
 		var queueWALErr error
 		if queueDatabase != nil {
 			queueTelemetry = queueDatabase.TelemetrySnapshot()
-			if queueDatabase.SQL != nil {
-				queueStats = queueDatabase.SQL.Stats()
-			}
+			queueStats = queueDatabase.WriterStats()
 			queueWAL, queueWALErr = queueDatabase.InspectWAL()
 		}
 		queueWaitCount := queueStats.WaitCount - previousQueue.WaitCount
@@ -1162,9 +1219,9 @@ func monitorSQLiteWriter(
 	}
 	checkpointWAL := func(
 		name string,
-		inspect func() (db.WALState, error),
-		passiveCheckpoint func(context.Context) (db.CheckpointResult, error),
-		checkpointed *db.WALState,
+		inspect func() (catalog.WALState, error),
+		passiveCheckpoint func(context.Context) (catalog.CheckpointResult, error),
+		checkpointed *catalog.WALState,
 		hasCheckpointed *bool,
 		lastCheckpoint **sqliteCheckpointObservation,
 	) {
@@ -1248,7 +1305,7 @@ func runSQLiteWriterMonitor(
 	}
 }
 
-func walStateAlreadyCheckpointed(current, checkpointed db.WALState, hasCheckpointed bool) bool {
+func walStateAlreadyCheckpointed(current, checkpointed catalog.WALState, hasCheckpointed bool) bool {
 	return hasCheckpointed &&
 		current.SizeBytes == checkpointed.SizeBytes &&
 		current.ModifiedAt.Equal(checkpointed.ModifiedAt)
@@ -1378,9 +1435,8 @@ func (host *pprofServerHost) shutdown(ctx context.Context) error {
 func initMLServices(
 	ctx context.Context,
 	appConfig config.AppConfig,
-	sqlDB *sql.DB,
 	writer *catalogtx.Writer,
-	readerDB *sql.DB,
+	reader *catalogtx.Reader,
 	queries *repo.Queries,
 	appLogger *zap.Logger,
 	lumenLogger *zap.Logger,
@@ -1401,9 +1457,9 @@ func initMLServices(
 		zap.Bool("enabled", appConfig.Lumen.Enabled()),
 	)
 
-	embeddingService := service.NewEmbeddingServiceWithCatalog(queries, writer, readerDB)
+	embeddingService := service.NewEmbeddingService(queries, writer, reader)
 	aiTagService := service.NewAIGeneratedTagService(queries)
-	classifierService := service.NewClassifierServiceWithCatalog(sqlDB, readerDB, writer, lumenService, embeddingService, appLogger.Named("classifier"))
+	classifierService := service.NewClassifierService(reader, writer, lumenService, embeddingService, appLogger.Named("classifier"))
 	_ = aiTagService
 
 	// Build classifier prototypes in the background once the semantic text-embed

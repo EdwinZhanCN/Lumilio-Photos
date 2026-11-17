@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"server/internal/storage/layout"
 )
 
 func TestPrepareRepositoryInitializationTargetAcceptsExistingEmptyDirectory(t *testing.T) {
@@ -58,12 +60,12 @@ func TestCleanupRepositoryInitializationTargetPreservesExistingMount(t *testing.
 		t.Fatalf("create target: %v", err)
 	}
 	for _, name := range []string{
-		DefaultStructure.ConfigFile,
-		DefaultStructure.SystemDir,
-		DefaultStructure.InboxDir,
+		repoConfigFile,
+		layout.PrivateRoot,
+		layout.Inbox,
 	} {
 		path := filepath.Join(target, name)
-		if name == DefaultStructure.ConfigFile {
+		if name == repoConfigFile {
 			if err := os.WriteFile(path, []byte("partial"), 0o644); err != nil {
 				t.Fatalf("create config: %v", err)
 			}
@@ -88,9 +90,9 @@ func TestCleanupRepositoryInitializationTargetPreservesExistingMount(t *testing.
 		t.Fatalf("unowned file was removed: %v", err)
 	}
 	for _, name := range []string{
-		DefaultStructure.ConfigFile,
-		DefaultStructure.SystemDir,
-		DefaultStructure.InboxDir,
+		repoConfigFile,
+		layout.PrivateRoot,
+		layout.Inbox,
 	} {
 		if _, err := os.Stat(filepath.Join(target, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("generated path %q still exists or returned unexpected error: %v", name, err)
@@ -107,7 +109,7 @@ func TestCleanupRepositoryInitializationTargetRemovesOwnedDirectory(t *testing.T
 	if !created {
 		t.Fatal("prepare target did not report newly created directory")
 	}
-	if err := os.Mkdir(filepath.Join(target, DefaultStructure.InboxDir), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(target, layout.Inbox), 0o755); err != nil {
 		t.Fatalf("create generated directory: %v", err)
 	}
 

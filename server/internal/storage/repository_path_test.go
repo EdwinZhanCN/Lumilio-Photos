@@ -3,6 +3,8 @@ package storage
 import (
 	"errors"
 	"testing"
+
+	"server/internal/storage/layout"
 )
 
 func TestParseUserMediaPath(t *testing.T) {
@@ -17,9 +19,9 @@ func TestParseUserMediaPath(t *testing.T) {
 		value := value
 		t.Run(value, func(t *testing.T) {
 			t.Parallel()
-			got, err := ParseUserMediaPath(value)
+			got, err := layout.ParseMedia(value)
 			if err != nil {
-				t.Fatalf("ParseUserMediaPath(%q): %v", value, err)
+				t.Fatalf("layout.ParseMedia(%q): %v", value, err)
 			}
 			if got.String() != value {
 				t.Fatalf("path = %q, want %q", got.String(), value)
@@ -52,8 +54,8 @@ func TestParseUserMediaPathRejectsNonCanonicalAndReservedPaths(t *testing.T) {
 		value := value
 		t.Run(value, func(t *testing.T) {
 			t.Parallel()
-			if _, err := ParseUserMediaPath(value); err == nil {
-				t.Fatalf("ParseUserMediaPath(%q) unexpectedly succeeded", value)
+			if _, err := layout.ParseMedia(value); err == nil {
+				t.Fatalf("layout.ParseMedia(%q) unexpectedly succeeded", value)
 			}
 		})
 	}
@@ -62,14 +64,14 @@ func TestParseUserMediaPathRejectsNonCanonicalAndReservedPaths(t *testing.T) {
 func TestParsePrivateRepositoryPath(t *testing.T) {
 	t.Parallel()
 
-	privatePath, err := ParsePrivateRepositoryPath(".lumilio/staging/incoming/upload.tmp")
+	privatePath, err := layout.Parse(".lumilio/staging/incoming/upload.tmp")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !privatePath.isPrivate() {
+	if !privatePath.IsPrivate() {
 		t.Fatal("private path did not retain its namespace")
 	}
-	if _, err := ParsePrivateRepositoryPath("inbox/upload.jpg"); !errors.Is(err, ErrRepositoryPathNamespace) {
+	if _, err := layout.Parse("inbox/upload.jpg"); !errors.Is(err, layout.ErrPathNamespace) {
 		t.Fatalf("error = %v, want namespace error", err)
 	}
 }

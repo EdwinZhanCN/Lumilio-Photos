@@ -13,6 +13,7 @@ func TestEveryMutationUsesConfirmedVersionedEffectPolicy(t *testing.T) {
 		"tag_assets",
 		"create_album",
 		"add_to_album",
+		"save_music_playlist",
 	} {
 		policy, ok := core.GetRegistry().EffectPolicy(name)
 		if !ok {

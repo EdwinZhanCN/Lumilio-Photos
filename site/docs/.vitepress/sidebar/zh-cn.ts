@@ -248,7 +248,7 @@ export const zhcnSidebar: DefaultTheme.Sidebar = {
                 { text: '了解原理', link: '/zh-cn/user-manual/concepts/' },
                 { text: '流明集的心智模型', link: '/zh-cn/user-manual/concepts/mental-model' },
                 { text: '原件、数据库与派生文件', link: '/zh-cn/user-manual/concepts/originals-database-derivatives' },
-                { text: '存储位置身份与资源库身份', link: '/zh-cn/user-manual/concepts/storage-root-and-repository' },
+                { text: '存储位置身份与资源库身份', link: '/zh-cn/user-manual/concepts/storage-location-and-repository' },
                 { text: '上传、扫描与云导入为什么不同', link: '/zh-cn/user-manual/concepts/upload-scan-cloud' },
                 { text: '内容重复与同名冲突', link: '/zh-cn/user-manual/concepts/duplicate-vs-conflict' },
                 { text: '后台处理流水线', link: '/zh-cn/user-manual/concepts/processing-pipeline' },
@@ -303,6 +303,7 @@ export const zhcnSidebar: DefaultTheme.Sidebar = {
                     text: '版本与限制',
                     collapsed: true,
                     items: [
+                        { text: '发布说明', link: '/zh-cn/user-manual/reference/release-notes' },
                         { text: '版本与发布产物', link: '/zh-cn/user-manual/reference/releases' },
                         { text: '升级与迁移索引', link: '/zh-cn/user-manual/reference/upgrade-index' },
                         { text: '当前限制', link: '/zh-cn/user-manual/reference/known-limitations' },

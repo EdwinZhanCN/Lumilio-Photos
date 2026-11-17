@@ -30,7 +30,9 @@ flowchart TD
     MAP --> ROUTEASSET["/assets/:assetId"]
 ```
 
-[GalleryGrid](./flows/overview/GalleryGrid.tsx) delegates finite asset presentation to Assets.
+[BrowseScopeSelect](../repositories/index.ts) is the Repositories-owned scope control.
+[GalleryGrid](./flows/overview/GalleryGrid.tsx) delegates finite asset presentation to Assets through
+[AssetPreviewGrid](../assets/index.ts).
 [SpacetimeMapCard](./flows/overview/SpacetimeMapCard.tsx) is lazy-loaded only when its card nears the viewport
 and delegates map rendering to [PhotoMapView](./flows/overview/PhotoMapView.tsx). Selecting a map point
 navigates to the owning asset route rather than opening an editor in Home.

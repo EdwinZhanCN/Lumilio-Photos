@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"server/internal/httporigin"
+	"server/internal/api/httporigin"
 
 	"github.com/gin-gonic/gin"
 )

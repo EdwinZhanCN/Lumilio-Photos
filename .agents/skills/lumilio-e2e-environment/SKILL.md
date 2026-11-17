@@ -64,7 +64,9 @@ Each regression slice is one Task target wrapping a Playwright tag:
 | `task web:test:agent-trust` | `@agent-trust` | deterministic agent trust contract |
 | `task web:test:agent-runtime` | `@agent-runtime` | keyless fake Ollama through real SSE, SQLite, tools, confirmation, cancel, and recovery; one worker, but a distinct user/repository per test and repeat |
 | `task web:test:video-semantic` | `@video-regression` | video-semantic seed profile; asserts fakelumen metrics |
+| `task web:test:people` | `@people` | syncs the `demo` profile for its portraits; replays recorded face recognition |
 | `task web:test:backup-recovery` | `@backup-recovery` | |
+| `task web:test:storage-recovery` | `@storage-recovery` | storage lifecycle recovery through the Web: a removed folder opened again through the shared review, reconnected after an external move, copied as a separate Repository, renamed, its inherited Trash held across a restart and restored; then a **reinstall** (the app-state volume is emptied, the storage volume kept) whose first-admin ceremony adopts the retained Primary Repository. Runs **last**: afterwards the instance is re-bootstrapped and the `bootstrap-totp.json` hand-off is rewritten |
 
 Run only the slice the change reaches
 ([lumilio-select-checks](../lumilio-select-checks/SKILL.md)). CI selects

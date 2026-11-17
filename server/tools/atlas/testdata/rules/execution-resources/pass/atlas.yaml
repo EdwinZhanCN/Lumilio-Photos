@@ -1,0 +1,10 @@
+goModules:
+  - { dir: fx, path: fx, side: server }
+groups:
+  - { id: all, title: All, side: server, summary: Every fixture package., match: ['fx/**'] }
+rules:
+  - id: execution-resources
+    why: resource demands come from the demand table
+    constructs:
+      types: [fx/execution.Resources]
+      only: [fx/execution]

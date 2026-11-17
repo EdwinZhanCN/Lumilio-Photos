@@ -19,6 +19,10 @@ func TestRuntimePresentationUsesFirstMatchOrder(t *testing.T) {
 		{"not configured", dto.RuntimeSnapshot{Phase: dto.RuntimeStopped}, dto.DotGray, "Setup required"},
 		{"stopped", dto.RuntimeSnapshot{Configured: true, DesiredState: dto.DesiredStopped, Phase: dto.RuntimeStopped}, dto.DotGray, "Stopped"},
 		{"failed", dto.RuntimeSnapshot{Configured: true, DesiredState: dto.DesiredRunning, Phase: dto.RuntimeFailed}, dto.DotRed, "Failed"},
+		{"catalog incompatible", dto.RuntimeSnapshot{Configured: true, DesiredState: dto.DesiredRunning, Phase: dto.RuntimeFailed, RecoveryCause: dto.ErrorCatalogIncompatible}, dto.DotRed, "Catalog incompatible"},
+		{"configuration incompatible", dto.RuntimeSnapshot{Configured: true, DesiredState: dto.DesiredRunning, Phase: dto.RuntimeFailed, RecoveryCause: dto.ErrorConfigurationIncompatible}, dto.DotRed, "Configuration incompatible"},
+		{"storage folder rejected", dto.RuntimeSnapshot{Configured: true, DesiredState: dto.DesiredRunning, Phase: dto.RuntimeFailed, RecoveryCause: dto.ErrorStorageMigrationRejected}, dto.DotRed, "Storage folder rejected"},
+		{"storage unavailable", dto.RuntimeSnapshot{Configured: true, DesiredState: dto.DesiredRunning, Phase: dto.RuntimeFailed, RecoveryCause: dto.ErrorStorageUnavailable}, dto.DotRed, "Storage unavailable"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

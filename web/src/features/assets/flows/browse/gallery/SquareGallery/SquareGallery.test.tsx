@@ -18,13 +18,10 @@ vi.mock("../media/StackedThumbnail", () => ({
 
 describe("SquareGallery large-library window", () => {
   it("keeps mounted media bounded for a 10,000-item fixture", async () => {
-    const assets = Array.from(
-      { length: 10_000 },
-      (_, index): Asset => ({
-        asset_id: `asset-${index}`,
-        original_filename: `asset-${index}.jpg`,
-      }),
-    );
+    const assets = Array.from({ length: 10_000 }, (_, index): Asset => ({
+      asset_id: `asset-${index}`,
+      original_filename: `asset-${index}.jpg`,
+    }));
 
     await renderWithProviders(
       <AssetBrowserScope scopeId="square-gallery-test">
@@ -46,13 +43,10 @@ describe("SquareGallery large-library window", () => {
   });
 
   it("uses layout width when an ancestor is transformed", async () => {
-    const assets = Array.from(
-      { length: 10 },
-      (_, index): Asset => ({
-        asset_id: `scaled-asset-${index}`,
-        original_filename: `scaled-asset-${index}.jpg`,
-      }),
-    );
+    const assets = Array.from({ length: 10 }, (_, index): Asset => ({
+      asset_id: `scaled-asset-${index}`,
+      original_filename: `scaled-asset-${index}.jpg`,
+    }));
 
     await renderWithProviders(
       <div style={{ width: 640, transform: "scale(0.8)", transformOrigin: "top left" }}>

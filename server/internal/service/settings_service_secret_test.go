@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"server/internal/secretbox"
-	"server/platform/fsprivacy"
+	"server/internal/foundation/fsprivacy"
+	"server/internal/foundation/secretbox"
 
 	"github.com/stretchr/testify/require"
 )

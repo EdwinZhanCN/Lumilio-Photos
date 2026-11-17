@@ -53,6 +53,13 @@ In-app backups contain only the SQLite catalog data (albums, people, edit record
 
 The runtime configuration cannot be edited from the web page. Server deployers change the full TOML manifest and restart; Desktop paths, listening settings, certificates, and logs are managed by the Desktop Control Panel.
 
+`[repository_trash].retention_days` is a required positive integer in the full
+Server TOML; generated manifests write `30`. Deleted files stay recoverable in
+each Repository's `.lumilio/trash` for this many days. An hourly maintenance
+pass permanently deletes expired files. Change the field in the full manifest
+and restart the Server; it has no code default or environment override.
+
+
 ## AI: administrator-configured optional capabilities
 
 Only administrators see the **AI** tab. It manages two independent capabilities: **Lumilio Agent** (the conversational organizing assistant) and **Lumen Intelligence** (media-understanding tasks). Both sections require **explicit choices**; there is no silent fallback to a default service.

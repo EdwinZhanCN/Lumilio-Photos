@@ -12,8 +12,8 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/service/user_service.go
-- server/internal/db/repo/queries/users.sql
-- server/internal/db/repo/queries/repositories.sql
+- server/internal/catalog/repo/queries/users.sql
+- server/internal/catalog/repo/queries/repositories.sql
 - server/internal/api/router.go
 -->
 

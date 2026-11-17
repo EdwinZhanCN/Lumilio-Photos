@@ -47,7 +47,7 @@ func TestAggregateSearchIgnoresSingleRetrieverFailure(t *testing.T) {
 		stubRetriever{source: SourceEmbedding, weight: 1, err: errors.New("offline")},
 		stubRetriever{source: SourceOCR, weight: 0.7, candidates: []Candidate{{AssetID: assetID, Source: SourceOCR, Rank: 1}}},
 	}, nil)
-	service.pool = nil
+	service.queries = nil
 
 	fused := fuseWeightedRRF([]Candidate{{AssetID: assetID, Source: SourceOCR, Rank: 1}}, map[string]float64{SourceOCR: 0.7}, DefaultRRFK)
 	require.Len(t, fused, 1)

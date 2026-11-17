@@ -37,5 +37,19 @@ func TestRegisteredProblemCatalogIsCompleteAndUnique(t *testing.T) {
 		require.Falsef(t, duplicate, "duplicate Problem type %s", descriptor.Type)
 		seen[descriptor.Type] = struct{}{}
 	}
-	require.Len(t, seen, 24)
+	require.Len(t, seen, 42)
+}
+
+// R10: every public Problem carries an executable recovery entry, complete
+// and self-consistent, and Lookup hands it out with the descriptor.
+func TestEveryRegisteredProblemHasAnExecutableRecoveryEntry(t *testing.T) {
+	for _, descriptor := range Registered() {
+		require.NoError(t, descriptor.Entry.Validate(), descriptor.Type)
+		found, ok := Lookup(descriptor.Type)
+		require.True(t, ok, descriptor.Type)
+		require.Equal(t, descriptor.Entry, found.Entry, descriptor.Type)
+	}
+	require.Error(t, RecoveryEntry{Actor: ActorAdmin, Phase: PhaseAny, Kind: RecoveryRoute}.Validate(), "a route entry without a route")
+	require.Error(t, RecoveryEntry{Actor: ActorAdmin, Phase: PhaseAny, Kind: RecoveryRetry, Route: RouteStorage}.Validate(), "a retry entry naming a route")
+	require.Error(t, RecoveryEntry{Actor: "someone", Phase: PhaseAny, Kind: RecoveryNone}.Validate(), "an unknown actor")
 }

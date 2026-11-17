@@ -51,7 +51,7 @@ test("@smoke user completes the compact upload, album, viewer, Trash, and restor
   test.setTimeout(120_000);
 
   await new LoginPage(page).signIn(workspace.username, workspace.password);
-  await page.goto("/manage");
+  await page.goto("/upload");
   await page
     .getByLabel(t("upload.UnifiedUploadSection.upload_target_label"))
     .selectOption({ label: workspace.repositoryName });
@@ -175,7 +175,7 @@ test("@smoke user completes the compact upload, album, viewer, Trash, and restor
   const restoreResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
-      new URL(response.url()).pathname === `/api/v1/assets/${asset.asset_id}/restore`,
+      new URL(response.url()).pathname === "/api/v1/assets/restore",
   );
   await page
     .getByRole("button", {

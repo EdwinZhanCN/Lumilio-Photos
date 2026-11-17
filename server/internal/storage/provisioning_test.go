@@ -19,7 +19,7 @@ func TestEnsureRootLayout(t *testing.T) {
 		t.Fatalf("EnsureRootLayout: %v", err)
 	}
 
-	for _, dir := range []string{root, cfg.CloudDir(), cfg.BackupsDir()} {
+	for _, dir := range []string{cfg.CloudDir(), cfg.BackupsDir()} {
 		info, err := os.Stat(dir)
 		if err != nil {
 			t.Fatalf("expected %s to exist: %v", dir, err)
@@ -27,6 +27,12 @@ func TestEnsureRootLayout(t *testing.T) {
 		if !info.IsDir() {
 			t.Fatalf("expected %s to be a directory", dir)
 		}
+	}
+	// The Default Storage Location is not provisioned here: a first run
+	// creates it when it registers the default, and a registered default
+	// whose folder is gone must stay absent so startup reports it offline.
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Fatalf("EnsureRootLayout created storage.path: %v", err)
 	}
 
 	// Owner-only access on the secret/cloud working areas, expressed in whatever

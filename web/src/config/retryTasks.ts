@@ -18,7 +18,7 @@ export type AssetType = "PHOTO" | "VIDEO" | "AUDIO";
 
 /**
  * Available retry tasks using catalog stage identifiers.
- * Keep this in sync with asset_handler.go isValidReprocessStage.
+ * Keep this in sync with asset_indexing_handler.go isValidReprocessStage.
  */
 export const RETRY_TASK_OPTIONS: RetryTaskOption[] = [
   {

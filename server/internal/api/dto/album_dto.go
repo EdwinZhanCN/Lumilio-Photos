@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 )
 
 // CreateAlbumRequestDTO represents the request structure for creating an album

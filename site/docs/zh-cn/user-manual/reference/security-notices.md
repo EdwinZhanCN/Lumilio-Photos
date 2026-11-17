@@ -12,7 +12,7 @@ verification_status: "verified-with-todo"
 <!--
 code-evidence:
 - !SECURITY.md
-- server/internal/logging/logger.go
+- server/internal/foundation/logging/logger.go
 - server/internal/service/auth_service.go
 -->
 

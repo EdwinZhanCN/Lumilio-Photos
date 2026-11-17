@@ -12,15 +12,15 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/directory_manager.go
-- server/internal/queue/jobs
-- server/internal/utils/imaging
-- server/internal/processors/transcode_task.go
+- server/internal/work/jobs
+- server/internal/media/imaging
+- server/internal/ingest/processors/transcode_task.go
 - server/config/schema/lumilio-server.schema.json
 -->
 
 # 缩略图缺失或媒体无法播放
 
-缩略图和 Web 播放文件位于资源库 `.lumilio/assets/`，属于可再生派生数据。缺失派生文件不应通过替换原件解决。
+缩略图和 Web 播放文件位于资源库 `.lumilio/cache/`，属于可再生派生数据。缺失派生文件不应通过替换原件解决。
 
 ## 照片没有缩略图
 
@@ -32,4 +32,4 @@ code-evidence:
 
 ## 重建
 
-修复根因后，对少量资产执行重新处理。批量删除 `.lumilio/assets` 会使全部派生文件失效并造成大规模重建，不是首选排障方法。
+修复根因后，对少量资产执行重新处理。批量删除 `.lumilio/cache` 会使全部派生文件失效并造成大规模重建，不是首选排障方法。

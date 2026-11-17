@@ -68,9 +68,7 @@ const PersonAssetsContent = () => {
     { label: displayName },
   ]);
   const coverUrl =
-    person?.person_id && person.cover_face_image_path
-      ? assetUrls.getPersonCoverUrl(person.person_id)
-      : null;
+    person?.person_id && person.has_cover ? assetUrls.getPersonCoverUrl(person.person_id) : null;
 
   const cover = (
     <div className="h-20 w-20 overflow-hidden rounded-[1.5rem] border border-base-300/70 bg-base-200">

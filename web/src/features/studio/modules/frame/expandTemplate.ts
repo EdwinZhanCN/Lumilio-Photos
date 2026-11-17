@@ -104,7 +104,13 @@ function resolveAnchor(anchor: TemplateAnchor, geom: Geometry): ResolvedAnchor {
     const bandWidth = isLeft ? padPx.left : padPx.right;
     const hFraction = anchor.h === "left" ? 0.3 : anchor.h === "right" ? 0.7 : 0.5;
     const vFraction =
-      typeof anchor.v === "number" ? anchor.v : anchor.v === "top" ? 0.12 : anchor.v === "bottom" ? 0.88 : 0.5;
+      typeof anchor.v === "number"
+        ? anchor.v
+        : anchor.v === "top"
+          ? 0.12
+          : anchor.v === "bottom"
+            ? 0.88
+            : 0.5;
     return {
       x: bandLeft + bandWidth * hFraction + dx,
       y: outHeight * vFraction + dy,
@@ -126,7 +132,13 @@ function resolveAnchor(anchor: TemplateAnchor, geom: Geometry): ResolvedAnchor {
   }
 
   const vFraction =
-    typeof anchor.v === "number" ? anchor.v : anchor.v === "top" ? 0.32 : anchor.v === "bottom" ? 0.68 : 0.5;
+    typeof anchor.v === "number"
+      ? anchor.v
+      : anchor.v === "top"
+        ? 0.32
+        : anchor.v === "bottom"
+          ? 0.68
+          : 0.5;
   const y = bandTop + bandHeight * vFraction + dy;
 
   if (anchor.h === "left") return { x: inset + dx, y, align: "left" };
@@ -276,7 +288,13 @@ export function expandTemplate(template: FrameTemplate, ctx: ExpandContext): Exp
   if (template.family === "dual" && brand) {
     for (const element of template.elements) {
       if (element.type !== "logo") continue;
-      if (pickVariant(brand, { variantId: element.variant, kind: element.kind, strict: element.strict })) {
+      if (
+        pickVariant(brand, {
+          variantId: element.variant,
+          kind: element.kind,
+          strict: element.strict,
+        })
+      ) {
         resolvedMarks += 1;
       }
     }

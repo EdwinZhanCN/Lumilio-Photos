@@ -52,3 +52,9 @@ Git history preserves everything the tier did.
 **Record all decisions in Obsidian only** — rejected: agents cannot read the
 vault, so settled decisions get re-litigated and prose accumulates dead
 references (the ADR-005/006 citations were the live example).
+
+## 2026-10-07 update
+
+Memory updates and red-run materials are now guidance; missing materials do
+not block merges. Correctness checks remain required. See
+[lighter gates](2026-10-07-lighter-gates.md).

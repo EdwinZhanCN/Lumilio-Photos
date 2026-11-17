@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   getStorageEntityDisplayName,
-  normalizeRepositoryRootsResponse,
+  normalizeStorageViewLocations,
   normalizeStorageDiagnosticsResponse,
 } from "./storageEntities";
 
@@ -45,8 +45,8 @@ describe("storage entity presentation", () => {
   });
 
   it("normalizes every storage API shape into the same discriminated model", () => {
-    const roots = normalizeRepositoryRootsResponse({
-      roots: [{ id: "root-1", kind: "default", name: "legacy default name", path: "/storage" }],
+    const storageLocations = normalizeStorageViewLocations({
+      storage_locations: [{ id: "root-1", kind: "default", name: "legacy default name" }],
     });
     const diagnostics = normalizeStorageDiagnosticsResponse({
       items: [
@@ -60,7 +60,7 @@ describe("storage entity presentation", () => {
       ],
     });
 
-    expect(roots.roots?.[0]).toMatchObject({
+    expect(storageLocations.storage_locations?.[0]).toMatchObject({
       entityType: "storage_location",
       kind: "default",
       rawName: "legacy default name",

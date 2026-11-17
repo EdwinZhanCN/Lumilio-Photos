@@ -1,0 +1,152 @@
+id: asset-processing
+kind: dataflow
+title: Asset processing — from original to searchable
+summary: >-
+  What each pipeline stage reads and what it produces. The original file is
+  only ever read. Stages are independent desired/applied pairs, so a missing
+  ML service delays enrichment without blocking metadata, thumbnails, or
+  browsing.
+direction: LR
+nodes:
+  - id: original
+    label: Original file in a repository
+    anchor: go:server/internal/storage.RepositoryFS
+    shape: store
+    note: Resolved to a present entry just before I/O; never rewritten.
+  - id: analyze
+    label: analyze
+    anchor: go:server/app.pipelineRuntime.analyze
+    group: Stages
+    note: exiftool and ffprobe metadata, capture time, GPS, component relations.
+  - id: derivatives
+    label: derivatives
+    anchor: go:server/app.pipelineRuntime.derivatives
+    group: Stages
+    note: Thumbnail ladder, video frames, audio artwork (libvips, LibRaw).
+  - id: transcode
+    label: transcode
+    anchor: go:server/app.pipelineRuntime.transcode
+    group: Stages
+    note: Browser-playable video and audio renditions (ffmpeg).
+  - id: enrich
+    label: enrich
+    anchor: go:server/app.pipelineRuntime.enrich
+    group: Stages
+    note: pHash, semantic embedding, BioCLIP, OCR, faces, zero-shot tags, video frames.
+  - id: lumen
+    label: Lumen Hub
+    anchor: go:service.LumenService
+    shape: external
+  - id: artifacts
+    label: Derived artifacts
+    anchor: go:artifact.Store
+    shape: store
+    note: Immutable files under the repository's .lumilio area.
+  - id: coordinator
+    label: Commit coordinator
+    anchor: go:commit.Coordinator
+  - id: metadata
+    label: assets metadata, stacks, media items
+    anchor: sql:media_items
+    shape: store
+    group: Catalog
+  - id: thumbs
+    label: thumbnails
+    anchor: sql:thumbnails
+    shape: store
+    group: Catalog
+  - id: vectors
+    label: embeddings + Vec1 index
+    anchor: sql:search_embeddings
+    shape: store
+    group: Catalog
+  - id: faces
+    label: faces, species, tags, OCR text
+    anchor: sql:face_items
+    shape: store
+    group: Catalog
+  - id: projections
+    label: Events, places, OCR index
+    anchor: sql:event_media_items
+    shape: store
+    group: Projections
+    note: Rebuilt in bounded, revision-fenced turns by projection jobs.
+  - id: bleve
+    label: Bleve OCR sidecar
+    anchor: go:bleveocr.Index
+    shape: store
+    group: Projections
+edges:
+  - from: original
+    to: analyze
+    via: [go:processors.AssetProcessor.ComputeMetadataTask]
+  - from: original
+    to: derivatives
+    via: [go:processors.AssetProcessor.ComputeThumbnailCodec]
+  - from: original
+    to: transcode
+    via: [go:processors.AssetProcessor.resolveCurrentAssetSource, go:processors.AssetProcessor.LoadTranscodeTask]
+  - from: thumbs
+    to: enrich
+    label: medium thumbnail as model input
+    anchor: go:queue.NewDBMLImageLoader
+  - from: enrich
+    to: lumen
+    style: dashed
+    label: inference
+    via: [go:server/app.runAssetEnrichment, go:queue.EnrichmentRunner]
+  - from: derivatives
+    to: artifacts
+    label: publish
+    anchor: go:processors.AssetProcessor.PublishThumbnailTask
+    via: [go:processors.AssetProcessor.PublishThumbnailTask, go:processors.AssetProcessor.saveThumbnail, go:processors.publishDerived]
+  - from: transcode
+    to: artifacts
+    label: publish
+    anchor: go:processors.AssetProcessor.PublishTranscodeTask
+    via: [go:processors.AssetProcessor.PublishTranscodeTask, go:processors.copyAudioForWeb, go:processors.saveAudioVersion, go:processors.publishDerived]
+  - from: enrich
+    to: artifacts
+    label: publish face crops
+    anchor: go:service.PublishFaceCrops
+    via: [go:server/app.runAssetEnrichment, go:queue.EnrichmentRunner, go:service.PublishFaceCrops]
+  - from: analyze
+    to: coordinator
+    anchor: go:commit.Coordinator.ApplyAssetMetadata
+  - from: derivatives
+    to: coordinator
+    anchor: go:commit.Coordinator.ApplyAssetDerivatives
+  - from: enrich
+    to: coordinator
+    anchor: go:commit.Coordinator.ApplyEnrichment
+  - from: coordinator
+    to: metadata
+  - from: coordinator
+    to: thumbs
+  - from: coordinator
+    to: vectors
+  - from: coordinator
+    to: faces
+  - from: metadata
+    to: projections
+    style: dashed
+    label: dirty ranges, outboxes
+  - from: faces
+    to: bleve
+    style: dashed
+    label: ocr_index_outbox
+    anchor: go:bleveocr.Writer
+notes:
+  - title: Catalog rows name artifacts by identity
+    body: >-
+      A thumbnail row and a face item store the artifact's source fence,
+      pipeline version, and name; the table implies the stage. The layout
+      package resolves the identity to a path under .lumilio/cache/artifacts/,
+      so no catalog row holds a private path.
+  - title: Fences
+    body: >-
+      Every result carries the source content it was computed from and the
+      desired version it answers. If the file changed or a newer request
+      arrived meanwhile, the coordinator records the result as stale and the
+      scheduler derives the work again.
+related: [background-work, upload-to-catalog, library-search]

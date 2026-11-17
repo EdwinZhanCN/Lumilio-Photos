@@ -1,3 +1,4 @@
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useCallback, useMemo, useState } from "react";
 import { Layers2 } from "lucide-react";
 import { useMessage } from "@/features/notifications";
@@ -41,6 +42,8 @@ export function useAssetsPageHeaderBulkActions({
   const showMessage = useMessage();
   const { createStack, isCreatingStack } = useStackActions();
 
+  const [deletePreviewReady, setDeletePreviewReady] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [confirmableBulkAction, setConfirmableBulkAction] = useState<ConfirmableBulkAction | null>(
     null,
@@ -183,10 +186,13 @@ export function useAssetsPageHeaderBulkActions({
   }, [selection]);
 
   const handleDeleteClick = () => {
+    setDeletePreviewReady(false);
     setIsDeleteConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
+    if (isDeleting || !deletePreviewReady) return;
+    setIsDeleting(true);
     try {
       await bulkOps.bulkDelete();
       showMessage(
@@ -195,9 +201,13 @@ export function useAssetsPageHeaderBulkActions({
           count: affectedAssetCount,
         }),
       );
-    } catch {
-      showMessage("error", t("assets.assetsPageHeader.messages.deleteError"));
+    } catch (error) {
+      showMessage(
+        "error",
+        localizeAPIProblem(error, t, t("assets.assetsPageHeader.messages.deleteError")),
+      );
     } finally {
+      setIsDeleting(false);
       setIsDeleteConfirmOpen(false);
     }
   };
@@ -406,6 +416,10 @@ export function useAssetsPageHeaderBulkActions({
     isRunningCustomAction,
     executeCustomBulkAction,
     isDeleteConfirmOpen,
+    resolvedSelectedAssetIds,
+    deletePreviewReady,
+    setDeletePreviewReady,
+    isDeleting,
     setIsDeleteConfirmOpen,
     confirmDelete,
     isAlbumModalOpen,

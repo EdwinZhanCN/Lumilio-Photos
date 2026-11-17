@@ -127,6 +127,7 @@ func IsKnownWidget(view string) bool {
 // the registry level.
 var modeToolSets = map[string]map[string]bool{
 	"review": {
+		"search_music": true, "show_music": true, "lookup_music_playlists": true,
 		"filter_assets": true,
 		"search_people": true,
 		"lookup_people": true,
@@ -136,6 +137,7 @@ var modeToolSets = map[string]map[string]bool{
 		"show":          true,
 	},
 	"organize": {
+		"search_music": true, "show_music": true, "lookup_music_playlists": true, "save_music_playlist": true,
 		"filter_assets":   true,
 		"search_semantic": true,
 		"search_people":   true,
@@ -150,6 +152,7 @@ var modeToolSets = map[string]map[string]bool{
 		"show":            true,
 	},
 	"analyze": {
+		"search_music": true, "show_music": true, "lookup_music_playlists": true,
 		"filter_assets":   true,
 		"search_semantic": true,
 		"search_text":     true,
@@ -163,6 +166,7 @@ var modeToolSets = map[string]map[string]bool{
 		"show":            true,
 	},
 	"curate": {
+		"search_music": true, "show_music": true, "lookup_music_playlists": true, "save_music_playlist": true,
 		"filter_assets":   true,
 		"search_semantic": true,
 		"search_people":   true,

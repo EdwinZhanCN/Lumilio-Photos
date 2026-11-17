@@ -8,8 +8,8 @@ description: Use when adding or changing overlapping UI in Lumilio Photos —
 
 # Apply The Z-Index Strategy
 
-Three rules, in priority order. The token table lives here so a session can
-apply it without opening FRONTEND.md; the design intent (calm operational UI,
+Three rules, in priority order. The token table lives here, next to the
+procedure; the design intent (calm operational UI,
 no competing stacks) is owned by [DESIGN.md](../../../docs/DESIGN.md).
 
 ## 1. Decorative overlays → DOM order
@@ -35,6 +35,7 @@ Use the theme tokens defined in `web/src/styles/App.css` `@theme inline`:
 | `z-overlay` | 300 | FABs, application drawers, floating docks, drag overlays |
 | `z-modal` | 400 | Modals and modal bottom-sheets |
 | `z-lightbox` | 500 | Fullscreen viewers (AssetViewer, PublicShareLightbox) |
+| `z-agent` | 550 | Lumilio ChatDock expanded body, above viewers but below tooltips |
 | `z-tooltip` | 600 | Portaled tooltips/popovers that escape a lightbox |
 | `z-toast` | 700 | App-wide notifications above other document-layer floating UI |
 

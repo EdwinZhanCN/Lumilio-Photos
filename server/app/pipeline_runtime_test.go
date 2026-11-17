@@ -11,31 +11,10 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 
-	"server/internal/commit"
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
-	"server/internal/execution"
-	"server/internal/queue/jobs"
+	"server/internal/catalog/catalogtx"
+	"server/internal/ingest/commit"
+	"server/internal/work/execution"
 )
-
-func TestRepositoryScanCommandKeepsActiveRunRunnableAfterDesiredEpochCoalesces(t *testing.T) {
-	runID := uuid.New()
-	state := repo.RepositoryObservationState{
-		DesiredEpoch: 5,
-		AppliedEpoch: 0,
-		ActiveRunID:  uuid.NullUUID{UUID: runID, Valid: true},
-	}
-	run := repo.RepositoryScanRun{RunID: runID, RequestedEpoch: 1}
-	args := jobs.ScanRepositoryBatchArgs{RepositoryID: uuid.New(), RequestedEpoch: 1, DesiredVersion: 1}
-	if !repositoryScanCommandCurrent(state, run, args) {
-		t.Fatal("coalesced desired epoch made the active repository run stale")
-	}
-	args.RequestedEpoch = 5
-	args.DesiredVersion = 5
-	if repositoryScanCommandCurrent(state, run, args) {
-		t.Fatal("latest desired epoch was accepted in place of the active run epoch")
-	}
-}
 
 func TestCommitQueuePressureStopsExecutionAdmission(t *testing.T) {
 	database, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "backpressure.sqlite3")+"?_txlock=immediate")

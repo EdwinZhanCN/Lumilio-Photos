@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"go.uber.org/zap"
+
+	"server/internal/storage/scan"
 )
 
 // runRepositoryVerifierLoop performs an authoritative sweep at startup and on
@@ -37,4 +40,28 @@ func runRepositoryVerifierLoop(
 			run()
 		}
 	}
+}
+
+// jitteredTicks delivers one tick per periodic interval, each delay drawn
+// from 3/4 to 5/4 of the interval so repositories do not scan in lockstep.
+func jitteredTicks(ctx context.Context, interval time.Duration) <-chan time.Time {
+	ticks := make(chan time.Time)
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	go func() {
+		for {
+			timer := time.NewTimer(scan.PeriodicDelay(interval, random))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case now := <-timer.C:
+				select {
+				case ticks <- now:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return ticks
 }

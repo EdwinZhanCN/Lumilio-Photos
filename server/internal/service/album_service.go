@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 )

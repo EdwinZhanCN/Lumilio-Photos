@@ -60,7 +60,6 @@ export class AppWorkerClient {
         }
         return this.justifiedLayoutWorker;
 
-
       default:
         throw new Error(`Unknown worker type: ${String(type)}`);
     }

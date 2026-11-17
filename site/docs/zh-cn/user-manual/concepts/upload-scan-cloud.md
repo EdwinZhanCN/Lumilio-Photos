@@ -11,11 +11,11 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_upload_handler.go
 - server/internal/storage/roe/controller/controller.go
 - server/internal/storage/roe/materializer
-- server/internal/cloud
-- server/internal/sourcing
+- server/internal/ingest/cloud
+- server/internal/ingest/sourcing
 -->
 
 # 上传、扫描与云导入为什么不同

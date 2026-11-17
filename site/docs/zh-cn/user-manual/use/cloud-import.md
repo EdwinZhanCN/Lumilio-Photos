@@ -11,8 +11,8 @@ verification_status: "verified-with-todo"
 
 <!--
 code-evidence:
-- server/internal/cloud/icloud
-- server/internal/cloud/sync_service.go
+- server/internal/ingest/cloud/icloud
+- server/internal/ingest/cloud/sync_service.go
 - server/internal/api/router.go
 - web/src/features/settings/flows/cloud
 -->

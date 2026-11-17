@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/settings"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/settings"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -131,7 +131,7 @@ func TestLocationRevisionCheckPropagatesDatabaseErrors(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -155,20 +155,21 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
 			display_name, role, webauthn_user_handle
 		) VALUES (1, 'owner', 'unused', 1, 1, 'Owner', 'admin', x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
-	`, rootID, repositoryID, rootID)
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');
+	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
 	geohashes := []string{"9q8yyk8", "9q8yyk8", "9q8yyk9"}
@@ -189,7 +190,7 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 
 	repositoryText := repositoryID.String()
 	ownerID := int32(1)
-	locationService := NewLocationService(catalog.Queries, catalog.SQL, nil)
+	locationService := NewLocationService(catalog.Queries, catalog.Writer, catalog.Reader)
 	moreWork, err := locationService.RebuildLocationClusters(ctx, &repositoryText, &ownerID)
 	require.NoError(t, err)
 	require.False(t, moreWork)
@@ -223,7 +224,7 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -231,20 +232,21 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
 			display_name, role, webauthn_user_handle
 		) VALUES (1, 'owner', 'unused', 1, 1, 'Owner', 'admin', x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
-	`, rootID, repositoryID, rootID)
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');
+	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
 	assetID := uuid.New()
@@ -305,23 +307,28 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 	require.Greater(t, newOwnerRevision, int64(0), "the new owner scope must be created")
 
 	_, err = catalog.SQL.ExecContext(ctx, `
-		UPDATE asset_locations
-		SET unbound_observation_revision = bound_observation_revision + 1
+		UPDATE repository_entries
+		SET state = 'missing', missing_since = 1, revision = revision + 1
 		WHERE asset_id = ?
 	`, assetID)
 	require.NoError(t, err)
-	require.Greater(t, revision(2), newOwnerRevision, "unbinding a Location must invalidate its scope")
+	require.Greater(t, revision(2), newOwnerRevision, "a file going missing must invalidate its scope")
 
-	oldOwnerBeforeNodeChange := revision(1)
-	newOwnerBeforeNodeChange := revision(2)
+	beforeRestore := revision(2)
 	_, err = catalog.SQL.ExecContext(ctx, `
-		UPDATE repository_nodes
-		SET lifecycle = 'tombstoned'
-		WHERE node_id IN (SELECT node_id FROM asset_locations WHERE asset_id = ?)
+		UPDATE repository_entries
+		SET state = 'present', missing_since = NULL, revision = revision + 1
+		WHERE asset_id = ?
 	`, assetID)
 	require.NoError(t, err)
-	require.Greater(t, revision(1), oldOwnerBeforeNodeChange)
-	require.Greater(t, revision(2), newOwnerBeforeNodeChange)
+	require.Greater(t, revision(2), beforeRestore, "a file coming back must invalidate its scope")
+
+	beforeUnrelated := revision(2)
+	_, err = catalog.SQL.ExecContext(ctx, `
+		UPDATE repository_entries SET stat_checked_ns = stat_checked_ns + 1 WHERE asset_id = ?
+	`, assetID)
+	require.NoError(t, err)
+	require.Equal(t, beforeUnrelated, revision(2), "a stat recheck must not manufacture projection work")
 }
 
 func TestNextLocationMembershipBatchIsStrictlyBounded(t *testing.T) {
@@ -349,7 +356,7 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -357,20 +364,21 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
 			display_name, role, webauthn_user_handle
 		) VALUES (1, 'owner', 'unused', 1, 1, 'Owner', 'admin', x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
-	`, rootID, repositoryID, rootID)
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none');
+	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
 	seedTx, err := catalog.SQL.BeginTx(ctx, nil)
@@ -395,7 +403,7 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 
 	repositoryText := repositoryID.String()
 	ownerID := int32(1)
-	locationService := NewLocationService(catalog.Queries, catalog.SQL, nil)
+	locationService := NewLocationService(catalog.Queries, catalog.Writer, catalog.Reader)
 	moreWork, err := locationService.RebuildLocationClusters(ctx, &repositoryText, &ownerID)
 	require.NoError(t, err)
 	require.True(t, moreWork, "one River turn must yield after its fixed transaction quantum")

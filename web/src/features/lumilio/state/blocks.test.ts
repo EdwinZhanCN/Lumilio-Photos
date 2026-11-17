@@ -8,6 +8,7 @@ import {
   assistantMessage,
   cancelActiveBlocks,
   failConfirm,
+  restorePersistedMessages,
   setConfirmSubmitting,
   userMessage,
 } from "./blocks";
@@ -167,5 +168,30 @@ describe("cancelActiveBlocks", () => {
     expect(messages[1].status).toBe("stopped");
     expect(messages[1].blocks[0]).toMatchObject({ kind: "text", markdown: "Partial answer" });
     expect(messages[1].blocks[1]).toMatchObject({ kind: "tool", status: "cancelled" });
+  });
+});
+
+describe("restorePersistedMessages", () => {
+  it("drops an empty reply and cancels tools that can no longer stream", () => {
+    let messages = applySideEvent(conversation(), toolEvent());
+    messages = [...messages, userMessage("again"), assistantMessage()];
+    const withRunning = messages.slice(0, 2);
+    const restored = restorePersistedMessages(withRunning);
+    expect(restored.awaitingConfirmation).toBe(false);
+    expect(restored.messages[1]).toMatchObject({ status: "stopped" });
+    expect(restored.messages[1].blocks[0]).toMatchObject({ kind: "tool", status: "cancelled" });
+
+    const trailing = restorePersistedMessages(messages);
+    expect(trailing.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+  });
+
+  it("keeps a confirmation awaiting the user's decision actionable", () => {
+    const messages = applyInterrupt(conversation(), {
+      InterruptContexts: [{ ID: "interrupt-1", IsRootCause: true, Info: { count: 2 } }],
+    });
+    const restored = restorePersistedMessages(messages);
+    expect(restored.awaitingConfirmation).toBe(true);
+    expect(restored.messages[1].blocks[0]).toMatchObject({ kind: "confirm", state: "pending" });
+    expect(restored.messages[1].status).toBeUndefined();
   });
 });

@@ -74,10 +74,9 @@ describe.skipIf(!webgl2Available())("DevelopEngine", () => {
   it("brightens with positive exposure and reports its size", async () => {
     const engine = DevelopEngine.create(await solidBitmap(100));
     const identity = readback(engine.render(DEFAULT_STUDIO_ADJUSTMENTS, 64, 64))(32, 32);
-    const brighter = readback(engine.render({ ...DEFAULT_STUDIO_ADJUSTMENTS, exposure: 1 }, 64, 64))(
-      32,
-      32,
-    );
+    const brighter = readback(
+      engine.render({ ...DEFAULT_STUDIO_ADJUSTMENTS, exposure: 1 }, 64, 64),
+    )(32, 32);
     expect(near(identity, [100, 100, 100], 14)).toBe(true);
     expect(brighter[0]).toBeGreaterThan(identity[0] + 20);
     engine.dispose();

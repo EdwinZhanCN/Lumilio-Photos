@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/dbtypes"
-	"server/internal/testutil"
-	"server/internal/utils/phash"
+	"server/internal/catalog"
+	"server/internal/catalog/dbtypes"
+	"server/internal/foundation/testutil"
+	"server/internal/media/phash"
 
 	"github.com/corona10/goimagehash"
 	"github.com/google/uuid"
@@ -21,7 +21,7 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	ctx := context.Background()
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
@@ -38,17 +38,18 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1)
-	`, rootID)
+	`, storageLocationID)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
-		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?)
-	`, repositoryID, rootID)
+			default_owner_id, role, storage_location_id,
+			path_case, path_normalization
+		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?, 'sensitive', 'none')
+	`, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO embedding_spaces (
@@ -76,7 +77,7 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	service := NewDuplicateService(catalog.Queries, catalog.SQL, catalog.Writer, nil, nil)
+	service := NewDuplicateService(catalog.Queries, catalog.Writer, nil, nil)
 	for run := 0; run < 2; run++ {
 		result, err := service.DetectForRepository(ctx, repositoryID)
 		require.NoError(t, err)

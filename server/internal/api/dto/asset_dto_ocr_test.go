@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/foundation/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -78,32 +78,33 @@ func ocrTextContents(items []AssetOCRTextItemDTO) []string {
 	return contents
 }
 
-func openAssetDetailOCRTestCatalog(t *testing.T) (*db.DB, uuid.UUID) {
+func openAssetDetailOCRTestCatalog(t *testing.T) (*catalog.DB, uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
+	catalog, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(dir, "library.sqlite3"),
 	})
 	require.NoError(t, err)
 	require.NoError(t, catalog.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, catalog.Close(context.Background())) })
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	assetID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 INSERT INTO users (
     user_id, username, password, created_at, updated_at, webauthn_user_handle
 ) VALUES (1, 'ocr-owner', 'hash', 1, 1, x'01');
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
-) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-`, rootID, repositoryID, rootID)
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id,
+    path_case, path_normalization
+) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?, 'sensitive', 'none');
+`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	_, err = testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
 		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,

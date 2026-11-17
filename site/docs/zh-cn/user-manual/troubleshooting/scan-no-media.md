@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/storage/roe/controller/controller.go
 - server/internal/storage/roe/changefeed
 - server/config/config.go
-- server/internal/utils/file/validator.go
+- server/internal/media/file/validator.go
 - server/internal/api/handler/repository_scan_handler.go
 -->
 

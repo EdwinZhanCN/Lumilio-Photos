@@ -87,9 +87,10 @@ tasks:
       - web:dev
 
   test:
-    desc: Run repository architecture, Server, and Web tests
+    desc: Run terminology, Atlas, Server, and Web tests
     cmds:
-      - task: architecture:check
+      - task: terminology:check
+      - task: atlas:check
       - task: test:modules
 
   test:modules:
@@ -103,13 +104,138 @@ tasks:
     cmds:
       - task: server:openapi
       - task: web:openapi-types
-      - go -C server run ./tools/problemcatalog ../site/docs/public/problems
+      - go -C server run ./tools/problemcatalog ../site/docs/public/problems ../web/src/lib/http-commons/problemRecovery.ts
       - task: site:openapi-docs
 
-  architecture:check:
-    desc: Check repository architecture constraints
+  # The product vocabulary spans the Web, Desktop, docs, and API annotations,
+  # so its check lives here; lumilio-frontend-i18n owns the term registry.
+  terminology:check:
+    desc: Check canonical product terminology and literal copy for contract codes
     cmds:
-      - go -C server run ./tools/architecturecheck
+      - go -C server run ./tools/terminology
+
+  # The Atlas spans Server, Desktop, and Web, so its targets live here. The Web
+  # facts are extracted first; the Go tool joins them with the Go packages.
+  atlas:
+    desc: Open the Atlas code map in the internal docs site (http://localhost:6690/atlas/)
+    cmds:
+      - task: atlas:data
+      - task: site:atlas
+
+  atlas:data:
+    desc: Write the Atlas site model to .local/atlas; an open Atlas page hot-reloads
+    cmds:
+      - task: web:atlas:facts
+      - task: atlas:run
+        vars: { ATLAS_ARGS: data }
+
+  atlas:generate:
+    desc: Regenerate docs/atlas/generated; fails on broken anchors, rule findings, or stale views
+    cmds:
+      - task: web:atlas:facts
+      - task: atlas:run
+        vars: { ATLAS_ARGS: generate }
+
+  atlas:check:
+    desc: Fail if any Atlas rule, anchor, dependency declaration, package doc, or generated file is out of sync
+    cmds:
+      - task: web:atlas:facts
+      - task: atlas:run
+        vars: { ATLAS_ARGS: check }
+
+  atlas:lock:
+    desc: Mark every Atlas view verified against the current code (only after re-reading stale views) and drop fixed baseline entries
+    cmds:
+      - task: web:atlas:facts
+      - task: atlas:run
+        vars: { ATLAS_ARGS: lock }
+
+  atlas:baseline:
+    desc: Record the existing findings of a new Atlas rule (task atlas:baseline -- <rule-id>); the owner approves it in the PR
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - task: web:atlas:facts
+      - task: atlas:run
+        vars: { ATLAS_ARGS: 'baseline {{.CLI_ARGS}}' }
+
+  atlas:split-report:
+    desc: File-to-file dependencies of one Go package, and the edges, crossing unexported symbols, and cycles of a proposed cut (task atlas:split-report -- internal/service [--clusters file])
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - task: atlas:run
+        vars: { ATLAS_ARGS: 'split-report {{.CLI_ARGS}}' }
+
+  atlas:movecheck:
+    desc: Every Go function changed, renamed, moved, added, or removed since a ref (task atlas:movecheck -- --base origin/dev); attach the report to a move PR
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - task: atlas:run
+        vars: { ATLAS_ARGS: 'movecheck {{.CLI_ARGS}}' }
+
+  # The Atlas type-checks Server and Desktop with go/packages, so it builds the
+  # way the binaries do (cgo, GO_BUILD_TAGS) and on the newest toolchain any
+  # module declares: go/types refuses a module newer than the tool's own Go.
+  atlas:run:
+    internal: true
+    env:
+      GOTOOLCHAIN:
+        sh: awk '$1 == "go" { print "go" $2 "+auto"; exit }' desktop/go.mod
+      GOFLAGS: '-tags={{.GO_BUILD_TAGS}}'
+    cmds:
+      - go -C server run ./tools/atlas {{.ATLAS_ARGS}}
+
+  # Published-artifact smoke (release-smoke.yml): install one Server image the
+  # way the release bundle does, from its Compose file and .env into host
+  # directories, run the browser journey against it, and keep what it made as
+  # the compatibility fixture. SUDO=sudo on runners where the container's app
+  # user owns the bind mounts.
+  release:smoke:up:
+    desc: Install LUMILIO_IMAGE from the release bundle's Compose files into .local/release-smoke and wait for it
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+    cmds:
+      - test -n "$LUMILIO_IMAGE" || { echo "LUMILIO_IMAGE is required (tag or @sha256 digest reference)" >&2; exit 1; }
+      - mkdir -p {{.SMOKE_DIR}}/bundle {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/app-state
+      - cp deploy/compose/compose.yml {{.SMOKE_DIR}}/bundle/compose.yml
+      - printf 'LUMILIO_IMAGE=%s\nLUMILIO_STORAGE=%s\nLUMILIO_STATE=%s\n' "$LUMILIO_IMAGE" "{{.SMOKE_DIR}}/media" "{{.SMOKE_DIR}}/app-state" > {{.SMOKE_DIR}}/bundle/.env
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke pull --quiet
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke up -d --wait --wait-timeout 180
+
+  release:smoke:fixture:
+    desc: Stop the smoke install and collect its catalog, config, backups, originals, and markers into .local/release-smoke/fixture (SUDO=sudo when the app user owns the mounts)
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+      SUDO: '{{default "" .SUDO}}'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke stop
+      - '{{.SUDO}} rm -rf {{.SMOKE_DIR}}/fixture'
+      - mkdir -p {{.SMOKE_DIR}}/fixture/app-state
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke cp lumilio:/app/config/docker-http.toml {{.SMOKE_DIR}}/fixture/config.toml
+      - '{{.SUDO}} cp -a {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/fixture/media'
+      - '{{.SUDO}} cp -a {{.SMOKE_DIR}}/app-state/library.sqlite3 {{.SMOKE_DIR}}/app-state/river.sqlite3 {{.SMOKE_DIR}}/app-state/backups {{.SMOKE_DIR}}/fixture/app-state/'
+      - '{{.SUDO}} chown -R "$(id -u):$(id -g)" {{.SMOKE_DIR}}/fixture'
+      - >-
+        docker image inspect "$LUMILIO_IMAGE" --format '{"image":"{{"{{"}}.Id{{"}}"}}","repo_digests":{{"{{"}}json .RepoDigests{{"}}"}},"revision":{{"{{"}}json (index .Config.Labels "org.opencontainers.image.revision"){{"}}"}},"version":{{"{{"}}json (index .Config.Labels "org.opencontainers.image.version"){{"}}"}}}'
+        > {{.SMOKE_DIR}}/fixture/image.json
+
+  release:smoke:logs:
+    desc: Print the smoke install's Server logs
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke logs --no-color
+
+  release:smoke:down:
+    desc: Remove the smoke install and its host directories (SUDO=sudo when the app user owns the mounts)
+    vars:
+      SMOKE_DIR: '{{.ROOT_DIR}}/.local/release-smoke'
+      SUDO: '{{default "" .SUDO}}'
+    cmds:
+      - docker compose --project-directory {{.SMOKE_DIR}}/bundle -p lumilio-release-smoke down --remove-orphans || true
+      - '{{.SUDO}} rm -rf {{.SMOKE_DIR}}/media {{.SMOKE_DIR}}/app-state {{.SMOKE_DIR}}/bundle'
 
   compose:test:
     desc: Validate every Docker Compose configuration
@@ -276,15 +402,16 @@ tasks:
       - task: dto
       - task: config:examples
       - task: web:docs
-      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
+      - task: atlas:generate
+      - git diff --exit-code -- docs/atlas server/docs web/src/lib/http-commons/schema.d.ts web/src/lib/http-commons/problemRecovery.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
 
   # CI contracts exist only when they orchestrate more than one module target.
   # One-to-one wrappers are forbidden: workflows call the module target
   # (web:test, server:test:ci, web:e2e:up, …) directly.
   ci:architecture:
-    desc: Run architecture, Compose, and cross-repository catalog CI gates
+    desc: Run terminology, Compose, and cross-repository catalog CI gates
     cmds:
-      - task: architecture:check
+      - task: terminology:check
       - task: compose:test
       - task: lumen:check
       - task: assets:check
@@ -295,16 +422,12 @@ tasks:
       - task: site:install:ci
       - task: site:checks
       - task: site:build
-
-  ci:desktop:panel:
-    desc: Install and build the Desktop control panel frontend
-    cmds:
-      - task: desktop:frontend:install:ci
-      - task: desktop:frontend:build
+      - task: site:build:atlas
 
   ci:desktop:native:
-    desc: Test embedded Server and Desktop modules, then compile Desktop
+    desc: Test embedded Server and Desktop modules, check the Settings window, then compile Desktop
     cmds:
       - task: server:test:ci
       - task: desktop:test:ci
+      - task: desktop:panel:check
       - task: desktop:compile

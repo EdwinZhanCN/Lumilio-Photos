@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"server/internal/storage/layout"
 )
 
 func TestDirectoryManagerCreatesAndValidatesOnlyRepositoryStructure(t *testing.T) {
@@ -19,18 +21,18 @@ func TestDirectoryManagerCreatesAndValidatesOnlyRepositoryStructure(t *testing.T
 	if !validation.Valid || len(validation.MissingDirectories) != 0 {
 		t.Fatalf("created repository structure = %+v", validation)
 	}
-	for _, directory := range repoDirs {
-		info, err := os.Stat(filepath.Join(repositoryPath, directory.path))
-		if err != nil || !info.IsDir() {
-			t.Fatalf("repository directory %s: info=%v error=%v", directory.path, info, err)
-		}
+	report, err := layout.Validate(repositoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Missing)+len(report.WrongKind)+len(report.Inaccessible)+len(report.Unknown) != 0 {
+		t.Fatalf("created repository layout = %+v", report)
 	}
 	for _, obsolete := range []string{
-		".lumilio/assets/thumbnails",
-		".lumilio/assets/videos",
-		".lumilio/assets/audios",
+		".lumilio/assets",
+		".lumilio/sidecars",
+		".lumilio/staging",
 		".lumilio/temp",
-		".lumilio/trash",
 		".lumilio/logs/app.log",
 	} {
 		if _, err := os.Stat(filepath.Join(repositoryPath, obsolete)); !os.IsNotExist(err) {
@@ -49,7 +51,7 @@ func TestDirectoryManagerValidationReportsMissingWithoutRepairing(t *testing.T) 
 	if validation.Valid || len(validation.MissingDirectories) == 0 {
 		t.Fatalf("empty repository validation = %+v", validation)
 	}
-	if _, err := os.Stat(filepath.Join(repositoryPath, DefaultStructure.SystemDir)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(repositoryPath, layout.PrivateRoot)); !os.IsNotExist(err) {
 		t.Fatalf("validation mutated repository structure: %v", err)
 	}
 }

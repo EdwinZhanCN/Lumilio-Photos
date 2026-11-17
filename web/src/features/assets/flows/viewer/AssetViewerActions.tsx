@@ -1,3 +1,4 @@
+import { AssetDeleteImpact } from "../../components/AssetDeleteImpact";
 import { useCallback, useOptimistic, useState, useTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { Ellipsis, Heart, Info, Plus, Share, Trash2, X } from "lucide-react";
@@ -38,6 +39,8 @@ export function AssetViewerActions({
   const { toggleLike, deleteAsset } = useAssetActions();
   const [exportAsset, setExportAsset] = useState<Asset | null>(null);
   const [shareAsset, setShareAsset] = useState<Asset | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteReady, setDeleteReady] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const albumOptionsQuery = useAlbumOptions();
@@ -76,7 +79,7 @@ export function AssetViewerActions({
   }, [asset, onAssetUpdate, optimisticLiked, setOptimisticLiked, startTransition, toggleLike]);
 
   const handleDelete = useCallback(async () => {
-    if (!deleteTarget?.asset_id || isDeleting) return;
+    if (!deleteTarget?.asset_id || isDeleting || !deleteReady) return;
     const assetId = deleteTarget.asset_id;
 
     setIsDeleting(true);
@@ -87,9 +90,10 @@ export function AssetViewerActions({
       console.error("Failed to delete asset:", error);
     } finally {
       setIsDeleting(false);
+      setDeleteOpen(false);
       closeDialog(DELETE_DIALOG_ID);
     }
-  }, [closeDialog, deleteAsset, deleteTarget?.asset_id, isDeleting, onAssetDelete]);
+  }, [closeDialog, deleteAsset, deleteTarget?.asset_id, isDeleting, deleteReady, onAssetDelete]);
 
   const handleSelectAlbum = useCallback(
     async (albumId: number) => {
@@ -138,7 +142,14 @@ export function AssetViewerActions({
         defaultTitle={shareAsset?.original_filename ?? undefined}
       />
 
-      <dialog id={DELETE_DIALOG_ID} className="modal">
+      <dialog
+        id={DELETE_DIALOG_ID}
+        className="modal"
+        onClose={() => {
+          setDeleteOpen(false);
+          setDeleteReady(false);
+        }}
+      >
         <div className="modal-box">
           <h3 className="font-bold text-lg text-error">{t("delete.confirmTitle")}</h3>
           <p className="py-4">
@@ -146,7 +157,9 @@ export function AssetViewerActions({
               filename: deleteTarget?.original_filename || t("delete.thisAsset"),
             })}
           </p>
-          <p className="text-sm text-base-content/70 mb-4">{t("delete.softDeleteNote")}</p>
+          {deleteOpen && deleteTarget?.asset_id && (
+            <AssetDeleteImpact assetIds={[deleteTarget.asset_id]} onReady={setDeleteReady} />
+          )}
           <div className="modal-action">
             <form method="dialog">
               <button className="btn btn-ghost mr-2" disabled={isDeleting}>
@@ -156,7 +169,7 @@ export function AssetViewerActions({
                 type="button"
                 className={`btn btn-error ${isDeleting ? "loading" : ""}`}
                 onClick={() => void handleDelete()}
-                disabled={isDeleting}
+                disabled={isDeleting || !deleteReady}
               >
                 {isDeleting ? "" : <Trash2 className="w-4 h-4 mr-2" />}
                 {isDeleting ? t("delete.deleting") : t("delete.confirm")}
@@ -264,7 +277,11 @@ export function AssetViewerActions({
         <button
           type="button"
           className="btn btn-circle btn-lg text-error"
-          onClick={() => openDialog(DELETE_DIALOG_ID)}
+          onClick={() => {
+            setDeleteReady(false);
+            setDeleteOpen(true);
+            openDialog(DELETE_DIALOG_ID);
+          }}
           disabled={!deleteTarget || isDeleting}
           aria-label={t("common.delete")}
         >

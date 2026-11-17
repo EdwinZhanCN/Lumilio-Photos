@@ -3,7 +3,7 @@ package dto
 import (
 	"testing"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

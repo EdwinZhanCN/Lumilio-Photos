@@ -289,9 +289,9 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(current, "primary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	currentRootID := uuid.NewString()
+	currentStorageLocationID := uuid.NewString()
 	currentPrimaryID := uuid.NewString()
-	writePortableStorageIdentity(t, current, currentRootID, currentPrimaryID)
+	writePortableStorageIdentity(t, current, currentStorageLocationID, currentPrimaryID)
 	draft.Settings.StoragePath = current
 	draft, err = store.PatchDraft(draft.TOML, draft.Settings)
 	if err != nil {
@@ -312,7 +312,7 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(candidate, "primary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writePortableStorageIdentity(t, candidate, currentRootID, uuid.NewString())
+	writePortableStorageIdentity(t, candidate, currentStorageLocationID, uuid.NewString())
 	draft.Settings.StoragePath = candidate
 	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil || !strings.Contains(err.Error(), "primary repository identity") {
 		t.Fatalf("different primary identity error = %v", err)
@@ -323,15 +323,106 @@ func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
 	}
 }
 
-func writePortableStorageIdentity(t *testing.T, rootPath, rootID, primaryID string) {
+func writePortableStorageIdentity(t *testing.T, rootPath, storageLocationID, primaryID string) {
 	t.Helper()
+	// Complete markers, as the Server writes them: the Desktop no longer
+	// has a parser of its own, so a marker it hands over must be adoptable.
 	markers := map[string]string{
-		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + rootID + "\n",
-		filepath.Join(rootPath, "primary", ".lumiliorepo"): "version: \"1.0\"\nid: " + primaryID + "\n",
+		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + storageLocationID + "\nname: Default Storage\ncreated_at: 2026-01-01T00:00:00Z\n",
+		filepath.Join(rootPath, "primary", ".lumiliorepo"): "version: \"1.0\"\nid: " + primaryID + "\nname: Primary\nstorage_strategy: date\nlocal_settings:\n  handle_duplicate_filenames: rename\ncreated_at: 2026-01-01T00:00:00Z\n",
 	}
 	for path, contents := range markers {
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// Fresh default during setup: before the Primary Repository
+// exists the person may point the Default Storage Location at a folder with
+// no Primary Repository in it; the Desktop pre-check lets the candidate
+// through and the Server decides at the controlled restart (a refusal rolls
+// the intent back). A Repository folder or an unreadable root marker never
+// reaches a restart.
+func TestPatchDraftAllowsAFreshDefaultCandidateWithoutAPrimary(t *testing.T) {
+	paths, err := platform.NewPaths(filepath.Join(t.TempDir(), "app-data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := paths.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(paths)
+	draft, err := store.ReadDraft()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The current default carries a leftover primary from an earlier install.
+	current := filepath.Join(t.TempDir(), "current")
+	if err := os.MkdirAll(filepath.Join(current, "primary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writePortableStorageIdentity(t, current, uuid.NewString(), uuid.NewString())
+	draft.Settings.StoragePath = current
+	draft, err = store.PatchDraft(draft.TOML, draft.Settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validation, err := store.Validate(filepath.Join(paths.RuntimeIntents, "candidate.toml"), []byte(draft.TOML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteIntent(validation); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WritePointer(paths.RuntimeCurrent, validation.Fingerprint); err != nil {
+		t.Fatal(err)
+	}
+
+	base := t.TempDir()
+	absent := filepath.Join(base, "absent")
+	empty := filepath.Join(base, "empty")
+	if err := os.MkdirAll(empty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rootOnly := filepath.Join(base, "root-only")
+	if err := os.MkdirAll(rootOnly, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rootOnly, ".lumilioroot"), []byte("version: \"1.0\"\nid: "+uuid.NewString()+"\nname: Root Only\ncreated_at: 2026-01-01T00:00:00Z\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{absent, empty, rootOnly} {
+		draft.Settings.StoragePath = candidate
+		patched, err := store.PatchDraft(draft.TOML, draft.Settings)
+		if err != nil {
+			t.Fatalf("fresh candidate %s refused: %v", candidate, err)
+		}
+		if patched.Settings.StoragePath != candidate {
+			t.Fatalf("fresh candidate path = %q, want %q", patched.Settings.StoragePath, candidate)
+		}
+	}
+
+	repositoryFolder := filepath.Join(base, "repository")
+	if err := os.MkdirAll(repositoryFolder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repositoryFolder, ".lumiliorepo"), []byte("version: \"1.0\"\nid: "+uuid.NewString()+"\nname: Repository\nstorage_strategy: date\nlocal_settings:\n  handle_duplicate_filenames: rename\ncreated_at: 2026-01-01T00:00:00Z\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	draft.Settings.StoragePath = repositoryFolder
+	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil || !strings.Contains(err.Error(), "Repository folder") {
+		t.Fatalf("repository folder as default = %v", err)
+	}
+	corrupt := filepath.Join(base, "corrupt")
+	if err := os.MkdirAll(corrupt, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corrupt, ".lumilioroot"), []byte("version: [unterminated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	draft.Settings.StoragePath = corrupt
+	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil || !strings.Contains(err.Error(), "cannot adopt") {
+		t.Fatalf("corrupt root marker as default = %v", err)
 	}
 }

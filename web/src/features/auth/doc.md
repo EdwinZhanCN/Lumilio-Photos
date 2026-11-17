@@ -37,8 +37,14 @@ password fallback, MFA challenge, and redirect recovery.
 [useRegistrationFlow](./flows/registration/useRegistrationFlow.ts) handles registration plus optional TOTP,
 passkey, and recovery-code onboarding. [useMFAFlow](./flows/mfa/useMFAFlow.ts) owns authenticated
 MFA management, with its `mfa` and `action` URL parameters authoritative.
-[useBootstrapFlow](./flows/bootstrap/useBootstrapFlow.ts) composes first-admin registration with repository
-creation without copying either domain's server state.
+[useBootstrapFlow](./flows/bootstrap/useBootstrapFlow.ts) composes first-admin registration with the Primary
+Repository setup step without copying either domain's server state;
+[usePrimarySetup](./flows/primary-setup/usePrimarySetup.ts) is that step, shared with the access gate: it reads
+the Server's review of the fixed primary target (create, adopt the
+Repository already there, or start fresh elsewhere through the host) and
+binds the administrator's acknowledgement to that review. [useSignOut](./flows/sign-out/useSignOut.ts)
+is the only sign-out path: it awaits `logout` before opening `/login`, so the
+login form never mounts while the session is still authenticated.
 
 [ProtectedRoute](./modules/access/ProtectedRoute.tsx), [BootstrapGate](./modules/access/BootstrapGate.tsx), and
 [PrimaryRepositoryGate](./modules/access/PrimaryRepositoryGate.tsx) are composition capabilities, not page

@@ -1,0 +1,19 @@
+id: flow
+kind: sequence
+title: Every way an arrow breaks
+summary: Fixture flow.
+nodes:
+  - { id: scheduler, label: Scheduler, anchor: go:scheduler.Scheduler }
+  - { id: worker, label: Worker, anchor: go:worker.Worker }
+  - { id: service, label: Service, anchor: go:worker.Service }
+  - { id: store, label: Store, anchor: go:store.Store }
+  - { id: audit, label: Audit, anchor: go:audit.Record }
+  - { id: jobs, label: Job payloads, anchor: mod:fx/jobs }
+  - { id: user, label: User, anchor: ext:User }
+steps:
+  - { from: scheduler, to: store, label: "no reference at all" }
+  - { from: service, to: store, label: "the named callee is not the one called", anchor: "go:store.Store.Load" }
+  - { from: scheduler, to: worker, label: "a message one end ignores", anchor: "go:jobs.Other" }
+  - { from: worker, to: audit, label: "a wiring site that wires nothing", anchor: "go:app.Unrelated" }
+  - { from: service, to: store, label: "a hop that is not in the code", via: ["go:audit.Record"] }
+  - { from: service, to: store, label: "an anchor on neither end beside via", anchor: "go:scheduler.Scheduler.Enqueue", via: ["go:app.runtime.run"] }

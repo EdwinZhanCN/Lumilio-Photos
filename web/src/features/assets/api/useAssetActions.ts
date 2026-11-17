@@ -1,3 +1,4 @@
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useCallback } from "react";
 import type { InfiniteData } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
@@ -182,7 +183,7 @@ export const useAssetActions = (): AssetActionsResult => {
         showMessage("success", t("delete.success"));
       } catch (error) {
         console.error("Failed to delete asset:", error);
-        showMessage("error", t("delete.error"));
+        showMessage("error", localizeAPIProblem(error, t, t("delete.error")));
         throw error;
       }
     },

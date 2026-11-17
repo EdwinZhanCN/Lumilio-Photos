@@ -14,7 +14,7 @@ code-evidence:
 - server/internal/agent
 - server/internal/agent/tools
 - server/internal/service/settings_service.go
-- server/internal/secretbox
+- server/internal/foundation/secretbox
 -->
 
 # Lumilio Agent 的隐私边界

@@ -10,17 +10,22 @@ import (
 	"fmt"
 	"time"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 
 	"github.com/google/uuid"
 )
 
 const effectReceiptRetention = 30 * 24 * time.Hour
 
+// MusicPlaylistWriter uses the effect transaction so mutations and receipts commit together.
+type MusicPlaylistWriter interface {
+	ApplyAgentPlaylistTx(context.Context, *sql.Tx, int32, uuid.UUID, []uuid.UUID, string, uuid.UUID, int64, bool) (uuid.UUID, int, error)
+}
+
 type EffectRuntime struct {
-	pool     *sql.DB
+	music    MusicPlaylistWriter
 	writer   *catalogtx.Writer
 	queries  *repo.Queries
 	registry *ToolRegistry
@@ -35,13 +40,18 @@ type EffectReceipt struct {
 	ToolName         string `json:"tool_name"`
 	Status           string `json:"status"`
 	Count            int    `json:"count"`
+	PlaylistID       string `json:"playlist_id,omitempty"`
 	AlbumID          int    `json:"album_id,omitempty"`
 	Message          string `json:"message"`
 	AlreadyCommitted bool   `json:"already_committed,omitempty"`
 }
 
-func NewEffectRuntime(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry) *EffectRuntime {
-	return &EffectRuntime{pool: pool, writer: writer, queries: queries, registry: registry}
+func NewEffectRuntime(writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry, music ...MusicPlaylistWriter) *EffectRuntime {
+	r := &EffectRuntime{writer: writer, queries: queries, registry: registry}
+	if len(music) > 0 {
+		r.music = music[0]
+	}
+	return r
 }
 
 func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
@@ -49,7 +59,7 @@ func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
 }
 
 func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID string, runID uuid.UUID, toolName string, membership []uuid.UUID, payload, target any) (uuid.UUID, error) {
-	if r == nil || r.pool == nil || r.queries == nil {
+	if r == nil || r.writer == nil || r.queries == nil {
 		return uuid.Nil, errors.New("effect runtime unavailable")
 	}
 	// Receipts remain queryable after a run so the client can reconcile a
@@ -127,7 +137,7 @@ func (r *EffectRuntime) Reject(ctx context.Context, userID int32, threadID strin
 }
 
 func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID string, runID, effectID uuid.UUID) (EffectReceipt, error) {
-	if r == nil || r.pool == nil {
+	if r == nil || r.writer == nil {
 		return EffectReceipt{}, errors.New("effect runtime unavailable")
 	}
 	tx, err := r.writer.BeginTx(ctx, catalogtx.OperationAgentEffectCommit, nil)
@@ -213,6 +223,30 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 			return EffectReceipt{}, err
 		}
 		receipt.Message = fmt.Sprintf("Applied tag change to %d assets", receipt.Count)
+	case "save_music_playlist":
+		var payload struct {
+			Title        string `json:"title"`
+			SkipExisting bool   `json:"skip_existing"`
+		}
+		var target struct {
+			PlaylistID uuid.UUID `json:"playlist_id"`
+			Revision   int64     `json:"revision"`
+		}
+		if err := json.Unmarshal(effect.Payload, &payload); err != nil {
+			return EffectReceipt{}, err
+		}
+		if err := json.Unmarshal(effect.Target, &target); err != nil {
+			return EffectReceipt{}, err
+		}
+		if r.music == nil {
+			return EffectReceipt{}, errors.New("music writer unavailable")
+		}
+		id, count, err := r.music.ApplyAgentPlaylistTx(ctx, tx.Raw(), userID, effectID, []uuid.UUID(effect.MembershipSnapshot), payload.Title, target.PlaylistID, target.Revision, payload.SkipExisting)
+		if err != nil {
+			return EffectReceipt{}, err
+		}
+		receipt.PlaylistID, receipt.Count = id.String(), count
+		receipt.Message = fmt.Sprintf("Saved %d tracks to playlist", count)
 	case "create_album":
 		var payload struct {
 			Title string `json:"title"`

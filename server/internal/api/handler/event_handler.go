@@ -12,10 +12,10 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/db/catalogtx"
+	"server/internal/catalog/catalogtx"
 	"server/internal/event"
-	"server/internal/pipeline"
 	"server/internal/service"
+	"server/internal/work/pipeline"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,23 +23,19 @@ import (
 
 type EventHandler struct {
 	service   *event.Service
-	db        *sql.DB
 	writer    *catalogtx.Writer
-	reader    *sql.DB
+	reader    *catalogtx.Reader
 	shares    service.ResolvedSnapshotShareService
 	relations *event.RelationService
 }
 
-func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
-	return NewEventHandlerWithReader(eventService, db, catalogtx.NewWriter(db, nil), db, shares)
-}
-
-func NewEventHandlerWithReader(eventService *event.Service, db *sql.DB, writer *catalogtx.Writer, reader *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
-	handler := &EventHandler{
-		service: eventService, db: db, writer: writer, reader: reader, shares: shares,
+// NewEventHandler serves Events, writing user state through writer and
+// reading lists and relations through the query-only reader.
+func NewEventHandler(eventService *event.Service, writer *catalogtx.Writer, reader *catalogtx.Reader, shares service.ResolvedSnapshotShareService) *EventHandler {
+	return &EventHandler{
+		service: eventService, writer: writer, reader: reader, shares: shares,
 		relations: event.NewRelationService(reader),
 	}
-	return handler
 }
 
 type eventCursor struct {
@@ -95,24 +91,25 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 			return
 		}
 	}
-	rows, err := h.reader.QueryContext(c, `
+	rows, err := h.reader.Statements().QueryContext(c, `
 SELECT e.event_id FROM events e
 WHERE e.owner_id=? AND e.status='active' AND (? OR e.is_hidden=0)
-AND (?='' OR EXISTS (
+AND EXISTS (
   SELECT 1
   FROM event_media_items emi
   JOIN media_items mi
     ON mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
   WHERE emi.event_id=e.event_id AND emi.owner_id=e.owner_id
-    AND EXISTS (
+    AND mi.media_kind IN ('photo','video','live_photo')
+    AND (?='' OR EXISTS (
       SELECT 1
       FROM media_item_assets scoped_membership
       JOIN active_asset_occurrences occurrence
         ON occurrence.asset_id=scoped_membership.asset_id
       WHERE scoped_membership.media_item_id=mi.media_item_id
         AND occurrence.repository_id=?
-    )
-))
+    ))
+)
 AND (?='' OR e.start_at<? OR (e.start_at=? AND e.event_id<?))
 ORDER BY e.start_at DESC,e.event_id DESC LIMIT ?`,
 		ownerID, includeHidden, repositoryFilter, repositoryFilter,
@@ -300,7 +297,13 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	if request.IsHidden != nil {
 		hidden = *request.IsHidden
 	}
-	result, err := h.writer.ExecContext(c, catalogtx.OperationEventPatch, `
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventPatch, nil)
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(c, `
 UPDATE events SET title_override=?,cover_override_media_item_id=?,is_hidden=?,updated_at=?
 WHERE event_id=? AND owner_id=? AND status='active'`,
 		title, cover, hidden, apiNowMicros(), summary.EventID, ownerID)
@@ -310,6 +313,18 @@ WHERE event_id=? AND owner_id=? AND status='active'`,
 	}
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		h.respondError(c, event.ErrNotFound)
+		return
+	}
+	// Title, cover, and hidden state are reconciliation inputs that every
+	// projection snapshot copies and republishes. Advancing the source
+	// revision in this transaction fences out a projection prepared before
+	// the edit, which would otherwise silently revert it on publish.
+	if err := event.MarkEventFactsChangedTx(c, tx.Raw(), ownerID, "event_user_state_changed"); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	updated, err := h.service.Resolver().Resolve(c, ownerID, summary.EventID)
@@ -407,7 +422,7 @@ func (h *EventHandler) GetRebuildStatus(c *gin.Context) {
 	}
 	var response dto.EventRebuildStatusDTO
 	var paused int
-	err := h.reader.QueryRowContext(c, `
+	err := h.reader.Statements().QueryRowContext(c, `
 SELECT active_algorithm_version,automatic_rebuild_paused,revision,source_revision,published_revision,
  (SELECT count(*) FROM event_dirty_ranges WHERE owner_id=?)
 FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
@@ -424,7 +439,7 @@ FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
 	}
 	response.Initialized, response.Paused = true, paused != 0
 	response.Pending = response.SourceRevision > response.PublishedRevision
-	rows, rowsErr := h.reader.QueryContext(c, `
+	rows, rowsErr := h.reader.Statements().QueryContext(c, `
 SELECT run_id,state,COALESCE(error_code,'') FROM event_rebuild_runs
 WHERE owner_id=? ORDER BY requested_at DESC,run_id DESC LIMIT 20`, ownerID)
 	if rowsErr != nil {
@@ -782,7 +797,7 @@ func (h *EventHandler) AddEventMembers(c *gin.Context) {
 
 func (h *EventHandler) pending(c *gin.Context, ownerID int32) bool {
 	var pending bool
-	_ = h.reader.QueryRowContext(c, `
+	_ = h.reader.Statements().QueryRowContext(c, `
 SELECT source_revision>published_revision FROM event_owner_state WHERE owner_id=?`, ownerID).Scan(&pending)
 	return pending
 }

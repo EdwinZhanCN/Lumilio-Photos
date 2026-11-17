@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

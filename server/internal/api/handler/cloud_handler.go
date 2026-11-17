@@ -12,9 +12,9 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/problem"
-	"server/internal/cloud"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/ingest/cloud"
 	"server/internal/service"
 )
 
@@ -350,6 +350,9 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 		Access:       cloudCredentialAccess(user),
 	})
 	if err != nil {
+		if writeUploadAdmissionError(c, err) {
+			return
+		}
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
@@ -681,6 +684,9 @@ func cloudCredentialAccess(user *service.UserResponse) cloud.CredentialAccess {
 func writeCloudAccessError(c *gin.Context, err error, message string) {
 	if errors.Is(err, cloud.ErrCredentialAccessDenied) {
 		api.WriteProblem(c, api.Forbidden(err))
+		return
+	}
+	if writeUploadAdmissionError(c, err) {
 		return
 	}
 	api.WriteProblem(c, api.Internal(err))

@@ -10,7 +10,7 @@ import (
 
 	"server/config"
 	"server/internal/api"
-	"server/internal/httporigin"
+	"server/internal/api/httporigin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"

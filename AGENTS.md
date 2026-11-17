@@ -27,11 +27,13 @@ configuration that boots and diagnoses cleanly.
 - `server/`: Go API and embedded SQLite runtime. `server/cmd/main.go` is the thin
   entry point; bootstrap lives in `server/app`, configuration in
   `server/config`, business logic in `server/internal`, and migrations in
-  `server/migrations`.
+  `server/migrations`. `server/internal` is layered, lowest first:
+  `foundation`, `media`, `catalog` (SQLite), `work`, the business packages,
+  `ingest`, and `api`.
 - `web/`: React 19 and TypeScript on Vite+. Feature code lives in
   `web/src/features`; shared runtime code belongs in `web/src/lib`,
   `web/src/components`, or `web/src/contexts`.
-- `desktop/`: Wails v3 desktop app for macOS and Windows. It is a separate Go
+- `desktop/`: MyGo desktop app for macOS and Windows. It is a separate Go
   module that runs `server/app` and SQLite in-process.
 - `wasm/`: Rust WebAssembly crates; checked-in browser bundles live in
   `web/src/wasm`.
@@ -45,11 +47,18 @@ configuration that boots and diagnoses cleanly.
 Before substantive changes, read the
 [system map](docs/architecture.md) and check
 [active execution plans](docs/exec-plans/active/).
-Then read only the references relevant to the change:
+To understand or locate code, start from the [Atlas](docs/atlas/README.md):
+the [generated index](docs/atlas/generated/README.md) and
+[module catalog](docs/atlas/generated/modules.md) show every package's group
+and purpose, and the sequence, data-flow, and lifecycle views name the exact
+symbols a flow passes through. Read the owning `doc.go` / `doc.ts` before
+editing a package. Then read only the references relevant to the change:
 
-- Backend: [BACKEND.md](docs/BACKEND.md).
-- Frontend: [FRONTEND.md](docs/FRONTEND.md) and
-  [web/ARCHITECTURE.md](web/ARCHITECTURE.md).
+- Backend: the owning package `doc.go` (find it in the
+  [module catalog](docs/atlas/generated/modules.md)) and the cross-cutting
+  invariants in [architecture.md](docs/architecture.md).
+- Frontend: [web/ARCHITECTURE.md](web/ARCHITECTURE.md) and the feature
+  `doc.ts`.
 - UI or product behavior: [DESIGN.md](docs/DESIGN.md) and
   [core beliefs](docs/core-beliefs.md).
 - Test or demo media: [test-assets.md](docs/test-assets.md).
@@ -59,6 +68,8 @@ Then read only the references relevant to the change:
 - Known debt: [tech-debt-tracker.md](docs/exec-plans/tech-debt-tracker.md).
 - Harness itself (memories, skills, gates):
   [agent-harness.md](docs/agent-harness.md).
+- Code map, package docs, and diagrams:
+  [Atlas README](docs/atlas/README.md).
 
 ## Agent Memories And Skills
 
@@ -76,13 +87,15 @@ the skill before running its workflow. Current set:
 - `z-index` — stacking tokens
 - `add-task-target` — Taskfile / CI wiring
 - `feature-doc` — `doc.ts` / `doc.md`
+- `atlas` — package `doc.go`, group rules, anchored views, re-verifying stale views
 - `pin-reconcile` — `assets.lock.json` / `lumen.lock.json`
 - `exec-plan` — plan lifecycle
 
 Project-coupled decisions live in `.agents/decisions/`; escaped-bug records
-live in `.agents/postmortems/`. A non-trivial change updates one memory in
+live in `.agents/postmortems/`. A non-trivial change should update one memory in
 the same PR — the owning decision record, exec plan, or postmortem;
-mechanical or local edits are exempt. Formats:
+mechanical or local edits are exempt. Missing memory materials do not block
+merges. Formats:
 [agent-harness.md](docs/agent-harness.md).
 
 ## Non-Negotiable Rules
@@ -90,14 +103,14 @@ mechanical or local edits are exempt. Formats:
 - Prefer root Task targets for repository workflows. Use `task server:test` for
   backend changes, `task web:test` for frontend changes, `task desktop:test` for
   desktop changes, and `task compose:test` for deployment changes. These are
-  local development gates; `task test` intentionally runs only the architecture,
-  Server, and Web gates. It does not include Site, Desktop, or browser E2E.
+  local development gates; `task test` intentionally runs only the terminology,
+  Atlas, Server, and Web gates. It does not include Site, Desktop, or browser E2E.
   Map a diff to its narrowest evidence with
   [lumilio-select-checks](.agents/skills/lumilio-select-checks/SKILL.md).
 - Workflows call module targets directly (`task web:test`,
   `task server:test:ci`, `task web:e2e:up`). Root `ci:*` names exist only for
   real cross-module orchestration: `task ci:architecture`, `task ci:site`,
-  `task ci:desktop:panel`, `task ci:desktop:native`. Do not add a 1:1 `ci:`
+  `task ci:desktop:native`. Do not add a 1:1 `ci:`
   wrapper for a target a workflow can already invoke.
 - Keep the Taskfile/workflow boundary explicit. `.github/workflows/*.yml`
   owns triggers, path filters, runner and native dependency setup, credentials,
@@ -107,8 +120,8 @@ mechanical or local edits are exempt. Formats:
   workflow path filters in the same change. Follow
   [lumilio-add-task-target](.agents/skills/lumilio-add-task-target/SKILL.md).
 - Follow the frontend test-layer taxonomy in
-  [FRONTEND.md](docs/FRONTEND.md); do not invent test-file
-  conventions. Placement:
+  [web/ARCHITECTURE.md](web/ARCHITECTURE.md#test-layers); do not invent
+  test-file conventions. Placement:
   [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 - API contracts are OpenAPI-first. Never hand-edit
   `web/src/lib/http-commons/schema.d.ts` or cast around a stale response type.
@@ -134,6 +147,16 @@ mechanical or local edits are exempt. Formats:
   matching `import type`, and the generated sibling `doc.md` is never edited by
   hand
   ([lumilio-feature-doc](.agents/skills/lumilio-feature-doc/SKILL.md)).
+- Every Go package documents itself in `doc.go` with doc links that
+  resolve, and its path is in exactly one group's `match` in
+  `docs/atlas/atlas.yaml`. An import that crosses into a group not listed in
+  its group's `uses` fails `task atlas:check`: declare it there (an
+  architecture decision) or remove the import. A rule under `rules:` that
+  reports a finding is fixed in the code, never baselined to pass. When
+  code an Atlas view anchors changes, re-read that view,
+  fix it if the behaviour changed, then `task atlas:lock` — never lock
+  without reading
+  ([lumilio-atlas](.agents/skills/lumilio-atlas/SKILL.md)).
 
 ## Execution Plans
 

@@ -1,6 +1,7 @@
 import { lazy, type ReactNode } from "react";
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
+import AssetsMissing from "@/features/assets/routes/AssetsMissing";
 import AssetsTrash from "@/features/assets/routes/AssetsTrash";
 import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
@@ -26,6 +27,12 @@ import RequiredPasswordChangePage from "@/features/auth/routes/RequiredPasswordC
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 import BootstrapWizard from "@/features/auth/routes/BootstrapWizard.tsx";
 import { Navigate } from "react-router-dom";
+import StoragePage from "./StoragePage";
+import Music from "@/features/music/routes/Music";
+import MusicTrackDetails from "@/features/music/flows/detail/MusicTrackDetailsFlow";
+import MusicAlbumDetails from "@/features/music/flows/detail/MusicAlbumDetailsFlow";
+import MusicArtistDetails from "@/features/music/flows/detail/MusicArtistDetailsFlow";
+import MusicPlaylistDetails from "@/features/music/flows/detail/MusicPlaylistDetailsFlow";
 
 type RouteDefinition = {
   path: string;
@@ -95,6 +102,18 @@ export const protectedStandaloneRoutes: RouteDefinition[] = [
 ];
 
 export const appRoutes: RouteDefinition[] = [
+  { path: "/storage/:repositoryId/missing", element: <AssetsMissing />, requiredRole: "admin" },
+  {
+    path: "/storage/:repositoryId/missing/:assetId",
+    element: <AssetsMissing />,
+    requiredRole: "admin",
+  },
+  { path: "/storage/:repositoryId/trash", element: <AssetsTrash />, requiredRole: "admin" },
+  {
+    path: "/storage/:repositoryId/trash/:assetId",
+    element: <AssetsTrash />,
+    requiredRole: "admin",
+  },
   {
     path: "/",
     element: <Home />,
@@ -106,6 +125,26 @@ export const appRoutes: RouteDefinition[] = [
   {
     path: "/collections",
     element: <Collections />,
+  },
+  {
+    path: "/music",
+    element: <Music />,
+  },
+  {
+    path: "/music/tracks/:trackId",
+    element: <MusicTrackDetails />,
+  },
+  {
+    path: "/music/albums/:albumId",
+    element: <MusicAlbumDetails />,
+  },
+  {
+    path: "/music/artists/:artistId",
+    element: <MusicArtistDetails />,
+  },
+  {
+    path: "/music/playlists/:playlistId",
+    element: <MusicPlaylistDetails />,
   },
   {
     path: "/collections/albums",
@@ -216,12 +255,8 @@ export const appRoutes: RouteDefinition[] = [
     element: <Assets />,
   },
   {
-    path: "/manage",
+    path: "/upload",
     element: <Manage />,
-  },
-  {
-    path: "/upload-photos",
-    element: <Navigate to="/manage" replace />,
   },
   {
     path: "/studio",
@@ -230,6 +265,11 @@ export const appRoutes: RouteDefinition[] = [
   {
     path: "/server-monitor",
     element: <Monitor />,
+    requiredRole: "admin",
+  },
+  {
+    path: "/storage",
+    element: <StoragePage />,
     requiredRole: "admin",
   },
   {

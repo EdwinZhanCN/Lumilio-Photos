@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { eventDateRange, eventTitle, type EventSummary } from "./event";
 
 const event = {

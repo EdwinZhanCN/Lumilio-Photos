@@ -1,6 +1,11 @@
 # Decision: Present storage entities from semantic identity
 
-Status: implemented
+Status: implemented — presentation of `rawName` / `kind` / `role` remains in
+force. Location-as-health overlay and dual selector DTOs are superseded by
+[Storage Location does not gate Repository I/O](2026-09-19-storage-location-authorization-only.md)
+and [Storage HTTP split](2026-09-19-storage-http-split.md). Where capacity is
+presented, and on which surfaces, is owned by
+[One admin storage surface with capacity as a Repository fact](2026-09-19-admin-storage-surface.md).
 
 ## Problem
 
@@ -17,7 +22,7 @@ Storage diagnostics also omitted the Storage Location `kind` and Repository
 
 ## Decision
 
-Storage APIs carry locale-neutral semantic identity. Repository-root responses
+Storage APIs carry locale-neutral semantic identity. Storage Location responses
 already expose `kind`; repository options already expose `role`; storage
 diagnostics now expose the corresponding `kind` or `role` for every item.
 Backend names remain raw data and are never localized by the Server.
@@ -51,6 +56,6 @@ break after renames, seed changes, imports, or another language.
 upload, browse, settings, and future consumers would drift again. One owned
 model, resolver, and boundary gate makes the rule reusable and enforceable.
 
-**Rename every technical identifier** — rejected because `RepositoryRootDTO`,
+**Rename every technical identifier** — rejected because `StorageLocationDTO`,
 database columns, URLs, and existing domain symbols are stable protocol names.
 The canonical terminology registry already records their product mapping.

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"server/internal/media/imagesource"
 	aggregatesearch "server/internal/search"
-	"server/internal/utils/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -90,7 +90,7 @@ func (s *assetService) searchVisualSimilarBrowseItems(ctx context.Context, param
 
 	total := int64(len(refs))
 	page := pageMediaRefs(refs, params.Limit, params.Offset)
-	items, err := s.browseItemsForMediaRefs(ctx, page, bestTsByItem, params.IsDeleted)
+	items, err := s.browseItemsForMediaRefs(ctx, page, bestTsByItem, params.LifecycleState)
 	if err != nil {
 		return SearchBrowseResult{}, err
 	}

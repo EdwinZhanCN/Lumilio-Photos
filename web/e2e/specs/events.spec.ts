@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
+import { uniqueJpeg } from "../support/assets";
 import { t } from "../support/i18n";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
@@ -12,20 +12,6 @@ type EventMutation = components["schemas"]["dto.EventMutationResponseDTO"];
 type EventShare = components["schemas"]["dto.CreateShareLinkResponseDTO"];
 type PublicShare = components["schemas"]["dto.PublicShareMetadataDTO"];
 
-function uniqueJpeg(sourcePath: string, markerText: string) {
-  const source = readFileSync(sourcePath);
-  const endOfImage = source.lastIndexOf(Buffer.from([0xff, 0xd9]));
-  if (endOfImage < 0) throw new Error("Events fixture is not a JPEG");
-  const marker = Buffer.from(markerText, "utf8");
-  const markerLength = marker.length + 2;
-  return Buffer.concat([
-    source.subarray(0, endOfImage),
-    Buffer.from([0xff, 0xfe, markerLength >> 8, markerLength & 0xff]),
-    marker,
-    source.subarray(endOfImage),
-  ]);
-}
-
 test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", async ({
   page,
   workspace,
@@ -33,7 +19,7 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
   test.setTimeout(120_000);
   await new LoginPage(page).signIn(workspace.username, workspace.password);
 
-  await page.goto("/manage");
+  await page.goto("/upload");
   const eventFilenames = [
     `e2e-event-${workspace.username}-1.jpg`,
     `e2e-event-${workspace.username}-2.jpg`,
@@ -61,6 +47,13 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
     .click();
   await accepted;
 
+  // Event topology is derived from capture facts, and those land after the
+  // asset row: taken_time first holds the file mtime and is replaced when the
+  // analyze stage extracts EXIF (which also writes the fixture's GPS). Until
+  // both photos carry EXIF, the projection legitimately passes through a
+  // split state (one photo at its 2025 capture time, the other at upload
+  // time) and keeps republishing while the spec edits the Event. Wait for the
+  // extracted facts so the rebuild below is the settled topology.
   for (const filename of eventFilenames) {
     await expect(async () => {
       const result = await api<components["schemas"]["dto.QueryAssetsResponseDTO"]>(
@@ -78,6 +71,7 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
         },
       );
       expect(result.items?.length).toBe(1);
+      expect(result.items?.[0]?.media_item?.primary_asset?.gps_latitude).toBeDefined();
     }).toPass({ timeout: 60_000 });
   }
 

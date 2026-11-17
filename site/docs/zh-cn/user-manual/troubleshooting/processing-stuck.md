@@ -11,9 +11,9 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/queue/jobs
-- server/internal/sourcing
-- server/internal/processors/transcode_task.go
+- server/internal/work/jobs
+- server/internal/ingest/sourcing
+- server/internal/ingest/processors/transcode_task.go
 - web/src/features/manage
 -->
 

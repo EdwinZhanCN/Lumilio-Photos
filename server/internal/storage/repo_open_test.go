@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/storage/layout"
 	"server/internal/storage/repocfg"
 )
 
@@ -18,19 +19,19 @@ func TestOpenRepositoryRejectsUnavailableCloudPlaceholderBeforeCatalogMutation(t
 	ctx := context.Background()
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-placeholder", Actor: "test", Name: "Placeholder Archive",
-		DirectoryName: "placeholder-archive", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "placeholder-archive", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	repositoryPath := created.Repository.Path
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(repositoryPath, ".family.jpg.icloud"), nil, 0o644); err != nil {
@@ -45,30 +46,30 @@ func TestOpenRepositoryRejectsUnavailableCloudPlaceholderBeforeCatalogMutation(t
 	}
 }
 
-func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T) {
+func TestOpenRepositoryPreservesStagingUnderAReceiptAndSchedulesInitialScan(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-reopen-source", Actor: "test", Name: "Reopened Archive",
-		DirectoryName: "reopened", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "reopened", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldState := filepath.Join(created.Repository.Path, DefaultStructure.SystemDir, "staging", "old-state")
+	oldState := filepath.Join(created.Repository.Path, layout.PrivateRoot, "work", "old-state")
 	if err := os.MkdirAll(filepath.Dir(oldState), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(oldState, []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
+	if _, err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,8 +123,10 @@ func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T)
 	if len(scanned) != 2 || scanned[1] != opened.RepoID.String() {
 		t.Fatalf("durably retried initial scans = %#v", scanned)
 	}
+	// Abandoned staging is moved under the registration's recovery receipt,
+	// out of the way of ordinary staging cleanup, never discarded.
 	recovered, err := filepath.Glob(filepath.Join(
-		opened.Path, DefaultStructure.SystemDir, "recovery", "reopened-*", "staging", "old-state",
+		opened.Path, filepath.FromSlash(layout.RecoveryDir().String()), "*", "work", "old-state",
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +134,7 @@ func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T)
 	if len(recovered) != 1 {
 		t.Fatalf("reopened private state = %#v", recovered)
 	}
-	if _, err := os.Stat(filepath.Join(opened.Path, DefaultStructure.SystemDir, "staging", "old-state")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(opened.Path, layout.PrivateRoot, "work", "old-state")); !os.IsNotExist(err) {
 		t.Fatalf("old private state remained active: %v", err)
 	}
 }
@@ -140,20 +143,24 @@ func TestRenameRepositoryChangesOnlyDisplayName(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	created, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "rename-only", Actor: "test", Name: "Before", DirectoryName: "stable-folder",
-		Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(), StorageStrategy: "cas", DuplicateHandling: "rename",
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(), StorageStrategy: "cas", DuplicateHandling: "rename",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	renamed, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
+	renamedResult, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
 		RequestID: "rename-before-after", Actor: "test",
 	})
+	var renamed *repo.Repository
+	if renamedResult != nil {
+		renamed = &renamedResult.Repository
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,9 +174,13 @@ func TestRenameRepositoryChangesOnlyDisplayName(t *testing.T) {
 	if disk.Name != "After" || disk.StorageStrategy != "cas" || disk.ID != renamed.RepoID.String() {
 		t.Fatalf("renamed marker = %#v", disk)
 	}
-	replayed, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
+	replayedResult, err := manager.RenameRepository(ctx, created.Repository.RepoID.String(), "After", LifecycleRequest{
 		RequestID: "rename-before-after", Actor: "test",
 	})
+	var replayed *repo.Repository
+	if replayedResult != nil {
+		replayed = &replayedResult.Repository
+	}
 	if err != nil || replayed.Name != "After" {
 		t.Fatalf("idempotent rename replay = %+v, error = %v", replayed, err)
 	}

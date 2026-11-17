@@ -48,7 +48,6 @@ export function MosaicView({ data, size, source }: ViewBodyProps) {
           >
             <WidgetAssetThumbnail
               asset={asset}
-              source={source}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             />
             {isLastShown && (

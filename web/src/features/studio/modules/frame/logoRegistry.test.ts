@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  allBrands,
-  findBrand,
-  matchBrand,
-  pickVariant,
-  resolveLogoColor,
-} from "./logoRegistry";
+import { allBrands, findBrand, matchBrand, pickVariant, resolveLogoColor } from "./logoRegistry";
 
 describe("matchBrand", () => {
   it("matches common makers", () => {

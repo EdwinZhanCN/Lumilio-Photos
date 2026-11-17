@@ -18,11 +18,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/pipeline"
-	"server/internal/settings"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/settings"
+	"server/internal/work/pipeline"
 )
 
 const (
@@ -165,22 +165,10 @@ type locationService struct {
 	pacer    *requestPacer
 }
 
-func NewLocationService(queries *repo.Queries, pool *sql.DB, _ ...any) LocationService {
-	return NewLocationServiceWithCatalog(
-		queries,
-		catalogtx.NewWriter(pool, nil),
-		catalogtx.NewReader(pool, nil),
-	)
-}
-
-func NewLocationServiceWithWriter(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, _ ...any) LocationService {
-	return NewLocationServiceWithCatalog(queries, writer, catalogtx.NewReader(pool, nil))
-}
-
-// NewLocationServiceWithCatalog wires the live catalog's explicit writer and
+// NewLocationService wires the live catalog's explicit writer and
 // query-only snapshot capabilities. Planning a topology never consumes the
 // sole writer connection.
-func NewLocationServiceWithCatalog(
+func NewLocationService(
 	queries *repo.Queries,
 	writer *catalogtx.Writer,
 	snapshot *catalogtx.Reader,

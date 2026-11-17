@@ -10,9 +10,9 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -94,8 +94,7 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 			UploadTime:           row.UploadTime,
 			TakenTime:            row.TakenTime,
 			CaptureOffsetMinutes: row.CaptureOffsetMinutes,
-			IsDeleted:            row.IsDeleted,
-			DeletedAt:            row.DeletedAt,
+			LifecycleState:       row.LifecycleState,
 			SpecificMetadata:     row.SpecificMetadata,
 			Rating:               row.Rating,
 			Liked:                row.Liked,

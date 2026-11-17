@@ -1,0 +1,16 @@
+-- name: GetTimeDistributionMonthly :many
+SELECT
+    strftime('%Y-%m', COALESCE(a.taken_time, a.upload_time) / 1000000, 'unixepoch') AS month,
+    COUNT(*) AS count
+FROM assets a
+WHERE
+    a.lifecycle_state = 'active'
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+      SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = sqlc.narg('repository_id')
+    ))
+    AND (a.taken_time IS NOT NULL OR a.upload_time IS NOT NULL)
+GROUP BY month
+ORDER BY month DESC
+LIMIT 24;

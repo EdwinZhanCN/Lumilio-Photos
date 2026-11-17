@@ -11,15 +11,15 @@ verification_status: "verified-with-todo"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_media_handler.go
 - server/internal/storage/directory_manager.go
 - web/src/features/studio
-- server/internal/utils/imaging/process.go
+- server/internal/media/imaging/process.go
 -->
 
 # 工作室与非破坏性编辑
 
-工作室提供裁剪、显影、画框、文字和深度估计等编辑工具。保存编辑时，服务端把版本化 sidecar 写入资源库 `.lumilio/sidecars/<asset-id>.lumilio-sidecar`；原件保持不变。
+工作室提供裁剪、显影、画框、文字和深度估计等编辑工具。保存编辑时，服务端把版本化 sidecar 写入资源库 `.lumilio/user/studio/<asset-id>.lumilio-sidecar`；原件保持不变。
 
 ## 编辑状态
 

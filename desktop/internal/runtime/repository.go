@@ -14,7 +14,7 @@ type StorageControl interface {
 	ListStorageLocations(context.Context) ([]StorageLocation, error)
 	ListPendingHostActions(context.Context) ([]HostAction, error)
 	SetHostActionExpectedVersion(context.Context, string, string, uint64) (HostAction, error)
-	ExecuteHostAction(context.Context, string, string, string, string, bool) (HostAction, error)
+	ExecuteHostAction(context.Context, string, string, string, string, []string) (HostAction, error)
 	CancelHostAction(context.Context, string) (HostAction, error)
 }
 
@@ -29,11 +29,6 @@ type StorageLocation struct {
 	CanRemove            bool
 	RemovalBlockedBy     string
 	FilesPreserved       bool
-	Writable             bool
-	CapacityKnown        bool
-	TotalBytes           uint64
-	AvailableBytes       uint64
-	Filesystem           string
 }
 
 type Repository struct {
@@ -71,8 +66,6 @@ func (a repositoryControlAdapter) ListStorageLocations(ctx context.Context) ([]S
 			ID: item.ID, Name: item.Name, Path: item.Path, Kind: item.Kind, Status: item.Status,
 			RepositoryCount: item.RepositoryCount, ActiveOperationCount: item.ActiveOperationCount,
 			CanRemove: item.CanRemove, RemovalBlockedBy: item.RemovalBlockedBy, FilesPreserved: item.FilesPreserved,
-			Writable: item.Writable, CapacityKnown: item.CapacityKnown, TotalBytes: item.TotalBytes,
-			AvailableBytes: item.AvailableBytes, Filesystem: item.Filesystem,
 		})
 	}
 	return result, nil
@@ -98,8 +91,8 @@ func (a repositoryControlAdapter) SetHostActionExpectedVersion(ctx context.Conte
 	return hostAction(item), nil
 }
 
-func (a repositoryControlAdapter) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, riskConfirmation bool) (HostAction, error) {
-	item, err := a.inner.ExecuteHostAction(ctx, actionID, nonce, hostInstanceID, selectedPath, riskConfirmation)
+func (a repositoryControlAdapter) ExecuteHostAction(ctx context.Context, actionID, nonce, hostInstanceID, selectedPath string, acknowledgedRisks []string) (HostAction, error) {
+	item, err := a.inner.ExecuteHostAction(ctx, actionID, nonce, hostInstanceID, selectedPath, acknowledgedRisks)
 	if err != nil {
 		return HostAction{}, err
 	}

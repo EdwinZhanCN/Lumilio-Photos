@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	"server/internal/db/repo"
-	"server/internal/testutil"
+	"server/internal/catalog"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/testutil"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/google/uuid"
@@ -69,7 +69,7 @@ func TestOutboxCrashAfterBleveBatchRetriesIdempotently(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
 
 	replaceOCRText(t, database, assetID, "updated crash recovery")
-	writer := NewWriter(database.SQL, database.Writer, database.Queries, index)
+	writer := NewWriter(database.Writer, database.Queries, index)
 	crash := errors.New("simulated crash before SQLite acknowledgement")
 	writer.afterApply = func() error { return crash }
 	_, err = writer.ProcessBatch(ctx, 16)
@@ -85,30 +85,30 @@ func TestOutboxCrashAfterBleveBatchRetriesIdempotently(t *testing.T) {
 	require.Equal(t, []string{assetID.String()}, searchIDs(t, index, "recovery"))
 }
 
-func openRebuildTestDatabase(t *testing.T, text string) (*db.DB, uuid.UUID) {
+func openRebuildTestDatabase(t *testing.T, text string) (*catalog.DB, uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
 	require.NoError(t, os.Chmod(dir, 0o700))
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "library.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(dir, "library.sqlite3")})
 	require.NoError(t, err)
 	require.NoError(t, database.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	assetID := uuid.New()
 	_, err = database.SQL.ExecContext(ctx, `
 INSERT INTO users (
     user_id, username, password, created_at, updated_at, webauthn_user_handle
 ) VALUES (1, 'ocr-owner', 'hash', 1, 1, x'01');
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
-) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-`, rootID, repositoryID, rootID)
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id, path_case, path_normalization
+) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?, 'sensitive', 'none');
+`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	_, err = testutil.InsertAssetOccurrence(ctx, database.SQL, testutil.AssetOccurrenceParams{
 		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,
@@ -131,7 +131,7 @@ VALUES (?, 1, 1);
 	return database, assetID
 }
 
-func replaceOCRText(t *testing.T, database *db.DB, assetID uuid.UUID, text string) {
+func replaceOCRText(t *testing.T, database *catalog.DB, assetID uuid.UUID, text string) {
 	t.Helper()
 	ctx := context.Background()
 	tx, err := database.SQL.BeginTx(ctx, nil)
@@ -168,7 +168,7 @@ func searchIDs(t *testing.T, index *Index, text string) []string {
 	return hitIDs(page.Hits)
 }
 
-func outboxCount(t *testing.T, database *db.DB) int {
+func outboxCount(t *testing.T, database *catalog.DB) int {
 	t.Helper()
 	var count int
 	require.NoError(t, database.SQL.QueryRow("SELECT count(*) FROM ocr_index_outbox").Scan(&count))

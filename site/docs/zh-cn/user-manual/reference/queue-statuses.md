@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/queue/jobs/types.go
+- server/internal/work/jobs/types.go
 - server/internal/api/dto/backup_dto.go
 - web/src/features/manage
 - web/src/features/monitor

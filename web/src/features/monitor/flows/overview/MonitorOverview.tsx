@@ -6,13 +6,10 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { getStorageEntityDisplayName, useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
-import { LifecycleHistory } from "./LifecycleHistory";
 import { MLMonitor } from "./MLMonitor";
-import { QueueSummaryList } from "./QueueSummaryList";
-import { StatMonitor } from "./StatMonitor";
-import { StorageMonitor } from "./StorageMonitor";
+import { ProcessingMonitor } from "./ProcessingMonitor";
 
-type MonitorView = "queue" | "ml" | "capabilities" | "storage";
+type MonitorView = "queue" | "ml" | "capabilities";
 
 export default function MonitorOverview() {
   const { t } = useI18n();
@@ -20,15 +17,15 @@ export default function MonitorOverview() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get("tab");
   const view: MonitorView =
-    requestedView === "capabilities" || requestedView === "ml" || requestedView === "storage"
-      ? requestedView
-      : "queue";
+    requestedView === "capabilities" || requestedView === "ml" ? requestedView : "queue";
 
   const [localRepoId, setLocalRepoId] = useState<string | undefined>(undefined);
   const { repositories } = useRepositoryOptions();
 
   const setView = (nextView: MonitorView) => {
     const params = new URLSearchParams(searchParams);
+    // A selected Processing stage belongs to that tab only.
+    params.delete("stage");
 
     if (nextView === "queue") {
       params.delete("tab");
@@ -54,24 +51,13 @@ export default function MonitorOverview() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={t("monitor.title")}
-        subtitle={
-          view === "queue"
-            ? t("monitor.subtitles.queue")
-            : view === "ml"
-              ? t("monitor.subtitles.ml")
-              : view === "capabilities"
-                ? t("monitor.subtitles.capabilities")
-                : t(
-                    "monitor.subtitles.storage",
-                    "Storage Location, Repository, capacity, mount, and lifecycle health.",
-                  )
-        }
         icon={<Activity className="w-6 h-6 text-primary" />}
         className="flex-wrap gap-y-3"
       >
         <div className="flex flex-wrap items-center justify-end gap-2">
           {view === "ml" && (
             <select
+              aria-label={t("navbar.repository.all")}
               className="select select-bordered select-sm w-48"
               value={localRepoId ?? ""}
               onChange={(e) => setLocalRepoId(e.target.value || undefined)}
@@ -116,45 +102,22 @@ export default function MonitorOverview() {
             >
               {t("monitor.tabs.capabilities")}
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "storage"}
-              className={`tab ${view === "storage" ? "tab-active" : ""}`}
-              onClick={() => setView("storage")}
-            >
-              {t("monitor.tabs.storage", "Storage")}
-            </button>
           </div>
         </div>
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        {view === "storage" ? (
-          <>
-            {/* 主从区按内容自然增高；Lifecycle 始终排在完整主从区之后 */}
-            <div className="container mx-auto w-full p-4 pb-3">
-              <StorageMonitor />
-            </div>
-            <div className="container mx-auto w-full p-4 pt-0 pb-6">
-              <LifecycleHistory />
-            </div>
-          </>
-        ) : (
-          <div className="container mx-auto w-full space-y-4 p-4 pb-6">
-            {view === "queue" ? (
-              <>
-                <StatMonitor />
-
-                <QueueSummaryList />
-              </>
-            ) : view === "ml" ? (
-              <MLMonitor localRepoId={localRepoId} />
-            ) : (
-              <CapabilitiesMonitor />
-            )}
-          </div>
-        )}
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${view === "queue" ? "bg-base-200/40" : ""}`}
+      >
+        <div className="mx-auto w-full max-w-7xl space-y-5 p-4 pb-8 sm:p-6">
+          {view === "queue" ? (
+            <ProcessingMonitor />
+          ) : view === "ml" ? (
+            <MLMonitor localRepoId={localRepoId} />
+          ) : (
+            <CapabilitiesMonitor />
+          )}
+        </div>
       </div>
     </div>
   );

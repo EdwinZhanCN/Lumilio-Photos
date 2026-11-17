@@ -9,10 +9,7 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
 	"server/internal/service"
-	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,6 +20,11 @@ type stubAssetIndexingService struct {
 	service.AssetIndexingService
 	getIndexingStatsFn   func(ctx context.Context, repositoryID *string) (service.AssetIndexingStats, error)
 	enqueueReindexAssets func(ctx context.Context, input service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error)
+	getReindexReceipt    func(ctx context.Context, receiptID uuid.UUID) (service.ReindexReceiptStatus, error)
+}
+
+func (s stubAssetIndexingService) GetReindexReceipt(ctx context.Context, receiptID uuid.UUID) (service.ReindexReceiptStatus, error) {
+	return s.getReindexReceipt(ctx, receiptID)
 }
 
 func (s stubAssetIndexingService) GetIndexingStats(ctx context.Context, repositoryID *string) (service.AssetIndexingStats, error) {
@@ -31,76 +33,6 @@ func (s stubAssetIndexingService) GetIndexingStats(ctx context.Context, reposito
 
 func (s stubAssetIndexingService) EnqueueReindexAssets(ctx context.Context, input service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error) {
 	return s.enqueueReindexAssets(ctx, input)
-}
-
-type stubRepositoryManager struct {
-	storage.RepositoryManager
-	listRepositoriesFn func() ([]*repo.Repository, error)
-}
-
-func (s stubRepositoryManager) ListRepositories() ([]*repo.Repository, error) {
-	return s.listRepositoriesFn()
-}
-
-func (s stubRepositoryManager) ReconcileAll(context.Context) error { return nil }
-
-func testRepository(t *testing.T, rawID string, name string, path string) *repo.Repository {
-	t.Helper()
-
-	repositoryID, err := uuid.Parse(rawID)
-	require.NoError(t, err)
-
-	return &repo.Repository{
-		RepoID: repositoryID,
-		Name:   name,
-		Path:   path,
-		Role:   dbtypes.RepoRoleRegular,
-	}
-}
-
-func TestAssetHandlerListIndexingRepositories_ReturnsOptions(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	handler := &AssetHandler{
-		repoManager: stubRepositoryManager{
-			listRepositoriesFn: func() ([]*repo.Repository, error) {
-				return []*repo.Repository{
-					func() *repo.Repository {
-						repository := testRepository(
-							t,
-							"550e8400-e29b-41d4-a716-446655440000",
-							"primary",
-							"/Volumes/Media/primary",
-						)
-						repository.Role = dbtypes.RepoRolePrimary
-						return repository
-					}(),
-					testRepository(
-						t,
-						"660e8400-e29b-41d4-a716-446655440000",
-						"Archive",
-						"/Volumes/Media/Archive",
-					),
-				}, nil
-			},
-		},
-	}
-
-	recorder := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assets/indexing/repositories", nil)
-
-	handler.ListIndexingRepositories(ctx)
-
-	require.Equal(t, http.StatusOK, recorder.Code)
-
-	var response dto.IndexingRepositoryListResponseDTO
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Len(t, response.Repositories, 2)
-	require.Equal(t, "primary", response.Repositories[0].Name)
-	require.Equal(t, "/Volumes/Media/primary", response.Repositories[0].Path)
-	require.True(t, response.Repositories[0].IsPrimary)
-	require.False(t, response.Repositories[1].IsPrimary)
 }
 
 func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
@@ -351,4 +283,35 @@ func TestAssetHandlerRebuildAssetIndexes_RejectsRepositoryScopedSemanticReset(t 
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+func TestAssetHandlerGetAssetIndexRebuild_ReportsReceiptState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	receiptID := uuid.New()
+	handler := &AssetHandler{indexingService: stubAssetIndexingService{
+		getReindexReceipt: func(_ context.Context, requested uuid.UUID) (service.ReindexReceiptStatus, error) {
+			if requested != receiptID {
+				return service.ReindexReceiptStatus{}, service.ErrReindexReceiptNotFound
+			}
+			return service.ReindexReceiptStatus{ReceiptID: receiptID, State: "completed"}, nil
+		},
+	}}
+	get := func(id string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Params = gin.Params{{Key: "receipt_id", Value: id}}
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assets/indexing/rebuild/"+id, nil)
+		handler.GetAssetIndexRebuild(ctx)
+		return recorder
+	}
+
+	recorder := get(receiptID.String())
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response dto.AssetIndexingRebuildStatusDTO
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, receiptID.String(), response.ReceiptID)
+	require.Equal(t, "completed", response.State)
+
+	require.Equal(t, http.StatusNotFound, get(uuid.NewString()).Code)
+	require.Equal(t, http.StatusBadRequest, get("not-a-uuid").Code)
 }

@@ -10,13 +10,13 @@ import (
 	"strconv"
 	"strings"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/repo"
-	"server/internal/logging"
-	"server/internal/pipeline"
-	"server/internal/settings"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/repo"
+	"server/internal/foundation/logging"
+	"server/internal/foundation/settings"
 	"server/internal/storage"
-	"server/internal/workqos"
+	"server/internal/work/pipeline"
+	"server/internal/work/qos"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -93,8 +93,21 @@ type AssetIndexingService interface {
 	ProcessReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (more bool, err error)
 	PrepareReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (PreparedReindex, error)
 	ApplyPreparedReindexTx(ctx context.Context, tx *sql.Tx, prepared PreparedReindex) error
+	// GetReindexReceipt reports one rebuild operation. A receipt completes only
+	// after every page was requested and every stage it bound was applied, so a
+	// caller can tell a finished rebuild from coverage left by an earlier one.
+	GetReindexReceipt(ctx context.Context, receiptID uuid.UUID) (ReindexReceiptStatus, error)
 }
 
+// ReindexReceiptStatus is the catalog-owned state of one rebuild request:
+// "pending", "completed", or "failed" (with TerminalError).
+type ReindexReceiptStatus struct {
+	ReceiptID     uuid.UUID
+	State         string
+	TerminalError string
+}
+
+var ErrReindexReceiptNotFound = errors.New("reindex receipt not found")
 var ErrReindexProjectionStale = errors.New("reindex projection source revision changed")
 var ErrSemanticResetRequiresGlobalScope = errors.New("semantic reset cannot be scoped to one repository")
 
@@ -125,7 +138,7 @@ type assetIndexingService struct {
 	settingsService SettingsService
 	runtimeChecker  LumenService
 	writer          *catalogtx.Writer
-	readerPool      *sql.DB
+	reader          *catalogtx.Reader
 	logger          *zap.Logger
 	auditProvider   logging.RepositoryAuditProvider
 	files           *storage.RepositoryFSFactory
@@ -136,33 +149,14 @@ type reindexCandidate struct {
 	tasks map[AssetIndexingTask]bool
 }
 
+// NewAssetIndexingService records reindex requests through the writer and
+// reads their status through the query-only reader.
 func NewAssetIndexingService(
 	queries *repo.Queries,
 	settingsService SettingsService,
 	runtimeChecker LumenService,
-	dbpool *sql.DB,
-	logger *zap.Logger,
-	auditProvider logging.RepositoryAuditProvider,
-	files *storage.RepositoryFSFactory,
-) AssetIndexingService {
-	return NewAssetIndexingServiceWithReader(
-		queries,
-		settingsService,
-		runtimeChecker,
-		catalogtx.NewWriter(dbpool, nil),
-		dbpool,
-		logger,
-		auditProvider,
-		files,
-	)
-}
-
-func NewAssetIndexingServiceWithReader(
-	queries *repo.Queries,
-	settingsService SettingsService,
-	runtimeChecker LumenService,
 	writer *catalogtx.Writer,
-	readerPool *sql.DB,
+	reader *catalogtx.Reader,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 	files *storage.RepositoryFSFactory,
@@ -171,14 +165,14 @@ func NewAssetIndexingServiceWithReader(
 		logger = zap.NewNop()
 	}
 	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
+		auditProvider = logging.NoopRepositoryAuditProvider()
 	}
 	return &assetIndexingService{
 		queries:         queries,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
 		writer:          writer,
-		readerPool:      readerPool,
+		reader:          reader,
 		logger:          logger.With(zap.String("component", "indexing")),
 		auditProvider:   auditProvider,
 		files:           files,
@@ -386,6 +380,21 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 	}, nil
 }
 
+func (s *assetIndexingService) GetReindexReceipt(ctx context.Context, receiptID uuid.UUID) (ReindexReceiptStatus, error) {
+	if s.reader == nil {
+		return ReindexReceiptStatus{}, errors.New("catalog reader is not configured")
+	}
+	status := ReindexReceiptStatus{ReceiptID: receiptID}
+	err := s.reader.Statements().QueryRowContext(ctx, `SELECT state,COALESCE(terminal_error,'') FROM catalog_operation_receipts WHERE receipt_id=? AND kind='reindex'`, receiptID.String()).Scan(&status.State, &status.TerminalError)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ReindexReceiptStatus{}, ErrReindexReceiptNotFound
+	}
+	if err != nil {
+		return ReindexReceiptStatus{}, fmt.Errorf("read reindex receipt: %w", err)
+	}
+	return status, nil
+}
+
 // offset pagination would skip or reprocess assets.
 func (s *assetIndexingService) ProcessReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (bool, error) {
 	prepared, err := s.PrepareReindexReceipt(ctx, receiptID, expectedRevision)
@@ -422,7 +431,7 @@ func (s *assetIndexingService) PrepareReindexReceipt(ctx context.Context, receip
 	var limit int
 	var missingOnly, resetSemantic bool
 	var requestedRevision, appliedRevision uint64
-	if err := s.readerPool.QueryRowContext(ctx, `SELECT repository_id,tasks,page_limit,cursor,missing_only,reset_semantic,requested_revision,applied_revision FROM asset_reindex_requests WHERE receipt_id=?`, receiptID.String()).Scan(&repositoryRaw, &tasksJSON, &limit, &cursor, &missingOnly, &resetSemantic, &requestedRevision, &appliedRevision); err != nil {
+	if err := s.reader.Statements().QueryRowContext(ctx, `SELECT repository_id,tasks,page_limit,cursor,missing_only,reset_semantic,requested_revision,applied_revision FROM asset_reindex_requests WHERE receipt_id=?`, receiptID.String()).Scan(&repositoryRaw, &tasksJSON, &limit, &cursor, &missingOnly, &resetSemantic, &requestedRevision, &appliedRevision); err != nil {
 		return PreparedReindex{}, fmt.Errorf("read reindex receipt: %w", err)
 	}
 	if requestedRevision != expectedRevision || appliedRevision >= requestedRevision {
@@ -510,7 +519,7 @@ func (s *assetIndexingService) ApplyPreparedReindexTx(ctx context.Context, tx *s
 		if candidate.AssetID == uuid.Nil || candidate.ContentID == uuid.Nil {
 			return errors.New("invalid reindex candidate")
 		}
-		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, workqos.Maintenance, prepared.ReceiptID); err != nil {
+		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, qos.Maintenance, prepared.ReceiptID); err != nil {
 			return err
 		}
 	}
@@ -663,12 +672,12 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 }
 
 func (s *assetIndexingService) countPendingCatalogEnrichment(ctx context.Context) int64 {
-	if s.readerPool == nil {
+	if s.reader == nil {
 		return 0
 	}
 
 	var count int64
-	if err := s.readerPool.QueryRowContext(ctx, `SELECT count(*) FROM asset_pipeline_state WHERE desired_version>applied_version AND stage='enrich'`).Scan(&count); err != nil {
+	if err := s.reader.Statements().QueryRowContext(ctx, `SELECT count(*) FROM asset_pipeline_state WHERE desired_version>applied_version AND stage='enrich'`).Scan(&count); err != nil {
 		s.logger.Warn("indexing stats catalog backlog count failed",
 			zap.String("operation", "indexing.stats"),
 			zap.String("scope", "asset_pipeline.enrich"),
@@ -680,11 +689,11 @@ func (s *assetIndexingService) countPendingCatalogEnrichment(ctx context.Context
 }
 
 func (s *assetIndexingService) countPendingReindexReceipts(ctx context.Context) int64 {
-	if s.readerPool == nil {
+	if s.reader == nil {
 		return 0
 	}
 	var count int64
-	if err := s.readerPool.QueryRowContext(ctx, `SELECT count(*) FROM asset_reindex_requests WHERE requested_revision>applied_revision`).Scan(&count); err != nil {
+	if err := s.reader.Statements().QueryRowContext(ctx, `SELECT count(*) FROM asset_reindex_requests WHERE requested_revision>applied_revision`).Scan(&count); err != nil {
 		s.logger.Warn("indexing stats receipt count failed", zap.String("operation", "indexing.stats"), zap.String("scope", "asset_reindex"), zap.Error(err))
 		return 0
 	}
@@ -693,7 +702,7 @@ func (s *assetIndexingService) countPendingReindexReceipts(ctx context.Context) 
 
 func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logging.RepositoryAuditLogger {
 	if s.auditProvider == nil {
-		return logging.NewRepositoryAuditProvider(s.logger, false).ForPath(repoPath)
+		return logging.NoopRepositoryAuditLogger()
 	}
 	if strings.TrimSpace(repoPath) != "" {
 		return s.auditProvider.ForPath(repoPath)

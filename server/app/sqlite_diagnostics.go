@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"server/internal/commit"
-	"server/internal/db"
-	"server/internal/db/catalogtx"
-	"server/internal/execution"
+	"server/internal/catalog"
+	"server/internal/catalog/catalogtx"
+	"server/internal/ingest/commit"
+	"server/internal/work/execution"
 )
 
 const sqliteRuntimeObservationFilename = "sqlite-runtime.json"
@@ -23,29 +23,29 @@ const sqliteRuntimeObservationFilename = "sqlite-runtime.json"
 // It is deliberately a file in the configured private log directory rather
 // than a debug HTTP API.
 type sqliteRuntimeObservation struct {
-	ObservedAt              time.Time                    `json:"observed_at"`
-	RuntimeElapsed          time.Duration                `json:"runtime_elapsed_ns"`
-	Telemetry               db.TelemetrySnapshot         `json:"telemetry"`
-	QueueTelemetry          db.QueueTelemetrySnapshot    `json:"queue_telemetry"`
-	TelemetryInterval       catalogtx.Report             `json:"telemetry_interval"`
-	IntervalStartedAt       time.Time                    `json:"interval_started_at"`
-	IntervalError           string                       `json:"interval_error,omitempty"`
-	WAL                     db.WALState                  `json:"wal"`
-	QueueWAL                db.WALState                  `json:"queue_wal"`
-	WALError                string                       `json:"wal_error,omitempty"`
-	QueueWALError           string                       `json:"queue_wal_error,omitempty"`
-	WriterWaitCount         int64                        `json:"writer_wait_count_delta"`
-	WriterWaitDuration      time.Duration                `json:"writer_wait_duration_delta_ns"`
-	QueueWriterWaitCount    int64                        `json:"queue_writer_wait_count_delta"`
-	QueueWriterWaitDuration time.Duration                `json:"queue_writer_wait_duration_delta_ns"`
-	LastCheckpoint          *sqliteCheckpointObservation `json:"last_checkpoint,omitempty"`
-	LastQueueCheckpoint     *sqliteCheckpointObservation `json:"last_queue_checkpoint,omitempty"`
-	CommitCoordinator       commit.Snapshot              `json:"commit_coordinator"`
-	ExecutionGovernor       execution.Snapshot           `json:"execution_governor"`
-	CatalogPipeline         catalogPipelineObservation   `json:"catalog_pipeline"`
-	MacroQueue              macroQueueObservation        `json:"macro_queue"`
-	CatalogPipelineError    string                       `json:"catalog_pipeline_error,omitempty"`
-	MacroQueueError         string                       `json:"macro_queue_error,omitempty"`
+	ObservedAt              time.Time                      `json:"observed_at"`
+	RuntimeElapsed          time.Duration                  `json:"runtime_elapsed_ns"`
+	Telemetry               catalog.TelemetrySnapshot      `json:"telemetry"`
+	QueueTelemetry          catalog.QueueTelemetrySnapshot `json:"queue_telemetry"`
+	TelemetryInterval       catalogtx.Report               `json:"telemetry_interval"`
+	IntervalStartedAt       time.Time                      `json:"interval_started_at"`
+	IntervalError           string                         `json:"interval_error,omitempty"`
+	WAL                     catalog.WALState               `json:"wal"`
+	QueueWAL                catalog.WALState               `json:"queue_wal"`
+	WALError                string                         `json:"wal_error,omitempty"`
+	QueueWALError           string                         `json:"queue_wal_error,omitempty"`
+	WriterWaitCount         int64                          `json:"writer_wait_count_delta"`
+	WriterWaitDuration      time.Duration                  `json:"writer_wait_duration_delta_ns"`
+	QueueWriterWaitCount    int64                          `json:"queue_writer_wait_count_delta"`
+	QueueWriterWaitDuration time.Duration                  `json:"queue_writer_wait_duration_delta_ns"`
+	LastCheckpoint          *sqliteCheckpointObservation   `json:"last_checkpoint,omitempty"`
+	LastQueueCheckpoint     *sqliteCheckpointObservation   `json:"last_queue_checkpoint,omitempty"`
+	CommitCoordinator       commit.Snapshot                `json:"commit_coordinator"`
+	ExecutionGovernor       execution.Snapshot             `json:"execution_governor"`
+	CatalogPipeline         catalogPipelineObservation     `json:"catalog_pipeline"`
+	MacroQueue              macroQueueObservation          `json:"macro_queue"`
+	CatalogPipelineError    string                         `json:"catalog_pipeline_error,omitempty"`
+	MacroQueueError         string                         `json:"macro_queue_error,omitempty"`
 }
 
 // catalogPipelineObservation is a fixed-size view derived from catalog truth.
@@ -76,14 +76,14 @@ type macroQueueObservation struct {
 	OldestRemainingAge time.Duration `json:"oldest_remaining_age_ns"`
 }
 
-func readCatalogPipelineObservation(ctx context.Context, reader *sql.DB, startedAt, endedAt time.Time) (catalogPipelineObservation, error) {
+func readCatalogPipelineObservation(ctx context.Context, reader *catalogtx.Reader, startedAt, endedAt time.Time) (catalogPipelineObservation, error) {
 	var snapshot catalogPipelineObservation
 	if reader == nil {
 		return snapshot, errors.New("catalog diagnostics reader is nil")
 	}
 	startedMicros := startedAt.UTC().UnixMicro()
 	endedMicros := endedAt.UTC().UnixMicro()
-	err := reader.QueryRowContext(ctx, `
+	err := reader.Statements().QueryRowContext(ctx, `
 WITH pipeline_state(pending, runnable, terminal, lag, applied_in_interval) AS (
   SELECT desired_version > applied_version,
          desired_version > applied_version AND terminal_error IS NULL,
@@ -92,12 +92,12 @@ WITH pipeline_state(pending, runnable, terminal, lag, applied_in_interval) AS (
          applied_version >= desired_version AND updated_at >= ?1 AND updated_at < ?2
   FROM asset_pipeline_state
   UNION ALL
-  SELECT desired_epoch > applied_epoch OR full_verification_required = 1,
-         (desired_epoch > applied_epoch OR full_verification_required = 1) AND terminal_error IS NULL,
-         (desired_epoch > applied_epoch OR full_verification_required = 1) AND terminal_error IS NOT NULL,
-         max(desired_epoch - applied_epoch, full_verification_required),
-         desired_epoch > 0 AND applied_epoch >= desired_epoch AND full_verification_required = 0 AND updated_at >= ?1 AND updated_at < ?2
-  FROM repository_observation_state
+  SELECT pending,
+         pending,
+         0,
+         pending,
+         NOT pending AND completed_at >= ?1 AND completed_at < ?2
+  FROM repository_scan_state
   UNION ALL
   SELECT source_revision > applied_revision,
          source_revision > applied_revision AND terminal_error IS NULL,
@@ -164,14 +164,14 @@ FROM pipeline_state`, startedMicros, endedMicros).Scan(
 	return snapshot, nil
 }
 
-func readMacroQueueObservation(ctx context.Context, reader *sql.DB, startedAt, endedAt time.Time) (macroQueueObservation, error) {
+func readMacroQueueObservation(ctx context.Context, reader *catalogtx.Reader, startedAt, endedAt time.Time) (macroQueueObservation, error) {
 	var snapshot macroQueueObservation
 	if reader == nil {
 		return snapshot, errors.New("macro queue diagnostics reader is nil")
 	}
 	var averageLatency, averageRuntime sql.NullFloat64
 	var oldestRemaining sql.NullInt64
-	err := reader.QueryRowContext(ctx, `
+	err := reader.Statements().QueryRowContext(ctx, `
 SELECT
   count(*) FILTER (WHERE state = 'available'),
   count(*) FILTER (WHERE state = 'scheduled'),
@@ -221,11 +221,11 @@ WHERE queue = 'catalog_macro'`, startedAt.UTC(), endedAt.UTC()).Scan(
 }
 
 type sqliteCheckpointObservation struct {
-	ObservedAt time.Time           `json:"observed_at"`
-	WALBefore  db.WALState         `json:"wal_before"`
-	Result     db.CheckpointResult `json:"result"`
-	Duration   time.Duration       `json:"duration_ns"`
-	Error      string              `json:"error,omitempty"`
+	ObservedAt time.Time                `json:"observed_at"`
+	WALBefore  catalog.WALState         `json:"wal_before"`
+	Result     catalog.CheckpointResult `json:"result"`
+	Duration   time.Duration            `json:"duration_ns"`
+	Error      string                   `json:"error,omitempty"`
 }
 
 func boundedDiagnosticError(err error) string {

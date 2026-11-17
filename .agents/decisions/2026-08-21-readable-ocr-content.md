@@ -55,7 +55,7 @@ one-asset context ref, and lets the deterministic Ollama fixture call the real
 asset.
 
 The final boundaries are documented in
-[`BACKEND.md`](../../docs/BACKEND.md#ml-lumen-and-llm) and the
+[`server/internal/agent/tools/doc.go`](../../server/internal/agent/tools/doc.go) and the
 Assets feature documentation.
 
 ## Alternatives considered

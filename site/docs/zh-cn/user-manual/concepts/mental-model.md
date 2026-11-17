@@ -15,7 +15,7 @@ code-evidence:
 - server/internal/storage/repocfg/repo_config.go
 - server/internal/storage/roe/controller/controller.go
 - server/internal/storage/roe/materializer
-- server/internal/sourcing/materializer.go
+- server/internal/ingest/sourcing/materializer.go
 -->
 
 # 流明集的心智模型

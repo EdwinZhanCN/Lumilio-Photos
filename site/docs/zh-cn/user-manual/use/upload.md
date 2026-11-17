@@ -11,9 +11,9 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
-- server/internal/sourcing/materializer.go
-- server/internal/utils/file/validator.go
+- server/internal/api/handler/asset_upload_handler.go
+- server/internal/ingest/sourcing/materializer.go
+- server/internal/media/file/validator.go
 - server/internal/storage/directory_manager.go
 -->
 
@@ -24,12 +24,12 @@ code-evidence:
 ## 数据路径
 
 1. 服务端先检查目标资源库在线。
-2. 数据写入资源库 `.lumilio/staging/incoming`。
+2. 数据写入资源库 `.lumilio/work/uploads/<会话>/`。
 3. 完成后计算完整 BLAKE3 哈希和文件大小。
 4. 同一资源库中已有相同内容且现有文件可验证时，上传被标记为重复，暂存副本被移除。
 5. 非重复内容由提交任务按资源库布局放入 `inbox/`，再进入元数据和派生处理队列。
 
-上传失败时，服务会尽力把暂存内容隔离到 `.lumilio/staging/failed`；在无法安全隔离时，不会为了“清理”而盲目删除唯一暂存副本。
+上传无法拼合时，整个上传会话会移到 `.lumilio/quarantine/uploads`；在无法安全隔离时，不会为了“清理”而盲目删除唯一暂存副本。
 
 ## 注意事项
 

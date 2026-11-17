@@ -11,8 +11,8 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
-- server/internal/utils/file/validator.go
+- server/internal/api/handler/asset_upload_handler.go
+- server/internal/media/file/validator.go
 - server/internal/storage/directory_manager.go
 - web/src/features/manage
 -->
@@ -25,11 +25,11 @@ code-evidence:
 
 ## 上传中断
 
-检查浏览器网络、Server 可用性和 `.lumilio/staging/incoming` 所在磁盘空间。分块会话可以保存进度，但会话过期或目标资源库离线时应重新开始。
+检查浏览器网络、Server 可用性和 `.lumilio/work/uploads` 所在磁盘空间。分块会话可以保存进度，但会话过期或目标资源库离线时应重新开始。
 
 ## 上传完成但处理失败
 
-上传数据可能已经安全暂存或提交，失败不等于原件消失。查看任务错误和 `.lumilio/staging/failed`；不要手工删除暂存区。相同内容再次上传时，服务可能通过哈希识别为重复。
+上传数据可能已经安全暂存或提交，失败不等于原件消失。查看任务错误，以及“存储”页该资源库的恢复清单和 `.lumilio/quarantine/uploads`；不要手工删除 `.lumilio/work`。相同内容再次上传时，服务可能通过哈希识别为重复。
 
 ## 收集信息
 

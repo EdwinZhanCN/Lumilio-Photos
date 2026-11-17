@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"server/internal/db/catalogtx"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -89,30 +89,15 @@ func ApplyOCRResultsTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, a
 
 type ocrService struct {
 	queries       *repo.Queries
-	pool          *sql.DB
 	writer        *catalogtx.Writer
 	indexNotifier OCRIndexNotifier
 }
 
-// NewOCRService creates OCR service instance
-func NewOCRService(queries *repo.Queries, pool *sql.DB) OCRService {
-	return &ocrService{
-		queries: queries,
-		pool:    pool,
-		writer:  catalogtx.NewWriter(pool, nil),
-	}
-}
-
-// NewOCRServiceWithNotifier is the runtime constructor. The notifier is kept
+// NewOCRService saves OCR results through the writer. The notifier is
 // optional so package tests and embedded callers can exercise OCR persistence
 // without starting the queue runtime.
-func NewOCRServiceWithNotifier(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, notifier OCRIndexNotifier) OCRService {
-	return &ocrService{
-		queries:       queries,
-		pool:          pool,
-		writer:        writer,
-		indexNotifier: notifier,
-	}
+func NewOCRService(queries *repo.Queries, writer *catalogtx.Writer, notifier OCRIndexNotifier) OCRService {
+	return &ocrService{queries: queries, writer: writer, indexNotifier: notifier}
 }
 
 // SaveOCRResults saves OCR results to database

@@ -54,7 +54,7 @@ jobs:
                   fi
 
     spa:
-        name: Web SPA, Desktop panel, and licenses
+        name: Web SPA and licenses
         needs: metadata
         runs-on: ubuntu-24.04
         steps:
@@ -68,7 +68,12 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/ and site/, never the repo
+                  # root, so `task web:install:ci` runs the workspace-scoped
+                  # `vp install`. Disable the action's implicit root
+                  # `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT.
+                  run-install: false
 
             - uses: actions/setup-go@v6
               with:
@@ -76,9 +81,6 @@ jobs:
                   cache-dependency-path: |
                       desktop/go.sum
                       server/go.sum
-
-            - name: Build Desktop control panel
-              run: task ci:desktop:panel
 
             - name: Build versioned Web SPA
               env:
@@ -94,13 +96,6 @@ jobs:
               with:
                   name: web-dist
                   path: web/dist
-                  if-no-files-found: error
-                  retention-days: 1
-
-            - uses: actions/upload-artifact@v7
-              with:
-                  name: panel-dist
-                  path: desktop/frontend/dist
                   if-no-files-found: error
                   retention-days: 1
 
@@ -244,7 +239,7 @@ jobs:
                   version: 3.52.0
 
             - name: Install build dependencies
-              run: brew install vips libraw dylibbundler create-dmg
+              run: brew install vips libraw dylibbundler
 
             - name: Record native dependency versions
               run: |
@@ -260,22 +255,16 @@ jobs:
                       server/go.sum
                       .brew-go-cache-key
 
-            - name: Install pinned wails3 CLI
-              run: |
-                  cd desktop
-                  W3_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
-                  go install "github.com/wailsapp/wails/v3/cmd/wails3@${W3_VERSION}"
-                  echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+            # The MyGo CLI is pinned by desktop/go.mod and runs as `go tool mygo`.
+            # It evaluates desktop/mygo.config.ts with Node.
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
 
             - uses: actions/download-artifact@v8
               with:
                   name: web-dist
                   path: web/dist
-
-            - uses: actions/download-artifact@v8
-              with:
-                  name: panel-dist
-                  path: desktop/frontend/dist
 
             - uses: actions/download-artifact@v8
               with:
@@ -285,25 +274,40 @@ jobs:
             - name: Stage media tools
               run: task desktop:resources
 
-            - name: Build app and DMG
+            # `mygo build` compiles, bundles, signs, and makes the disk image. With
+            # desktop/build/update.pub committed and the secret key below set,
+            # it also writes the signed update archive and manifest.
+            - name: Package app and disk image
               env:
                   LUMILIO_VERSION: ${{ needs.metadata.outputs.product_version }}
                   LUMILIO_PLATFORM_VERSION: ${{ needs.metadata.outputs.platform_version }}
                   LUMILIO_BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
                   LUMILIO_WEB_DIST_PREBUILT: "1"
-                  LUMILIO_FRONTEND_DIST_PREBUILT: "1"
-              run: task desktop:build:macos:dmg ARCH=${{ matrix.arch }}
+                  MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+              run: task desktop:package ARCH=${{ matrix.arch }} INSTALLER=true
 
             - name: Name release artifact
               run: |
-                  mv "desktop/bin/Lumilio-Photos-${{ matrix.arch }}.dmg" \
+                  out="desktop/bin/darwin-${{ matrix.arch }}"
+                  mv "${out}"/lumilio-photos-*.dmg \
                      "desktop/bin/Lumilio-Photos-${{ needs.metadata.outputs.artifact_ref }}-macos-${{ matrix.arch }}.dmg"
+                  mkdir -p desktop/bin/updates
+                  # Update files keep the names their manifest refers to.
+                  find "${out}" -maxdepth 1 -type f \
+                      \( -name 'update-*.json' -o -name '*.tar.gz' -o -name '*.delta' \) \
+                      -exec mv {} desktop/bin/updates/ \;
 
             - uses: actions/upload-artifact@v7
               with:
                   name: dmg-${{ matrix.arch }}
                   path: desktop/bin/Lumilio-Photos-*-macos-${{ matrix.arch }}.dmg
                   if-no-files-found: error
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: desktop-updates-macos-${{ matrix.arch }}
+                  path: desktop/bin/updates/
+                  if-no-files-found: ignore
 
     windows:
         name: Windows installer and portable app
@@ -340,11 +344,6 @@ jobs:
 
             - uses: actions/download-artifact@v8
               with:
-                  name: panel-dist
-                  path: desktop/frontend/dist
-
-            - uses: actions/download-artifact@v8
-              with:
                   name: third-party-notices
                   path: desktop/licenses
 
@@ -352,36 +351,45 @@ jobs:
               shell: msys2 {0}
               run: task desktop:resources
 
-            - name: Install pinned wails3 CLI
-              shell: msys2 {0}
-              run: |
-                  cd desktop
-                  W3_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
-                  go install "github.com/wailsapp/wails/v3/cmd/wails3@${W3_VERSION}"
-                  echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+            # The MyGo CLI is pinned by desktop/go.mod and runs as `go tool mygo`.
+            # It evaluates desktop/mygo.config.ts with Node, which
+            # `path-type: inherit` makes visible inside the MSYS2 shell.
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
 
-            - name: Build portable app
+            # `mygo build` compiles, embeds the icon and version resources, and
+            # makes the per-user NSIS installer (it fetches NSIS when the runner
+            # has none). The installer puts the app where it can update itself.
+            - name: Package app and installer
               shell: msys2 {0}
               env:
                   LUMILIO_VERSION: ${{ needs.metadata.outputs.product_version }}
                   LUMILIO_PLATFORM_VERSION: ${{ needs.metadata.outputs.platform_version }}
                   LUMILIO_WEB_DIST_PREBUILT: "1"
-                  LUMILIO_FRONTEND_DIST_PREBUILT: "1"
-              run: task desktop:build:windows
+                  MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+              run: |
+                  # desktop/go.mod names the Go release MyGo needs. Let the go
+                  # command fetch it when the MSYS2 package is older.
+                  export GOTOOLCHAIN=auto
+                  task desktop:package ARCH=amd64 INSTALLER=true
 
-            - name: Package portable app
+            - name: Name release artifacts
               shell: pwsh
               run: |
-                  Compress-Archive -Path "desktop/bin/windows/Lumilio Photos" `
-                      -DestinationPath "desktop/bin/Lumilio-Photos-${{ needs.metadata.outputs.artifact_ref }}-windows-amd64.zip"
-
-            - name: Build installer
-              shell: pwsh
-              run: |
-                  choco install innosetup --no-progress -y
-                  $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-                  & "$iscc" "/DAppVersion=${{ needs.metadata.outputs.product_version }}" "desktop/packaging/windows/lumilio.iss"
-                  if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
+                  $out = "desktop/bin/windows-amd64"
+                  $ref = "${{ needs.metadata.outputs.artifact_ref }}"
+                  New-Item -ItemType Directory -Force -Path "desktop/bin/updates" | Out-Null
+                  Move-Item "$out/lumilio-photos-setup-*.exe" "desktop/bin/Lumilio-Photos-$ref-windows-amd64-setup.exe"
+                  # Update files keep the names their manifest refers to.
+                  Get-ChildItem $out -File | Where-Object {
+                      $_.Name -like "update-*.json" -or $_.Name -like "*.delta" -or
+                      $_.Name -like "lumilio-photos-*.zip" -or $_.Name -like "lumilio-photos-*.tar.gz" -or
+                      $_.Name -eq "install.ps1"
+                  } | Move-Item -Destination "desktop/bin/updates"
+                  # What is left is the app as installed: the portable copy.
+                  Compress-Archive -Path "$out/*" `
+                      -DestinationPath "desktop/bin/Lumilio-Photos-$ref-windows-amd64.zip"
 
             - uses: actions/upload-artifact@v7
               with:
@@ -394,6 +402,12 @@ jobs:
                   name: windows-amd64
                   path: desktop/bin/Lumilio-Photos-*-windows-amd64.zip
                   if-no-files-found: error
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: desktop-updates-windows-amd64
+                  path: desktop/bin/updates/
+                  if-no-files-found: ignore
 
     release:
         name: Publish complete GitHub Release
@@ -410,6 +424,15 @@ jobs:
               with:
                   pattern: "{dmg-*,windows-amd64,windows-amd64-setup}"
                   path: dist
+                  merge-multiple: true
+
+            # Present only for a build with an update feed: the signed archives,
+            # deltas, and per-platform manifests the installed apps read.
+            - name: Download signed Desktop updates
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: "desktop-updates-*"
+                  path: dist/updates
                   merge-multiple: true
 
             - name: Build digest-pinned Server bundle
@@ -486,6 +509,12 @@ jobs:
 
                   Before upgrading real data, create a Lumilio database snapshot and retain the previous application version or image digest. A database migrated by this build may require its matching pre-upgrade snapshot when rolling back.
                   EOF
+                  for notes in "docs/releases/${GITHUB_REF_NAME}.md" "docs/releases/${GITHUB_REF_NAME}.zh-cn.md"; do
+                      if [[ -f "$notes" ]]; then
+                          printf '\n' >> dist/release-notes.md
+                          cat "$notes" >> dist/release-notes.md
+                      fi
+                  done
 
             - uses: softprops/action-gh-release@v3
               with:
@@ -517,6 +546,18 @@ jobs:
                       --json assets --jq '.assets[].name' \
                       | sort > /tmp/published-assets
                   diff -u /tmp/expected-assets /tmp/published-assets
+                  # A build with an update feed also publishes what installed
+                  # apps read: the per-platform manifests and the signed
+                  # archives and deltas they name. They are attached while the
+                  # release is still a draft, so no app sees a manifest whose
+                  # files are missing.
+                  shopt -s nullglob
+                  updates=(dist/updates/*)
+                  if (( ${#updates[@]} > 0 )); then
+                      gh release upload "$GITHUB_REF_NAME" "${updates[@]}" --clobber
+                  else
+                      echo "This build has no update feed; no update files to attach."
+                  fi
                   if [[ "$IS_PRERELEASE" == "true" ]]; then
                       gh release edit "$GITHUB_REF_NAME" --draft=false
                   else

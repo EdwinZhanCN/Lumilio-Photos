@@ -2,14 +2,13 @@
 
 Full license texts for Lumilio Photos and the native components the desktop
 build bundles, plus the generated `THIRD_PARTY_NOTICES.txt` covering runtime Go
-modules and npm packages. The application license and notices are embedded into
-the desktop binary for the legal links, and the build scripts stage this
-directory into the bundle (`Resources/licenses` on macOS,
-`resources\licenses` on Windows) so the texts also ship as plain files.
+modules and npm packages. `go run ./cmd/devtool package` stages this directory
+into `desktop/resources/licenses`, and the packager ships it with the app
+(`Contents/Resources/licenses` on macOS, `licenses\` beside the executable on
+Windows), so the texts ship as plain files.
 
 The English and Simplified Chinese Terms of Use are stored alongside these
-files as `TERMS-OF-USE.en.txt` and `TERMS-OF-USE.zh-CN.txt` and are selected by
-the onboarding interface language.
+files as `TERMS-OF-USE.en.txt` and `TERMS-OF-USE.zh-CN.txt`.
 
 Provenance: canonical SPDX texts, fetched with
 
@@ -18,7 +17,7 @@ base=https://raw.githubusercontent.com/spdx/license-list-data/main/text
 curl -fsSL -o LGPL-2.1.txt          $base/LGPL-2.1-only.txt
 curl -fsSL -o GPL-2.0.txt           $base/GPL-2.0-only.txt
 curl -fsSL -o Artistic-1.0-Perl.txt $base/Artistic-1.0-Perl.txt
-curl -fsSL -o MIT-Wails.txt https://raw.githubusercontent.com/wailsapp/wails/master/LICENSE
+curl -fsSL -o MIT-MyGo.txt https://raw.githubusercontent.com/egoist/mygo/main/LICENSE
 ```
 
 `GPL-3.0.txt` is a copy of the repository root `LICENSE` (the app's own

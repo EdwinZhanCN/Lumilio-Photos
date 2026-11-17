@@ -8,8 +8,9 @@ import (
 
 	"server/internal/agent/facets"
 	"server/internal/agent/ref"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/catalogtx"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 	"server/internal/event"
 	"server/internal/search"
 
@@ -22,21 +23,20 @@ import (
 type AuthorizedLibraryFactory struct {
 	queries *repo.Queries
 	search  RetrieverSearch
-	pool    *sql.DB
+	reader  *catalogtx.Reader
 }
 
-func NewAuthorizedLibraryFactory(queries *repo.Queries, search RetrieverSearch, pools ...*sql.DB) *AuthorizedLibraryFactory {
-	var pool *sql.DB
-	if len(pools) > 0 {
-		pool = pools[0]
-	}
-	return &AuthorizedLibraryFactory{queries: queries, search: search, pool: pool}
+// NewAuthorizedLibraryFactory binds libraries to queries and search; reader,
+// the catalog's query-only reader, resolves Events and may be nil where no
+// tool reads Events.
+func NewAuthorizedLibraryFactory(queries *repo.Queries, search RetrieverSearch, reader *catalogtx.Reader) *AuthorizedLibraryFactory {
+	return &AuthorizedLibraryFactory{queries: queries, search: search, reader: reader}
 }
 
 func (f *AuthorizedLibraryFactory) ForUser(userID int32) *AuthorizedLibrary {
 	var resolver *event.Resolver
-	if f.pool != nil {
-		resolver = event.NewResolver(f.pool)
+	if f.reader != nil {
+		resolver = event.NewResolver(f.reader)
 	}
 	return &AuthorizedLibrary{userID: userID, queries: f.queries, search: f.search, resolver: resolver}
 }

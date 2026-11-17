@@ -12,13 +12,15 @@ verification_status: "verified-with-todo"
 <!--
 code-evidence:
 - web/src/features/collections
-- server/internal/db/repo/queries/albums.sql
+- server/internal/catalog/repo/queries/albums.sql
 - server/internal/service/asset_service.go
 -->
 
 # 组织媒体
 
 流明集同时提供人工组织和派生组织。相册、标签、喜欢、评分和描述是用户明确维护的数据库关系；人物、地点、事件、重复项和分类视图部分依赖元数据或计算结果。
+
+素材页面和合集默认显示照片和视频；音频在音乐中浏览。直接打开或分享的音频仍可播放。
 
 ## “合集”不是一种对象
 

@@ -1,0 +1,17 @@
+# Context is the repository root; send only what the Server tests read.
+*
+!taskfile.yml
+!server/**
+!docs/**
+!web/taskfile.yml
+!desktop/taskfile.yml
+!site/taskfile.yml
+!web/src/app/router/routes.tsx
+!web/src/lib/http-commons/**
+!web/src/locales/**
+!web/src/features/repositories/**
+!site/docs/public/problems/**
+!desktop/go.mod
+!desktop/internal/panel/text.go
+**/node_modules
+server/assetslock

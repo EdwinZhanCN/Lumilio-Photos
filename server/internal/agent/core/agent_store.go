@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
+	"server/internal/catalog/dbtypes"
+	"server/internal/catalog/repo"
 )
 
 // CheckpointStore persists agent checkpoints in the library catalog.

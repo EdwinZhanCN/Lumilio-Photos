@@ -39,7 +39,7 @@ export default function ServerTab() {
         ["acme_last_managed_at", runtime.acme_last_managed_at],
         ["current_browser_origin", browserCapabilities.data?.current_origin],
         ["passkey_available", formatBoolean(browserCapabilities.data?.passkey_available, t)],
-        ["storage_root", runtime.storage_root],
+        ["storage_location", runtime.storage_location],
         ["hardware_accel", runtime.hardware_accel],
         ["repository_scan_interval_seconds", runtime.repository_scan_interval_seconds],
         ["log_level", runtime.log_level],

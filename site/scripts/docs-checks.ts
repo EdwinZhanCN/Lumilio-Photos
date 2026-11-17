@@ -12,8 +12,8 @@
  * 5. Internal markdown links resolve to existing files, and fragments
  *    resolve to existing heading slugs.
  *
- * Internal engineering docs under `internal/**` are excluded from the public
- * build and therefore from these checks.
+ * Internal engineering docs under `internal/**` and the local-only Atlas under
+ * `atlas/**` are excluded from the public build and therefore from these checks.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, normalize, relative, resolve } from 'node:path'
@@ -53,7 +53,7 @@ function walk(dir: string): string[] {
   const files: string[] = []
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
-    if (entry === 'internal') continue
+    if (entry === 'internal' || entry === 'atlas') continue
     if (statSync(full).isDirectory()) {
       files.push(...walk(full))
     } else if (entry.endsWith('.md')) {

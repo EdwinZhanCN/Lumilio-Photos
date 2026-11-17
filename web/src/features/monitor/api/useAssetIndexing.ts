@@ -12,7 +12,6 @@ type AssetIndexingTaskStatsDTO = Schemas["dto.AssetIndexingTaskStatsDTO"];
 
 type AssetIndexingTaskStats = {
   indexedCount: number;
-  queuedJobs: number;
   totalCount: number;
   coverage: number;
 };
@@ -35,12 +34,10 @@ function normalizeTaskStats(
   fallbackTotal: number,
 ): AssetIndexingTaskStats {
   const indexedCount = task?.indexed_count ?? 0;
-  const queuedJobs = task?.queued_jobs ?? 0;
   const totalCount = task?.total_count ?? fallbackTotal;
 
   return {
     indexedCount,
-    queuedJobs,
     totalCount,
     coverage: totalCount > 0 ? indexedCount / totalCount : 0,
   };

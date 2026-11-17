@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/service/share_link_service.go
-- server/internal/cloud/sync_service.go
+- server/internal/ingest/cloud/sync_service.go
 - server/internal/storage/doc.go
 - server/config/schema/lumilio-server.schema.json
 -->

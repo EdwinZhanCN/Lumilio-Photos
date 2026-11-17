@@ -19,12 +19,15 @@ writes `release` + `revision` + `manifestSha256` together. Downgrades are
 rejected. `task assets:check` is the offline CI gate.
 
 The source repo holds `assets.json` (catalog: `id`, `media/...` path, `sha256`,
-`bytes`), `profiles/<name>.json` (a list of asset IDs), and publishes
-`release.json` with every release. Profiles: `smoke` (minimal, for e2e),
-`demo` (full image pool), and `e2e` (the deterministic test set).
+`bytes`), `profiles/<name>.json` (a list of asset IDs), and publishes immutable Git tags. Profiles: `smoke` (minimal, for e2e),
+`demo` (full media pool), and `e2e` (the deterministic test set).
 
 Sync materializes into `.cache/lumilio-assets/<revision>/<profile>/`. The cache
-is validated (revision+profile+manifest) and reused.
+is validated (revision+profile+manifest+synced IDs) and reused. Repeated
+`--asset <id>` flags fetch only those profile members (same manifest and
+sha256 checks) into `<profile>+selection/`, which specs read through
+`selectedProfileAsset`; the `@people` slice uses this to pull five `demo`
+portraits (~1.9 MB of LFS) instead of the whole profile.
 
 ## Seed contract
 
@@ -33,3 +36,28 @@ not touch the catalog directly. They wait for **ingestion only, not ML**.
 `search_embeddings` / semantic search populate asynchronously afterward and
 only when a Lumen Hub (or fakelumen) is online. Business endpoints return
 `409 app_not_initialized` until admin + exactly one primary repository exist.
+
+
+## Music corpus
+
+Asset release `assets-v1.3.0` adds 35 free Bandcamp tracks across nine albums. Local
+`demo` and browser profiles reference the same original bytes; purchased audio
+and a separate private fixture path are excluded. `Lumilio-Assets/MUSIC-SOURCES.md`
+and each catalog entry retain artist, source and CC BY attribution.
+
+The compact Music smoke test imports an AAC remaster and original FLAC edition,
+checks extracted tags and explicit release grouping through public APIs, and verifies real audio playback
+continues across SPA navigation and advances in album order. The wider `e2e`
+profile adds ALAC, MP3, Ogg Vorbis, AIFF and a long-track case.
+
+Demo seeding uploads every selected original through the public API and waits
+for each returned ingestion receipt to complete successfully. Retrying relies
+on server-side duplicate resolution; unrelated assets or a matching total
+count cannot mark a seed complete. Receipt polling is batched at the API limit
+of 100 IDs and reports failed or timed-out imports.
+
+Bandcamp originals have no stable release ID. After metadata is ready, the demo
+seeder groups only its curated fixtures by catalog `source.albumUrl`, creates
+Music albums through the public API and assigns ungrouped tracks with optimistic
+revisions. Existing assignments are preserved on retry. Audio embedded-cover
+thumbnail extraction is not implemented yet; demo albums use placeholder artwork.

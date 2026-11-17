@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"server/internal/api/problem"
+	"server/internal/storage"
 )
 
 type CreateRepositoryRequestDTO struct {
@@ -15,26 +16,71 @@ type CreateRepositoryRequestDTO struct {
 	// Storage Location. It is required for regular repositories and omitted for
 	// the primary repository, whose folder is always "primary".
 	DirectoryName string `json:"directory_name,omitempty" example:"family-photos"`
-	// RootID identifies a registered Storage Location. Empty selects the
+	// StorageLocationID identifies a registered Storage Location. Empty selects the
 	// configured default location. Clients never submit an arbitrary root path.
-	RootID           string `json:"root_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Role             string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
-	StorageStrategy  string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
+	StorageLocationID string `json:"storage_location_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
+	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
+	// AssessmentToken is the token returned by the create assessment (or by a
+	// storage/confirmation-required Problem) for this exact target. It is
+	// required whenever the target carries risks.
+	AssessmentToken string `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	// AcknowledgedRisks lists every risk code the administrator acknowledged
+	// against AssessmentToken. All risks the assessment reported must appear.
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"removable_storage,non_default_location"`
+}
+
+// StorageAssessmentRequestDTO selects a create target by registered Storage
+// Location and direct-child folder. Clients never submit a filesystem path.
+type StorageAssessmentRequestDTO struct {
+	// Intent is the command the review is for: create_repository and
+	// setup_primary review a create target, open_repository an existing
+	// direct child of the Default Storage Location (the candidate journeys).
+	Intent string `json:"intent" binding:"required,oneof=create_repository setup_primary open_repository" example:"create_repository"`
+	// StorageLocationID identifies a registered Storage Location. Empty selects
+	// the configured default; setup_primary and open_repository always use the default.
+	StorageLocationID string `json:"storage_location_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// DirectoryName is the direct-child folder for create_repository and open_repository; ignored for setup_primary.
+	DirectoryName string `json:"directory_name,omitempty" example:"family-photos"`
+}
+
+// StorageAssessmentDTO is the Server's read-only review of one create
+// target. The token binds a later acknowledgement to exactly these facts;
+// capacity fluctuation does not change it, a changed mount, marker, or risk
+// vocabulary does.
+type StorageAssessmentDTO struct {
+	Token               string `json:"token" example:"v1.0123456789abcdef"`
+	Intent              string `json:"intent" enums:"create_repository,setup_primary,open_repository" example:"create_repository"`
+	StorageLocationID   string `json:"storage_location_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	StorageLocationKind string `json:"storage_location_kind" enums:"default,external" example:"external"`
+	DirectoryName       string `json:"directory_name" example:"family-photos"`
+	// Support is supported, unsupported, or unknown; Problem names the typed
+	// refusal when Support is not supported or the target needs materialization.
+	Support string `json:"support" enums:"supported,unsupported,unknown" example:"supported"`
+	Problem string `json:"problem,omitempty" example:"storage/unsupported-filesystem"`
+	// Risks are the acknowledgements the create command will require.
+	Risks []string `json:"risks" example:"removable_storage,non_default_location"`
+	// CanCreate reports whether the target is reviewable for creation: an
+	// absent or empty target with no Repository marker on supported storage.
+	CanCreate bool `json:"can_create"`
+	// ExistingRepositoryID is the identity of a valid .lumiliorepo already at the target, if any.
+	ExistingRepositoryID string `json:"existing_repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// MarkerState is the typed reading of the target's Repository marker.
+	MarkerState string `json:"marker_state" enums:"valid,absent,permission_denied,unknown,corrupt,unsupported_version" example:"absent"`
 }
 
 type RepositoryDTO struct {
-	ID              string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name            string                  `json:"name" example:"Family Photos"`
-	Path            string                  `json:"path" example:"/data/storage/Family Photos"`
-	Role            string                  `json:"role" example:"regular"`
-	IsPrimary       bool                    `json:"is_primary" example:"false"`
-	RootID          string                  `json:"root_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Reachability    string                  `json:"reachability" example:"active"`
-	Activity        string                  `json:"activity" example:"idle"`
-	DefaultOwnerID  *int32                  `json:"default_owner_id,omitempty"`
-	StorageStrategy string                  `json:"storage_strategy" example:"date"`
-	LocalSettings   RepositoryLocalSettings `json:"local_settings"`
+	ID                string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name              string                  `json:"name" example:"Family Photos"`
+	Path              string                  `json:"path" example:"/data/storage/Family Photos"`
+	Role              string                  `json:"role" example:"regular"`
+	IsPrimary         bool                    `json:"is_primary" example:"false"`
+	StorageLocationID string                  `json:"storage_location_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Reachability      string                  `json:"reachability" example:"active"`
+	Activity          string                  `json:"activity" example:"idle"`
+	DefaultOwnerID    *int32                  `json:"default_owner_id,omitempty"`
+	StorageStrategy   string                  `json:"storage_strategy" example:"date"`
+	LocalSettings     RepositoryLocalSettings `json:"local_settings"`
 }
 
 type RepositoryLocalSettings struct {
@@ -43,6 +89,37 @@ type RepositoryLocalSettings struct {
 
 type RenameRepositoryRequestDTO struct {
 	Name string `json:"name" binding:"required" example:"Family Archive"`
+}
+
+// LifecycleReceiptDTO is the durable operation a journaled storage command
+// became. A retry that sends the same Idempotency-Key receives the same
+// receipt with replayed set, never a second mutation.
+type LifecycleReceiptDTO struct {
+	OperationID string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RequestID   string `json:"request_id" example:"3f0c2d2e-8d6d-4e4e-9b3a-8d2c7b1d9f10"`
+	Kind        string `json:"kind" example:"rename_repository" enums:"rename_repository,detach_repository"`
+	Status      string `json:"status" example:"completed" enums:"completed"`
+	Replayed    bool   `json:"replayed" example:"false"`
+}
+
+// RenameRepositoryResponseDTO is the renamed Repository with its receipt.
+type RenameRepositoryResponseDTO struct {
+	Repository RepositoryDTO       `json:"repository"`
+	Operation  LifecycleReceiptDTO `json:"operation"`
+}
+
+// DetachRepositoryResponseDTO confirms a detach: the registration is gone,
+// every file stays, and the receipt answers a retry.
+type DetachRepositoryResponseDTO struct {
+	Operation      LifecycleReceiptDTO `json:"operation"`
+	FilesPreserved bool                `json:"files_preserved" example:"true"`
+}
+
+// RepositoryActionBlockDTO explains one withheld row action with stable codes.
+type RepositoryActionBlockDTO struct {
+	Action       string   `json:"action" example:"rename" enums:"verify,rename,detach,reconnect"`
+	Blockers     []string `json:"blockers" example:"primary_protected"`
+	Alternatives []string `json:"alternatives,omitempty" example:"default_configuration"`
 }
 
 type RepositoryRemovalImpactDTO struct {
@@ -67,37 +144,35 @@ type ListRepositoriesResponseDTO struct {
 	Repositories []RepositoryDTO `json:"repositories"`
 }
 
+// ToStorageAssessmentDTO projects a Server assessment onto the wire. The
+// resolved path and raw observation stay on the Server.
+func ToStorageAssessmentDTO(assessment *storage.CreateTargetAssessment) StorageAssessmentDTO {
+	risks := storage.RiskCodes(assessment.Risks)
+	if risks == nil {
+		risks = []string{}
+	}
+	return StorageAssessmentDTO{
+		Token:                assessment.Token,
+		Intent:               string(assessment.Intent),
+		StorageLocationID:    assessment.StorageLocationID.String(),
+		StorageLocationKind:  string(assessment.StorageLocationKind),
+		DirectoryName:        assessment.DirectoryName,
+		Support:              string(assessment.Assessment.Classification.Support),
+		Problem:              string(assessment.Problem()),
+		Risks:                risks,
+		CanCreate:            assessment.Assessment.Capabilities.ReviewCreate,
+		ExistingRepositoryID: assessment.ExistingRepositoryID(),
+		MarkerState:          string(assessment.Assessment.Observation.RepositoryMarker.State),
+	}
+}
+
+// CreateRepositoryResponseDTO returns the created Repository and the risks
+// the administrator acknowledged to place it there.
 type CreateRepositoryResponseDTO struct {
 	Repository RepositoryDTO `json:"repository"`
-	// Warnings are non-fatal notes about the chosen location, such as it being
-	// inside a cloud-sync folder. The repository was created regardless.
-	Warnings []string `json:"warnings,omitempty"`
-}
-
-type RepositoryRootDTO struct {
-	ID                         string   `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name                       string   `json:"name" example:"External Archive"`
-	Path                       string   `json:"path" example:"/Volumes/Photos"`
-	Kind                       string   `json:"kind" example:"external"`
-	Status                     string   `json:"status" example:"active"`
-	Writable                   bool     `json:"writable"`
-	CapacityKnown              bool     `json:"capacity_known"`
-	TotalBytes                 uint64   `json:"total_bytes,omitempty" example:"1000000000000"`
-	AvailableBytes             uint64   `json:"available_bytes,omitempty" example:"500000000000"`
-	Filesystem                 string   `json:"filesystem,omitempty" example:"apfs"`
-	RepositoryCount            int64    `json:"repository_count" example:"2"`
-	ActiveOperationCount       int64    `json:"active_operation_count" example:"0"`
-	CanRemove                  bool     `json:"can_remove"`
-	RemovalBlockedBy           string   `json:"removal_blocked_by,omitempty" example:"registered_repositories"`
-	FilesPreserved             bool     `json:"files_preserved"`
-	RiskWarnings               []string `json:"risk_warnings,omitempty"`
-	MountFingerprint           string   `json:"mount_fingerprint,omitempty"`
-	RegisteredMountFingerprint string   `json:"registered_mount_fingerprint,omitempty"`
-	MountFingerprintChanged    bool     `json:"mount_fingerprint_changed"`
-}
-
-type ListRepositoryRootsResponseDTO struct {
-	Roots []RepositoryRootDTO `json:"roots"`
+	// AcknowledgedRisks are the risk codes the administrator acknowledged for
+	// this placement; empty when the target carried none.
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"removable_storage"`
 }
 
 type LifecycleAuditEventDTO struct {
@@ -158,7 +233,6 @@ type StorageDiagnosticDTO struct {
 	NetworkFilesystem          bool       `json:"network_filesystem"`
 	RemovableLikely            bool       `json:"removable_likely"`
 	CloudSyncProvider          string     `json:"cloud_sync_provider,omitempty"`
-	RiskWarnings               []string   `json:"risk_warnings,omitempty"`
 }
 
 type StorageDiagnosticsResponseDTO struct {
@@ -187,7 +261,6 @@ type RepositoryCandidateDTO struct {
 	TotalBytes         uint64   `json:"total_bytes,omitempty"`
 	AvailableBytes     uint64   `json:"available_bytes,omitempty"`
 	Filesystem         string   `json:"filesystem,omitempty"`
-	RiskWarnings       []string `json:"risk_warnings,omitempty"`
 }
 
 type ListRepositoryCandidatesResponseDTO struct {
@@ -197,50 +270,59 @@ type ListRepositoryCandidatesResponseDTO struct {
 type OpenRepositoryCandidateRequestDTO struct {
 	// DirectoryName is a portable direct-child folder segment below the
 	// configured default Storage Location, never an arbitrary host path.
-	DirectoryName    string `json:"directory_name" binding:"required" example:"family-archive"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
+	DirectoryName string `json:"directory_name" binding:"required" example:"family-archive"`
+	// AssessmentToken and AcknowledgedRisks bind the administrator's risk
+	// acknowledgement to the open_repository assessment of this exact
+	// folder; without them a risky folder answers storage/confirmation-required.
+	AssessmentToken   string   `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"mount_fingerprint_changed"`
 }
 
 type ResolveRepositoryCandidateRequestDTO struct {
-	DirectoryName    string `json:"directory_name" binding:"required" example:"family-archive"`
-	Resolution       string `json:"resolution" binding:"required,oneof=update_location add_separate" example:"update_location"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
-}
-
-type RepositoryScanRequestDTO struct {
-	Force bool `json:"force" example:"false"`
+	DirectoryName     string   `json:"directory_name" binding:"required" example:"family-archive"`
+	Resolution        string   `json:"resolution" binding:"required,oneof=update_location add_separate" example:"update_location"`
+	AssessmentToken   string   `json:"assessment_token,omitempty" example:"v1.0123456789abcdef"`
+	AcknowledgedRisks []string `json:"acknowledged_risks,omitempty" example:"mount_fingerprint_changed"`
 }
 
 type RepositoryScanQueuedDTO struct {
 	OperationID  string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	RepositoryID string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Mode         string `json:"mode" example:"manual"`
-	Status       string `json:"status" example:"queued"`
-	Inserted     bool   `json:"inserted" example:"true"`
-	Coalesced    bool   `json:"coalesced" example:"false"`
+	// Mode is the scan trigger: manual, periodic, watcher, startup, or settle.
+	Mode      string `json:"mode" example:"manual" enums:"manual,periodic,watcher,startup,settle"`
+	Status    string `json:"status" example:"queued"`
+	Inserted  bool   `json:"inserted" example:"true"`
+	Coalesced bool   `json:"coalesced" example:"false"`
 }
 
+// RepositoryScanRunDTO is one scan of the repository index. Counters are
+// incremental: seen entries, new and changed entries, hashed files, entries
+// marked missing, restored, removed as moves, deferred inside the settle
+// window, and read errors.
 type RepositoryScanRunDTO struct {
-	OperationID              string             `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RepositoryID             string             `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RequestedEpoch           int64              `json:"requested_epoch" example:"2"`
-	Mode                     string             `json:"mode" example:"manual"`
-	RequestedBy              *string            `json:"requested_by,omitempty" example:"edwin"`
-	CoalescedCount           int64              `json:"coalesced_count" example:"1"`
-	Status                   string             `json:"status" example:"completed"`
-	CreatedAt                time.Time          `json:"created_at"`
-	StartedAt                *time.Time         `json:"started_at,omitempty"`
-	FinishedAt               *time.Time         `json:"finished_at,omitempty"`
-	DirectoriesObserved      int64              `json:"directories_observed" example:"10"`
-	FilesObserved            int64              `json:"files_observed" example:"120"`
-	BytesQueued              int64              `json:"bytes_queued" example:"1048576"`
-	BytesHashed              int64              `json:"bytes_hashed" example:"524288"`
-	AuthoritativeDirectories int64              `json:"authoritative_directories" example:"8"`
-	ErrorDirectories         int64              `json:"error_directories" example:"1"`
-	OutboxDepth              int64              `json:"outbox_depth" example:"12"`
-	PartialCoverage          bool               `json:"partial_coverage" example:"true"`
-	CancellationRequested    bool               `json:"cancellation_requested" example:"false"`
-	Problem                  *problem.Reference `json:"problem,omitempty"`
+	OperationID  string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RepositoryID string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// Mode is the scan trigger: manual, periodic, watcher, startup, or settle.
+	Mode        string  `json:"mode" example:"manual" enums:"manual,periodic,watcher,startup,settle"`
+	RequestedBy *string `json:"requested_by,omitempty" example:"edwin"`
+	// ScopePath is the scanned subtree; empty means the whole repository.
+	ScopePath             string             `json:"scope_path" example:""`
+	Status                string             `json:"status" example:"completed" enums:"queued,walking,sweeping,completed,offline,failed,cancelled"`
+	CreatedAt             time.Time          `json:"created_at"`
+	StartedAt             *time.Time         `json:"started_at,omitempty"`
+	FinishedAt            *time.Time         `json:"finished_at,omitempty"`
+	Seen                  int64              `json:"seen" example:"1200"`
+	NewEntries            int64              `json:"new_entries" example:"12"`
+	Changed               int64              `json:"changed" example:"3"`
+	Hashed                int64              `json:"hashed" example:"15"`
+	BytesHashed           int64              `json:"bytes_hashed" example:"524288"`
+	Missing               int64              `json:"missing" example:"1"`
+	Restored              int64              `json:"restored" example:"0"`
+	Moved                 int64              `json:"moved" example:"2"`
+	Deferred              int64              `json:"deferred" example:"0"`
+	Errors                int64              `json:"errors" example:"0"`
+	CancellationRequested bool               `json:"cancellation_requested" example:"false"`
+	Problem               *problem.Reference `json:"problem,omitempty"`
 }
 
 type RepositoryScanRunListDTO struct {

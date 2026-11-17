@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"server/internal/db/repo"
+	"server/internal/catalog/repo"
 )
 
 // CreateShareLinkRequestDTO represents the request to create a share link.

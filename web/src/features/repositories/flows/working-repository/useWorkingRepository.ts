@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import type { RepositoryOption } from "../../types";
 import { getStorageEntityDisplayName } from "../../model/storageEntities";
-import { isRepositoryUnavailable } from "../../model/repositoryOptions";
+import { isRepositoryUnavailable, uploadAdmissionReasonLabel } from "../../model/repositoryOptions";
 import { useRepositoryOptions } from "../../api/useRepositoryOptions";
 
 export function useWorkingRepository() {
@@ -38,9 +38,6 @@ export function useWorkingRepository() {
       return;
     }
 
-    // Auto-selecting an unreachable repository as the upload target guarantees
-    // the next upload is refused, so only fall back to a reachable one. An
-    // explicit user choice is left alone even when it goes offline.
     const reachable = repositories.filter((repository) => !isRepositoryUnavailable(repository));
     const fallback = reachable.find((repository) => repository.role === "primary") ?? reachable[0];
     if (fallback && normalizedWorkingRepositoryId !== fallback.id) {
@@ -66,8 +63,8 @@ export function useWorkingRepository() {
           defaultValue: "All Repositories",
         });
 
-  const scopeDescription = selectedRepository?.path
-    ? selectedRepository.path
+  const scopeDescription = selectedRepository
+    ? uploadScopeDescription(selectedRepository, t)
     : normalizedWorkingRepositoryId
       ? t("settings.serverSettings.workingRepositoryUnavailable", {
           defaultValue: "Repository options are temporarily unavailable.",
@@ -91,4 +88,29 @@ export function useWorkingRepository() {
     ),
     setWorkingRepositoryId,
   };
+}
+
+function uploadScopeDescription(
+  repository: RepositoryOption,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  if (repository.upload.allowed) {
+    return t(
+      "upload.UnifiedUploadSection.upload_target_ready",
+      "This Repository can accept uploads.",
+    );
+  }
+
+  if (repository.upload.reasons.length > 0) {
+    return t("manage.repositories.uploadBlockedReasons", "Upload unavailable: {{reasons}}", {
+      reasons: repository.upload.reasons
+        .map((reason) => uploadAdmissionReasonLabel(t, reason))
+        .join(", "),
+    });
+  }
+
+  return t(
+    "upload.UnifiedUploadSection.repository_unavailable_for_upload",
+    "This Repository is not currently available for uploads.",
+  );
 }

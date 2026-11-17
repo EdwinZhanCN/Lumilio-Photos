@@ -8,7 +8,7 @@ import (
 )
 
 type storageReconciler interface {
-	ReconcileRepositoryRoots(context.Context) error
+	ReconcileStorageLocations(context.Context) error
 	ReconcileAll(context.Context) error
 }
 
@@ -33,7 +33,7 @@ func startStorageReconciler(ctx context.Context, manager storageReconciler, inte
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := manager.ReconcileRepositoryRoots(ctx); err != nil {
+				if err := manager.ReconcileStorageLocations(ctx); err != nil {
 					logger.Warn("background Storage Location reconciliation failed", zap.Error(err))
 					continue
 				}

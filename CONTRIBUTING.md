@@ -79,14 +79,15 @@ daemon.
 | `task web:dev` | Start only the Web development server |
 | `task test` | Run the repository architecture, Server, and Web gates |
 | `task server:test` | Run the Go Server tests |
+| `task server:test:volumes` | Volume-semantics tests on mounted filesystem images (CI sets `LUMILIO_VOLUME_FIXTURES`) |
 | `task web:test` | Run frontend type, lint, boundary, and unit checks |
-| `task desktop:test` | Run the Wails desktop race-test gate |
+| `task desktop:test` | Run the Desktop race-test gate |
 | `task compose:test` | Validate production and E2E Compose files |
 | `task ci:architecture` | Run the architecture, Compose, and lock CI gates |
 | `task verify:generated` | Regenerate OpenAPI, types, doc.md, config examples; fail on drift |
 | `task ci:site` | Install the documentation site with the lockfile and build it |
-| `task ci:desktop:panel` | Install and build the Desktop control-panel frontend |
-| `task ci:desktop:native` | Test Server and Desktop modules, then compile Desktop |
+| `task desktop:panel:check` | Check the Desktop Settings window's catalogs, generated accessors, and views |
+| `task ci:desktop:native` | Test Server and Desktop modules, check the Settings window, then compile Desktop |
 | `task dto` | Regenerate OpenAPI, frontend API types, and API documentation |
 | `task config:examples` | Regenerate the configuration schema and TOML examples |
 | `task lumen:record` | Start the E2E stack with fakelumen recording against a real Hub |
@@ -112,7 +113,7 @@ task compose:test
 `task test` includes the architecture guards, `server:test`, and `web:test`; it
 does not include the desktop app or browser E2E. Follow the “Test layers”
 section in
-[FRONTEND.md](docs/FRONTEND.md) when choosing frontend test
+[web/ARCHITECTURE.md](web/ARCHITECTURE.md#test-layers) when choosing frontend test
 file names and runners. Placement:
 [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 
@@ -126,7 +127,6 @@ task server:test:ci
 task web:install:ci
 task web:test
 task ci:site
-task ci:desktop:panel
 task ci:desktop:native
 ```
 
@@ -154,6 +154,7 @@ task web:test:auth-totp
 task web:test:auth-hardening
 task web:test:video-semantic
 task web:test:backup-recovery
+task web:test:storage-recovery
 ```
 
 The matching CI E2E jobs call the same `web:*` targets. Playwright installation

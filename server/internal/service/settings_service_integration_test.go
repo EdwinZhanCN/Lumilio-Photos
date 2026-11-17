@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"server/config"
-	"server/internal/db"
-	runtimesettings "server/internal/settings"
+	"server/internal/catalog"
+	runtimesettings "server/internal/foundation/settings"
 
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func TestSettingsServiceUpdatesFreshSQLiteCatalog(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{
+	database, err := catalog.Open(ctx, config.DatabaseConfig{
 		Path: filepath.Join(catalogDir, "settings.sqlite3"),
 	})
 	require.NoError(t, err)
@@ -32,6 +32,7 @@ func TestSettingsServiceUpdatesFreshSQLiteCatalog(t *testing.T) {
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	semanticEnabled := true
 	videoSemanticEnabled := true
@@ -56,7 +57,7 @@ func TestSettingsServiceDoesNotReuseCredentialAcrossProviders(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -65,6 +66,7 @@ func TestSettingsServiceDoesNotReuseCredentialAcrossProviders(t *testing.T) {
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	provider := "openai"
 	model := "gpt-4.1-mini"
@@ -123,7 +125,7 @@ func TestSettingsServiceRejectsEnablingIncompleteAgentConfiguration(t *testing.T
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -132,6 +134,7 @@ func TestSettingsServiceRejectsEnablingIncompleteAgentConfiguration(t *testing.T
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	enabled := true
 	provider := "openai"
@@ -153,7 +156,7 @@ func TestSettingsServiceClearsAgentFieldsWhenProviderIsUnset(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
@@ -162,6 +165,7 @@ func TestSettingsServiceClearsAgentFieldsWhenProviderIsUnset(t *testing.T) {
 		database.Queries,
 		runtimesettings.Settings{},
 		filepath.Join(catalogDir, "lumilio_secret_key"),
+		nil,
 	)
 	provider := "openai"
 	model := "gpt-4.1-mini"
@@ -197,16 +201,16 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 	catalogDir := filepath.Join(t.TempDir(), "private")
 	require.NoError(t, os.Mkdir(catalogDir, 0o700))
 
-	database, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
+	database, err := catalog.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDir, "settings.sqlite3")})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
 
-	settingsService := NewSettingsServiceWithRuntime(
+	settingsService := NewSettingsService(
 		database.Queries,
 		runtimesettings.Default("production"),
 		filepath.Join(catalogDir, "lumilio_secret_key"),
-		SettingsRuntime{DB: database.SQL, Writer: database.Writer},
+		database.Writer,
 	)
 
 	row, err := database.Queries.GetSettings(ctx)

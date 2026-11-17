@@ -35,10 +35,8 @@ func run(ctx context.Context, args []string) error {
 		return generateThirdPartyNotices(ctx, root)
 	case "fetch-resources":
 		return fetchResources(ctx, root, args[1:])
-	case "build-windows":
-		return buildWindows(ctx, root, args[1:])
-	case "build-macos":
-		return buildMacOS(ctx, root, args[1:])
+	case "package":
+		return packageApp(ctx, root, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -51,9 +49,9 @@ func printUsage() {
 Commands:
   notices                       Generate desktop/licenses/THIRD_PARTY_NOTICES.txt
   fetch-resources               Fetch platform media tools for the current OS
-  build-windows                 Build the Windows portable application directory
-  build-macos [arm64|amd64]     Build the macOS app bundle
+  package [arm64|amd64]         Stage resources and package the app with mygo build
 
 Options:
-  build-macos --dmg             Also create a DMG`)
+  package --installer           Also make the disk image (macOS) or setup program (Windows)
+  package --stage-only          Stage desktop/resources and stop before the build`)
 }

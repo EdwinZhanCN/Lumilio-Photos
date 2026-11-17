@@ -12,7 +12,29 @@ type setupBootstrapStub struct {
 }
 
 type setupStorageStub struct {
-	runtime storage.StorageRuntimeStatus
+	runtime        storage.StorageRuntimeStatus
+	assessment     *storage.SetupPrimaryAssessment
+	assessErr      error
+	assessed       int
+	defaultStorage storage.DefaultStorageAssessment
+}
+
+func (s *setupStorageStub) AssessSetupPrimaryTarget(context.Context) (*storage.SetupPrimaryAssessment, error) {
+	s.assessed++
+	if s.assessErr != nil {
+		return nil, s.assessErr
+	}
+	return s.assessment, nil
+}
+
+func (s *setupStorageStub) AssessDefaultStorageLocation(_ context.Context, path string) (storage.DefaultStorageAssessment, error) {
+	result := s.defaultStorage
+	result.ConfiguredPath = path
+	if result.State == "" {
+		result.State = storage.DefaultStorageReady
+		result.Registered = true
+	}
+	return result, nil
 }
 
 func (s *setupStorageStub) GetRepositoryDefaults(context.Context) (storage.RepoDefaults, error) {
@@ -72,20 +94,80 @@ func TestSetupServiceStatusUsesSQLiteAndBootstrapGates(t *testing.T) {
 	}
 }
 
-func TestSetupServiceReportsDefaultStoragePlacementRisks(t *testing.T) {
+func TestSetupServicePublicStatusCarriesNoHostFacts(t *testing.T) {
 	bootstrap := &setupBootstrapStub{phase: BootstrapPhaseAdminCreated}
-	repositories := &setupStorageStub{}
-	service := NewSetupService(
-		bootstrap,
-		repositories,
-		"/Users/example/Library/Mobile Documents/Lumilio",
-	)
+	repositories := &setupStorageStub{assessment: &storage.SetupPrimaryAssessment{State: storage.SetupPrimaryAdoptable}}
+	service := NewSetupService(bootstrap, repositories, "/Users/example/Library/Mobile Documents/Lumilio")
 
 	status, err := service.Status(context.Background())
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
-	if status.RepositoryDefaults == nil || len(status.RepositoryDefaults.RiskWarnings) == 0 {
-		t.Fatalf("expected setup storage risks, got %+v", status.RepositoryDefaults)
+	if status.AdminInitialized != true || status.PrimaryRepositoryInitialized || status.NextRegistrationRole != string(UserRoleUser) {
+		t.Fatalf("status = %+v", status)
+	}
+	if repositories.assessed != 0 {
+		t.Fatal("the public status reviewed the primary target")
+	}
+}
+
+func TestSetupServicePrimaryTargetReportsTheReviewForTheAdministrator(t *testing.T) {
+	bootstrap := &setupBootstrapStub{phase: BootstrapPhaseAdminCreated}
+	repositories := &setupStorageStub{assessment: &storage.SetupPrimaryAssessment{
+		CreateTargetAssessment: &storage.CreateTargetAssessment{
+			Intent: storage.IntentSetupPrimary, DirectoryName: "primary",
+			Risks: []storage.StorageRisk{storage.RiskCloudSync}, Token: "v1.setup",
+		},
+		State: storage.SetupPrimaryAdoptable, Actions: []string{storage.SetupActionAdopt, storage.SetupActionFreshElsewhere},
+	}}
+	service := NewSetupService(bootstrap, repositories, "/Users/example/Library/Mobile Documents/Lumilio")
+
+	target, err := service.PrimaryTarget(context.Background())
+	if err != nil {
+		t.Fatalf("primary target: %v", err)
+	}
+	if target.SetupComplete || target.RepositoryDefaults.StorageLocation != "/Users/example/Library/Mobile Documents/Lumilio" ||
+		target.RepositoryDefaults.Strategy != "date" || !target.DefaultStorage.Usable() {
+		t.Fatalf("target = %+v", target)
+	}
+	if target.Target == nil || target.Target.State != storage.SetupPrimaryAdoptable || target.Target.Token != "v1.setup" || len(target.Target.Risks) != 1 {
+		t.Fatalf("expected the setup_primary review, got %+v", target.Target)
+	}
+	if repositories.assessed != 1 {
+		t.Fatalf("assessment requests = %d, want one", repositories.assessed)
+	}
+}
+
+func TestSetupServicePrimaryTargetSurvivesAnUnusableDefaultStorageLocation(t *testing.T) {
+	bootstrap := &setupBootstrapStub{phase: BootstrapPhaseAdminCreated}
+	repositories := &setupStorageStub{
+		assessErr:      storage.ErrStorageLocationInvalid,
+		defaultStorage: storage.DefaultStorageAssessment{State: storage.DefaultStorageMarkerInvalid, Detail: "parse storage location marker"},
+	}
+	service := NewSetupService(bootstrap, repositories, "/storage")
+
+	target, err := service.PrimaryTarget(context.Background())
+	if err != nil {
+		t.Fatalf("primary target: %v", err)
+	}
+	if target.Target != nil || target.DefaultStorage.State != storage.DefaultStorageMarkerInvalid || target.DefaultStorage.ConfiguredPath != "/storage" {
+		t.Fatalf("target = %+v, want the default-storage diagnosis without a review", target)
+	}
+	if repositories.assessed != 0 {
+		t.Fatal("an unusable default Storage Location was still reviewed")
+	}
+}
+
+func TestSetupServiceSkipsTheReviewOnceThePrimaryExists(t *testing.T) {
+	bootstrap := &setupBootstrapStub{phase: BootstrapPhaseReady}
+	repositories := &setupStorageStub{assessment: &storage.SetupPrimaryAssessment{State: storage.SetupPrimaryRegistered}}
+	service := NewSetupService(bootstrap, repositories, "/storage")
+
+	target, err := service.PrimaryTarget(context.Background())
+	if err != nil {
+		t.Fatalf("primary target: %v", err)
+	}
+	if !target.SetupComplete || target.Target != nil || repositories.assessed != 0 {
+		t.Fatalf("completed setup still reviews the primary target: %+v (assessed %d)", target, repositories.assessed)
 	}
 }
